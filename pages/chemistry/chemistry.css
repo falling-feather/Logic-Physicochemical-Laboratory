@@ -1,0 +1,469 @@
+/* ===== Periodic Table ===== */
+
+.pt-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: var(--space-4);
+}
+
+#periodic-table-grid {
+    display: grid;
+    grid-template-columns: repeat(18, minmax(48px, 1fr));
+    gap: 2px;
+    min-width: 700px;
+}
+
+.pt-cell {
+    aspect-ratio: 1;
+    border-radius: var(--radius-sm);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    position: relative;
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
+}
+
+.pt-empty {
+    visibility: hidden;
+}
+
+.pt-spacer {
+    height: 8px;
+}
+
+/* 元素格子 */
+.pt-element {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--el-color, rgba(255,255,255,0.08));
+    cursor: pointer;
+    user-select: none;
+}
+
+.pt-element:hover {
+    transform: scale(1.15);
+    z-index: 10;
+    box-shadow: 0 0 12px color-mix(in srgb, var(--el-color) 40%, transparent);
+    background: color-mix(in srgb, var(--el-color) 12%, transparent);
+}
+
+.pt-element.pt-dim {
+    opacity: 0.15;
+}
+
+.pt-number {
+    font-size: 8px;
+    color: var(--text-tertiary);
+    position: absolute;
+    top: 2px;
+    left: 3px;
+    font-family: var(--font-mono);
+}
+
+.pt-symbol {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--el-color, var(--text-primary));
+    line-height: 1;
+}
+
+.pt-name {
+    font-size: 9px;
+    color: var(--text-secondary);
+    margin-top: 1px;
+}
+
+/* 镧系/锕系占位符 */
+.pt-placeholder {
+    background: rgba(255,255,255,0.02);
+    border: 1px dashed rgba(255,255,255,0.08);
+    cursor: default;
+}
+
+.pt-placeholder .pt-symbol {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+}
+
+/* 图例 */
+.pt-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
+    margin-top: var(--space-4);
+}
+
+.pt-legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.pt-legend-item:hover {
+    color: var(--text-primary);
+}
+
+.pt-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* 详情面板 */
+.pt-detail {
+    position: fixed;
+    bottom: -280px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(400px, calc(100vw - 32px));
+    background: var(--surface-2);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5) var(--space-6);
+    z-index: 100;
+    transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s 0.3s;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.4);
+    visibility: hidden;
+}
+
+.pt-detail.active {
+    bottom: 24px;
+    visibility: visible;
+    transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s;
+}
+
+.pt-detail-header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+.pt-detail-big {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 72px;
+}
+
+.pt-detail-number {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+}
+
+.pt-detail-symbol {
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.pt-detail-name {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+.pt-detail-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.pt-detail-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--text-sm);
+}
+
+.pt-detail-row .label {
+    color: var(--text-tertiary);
+}
+
+.pt-detail-row .value {
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+}
+
+.pt-detail-cat {
+    font-weight: 600;
+}
+
+.pt-detail-config {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    padding: var(--space-2) var(--space-3);
+    background: var(--surface-0);
+    border-radius: var(--radius-sm);
+    text-align: center;
+}
+
+.pt-detail-close {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 4px;
+}
+.pt-detail-close:hover {
+    color: var(--text-primary);
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+    #periodic-table-grid {
+        grid-template-columns: repeat(18, minmax(36px, 1fr));
+        gap: 1px;
+    }
+    .pt-symbol { font-size: 11px; }
+    .pt-name { font-size: 7px; }
+    .pt-number { font-size: 6px; }
+}
+
+@media (max-width: 480px) {
+    #periodic-table-grid {
+        grid-template-columns: repeat(18, minmax(28px, 1fr));
+    }
+    .pt-name { display: none; }
+    .pt-symbol { font-size: 10px; }
+}
+
+/* ===== Molecular Structure ===== */
+.mol-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.mol-select-btn {
+    padding: 6px 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.7);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mol-select-btn:hover { border-color: var(--accent-green); color: #fff; }
+.mol-select-btn.active {
+    background: rgba(77,158,126,0.15);
+    border-color: var(--accent-green);
+    color: #fff;
+}
+
+.mol-canvas-wrap {
+    position: relative;
+    background: #0d1017;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+
+.mol-canvas {
+    display: block;
+    width: 100%;
+    cursor: grab;
+}
+
+.mol-canvas:active { cursor: grabbing; }
+
+.mol-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.mol-hint {
+    margin-top: 8px;
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.35);
+}
+
+#mol-info {
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+
+.mol-info-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 4px;
+}
+
+.mol-info-desc {
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 8px;
+}
+
+.mol-info-row {
+    display: flex;
+    gap: 8px;
+    padding: 3px 0;
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.8);
+}
+
+.mol-info-label {
+    color: rgba(255,255,255,0.5);
+    min-width: 50px;
+}
+
+.mol-atom-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .mol-controls { gap: 6px; }
+    .mol-select-btn { padding: 5px 10px; font-size: 0.78rem; }
+}
+
+/* ===== Chemical Reactions ===== */
+.rxn-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.rxn-select-btn {
+    padding: 6px 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.7);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.rxn-select-btn:hover { border-color: var(--accent-green); color: #fff; }
+.rxn-select-btn.active {
+    background: rgba(77,158,126,0.15);
+    border-color: var(--accent-green);
+    color: #fff;
+}
+
+.rxn-canvas-wrap {
+    position: relative;
+    background: #0d1017;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+
+.rxn-canvas {
+    display: block;
+    width: 100%;
+}
+
+.rxn-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
+.rxn-speed {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.5);
+}
+
+.rxn-speed input[type="range"] { width: 100px; }
+
+.rxn-energy-wrap {
+    margin-top: 12px;
+    padding: 10px 16px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+
+.rxn-energy-track {
+    height: 8px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+#rxn-energy-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: background 0.1s;
+}
+
+#rxn-energy-label {
+    font-size: 0.82rem;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+#rxn-info {
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+
+.rxn-info-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 4px;
+}
+
+.rxn-info-desc {
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 8px;
+}
+
+.rxn-info-row {
+    display: flex;
+    gap: 8px;
+    padding: 3px 0;
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.8);
+}
+
+.rxn-info-label {
+    color: rgba(255,255,255,0.5);
+    min-width: 60px;
+}
+
+@media (max-width: 768px) {
+    .rxn-controls { gap: 6px; }
+    .rxn-select-btn { padding: 5px 10px; font-size: 0.78rem; }
+    .rxn-actions { flex-direction: column; align-items: flex-start; }
+}

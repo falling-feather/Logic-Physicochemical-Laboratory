@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="工科实验室 - 交互式可视化科学学习平台，涵盖数学、物理、化学、算法与生物">
+    <meta name="theme-color" content="#08090e">
+    <title>工科实验室 - 可视化学习平台</title>
+
+    <!-- Resource Hints -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://unpkg.com">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <!-- Preload critical external scripts -->
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js" as="script">
+
+    <!-- Fonts (non-blocking) -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+
+    <!-- CSS: Shared -->
+    <link rel="stylesheet" href="shared/css/tokens.css">
+    <link rel="stylesheet" href="shared/css/base.css">
+    <link rel="stylesheet" href="shared/css/typography.css">
+    <link rel="stylesheet" href="shared/css/navbar.css">
+    <link rel="stylesheet" href="shared/css/page-layout.css">
+    <link rel="stylesheet" href="shared/css/cards.css">
+    <link rel="stylesheet" href="shared/css/module-selector.css">
+    <!-- CSS: Pages -->
+    <link rel="stylesheet" href="pages/home/home.css">
+    <link rel="stylesheet" href="pages/mathematics/mathematics.css">
+    <link rel="stylesheet" href="pages/physics/physics.css">
+    <link rel="stylesheet" href="pages/chemistry/chemistry.css">
+    <link rel="stylesheet" href="pages/algorithms/algorithms.css">
+    <link rel="stylesheet" href="pages/biology/biology.css">
+    <!-- CSS: Responsive (must be last) -->
+    <link rel="stylesheet" href="shared/css/responsive.css">
+</head>
+<body>
+    <!-- ═══════════════ Navigation ═══════════════ -->
+    <nav class="navbar navbar--transparent" id="navbar">
+        <div class="nav-container">
+            <a href="#home" class="nav-logo" data-page="home">
+                <div class="logo-icon">
+                    <i data-lucide="flask-conical"></i>
+                </div>
+                <span class="logo-text desktop-only">工科实验室</span>
+            </a>
+            <div class="nav-menu">
+                <a href="#home" class="nav-item active" data-page="home">
+                    <i data-lucide="home"></i>
+                    <span>首页</span>
+                </a>
+                <a href="#mathematics" class="nav-item" data-page="mathematics">
+                    <i data-lucide="calculator"></i>
+                    <span>数学</span>
+                </a>
+                <a href="#physics" class="nav-item" data-page="physics">
+                    <i data-lucide="atom"></i>
+                    <span>物理</span>
+                </a>
+                <a href="#chemistry" class="nav-item" data-page="chemistry">
+                    <i data-lucide="flask-conical"></i>
+                    <span>化学</span>
+                </a>
+                <a href="#algorithms" class="nav-item" data-page="algorithms">
+                    <i data-lucide="code"></i>
+                    <span>算法</span>
+                </a>
+                <a href="#biology" class="nav-item" data-page="biology">
+                    <i data-lucide="leaf"></i>
+                    <span>生物</span>
+                </a>
+                <div class="nav-indicator"></div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ═══════════════ Main Content ═══════════════ -->
+    <main class="main-content">
+
+        <!-- ────────── HOME ────────── -->
+        <section id="page-home" class="page active home-page">
+            <!-- Particle Network Canvas -->
+            <canvas id="particle-network" class="particle-network"></canvas>
+
+            <!-- HUD Frame Overlay -->
+            <div class="hud-frame">
+                <div class="hud-corner hud-corner--tl"></div>
+                <div class="hud-corner hud-corner--tr"></div>
+                <div class="hud-corner hud-corner--bl"></div>
+                <div class="hud-corner hud-corner--br"></div>
+                <div class="hud-scanline"></div>
+                <div class="hud-data hud-data--left" id="hud-data-left"></div>
+                <div class="hud-data hud-data--right" id="hud-data-right"></div>
+            </div>
+
+            <div class="stars-background" id="stars-bg">
+                <div class="star-layer star-layer-far" id="star-layer-1"></div>
+                <div class="star-layer star-layer-mid" id="star-layer-2"></div>
+                <div class="star-layer star-layer-near" id="star-layer-3"></div>
+            </div>
+            <div class="nebula-container">
+                <div class="nebula nebula-1"></div>
+                <div class="nebula nebula-2"></div>
+                <div class="nebula nebula-3"></div>
+            </div>
+            <div class="shooting-stars" id="shooting-stars"></div>
+
+            <!-- Hex Grid Overlay -->
+            <div class="hex-grid-overlay"></div>
+
+            <div class="home-container">
+                <div class="main-star" id="main-star">
+                    <div class="star-atmosphere"></div>
+                    <div class="star-body">
+                        <div class="planet-surface"></div>
+                        <div class="planet-highlight"></div>
+                        <h1 class="star-title" data-text="工科实验室">工科实验室</h1>
+                    </div>
+                    <div class="star-eyes-container">
+                        <div class="star-eyes">
+                            <div class="eye" id="eye-left">
+                                <div class="pupil" id="pupil-left"><div class="pupil-shine"></div></div>
+                            </div>
+                            <div class="eye" id="eye-right">
+                                <div class="pupil" id="pupil-right"><div class="pupil-shine"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="home-tagline" id="home-tagline">
+                    <p id="tagline-text">探索科学的星辰大海</p>
+                    <div class="tagline-cursor"></div>
+                </div>
+
+                <div class="orbit-path orbit-path-1"></div>
+                <div class="orbit-path orbit-path-2"></div>
+                <div class="orbit-path orbit-path-3"></div>
+                <div class="orbit-path orbit-path-4"></div>
+
+                <div class="satellites-orbit" id="satellites-orbit">
+                    <div class="satellite satellite-1" data-target="mathematics" onclick="selectModule('mathematics')">
+                        <div class="satellite-glow"></div>
+                        <div class="satellite-icon">
+                            <div class="planet-surface"></div>
+                            <div class="planet-highlight"></div>
+                            <i data-lucide="calculator"></i>
+                        </div>
+                        <div class="satellite-label-container">
+                            <span class="satellite-label">数学</span>
+                            <span class="satellite-desc">可视化探索数学之美</span>
+                        </div>
+                    </div>
+                    <div class="satellite satellite-2" data-target="physics" onclick="selectModule('physics')">
+                        <div class="satellite-glow"></div>
+                        <div class="satellite-icon">
+                            <div class="planet-surface"></div>
+                            <div class="planet-highlight"></div>
+                            <i data-lucide="atom"></i>
+                        </div>
+                        <div class="satellite-ring"></div>
+                        <div class="satellite-label-container">
+                            <span class="satellite-label">物理</span>
+                            <span class="satellite-desc">感受力与运动的世界</span>
+                        </div>
+                    </div>
+                    <div class="satellite satellite-3" data-target="chemistry" onclick="selectModule('chemistry')">
+                        <div class="satellite-glow"></div>
+                        <div class="satellite-icon">
+                            <div class="planet-surface"></div>
+                            <div class="planet-highlight"></div>
+                            <i data-lucide="flask-conical"></i>
+                        </div>
+                        <div class="satellite-label-container">
+                            <span class="satellite-label">化学</span>
+                            <span class="satellite-desc">探索微观粒子的奥秘</span>
+                        </div>
+                    </div>
+                    <div class="satellite satellite-4" data-target="algorithms" onclick="selectModule('algorithms')">
+                        <div class="satellite-glow"></div>
+                        <div class="satellite-icon">
+                            <div class="planet-surface"></div>
+                            <div class="planet-highlight"></div>
+                            <i data-lucide="code"></i>
+                        </div>
+                        <div class="satellite-label-container">
+                            <span class="satellite-label">算法</span>
+                            <span class="satellite-desc">用代码解构复杂问题</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ────────── MATHEMATICS ────────── -->
+        <section id="page-mathematics" class="page">
+            <div class="page-hero">
+                <div class="page-hero__text">
+                    <span class="page-hero__label page-hero__label--blue">Mathematics</span>
+                    <h1 class="page-hero__title">数学可视化</h1>
+                    <p class="page-hero__desc">通过交互式可视化探索数学的奥秘，从古代算筹到现代函数图像，感受数学之美。</p>
+                </div>
+                <div class="page-hero__visual">
+                    <canvas id="hero-canvas-mathematics" class="page-hero__canvas"></canvas>
+                </div>
+            </div>
+
+            <div class="content-section" data-module="function-graph">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>算筹加减法演示</h2>
+                        <p>算筹是中国古代的计算工具，通过纵横摆放表示不同数字</p>
+                    </div>
+                    <div class="demo-layout">
+                        <div class="demo-controls-panel">
+                            <div class="abacus-controls">
+                                <div class="control-group">
+                                    <label>第一个数：</label>
+                                    <input type="number" id="num1" class="input" value="5" min="0" max="99" onchange="updateAbacus()">
+                                </div>
+                                <div class="control-group">
+                                    <label>运算符：</label>
+                                    <select id="operator" class="select" onchange="updateAbacus()">
+                                        <option value="add">+ 加法</option>
+                                        <option value="subtract">- 减法</option>
+                                    </select>
+                                </div>
+                                <div class="control-group">
+                                    <label>第二个数：</label>
+                                    <input type="number" id="num2" class="input" value="3" min="0" max="99" onchange="updateAbacus()">
+                                </div>
+                                <button class="btn btn--primary" onclick="calculateAbacus()">计算</button>
+                            </div>
+                        </div>
+                        <div class="demo-visualization">
+                            <div class="abacus-display">
+                                <div class="abacus-row">
+                                    <div class="abacus-label">第一个数：</div>
+                                    <div class="abacus-sticks" id="abacus-num1"></div>
+                                </div>
+                                <div class="abacus-row">
+                                    <div class="abacus-label">第二个数：</div>
+                                    <div class="abacus-sticks" id="abacus-num2"></div>
+                                </div>
+                                <div class="abacus-row result-row">
+                                    <div class="abacus-label">结果：</div>
+                                    <div class="abacus-sticks" id="abacus-result"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>函数图像绘制</h2>
+                        <p>输入数学表达式，实时查看函数图像，支持常见函数与运算符</p>
+                    </div>
+                    <div class="demo-layout">
+                        <div class="demo-controls-panel">
+                            <div class="graph-controls">
+                                <div class="control-group control-group--col">
+                                    <label>f(x) =</label>
+                                    <input type="text" id="func-expr" class="input" value="sin(x)" placeholder="例如: sin(x), x^2" oninput="drawFunctionGraph()">
+                                </div>
+                                <div class="preset-functions">
+                                    <button class="btn btn--ghost btn--sm" onclick="setFunction('sin(x)')">sin(x)</button>
+                                    <button class="btn btn--ghost btn--sm" onclick="setFunction('cos(x)')">cos(x)</button>
+                                    <button class="btn btn--ghost btn--sm" onclick="setFunction('x^2')">x²</button>
+                                    <button class="btn btn--ghost btn--sm" onclick="setFunction('x^3')">x³</button>
+                                    <button class="btn btn--ghost btn--sm" onclick="setFunction('1/x')">1/x</button>
+                                    <button class="btn btn--ghost btn--sm" onclick="setFunction('tan(x)')">tan(x)</button>
+                                    <button class="btn btn--ghost btn--sm" onclick="setFunction('abs(x)')">|x|</button>
+                                    <button class="btn btn--ghost btn--sm" onclick="setFunction('sqrt(x)')">√x</button>
+                                    <button class="btn btn--ghost btn--sm" onclick="setFunction('sin(x)/x')">sinc</button>
+                                    <button class="btn btn--ghost btn--sm" onclick="setFunction('exp(-x^2)')">高斯</button>
+                                </div>
+                                <div class="control-group">
+                                    <label>X 范围</label>
+                                    <div class="range-inline">
+                                        <input type="number" id="graph-xmin" class="input input--sm" value="-10" onchange="drawFunctionGraph()">
+                                        <span class="range-sep">~</span>
+                                        <input type="number" id="graph-xmax" class="input input--sm" value="10" onchange="drawFunctionGraph()">
+                                    </div>
+                                </div>
+                                <div class="control-group">
+                                    <label>Y 范围</label>
+                                    <div class="range-inline">
+                                        <input type="number" id="graph-ymin" class="input input--sm" value="-5" onchange="drawFunctionGraph()">
+                                        <span class="range-sep">~</span>
+                                        <input type="number" id="graph-ymax" class="input input--sm" value="5" onchange="drawFunctionGraph()">
+                                    </div>
+                                </div>
+                                <label class="checkbox-group">
+                                    <input type="checkbox" id="graph-grid" checked onchange="drawFunctionGraph()">
+                                    <span>显示网格</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="demo-visualization">
+                            <div class="graph-canvas-wrap">
+                                <canvas id="function-graph-canvas" class="graph-canvas"></canvas>
+                                <div id="graph-coord-display" class="graph-coord-display"></div>
+                                <div id="graph-error" class="graph-error"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-section" data-module="calculus">
+                <!-- ═══ 微积分可视化 ═══ -->
+                <div class="demo-section" id="calculus-section">
+                    <div class="section-header">
+                        <h2>微积分可视化</h2>
+                        <p>实时观察导数切线与定积分面积，鼠标在画布上移动即可交互</p>
+                    </div>
+                    <div id="calc-controls">
+                        <label style="font-size:var(--text-sm);color:var(--accent-blue);font-family:var(--font-mono)">f(x) =</label>
+                        <input type="text" id="calc-expr" value="sin(x)" placeholder="sin(x), x^2, ...">
+                        <div class="calc-mode-btns">
+                            <button class="calc-mode-btn active" onclick="Calculus.setMode('derivative')">导数/切线</button>
+                            <button class="calc-mode-btn" onclick="Calculus.setMode('integral')">定积分</button>
+                        </div>
+                        <button class="btn btn--primary btn--sm" id="calc-animate-btn" onclick="Calculus.animate()">▶ 动画</button>
+                    </div>
+                    <div class="calc-presets" style="margin-bottom:var(--space-3)">
+                        <button class="btn btn--ghost btn--sm" onclick="Calculus.setPreset('sin(x)')">sin(x)</button>
+                        <button class="btn btn--ghost btn--sm" onclick="Calculus.setPreset('x^2')">x²</button>
+                        <button class="btn btn--ghost btn--sm" onclick="Calculus.setPreset('x^3-3*x')">x³−3x</button>
+                        <button class="btn btn--ghost btn--sm" onclick="Calculus.setPreset('exp(-x^2)')">高斯</button>
+                        <button class="btn btn--ghost btn--sm" onclick="Calculus.setPreset('1/(1+x^2)')">洛伦兹</button>
+                        <button class="btn btn--ghost btn--sm" onclick="Calculus.setPreset('cos(x)*x')">x·cos(x)</button>
+                    </div>
+                    <div class="calc-param-group" style="margin-bottom:var(--space-3)">
+                        <label>x =</label>
+                        <input type="range" id="calc-param" min="-8" max="8" step="0.05" value="0">
+                        <span class="param-label" id="calc-param-value">0.00</span>
+                    </div>
+                    <div class="calc-canvas-wrap">
+                        <canvas id="calculus-canvas" class="calc-canvas"></canvas>
+                    </div>
+                    <div class="calc-legend">
+                        <span class="cl-func">f(x)</span>
+                        <span class="cl-tangent">切线</span>
+                        <span class="cl-deriv">f'(x)</span>
+                        <span class="cl-area">∫ 面积</span>
+                    </div>
+                    <div class="calc-info" id="calc-info"></div>
+                </div>
+            </div>
+
+            <div class="content-section" data-module="geometry">
+                <!-- 几何变换 -->
+                <div class="demo-section" id="geometry-section">
+                    <div class="section-header">
+                        <h3><i data-lucide="shapes"></i> 几何变换</h3>
+                        <p>可视化平移、旋转、缩放、剪切与镜像变换，观察变换矩阵的实时更新</p>
+                    </div>
+                    <div class="demo-content">
+                        <div id="geo-controls" class="geo-controls">
+                            <div class="geo-param">
+                                <label>平移 X: <span id="geo-tx-val">0</span></label>
+                                <input type="range" id="geo-tx" min="-5" max="5" step="0.1" value="0">
+                            </div>
+                            <div class="geo-param">
+                                <label>平移 Y: <span id="geo-ty-val">0</span></label>
+                                <input type="range" id="geo-ty" min="-5" max="5" step="0.1" value="0">
+                            </div>
+                            <div class="geo-param">
+                                <label>旋转: <span id="geo-angle-val">0</span>°</label>
+                                <input type="range" id="geo-angle" min="0" max="360" step="1" value="0">
+                            </div>
+                            <div class="geo-param">
+                                <label>缩放 X: <span id="geo-sx-val">1</span></label>
+                                <input type="range" id="geo-sx" min="0.1" max="3" step="0.1" value="1">
+                            </div>
+                            <div class="geo-param">
+                                <label>缩放 Y: <span id="geo-sy-val">1</span></label>
+                                <input type="range" id="geo-sy" min="0.1" max="3" step="0.1" value="1">
+                            </div>
+                            <div class="geo-param">
+                                <label>剪切: <span id="geo-shx-val">0</span></label>
+                                <input type="range" id="geo-shx" min="-2" max="2" step="0.1" value="0">
+                            </div>
+                            <div class="geo-btn-group">
+                                <label>形状:</label>
+                                <button class="geo-shape-btn active" onclick="GeoTransform.setShape('square')">正方形</button>
+                                <button class="geo-shape-btn" onclick="GeoTransform.setShape('triangle')">三角形</button>
+                                <button class="geo-shape-btn" onclick="GeoTransform.setShape('arrow')">箭头</button>
+                                <button class="geo-shape-btn" onclick="GeoTransform.setShape('star')">星形</button>
+                            </div>
+                            <div class="geo-btn-group">
+                                <label>镜像:</label>
+                                <button class="geo-mirror-btn active" data-v="none" onclick="GeoTransform.setMirror('none')">无</button>
+                                <button class="geo-mirror-btn" data-v="x" onclick="GeoTransform.setMirror('x')">X轴</button>
+                                <button class="geo-mirror-btn" data-v="y" onclick="GeoTransform.setMirror('y')">Y轴</button>
+                            </div>
+                            <div class="geo-btn-group">
+                                <button class="btn-secondary" onclick="GeoTransform.resetAll()">重置</button>
+                                <button class="btn-primary" id="geo-animate-btn" onclick="GeoTransform.animate()">动画演示</button>
+                            </div>
+                        </div>
+                        <div class="geo-canvas-wrap">
+                            <canvas id="geo-canvas" class="geo-canvas"></canvas>
+                            <div class="geo-legend">
+                                <span class="gl-orig">原始</span>
+                                <span class="gl-trans">变换后</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-section" data-module="complex">
+                <!-- 复数运算 -->
+                <div class="demo-section" id="complex-section">
+                    <div class="section-header">
+                        <h3><i data-lucide="calculator"></i> 复数运算</h3>
+                        <p>在复平面上可视化复数的加减乘除与欧拉公式，拖拽圆点改变复数值</p>
+                    </div>
+                    <div class="demo-content">
+                        <div class="cx-controls">
+                            <div class="cx-op-group">
+                                <button class="cx-op-btn active" data-op="add">加法</button>
+                                <button class="cx-op-btn" data-op="sub">减法</button>
+                                <button class="cx-op-btn" data-op="mul">乘法</button>
+                                <button class="cx-op-btn" data-op="div">除法</button>
+                                <button class="cx-op-btn" data-op="pow">幂</button>
+                                <button class="cx-op-btn" data-op="euler">欧拉公式</button>
+                            </div>
+                        </div>
+                        <div class="cx-inputs">
+                            <div class="cx-input-group">
+                                <label style="color:#5b8dce">z₁:</label>
+                                <input type="number" id="cx-z1-re" value="2" step="0.5"> +
+                                <input type="number" id="cx-z1-im" value="1" step="0.5"> i
+                            </div>
+                            <div class="cx-input-group">
+                                <label style="color:#8b6fc0">z₂:</label>
+                                <input type="number" id="cx-z2-re" value="-1" step="0.5"> +
+                                <input type="number" id="cx-z2-im" value="2" step="0.5"> i
+                            </div>
+                        </div>
+                        <div class="cx-euler-controls" style="display:none" id="cx-euler-panel">
+                            <label>θ: <span id="cx-theta-val">0</span>°</label>
+                            <input type="range" id="cx-theta" min="0" max="6.2832" step="0.01" value="0">
+                            <button class="btn-primary" id="cx-euler-anim">旋转动画</button>
+                        </div>
+                        <div class="cx-presets">
+                            <button class="cx-preset-btn" data-preset="unit-roots">单位根 (ω·ω)</button>
+                            <button class="cx-preset-btn" data-preset="conjugate">共轭相乘</button>
+                            <button class="cx-preset-btn" data-preset="rotation">旋转 90°</button>
+                            <button class="cx-preset-btn" data-preset="inverse">求逆</button>
+                        </div>
+                        <div class="cx-canvas-wrap">
+                            <canvas id="complex-canvas" class="cx-canvas"></canvas>
+                            <div class="cx-legend">
+                                <span class="cxl-z1">z₁</span>
+                                <span class="cxl-z2">z₂</span>
+                                <span class="cxl-result">结果 w</span>
+                            </div>
+                        </div>
+                        <div id="cx-info"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-section" data-module="function-graph">
+                <div class="video-section">
+                    <div class="video-section__header">
+                        <h3>计算工具的历史演变</h3>
+                        <p>了解从算筹到现代计算机的计算工具发展历程</p>
+                    </div>
+                    <div class="video-container">
+                        <iframe
+                            src="https://player.bilibili.com/player.html?bvid=BV1PuHXePE7T&page=1&high_quality=1&danmaku=0"
+                            scrolling="no"
+                            border="0"
+                            frameborder="no"
+                            framespacing="0"
+                            allowfullscreen="true"
+                            loading="lazy"
+                            class="bilibili-video">
+                        </iframe>
+                    </div>
+                </div>
+            </div>
+
+            <div class="experiments-section">
+                <div class="section-header">
+                    <h2>更多实验</h2>
+                    <p>探索更多数学可视化实验</p>
+                </div>
+                <div class="bento-grid" id="mathematics-experiments"></div>
+            </div>
+        </section>
+
+        <!-- ────────── PHYSICS ────────── -->
+        <section id="page-physics" class="page">
+            <div class="page-hero">
+                <div class="page-hero__text">
+                    <span class="page-hero__label page-hero__label--purple">Physics</span>
+                    <h1 class="page-hero__title">物理演示</h1>
+                    <p class="page-hero__desc">通过动态模拟理解物理世界的运行规律，从力学到电磁场，沉浸式体验物理法则。</p>
+                </div>
+                <div class="page-hero__visual">
+                    <canvas id="hero-canvas-physics" class="page-hero__canvas"></canvas>
+                </div>
+            </div>
+
+            <div class="content-section" data-module="mechanics">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>力学模拟</h2>
+                        <p>点击画布发射小球，观察重力、弹跳和碰撞效果</p>
+                    </div>
+                    <div class="demo-layout">
+                        <div class="demo-controls-panel">
+                            <div class="physics-controls">
+                                <div class="control-group">
+                                    <label>重力加速度</label>
+                                    <div class="range-group">
+                                        <input type="range" id="gravity-slider" class="range" min="0" max="2000" step="50" value="980">
+                                        <span class="range-value" id="gravity-value">980</span>
+                                        <span class="range-unit">px/s²</span>
+                                    </div>
+                                </div>
+                                <div class="control-group">
+                                    <label>弹性系数</label>
+                                    <div class="range-group">
+                                        <input type="range" id="restitution-slider" class="range" min="0" max="100" step="5" value="75">
+                                        <span class="range-value" id="restitution-value">0.75</span>
+                                    </div>
+                                </div>
+                                <div class="control-group">
+                                    <label>摩擦力</label>
+                                    <div class="range-group">
+                                        <input type="range" id="friction-slider" class="range" min="0" max="100" step="5" value="10">
+                                        <span class="range-value" id="friction-value">0.10</span>
+                                    </div>
+                                </div>
+                                <div class="control-group">
+                                    <label>球体半径</label>
+                                    <div class="range-group">
+                                        <input type="range" id="radius-slider" class="range" min="8" max="40" step="2" value="16">
+                                        <span class="range-value" id="radius-value">16</span>
+                                        <span class="range-unit">px</span>
+                                    </div>
+                                </div>
+                                <div class="physics-actions">
+                                    <button class="btn btn--primary" id="physics-clear">清空画布</button>
+                                    <button class="btn btn--ghost" id="physics-pause">暂停</button>
+                                </div>
+                                <div class="physics-stats">
+                                    <span>球体数：<strong id="ball-count">0</strong></span>
+                                    <span>FPS：<strong id="physics-fps">0</strong></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="demo-visualization">
+                            <canvas id="physics-canvas" class="physics-canvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h3>力学原理</h3>
+                        <p>本模拟基于牛顿经典力学</p>
+                    </div>
+                    <div class="steps-panel">
+                        <div class="step-item">
+                            <span class="step-number">1</span>
+                            <p><strong>重力</strong> — 所有球体受恒定向下加速度 <em>g</em> 的作用，速度随时间持续增加。</p>
+                        </div>
+                        <div class="step-item">
+                            <span class="step-number">2</span>
+                            <p><strong>碰撞检测</strong> — 球体与边界或其他球体接触时触发碰撞响应，基于弹性系数计算反弹速度。</p>
+                        </div>
+                        <div class="step-item">
+                            <span class="step-number">3</span>
+                            <p><strong>能量耗散</strong> — 摩擦力和非完全弹性碰撞使动能逐渐转化为热能，球体最终趋于静止。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── 电磁场可视化 Demo ── -->
+            <div class="content-section" data-module="electromagnetism">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>电磁场可视化</h2>
+                        <p>添加正/负电荷，拖拽调整位置，观察电场线分布</p>
+                    </div>
+                    <div class="demo-layout">
+                        <div class="demo-controls-panel">
+                            <div class="em-controls">
+                                <div class="em-actions">
+                                    <button class="btn btn--pos" id="em-add-pos">+ 正电荷</button>
+                                    <button class="btn btn--neg" id="em-add-neg">− 负电荷</button>
+                                </div>
+                                <div class="em-actions">
+                                    <button class="btn btn--ghost" id="em-clear">清空</button>
+                                </div>
+                                <div class="control-group">
+                                    <label>场线密度</label>
+                                    <div class="range-group">
+                                        <input type="range" id="em-line-count" class="range" min="8" max="32" step="4" value="16">
+                                        <span class="range-value" id="em-line-count-value">16</span>
+                                    </div>
+                                </div>
+                                <div class="em-toggle-group">
+                                    <label class="em-toggle">
+                                        <input type="checkbox" id="em-toggle-lines" checked>
+                                        <span>电场线</span>
+                                    </label>
+                                    <label class="em-toggle">
+                                        <input type="checkbox" id="em-toggle-vectors">
+                                        <span>矢量场</span>
+                                    </label>
+                                </div>
+                                <div class="em-stats">
+                                    <span>电荷数：<strong id="em-charge-count">0</strong> / 20</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="demo-visualization">
+                            <canvas id="em-canvas" class="em-canvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h3>电磁场原理</h3>
+                        <p>本模拟基于库仑定律</p>
+                    </div>
+                    <div class="steps-panel">
+                        <div class="step-item">
+                            <span class="step-number">1</span>
+                            <p><strong>库仑定律</strong> — 电场强度 <em>E = kq/r²</em>，与电荷量成正比，与距离的平方成反比。</p>
+                        </div>
+                        <div class="step-item">
+                            <span class="step-number">2</span>
+                            <p><strong>叠加原理</strong> — 多个电荷产生的电场在空间中矢量叠加，形成复杂的场分布。</p>
+                        </div>
+                        <div class="step-item">
+                            <span class="step-number">3</span>
+                            <p><strong>场线规则</strong> — 电场线从正电荷出发，终止于负电荷；场线密度反映场强大小。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── 波动演示 Demo ── -->
+            <div class="content-section" data-module="waves">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>波动演示</h2>
+                        <p>调节两列波的参数，观察叠加、干涉与驻波现象</p>
+                    </div>
+                    <div class="demo-layout">
+                        <div class="demo-controls-panel">
+                            <div class="wave-controls">
+                                <div class="wave-param-group">
+                                    <h4><span class="dot dot--w1"></span>波 1</h4>
+                                    <div class="control-group">
+                                        <label>振幅</label>
+                                        <div class="range-group">
+                                            <input type="range" id="wave-a1" class="range" min="0" max="100" step="5" value="60">
+                                            <span class="range-value" id="wave-a1-value">60</span>
+                                            <span class="range-unit">px</span>
+                                        </div>
+                                    </div>
+                                    <div class="control-group">
+                                        <label>频率</label>
+                                        <div class="range-group">
+                                            <input type="range" id="wave-f1" class="range" min="0.2" max="4" step="0.1" value="1.2">
+                                            <span class="range-value" id="wave-f1-value">1.2</span>
+                                            <span class="range-unit">Hz</span>
+                                        </div>
+                                    </div>
+                                    <div class="control-group">
+                                        <label>波长</label>
+                                        <div class="range-group">
+                                            <input type="range" id="wave-l1" class="range" min="60" max="400" step="10" value="200">
+                                            <span class="range-value" id="wave-l1-value">200</span>
+                                            <span class="range-unit">px</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="wave-param-group">
+                                    <h4><span class="dot dot--w2"></span>波 2</h4>
+                                    <div class="control-group">
+                                        <label>振幅</label>
+                                        <div class="range-group">
+                                            <input type="range" id="wave-a2" class="range" min="0" max="100" step="5" value="60">
+                                            <span class="range-value" id="wave-a2-value">60</span>
+                                            <span class="range-unit">px</span>
+                                        </div>
+                                    </div>
+                                    <div class="control-group">
+                                        <label>频率</label>
+                                        <div class="range-group">
+                                            <input type="range" id="wave-f2" class="range" min="0.2" max="4" step="0.1" value="1.2">
+                                            <span class="range-value" id="wave-f2-value">1.2</span>
+                                            <span class="range-unit">Hz</span>
+                                        </div>
+                                    </div>
+                                    <div class="control-group">
+                                        <label>波长</label>
+                                        <div class="range-group">
+                                            <input type="range" id="wave-l2" class="range" min="60" max="400" step="10" value="200">
+                                            <span class="range-value" id="wave-l2-value">200</span>
+                                            <span class="range-unit">px</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="wave-param-group">
+                                    <h4>预设</h4>
+                                    <div class="wave-presets">
+                                        <button class="btn btn--ghost active" data-wave-preset="constructive">加强</button>
+                                        <button class="btn btn--ghost" data-wave-preset="destructive">抵消</button>
+                                        <button class="btn btn--ghost" data-wave-preset="standing">驻波</button>
+                                        <button class="btn btn--ghost" data-wave-preset="beat">拍频</button>
+                                    </div>
+                                </div>
+
+                                <div class="wave-toggles">
+                                    <label class="em-toggle">
+                                        <input type="checkbox" id="wave-show1" checked>
+                                        <span style="color:#ef4444">波 1</span>
+                                    </label>
+                                    <label class="em-toggle">
+                                        <input type="checkbox" id="wave-show2" checked>
+                                        <span style="color:#3b82f6">波 2</span>
+                                    </label>
+                                    <label class="em-toggle">
+                                        <input type="checkbox" id="wave-show-sum" checked>
+                                        <span style="color:#a78bfa">叠加</span>
+                                    </label>
+                                </div>
+
+                                <div class="physics-actions">
+                                    <button class="btn btn--ghost" id="wave-pause">暂停</button>
+                                    <button class="btn btn--ghost" id="wave-reset">重置时间</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="demo-visualization">
+                            <canvas id="wave-canvas" class="wave-canvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h3>波动原理</h3>
+                        <p>波的叠加与干涉</p>
+                    </div>
+                    <div class="steps-panel">
+                        <div class="step-item">
+                            <span class="step-number">1</span>
+                            <p><strong>波的叠加</strong> — 多列波在同一介质中传播时，合位移等于各波位移的矢量和。</p>
+                        </div>
+                        <div class="step-item">
+                            <span class="step-number">2</span>
+                            <p><strong>干涉现象</strong> — 两列相干波叠加，同相处振幅加强，反相处振幅减弱甚至抵消。</p>
+                        </div>
+                        <div class="step-item">
+                            <span class="step-number">3</span>
+                            <p><strong>驻波</strong> — 两列同频反向波叠加形成驻波，存在固定的波节（不动点）和波腹（最大振幅点）。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── 相对论演示 ── -->
+            <div class="content-section" id="relativity-section" data-module="relativity">
+                <div class="demo-section">
+                    <h2>狭义相对论 <span class="formula-badge">Special Relativity</span></h2>
+
+                    <div class="rel-mode-btns">
+                        <button class="rel-mode-btn active" data-mode="time">时间膨胀</button>
+                        <button class="rel-mode-btn" data-mode="length">长度收缩</button>
+                        <button class="rel-mode-btn" data-mode="mass">质能等价</button>
+                    </div>
+
+                    <div class="rel-velocity-row">
+                        <label>速度 v：</label>
+                        <input type="range" id="rel-velocity" min="0" max="0.99" step="0.01" value="0">
+                        <span class="rel-val" id="rel-velocity-val">0.00c</span>
+                    </div>
+
+                    <div class="relativity-canvas-wrap">
+                        <canvas id="relativity-canvas"></canvas>
+                    </div>
+
+                    <div class="rel-actions">
+                        <button id="rel-reset">重置</button>
+                    </div>
+
+                    <div class="rel-info" id="rel-info"></div>
+                </div>
+            </div>
+
+            <div class="experiments-section">
+                <div class="section-header">
+                    <h2>物理实验</h2>
+                    <p>通过模拟理解物理法则</p>
+                </div>
+                <div class="bento-grid" id="physics-experiments"></div>
+            </div>
+        </section>
+
+        <!-- ────────── CHEMISTRY ────────── -->
+        <section id="page-chemistry" class="page">
+            <div class="page-hero">
+                <div class="page-hero__text">
+                    <span class="page-hero__label page-hero__label--green">Chemistry</span>
+                    <h1 class="page-hero__title">化学实验</h1>
+                    <p class="page-hero__desc">探索化学元素和反应的奥秘，从原子结构到化学平衡，理解物质的本质。</p>
+                </div>
+                <div class="page-hero__visual">
+                    <canvas id="hero-canvas-chemistry" class="page-hero__canvas"></canvas>
+                </div>
+            </div>
+
+            <!-- ── 元素周期表 ── -->
+            <div class="content-section" data-module="periodic-table">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>元素周期表</h2>
+                        <p>点击元素查看详情，悬浮高亮同族元素</p>
+                    </div>
+                    <div class="pt-wrapper">
+                        <div id="periodic-table-grid"></div>
+                    </div>
+                    <div id="pt-legend" class="pt-legend"></div>
+                </div>
+            </div>
+
+            <!-- ── 分子结构 ── -->
+            <div class="content-section" data-module="molecular-structure">
+                <div class="demo-section" id="molecule-section">
+                    <div class="section-header">
+                        <h3><i data-lucide="atom"></i> 分子结构</h3>
+                        <p>拖拽旋转 3D 球棍模型，滚轮缩放，观察分子的空间构型</p>
+                    </div>
+                    <div class="demo-content">
+                        <div class="mol-controls">
+                            <button class="mol-select-btn active" data-mol="H2O">H₂O 水</button>
+                            <button class="mol-select-btn" data-mol="CO2">CO₂</button>
+                            <button class="mol-select-btn" data-mol="CH4">CH₄ 甲烷</button>
+                            <button class="mol-select-btn" data-mol="NH3">NH₃ 氨</button>
+                            <button class="mol-select-btn" data-mol="C2H4">C₂H₄ 乙烯</button>
+                            <button class="mol-select-btn" data-mol="C2H2">C₂H₂ 乙炔</button>
+                            <button class="mol-select-btn" data-mol="C6H6">C₆H₆ 苯</button>
+                            <button class="mol-select-btn" data-mol="NaCl">NaCl</button>
+                        </div>
+                        <div class="mol-canvas-wrap">
+                            <canvas id="mol-canvas" class="mol-canvas"></canvas>
+                        </div>
+                        <div class="mol-actions">
+                            <button class="btn-primary" id="mol-auto-rotate">自动旋转</button>
+                            <button class="btn-secondary" id="mol-reset">重置视角</button>
+                        </div>
+                        <p class="mol-hint">💡 拖拽旋转 · 滚轮缩放</p>
+                        <div id="mol-info"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── 化学反应 ── -->
+            <div class="content-section" data-module="reactions">
+                <div class="demo-section" id="reaction-section">
+                    <div class="section-header">
+                        <h3><i data-lucide="test-tube"></i> 化学反应</h3>
+                        <p>观察原子在化学反应中的重新排列过程，理解质量守恒与能量变化</p>
+                    </div>
+                    <div class="demo-content">
+                        <div class="rxn-controls">
+                            <button class="rxn-select-btn active" data-rxn="combustion">甲烷燃烧</button>
+                            <button class="rxn-select-btn" data-rxn="synthesis">合成氨</button>
+                            <button class="rxn-select-btn" data-rxn="neutralization">酸碱中和</button>
+                            <button class="rxn-select-btn" data-rxn="decomposition">碳酸钙分解</button>
+                            <button class="rxn-select-btn" data-rxn="redox">铁铜置换</button>
+                        </div>
+                        <div class="rxn-canvas-wrap">
+                            <canvas id="rxn-canvas" class="rxn-canvas"></canvas>
+                        </div>
+                        <div class="rxn-actions">
+                            <button class="btn-primary" id="rxn-play">▶ 开始反应</button>
+                            <button class="btn-secondary" id="rxn-reset">重置</button>
+                            <div class="rxn-speed">
+                                <label>速度:</label>
+                                <input type="range" id="rxn-speed" min="0.3" max="3" step="0.1" value="1">
+                            </div>
+                        </div>
+                        <div class="rxn-energy-wrap">
+                            <div class="rxn-energy-track"><div id="rxn-energy-bar"></div></div>
+                            <div id="rxn-energy-label">ΔH = 0 kJ/mol</div>
+                        </div>
+                        <div id="rxn-info"></div>
+                    </div>
+                </div>
+            </div>
+
+            </div>
+
+            <div class="experiments-section">
+                <div class="section-header">
+                    <h2>化学实验</h2>
+                    <p>分子与反应的可视化探索</p>
+                </div>
+                <div class="bento-grid" id="chemistry-experiments"></div>
+            </div>
+        </section>
+
+        <!-- ────────── ALGORITHMS ────────── -->
+        <section id="page-algorithms" class="page">
+            <div class="page-hero">
+                <div class="page-hero__text">
+                    <span class="page-hero__label page-hero__label--orange">Algorithms</span>
+                    <h1 class="page-hero__title">算法可视化</h1>
+                    <p class="page-hero__desc">通过动画理解算法的工作原理，从排序到图论，用代码解构复杂问题。</p>
+                </div>
+                <div class="page-hero__visual">
+                    <canvas id="hero-canvas-algorithms" class="page-hero__canvas"></canvas>
+                </div>
+            </div>
+
+            <div class="content-section" data-module="sorting">
+                <div class="steps-panel">
+                    <h3 class="steps-panel__title">桶排序 — 算法原理</h3>
+                    <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
+                        <strong style="color: var(--text-primary);">桶排序（Bucket Sort）</strong>是一种分配排序算法：
+                    </p>
+                    <ol class="steps-list">
+                        <li class="step-item">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <p><strong>分配阶段</strong> — 将待排序数组中的元素根据其值的大小，分配到不同的"桶"中。</p>
+                            </div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <p><strong>排序阶段</strong> — 对每个非空的桶内的元素进行排序。</p>
+                            </div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <p><strong>收集阶段</strong> — 按照桶的顺序，依次将每个桶中的元素取出，合并成最终的排序结果。</p>
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+
+                <div class="demo-section">
+                    <div class="sort-toolbar">
+                        <button class="btn btn--orange" onclick="generateRandomArray()">生成随机数组</button>
+                        <button class="btn btn--orange" onclick="startBucketSort()">开始排序</button>
+                        <button class="btn btn--ghost" onclick="resetBucketSort()">重置</button>
+                        <div class="speed-control">
+                            <label>速度：</label>
+                            <input type="range" id="sort-speed" min="100" max="1000" value="500" step="100">
+                            <span id="speed-value">500ms</span>
+                        </div>
+                    </div>
+                    <div class="array-display">
+                        <div class="array-label">原始数组：</div>
+                        <div class="array-bars" id="original-array"></div>
+                    </div>
+                    <div class="buckets-display">
+                        <div class="array-label">桶：</div>
+                        <div class="buckets-container" id="buckets-container"></div>
+                    </div>
+                    <div class="result-display">
+                        <div class="array-label">排序结果：</div>
+                        <div class="array-bars" id="sorted-array"></div>
+                    </div>
+                    <div class="sort-info" id="sort-info"></div>
+                </div>
+            </div>
+
+            <!-- ═══ 二分查找 ═══ -->
+            <div class="content-section" id="binary-search-section" data-module="searching">
+                <div class="steps-panel">
+                    <h3 class="steps-panel__title">二分查找 — 算法原理</h3>
+                    <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
+                        <strong style="color: var(--text-primary);">二分查找（Binary Search）</strong>是在<em>有序数组</em>中高效定位目标的经典算法：
+                    </p>
+                    <ol class="steps-list">
+                        <li class="step-item">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <p><strong>取中间值</strong> — 计算当前搜索范围 [low, high] 的中点 mid。</p>
+                            </div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <p><strong>比较判断</strong> — 若 arr[mid] == target 则找到；若 arr[mid] < target 则搜索右半；否则搜索左半。</p>
+                            </div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <p><strong>时间复杂度 O(log n)</strong> — 每一步排除一半候选项，16 个元素最多只需 4 步。</p>
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+
+                <div class="demo-section">
+                    <div id="bs-controls">
+                        <button class="btn btn--orange" onclick="BinarySearch.generateArray()">生成数组</button>
+                        <label style="font-size:var(--text-sm);color:var(--text-secondary)">目标值</label>
+                        <input type="number" id="bs-target" placeholder="?" min="1" max="99">
+                        <button class="btn btn--orange" onclick="BinarySearch.start()">开始查找</button>
+                        <button class="btn btn--ghost" onclick="BinarySearch.reset()">重置</button>
+                        <div class="bs-speed">
+                            <label>速度：</label>
+                            <input type="range" id="bs-speed" min="200" max="1200" value="600" step="100">
+                            <span id="bs-speed-value">600ms</span>
+                        </div>
+                    </div>
+                    <div class="bs-container" id="bs-array"></div>
+                    <div class="search-info" id="bs-info"></div>
+                </div>
+            </div>
+
+            <!-- ═══ 图遍历 BFS / DFS ═══ -->
+            <div class="content-section" id="graph-traversal-section" data-module="searching">
+                <div class="steps-panel">
+                    <h3 class="steps-panel__title">图遍历 — BFS vs DFS</h3>
+                    <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
+                        两种基本的图遍历策略，决定了节点的访问顺序：
+                    </p>
+                    <ol class="steps-list">
+                        <li class="step-item">
+                            <div class="step-number">B</div>
+                            <div class="step-content">
+                                <p><strong>广度优先搜索 (BFS)</strong> — 使用<em>队列</em>，逐层扩展，先访问所有近邻再深入。适合最短路径问题。</p>
+                            </div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">D</div>
+                            <div class="step-content">
+                                <p><strong>深度优先搜索 (DFS)</strong> — 使用<em>栈</em>，沿一条路径尽可能深入，回溯后探索其它分支。适合拓扑排序、连通分量。</p>
+                            </div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">!</div>
+                            <div class="step-content">
+                                <p><strong>对比关键</strong> — 同一张图上，BFS 和 DFS 的访问顺序截然不同。点击节点可更换起点。</p>
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+
+                <div class="demo-section">
+                    <div id="graph-controls">
+                        <button class="btn btn--orange" onclick="GraphTraversal.startBFS()">BFS 广度优先</button>
+                        <button class="btn btn--orange" onclick="GraphTraversal.startDFS()">DFS 深度优先</button>
+                        <button class="btn btn--ghost" onclick="GraphTraversal.reset()">重置</button>
+                        <div class="graph-presets">
+                            <button class="btn btn--ghost active" onclick="GraphTraversal.loadPreset('tree')">二叉树</button>
+                            <button class="btn btn--ghost" onclick="GraphTraversal.loadPreset('grid')">网格图</button>
+                            <button class="btn btn--ghost" onclick="GraphTraversal.loadPreset('cycle')">环形图</button>
+                        </div>
+                        <div class="graph-speed">
+                            <label>速度：</label>
+                            <input type="range" id="graph-speed" min="200" max="1200" value="500" step="100">
+                            <span id="graph-speed-value">500ms</span>
+                        </div>
+                    </div>
+                    <div class="canvas-container">
+                        <canvas id="graph-canvas" class="graph-canvas"></canvas>
+                    </div>
+                    <div class="search-legend">
+                        <span class="sl-current">当前节点</span>
+                        <span class="sl-visited">已访问</span>
+                        <span class="sl-frontier">待访问</span>
+                        <span class="sl-start">起点</span>
+                        <span class="sl-unvisited">未访问</span>
+                    </div>
+                    <div class="search-info" id="graph-info"></div>
+                </div>
+            </div>
+
+            <!-- ═══ 图算法: Dijkstra & Prim ═══ -->
+            <div class="content-section" id="graph-algo-section" data-module="graph">
+                <div class="steps-panel">
+                    <h3 class="steps-panel__title">图算法 — 最短路径 & 最小生成树</h3>
+                    <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
+                        两种经典的贪心图算法，用于加权无向图：
+                    </p>
+                    <ol class="steps-list">
+                        <li class="step-item">
+                            <div class="step-number">D</div>
+                            <div class="step-content">
+                                <p><strong>Dijkstra 最短路径</strong> — 从起点出发，每次选距离最小的未确认节点，松弛其邻居的距离估计。保证找到从起点到所有节点的最短路径。</p>
+                            </div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">P</div>
+                            <div class="step-content">
+                                <p><strong>Prim 最小生成树</strong> — 从任意节点开始，每次选一条连接已访问和未访问节点的最小权边，加入生成树。保证总权值最小。</p>
+                            </div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">!</div>
+                            <div class="step-content">
+                                <p><strong>对比关键</strong> — Dijkstra 关注<em>到源的累计距离</em>，Prim 关注<em>单条边的权值</em>。点击节点可更换起点。</p>
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+
+                <div class="demo-section">
+                    <div id="ga-controls">
+                        <button class="btn btn--orange" onclick="GraphAlgo.startDijkstra()">Dijkstra 最短路径</button>
+                        <button class="btn btn--orange" onclick="GraphAlgo.startPrim()">Prim 最小生成树</button>
+                        <button class="btn btn--ghost" onclick="GraphAlgo.reset()">重置</button>
+                        <div class="ga-presets">
+                            <button class="btn btn--ghost active" onclick="GraphAlgo.loadPreset('weighted')">加权图</button>
+                            <button class="btn btn--ghost" onclick="GraphAlgo.loadPreset('small')">简单图</button>
+                            <button class="btn btn--ghost" onclick="GraphAlgo.loadPreset('dense')">稠密图</button>
+                        </div>
+                        <div class="ga-speed">
+                            <label>速度：</label>
+                            <input type="range" id="ga-speed" min="200" max="1200" value="500" step="100">
+                            <span id="ga-speed-value">500ms</span>
+                        </div>
+                    </div>
+                    <div class="canvas-container">
+                        <canvas id="graph-algo-canvas" class="graph-algo-canvas"></canvas>
+                    </div>
+                    <div class="ga-legend">
+                        <span class="gal-current">当前节点</span>
+                        <span class="gal-visited">已确认</span>
+                        <span class="gal-mst">MST/路径边</span>
+                        <span class="gal-frontier">候选边</span>
+                        <span class="gal-start">起点</span>
+                    </div>
+                    <div class="search-info" id="ga-info"></div>
+                </div>
+            </div>
+
+            <!-- ── 数据结构 ── -->
+            <div class="content-section" id="data-struct-section" data-module="data-structures">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h3><i data-lucide="layers"></i> 数据结构</h3>
+                        <p>可视化栈、队列和二叉搜索树的基本操作</p>
+                    </div>
+                    <div class="demo-content">
+                        <div class="ds-controls">
+                            <button class="ds-mode-btn active" data-mode="stack">栈 Stack</button>
+                            <button class="ds-mode-btn" data-mode="queue">队列 Queue</button>
+                            <button class="ds-mode-btn" data-mode="bst">二叉搜索树 BST</button>
+                        </div>
+                        <!-- Stack panel -->
+                        <div class="ds-panel" id="ds-stack-panel">
+                            <button class="btn-primary" id="ds-push">Push (随机)</button>
+                            <button class="btn-secondary" id="ds-pop">Pop</button>
+                        </div>
+                        <!-- Queue panel -->
+                        <div class="ds-panel" id="ds-queue-panel" style="display:none">
+                            <button class="btn-primary" id="ds-enqueue">Enqueue (随机)</button>
+                            <button class="btn-secondary" id="ds-dequeue">Dequeue</button>
+                        </div>
+                        <!-- BST panel -->
+                        <div class="ds-panel" id="ds-bst-panel" style="display:none">
+                            <input type="number" id="ds-bst-val" placeholder="值" min="1" max="99">
+                            <button class="btn-primary" id="ds-bst-insert">插入</button>
+                            <button class="btn-secondary" id="ds-bst-search">搜索</button>
+                            <button class="btn-secondary" id="ds-bst-preset">加载预设</button>
+                            <button class="btn-secondary" id="ds-bst-clear">清空</button>
+                            <div class="ds-trav-group">
+                                <button class="ds-trav-btn" data-trav="pre">前序遍历</button>
+                                <button class="ds-trav-btn" data-trav="in">中序遍历</button>
+                                <button class="ds-trav-btn" data-trav="post">后序遍历</button>
+                            </div>
+                        </div>
+                        <div class="ds-canvas-wrap">
+                            <canvas id="ds-canvas" class="ds-canvas"></canvas>
+                        </div>
+                        <div class="ds-speed-row">
+                            <label>动画速度:</label>
+                            <input type="range" id="ds-speed" min="200" max="1000" step="50" value="700">
+                        </div>
+                        <div id="ds-info">就绪 — 使用上方按钮操作数据结构</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="experiments-section">
+                <div class="section-header">
+                    <h2>更多算法</h2>
+                    <p>探索更多算法可视化实验</p>
+                </div>
+                <div class="bento-grid" id="algorithms-experiments"></div>
+            </div>
+        </section>
+
+        <!-- ────────── BIOLOGY ────────── -->
+        <section id="page-biology" class="page">
+            <div class="page-hero">
+                <div class="page-hero__text">
+                    <span class="page-hero__label page-hero__label--teal">Biology</span>
+                    <h1 class="page-hero__title">生物实验</h1>
+                    <p class="page-hero__desc">探索生命的奥秘，从细胞结构到遗传规律，可视化理解生物学核心概念。</p>
+                </div>
+            </div>
+
+            <!-- ═══ 细胞结构 ═══ -->
+            <div class="content-section" data-module="cell-structure">
+                <div class="steps-panel">
+                    <h3 class="steps-panel__title">细胞结构 — 生命的基本单位</h3>
+                    <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
+                        <strong style="color: var(--text-primary);">细胞</strong>是生物体结构和功能的基本单位。动物细胞与植物细胞在结构上既有相似之处，也有显著差异。
+                    </p>
+                    <ol class="steps-list">
+                        <li class="step-item">
+                            <div class="step-number">1</div>
+                            <div class="step-content"><p><strong>细胞膜</strong> — 控制物质进出的半透膜。</p></div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">2</div>
+                            <div class="step-content"><p><strong>细胞核</strong> — 控制中心，含有遗传物质 DNA。</p></div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">3</div>
+                            <div class="step-content"><p><strong>线粒体</strong> — 细胞的"动力工厂"，进行有氧呼吸。</p></div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">4</div>
+                            <div class="step-content"><p><strong>叶绿体</strong> — 植物细胞特有，进行光合作用。</p></div>
+                        </li>
+                    </ol>
+                </div>
+                <div class="viz-panel">
+                    <div class="viz-controls">
+                        <button class="btn-primary" id="bio-cell-toggle">切换动/植物细胞</button>
+                        <button class="btn-secondary" id="bio-cell-label-toggle">显示/隐藏标注</button>
+                    </div>
+                    <canvas id="cell-canvas" class="bio-canvas" width="700" height="500"></canvas>
+                    <div class="bio-info" id="cell-info">点击细胞器查看详细信息</div>
+                </div>
+            </div>
+
+            <!-- ═══ DNA 结构 ═══ -->
+            <div class="content-section" data-module="dna">
+                <div class="steps-panel">
+                    <h3 class="steps-panel__title">DNA 双螺旋 — 遗传信息的载体</h3>
+                    <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
+                        <strong style="color: var(--text-primary);">DNA（脱氧核糖核酸）</strong>由两条反向平行的多核苷酸链组成双螺旋结构，碱基互补配对。
+                    </p>
+                    <ol class="steps-list">
+                        <li class="step-item">
+                            <div class="step-number">A</div>
+                            <div class="step-content"><p><strong>腺嘌呤(A)</strong> 与 <strong>胸腺嘧啶(T)</strong> 通过两个氢键配对。</p></div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">G</div>
+                            <div class="step-content"><p><strong>鸟嘌呤(G)</strong> 与 <strong>胞嘧啶(C)</strong> 通过三个氢键配对。</p></div>
+                        </li>
+                    </ol>
+                </div>
+                <div class="viz-panel">
+                    <div class="viz-controls">
+                        <button class="btn-primary" id="bio-dna-rotate">旋转螺旋</button>
+                        <button class="btn-secondary" id="bio-dna-replicate">模拟复制</button>
+                        <button class="btn-secondary" id="bio-dna-reset">重置</button>
+                    </div>
+                    <canvas id="dna-canvas" class="bio-canvas" width="700" height="500"></canvas>
+                    <div class="bio-info" id="dna-info">DNA 双螺旋结构 — 点击按钮开始探索</div>
+                </div>
+            </div>
+
+            <!-- ═══ 光合作用 ═══ -->
+            <div class="content-section" data-module="photosynthesis">
+                <div class="steps-panel">
+                    <h3 class="steps-panel__title">光合作用 — 能量转化</h3>
+                    <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
+                        <strong style="color: var(--text-primary);">光合作用</strong>是绿色植物利用光能将 CO₂ 和 H₂O 转化为有机物并释放 O₂ 的过程。
+                    </p>
+                    <ol class="steps-list">
+                        <li class="step-item">
+                            <div class="step-number">1</div>
+                            <div class="step-content"><p><strong>光反应</strong> — 在类囊体薄膜上，水的光解产生 [H]、ATP 和 O₂。</p></div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">2</div>
+                            <div class="step-content"><p><strong>暗反应</strong> — 在叶绿体基质中，CO₂ 被固定并还原为 C₃H₆O₃（G3P）。</p></div>
+                        </li>
+                    </ol>
+                </div>
+                <div class="viz-panel">
+                    <div class="viz-controls">
+                        <label style="color: var(--text-secondary); font-size: var(--text-sm);">光照强度:</label>
+                        <input type="range" id="bio-light-intensity" min="0" max="100" value="50">
+                        <button class="btn-primary" id="bio-photo-start">开始模拟</button>
+                        <button class="btn-secondary" id="bio-photo-reset">重置</button>
+                    </div>
+                    <canvas id="photosynthesis-canvas" class="bio-canvas" width="700" height="500"></canvas>
+                    <div class="bio-info" id="photo-info">调节光照强度，观察光合作用速率变化</div>
+                </div>
+            </div>
+
+            <!-- ═══ 遗传学 ═══ -->
+            <div class="content-section" data-module="genetics">
+                <div class="steps-panel">
+                    <h3 class="steps-panel__title">遗传学 — 孟德尔定律</h3>
+                    <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
+                        <strong style="color: var(--text-primary);">孟德尔遗传定律</strong>揭示了生物性状遗传的基本规律：分离定律和自由组合定律。
+                    </p>
+                    <ol class="steps-list">
+                        <li class="step-item">
+                            <div class="step-number">1</div>
+                            <div class="step-content"><p><strong>分离定律</strong> — 等位基因在形成配子时彼此分离。</p></div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">2</div>
+                            <div class="step-content"><p><strong>自由组合定律</strong> — 非同源染色体上的基因自由组合。</p></div>
+                        </li>
+                    </ol>
+                </div>
+                <div class="viz-panel">
+                    <div class="viz-controls">
+                        <select id="bio-parent1" class="bio-select">
+                            <option value="AA">AA (纯合显性)</option>
+                            <option value="Aa" selected>Aa (杂合)</option>
+                            <option value="aa">aa (纯合隐性)</option>
+                        </select>
+                        <span style="color: var(--text-secondary);">×</span>
+                        <select id="bio-parent2" class="bio-select">
+                            <option value="AA">AA (纯合显性)</option>
+                            <option value="Aa" selected>Aa (杂合)</option>
+                            <option value="aa">aa (纯合隐性)</option>
+                        </select>
+                        <button class="btn-primary" id="bio-cross">杂交</button>
+                    </div>
+                    <canvas id="genetics-canvas" class="bio-canvas" width="700" height="500"></canvas>
+                    <div class="bio-info" id="genetics-info">选择亲本基因型，点击杂交查看后代比例</div>
+                </div>
+            </div>
+
+            <div class="experiments-section">
+                <div class="section-header">
+                    <h2>生物实验</h2>
+                    <p>探索更多生物学可视化实验</p>
+                </div>
+                <div class="bento-grid" id="biology-experiments"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ═══════════════ Element Detail Panel ═══════════════ -->
+    <div id="pt-detail" class="pt-detail">
+        <button class="pt-detail-close" id="pt-detail-close">&times;</button>
+        <div class="pt-detail-header">
+            <div class="pt-detail-big">
+                <span class="pt-detail-number"></span>
+                <span class="pt-detail-symbol"></span>
+                <span class="pt-detail-name"></span>
+            </div>
+            <div class="pt-detail-info">
+                <div class="pt-detail-row">
+                    <span class="label">原子量</span>
+                    <span class="value pt-detail-mass"></span>
+                </div>
+                <div class="pt-detail-row">
+                    <span class="label">分类</span>
+                    <span class="value pt-detail-cat"></span>
+                </div>
+            </div>
+        </div>
+        <div class="pt-detail-config"></div>
+    </div>
+
+    <!-- ═══════════════ Back to Top ═══════════════ -->
+    <button class="back-to-top" id="back-to-top" aria-label="返回顶部">
+        <i data-lucide="chevron-up"></i>
+    </button>
+
+    <!-- ═══════════════ Footer ═══════════════ -->
+    <footer class="site-footer" id="site-footer">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <div class="footer-logo">
+                    <div class="logo-icon"><i data-lucide="flask-conical"></i></div>
+                    <span>工科实验室</span>
+                </div>
+                <p class="footer-desc">交互式可视化科学学习平台，让知识触手可及。</p>
+            </div>
+            <div class="footer-links">
+                <div class="footer-col">
+                    <h4>学科探索</h4>
+                    <a href="#mathematics" data-page="mathematics">数学可视化</a>
+                    <a href="#physics" data-page="physics">物理演示</a>
+                    <a href="#chemistry" data-page="chemistry">化学实验</a>
+                    <a href="#algorithms" data-page="algorithms">算法可视化</a>
+                    <a href="#biology" data-page="biology">生物实验</a>
+                </div>
+                <div class="footer-col">
+                    <h4>关于</h4>
+                    <a href="#">开源协议</a>
+                    <a href="#">更新日志</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span>&copy; 2026 工科实验室 · 探索科学的星辰大海</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- External Libraries (pinned versions) -->
+    <script src="https://unpkg.com/lucide@0.454.0/dist/umd/lucide.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/ScrollTrigger.min.js"></script>
+
+    <!-- Application Scripts: Shared -->
+    <script src="shared/js/config.js"></script>
+    <script src="shared/js/module-selector.js"></script>
+    <script src="shared/js/router.js"></script>
+    <script src="shared/js/scroll-animations.js"></script>
+    <script src="shared/js/cards.js"></script>
+    <script src="shared/js/common.js"></script>
+    <!-- Scripts: Home -->
+    <script src="pages/home/home.js"></script>
+    <!-- Scripts: Mathematics -->
+    <script src="pages/mathematics/mathematics.js"></script>
+    <script src="pages/mathematics/calculus.js"></script>
+    <script src="pages/mathematics/geometry.js"></script>
+    <script src="pages/mathematics/complex-numbers.js"></script>
+    <!-- Scripts: Physics -->
+    <script src="pages/physics/physics.js"></script>
+    <script src="pages/physics/electromagnetic.js"></script>
+    <script src="pages/physics/waves.js"></script>
+    <script src="pages/physics/relativity.js"></script>
+    <!-- Scripts: Chemistry -->
+    <script src="pages/chemistry/periodic-table.js"></script>
+    <script src="pages/chemistry/molecular-structure.js"></script>
+    <script src="pages/chemistry/chemical-reactions.js"></script>
+    <!-- Scripts: Algorithms -->
+    <script src="pages/algorithms/algorithms.js"></script>
+    <script src="pages/algorithms/search-algorithms.js"></script>
+    <script src="pages/algorithms/graph-algo.js"></script>
+    <script src="pages/algorithms/data-structures.js"></script>
+    <!-- Scripts: Biology -->
+    <script src="pages/biology/biology.js"></script>
+    <script src="pages/biology/cell-structure.js"></script>
+    <script src="pages/biology/dna-helix.js"></script>
+    <script src="pages/biology/photosynthesis.js"></script>
+    <script src="pages/biology/genetics.js"></script>
+    <!-- Scripts: Bootstrap -->
+    <script src="shared/js/main.js"></script>
+</body>
+</html>

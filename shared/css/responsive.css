@@ -1,0 +1,233 @@
+/* ===== Responsive ===== */
+
+/* ── Touch-device overrides ── */
+@media (hover: none) and (pointer: coarse) {
+    /* Remove hover-only transforms on touch */
+    .card:hover {
+        transform: none;
+    }
+
+    .card:active {
+        transform: scale(0.97);
+        border-color: var(--border-hover);
+        box-shadow: var(--shadow-lg);
+        background: var(--surface-2);
+    }
+
+    .card:active::before {
+        transform: scaleX(1);
+    }
+
+    .card--upcoming:active {
+        opacity: 1;
+        border-style: solid;
+    }
+
+    /* Satellite: show labels always on touch */
+    .satellite-label-container {
+        opacity: 1 !important;
+    }
+
+    /* Larger tap targets for nav */
+    .nav-item {
+        min-height: 44px;
+        min-width: 44px;
+        justify-content: center;
+    }
+
+    /* Back-to-top larger for thumb */
+    .back-to-top {
+        width: 48px;
+        height: 48px;
+    }
+}
+
+/* ── Tablet ── */
+@media (max-width: 1024px) {
+    .bento-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .card--featured {
+        grid-column: span 2;
+        grid-row: span 1;
+    }
+
+    .demo-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .footer-container {
+        grid-template-columns: 1fr;
+        gap: var(--space-8);
+    }
+}
+
+/* ── Mobile ── */
+@media (max-width: 768px) {
+    /* Nav – icon-only, 44px touch targets */
+    .desktop-only { display: none; }
+    .nav-item span { display: none; }
+    .nav-item {
+        padding: var(--space-3);
+        min-height: 44px;
+        min-width: 44px;
+        justify-content: center;
+    }
+    .nav-item i {
+        width: 20px;
+        height: 20px;
+    }
+    .nav-container {
+        padding: 0 var(--space-4);
+        height: 52px;
+    }
+
+    /* Page heroes */
+    .page-hero {
+        grid-template-columns: 1fr;
+        min-height: auto;
+        padding: var(--space-10) var(--space-6) var(--space-8);
+        gap: var(--space-6);
+    }
+
+    .page-hero__visual {
+        min-height: 160px;
+        order: -1;
+    }
+
+    .page-hero__title {
+        font-size: var(--text-2xl);
+    }
+
+    /* Cards */
+    .bento-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--space-3);
+    }
+
+    .card--featured,
+    .card--wide {
+        grid-column: span 2;
+    }
+
+    .card {
+        padding: var(--space-5);
+    }
+
+    .card--featured {
+        padding: var(--space-6);
+    }
+
+    /* Content */
+    .content-section {
+        padding: var(--space-6) var(--space-4);
+    }
+
+    .demo-section {
+        padding: var(--space-6);
+    }
+
+    .experiments-section {
+        padding: var(--space-6) var(--space-4);
+    }
+
+    /* Home orbit system – shrink for mobile viewport */
+    .orbit-path-1 { width: 400px; height: 260px; }
+    .orbit-path-2 { width: 520px; height: 340px; }
+    .orbit-path-3 { width: 640px; height: 420px; }
+    .orbit-path-4 { width: 560px; height: 370px; }
+    .star-body { width: 180px; height: 180px; }
+    .star-title { font-size: 1.4rem; }
+    .satellite { width: 55px; height: 55px; }
+    .home-tagline p { font-size: 0.85rem; letter-spacing: 0.15em; }
+    .nebula { display: none; }
+
+    /* Sort controls */
+    .sort-toolbar {
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+
+    .speed-control {
+        width: 100%;
+    }
+
+    /* Footer */
+    .footer-links {
+        flex-direction: column;
+        gap: var(--space-6);
+    }
+
+    .site-footer {
+        padding: var(--space-10) 0 var(--space-6);
+    }
+
+    .footer-container {
+        padding: 0 var(--space-4);
+    }
+
+    .footer-bottom {
+        flex-direction: column;
+        text-align: center;
+        gap: var(--space-3);
+    }
+
+    /* Back to top */
+    .back-to-top {
+        bottom: var(--space-4);
+        right: var(--space-4);
+    }
+}
+
+/* ── Small phones ── */
+@media (max-width: 480px) {
+    .orbit-path-1 { width: 300px; height: 200px; }
+    .orbit-path-2 { width: 380px; height: 250px; }
+    .orbit-path-3 { width: 460px; height: 300px; }
+    .orbit-path-4 { width: 420px; height: 275px; }
+    .star-body { width: 150px; height: 150px; }
+    .star-title { font-size: 1.15rem; }
+    .satellite { width: 45px; height: 45px; }
+    .home-tagline p { font-size: 0.75rem; }
+
+    .page-hero {
+        padding: var(--space-8) var(--space-4) var(--space-6);
+    }
+
+    .page-hero__title {
+        font-size: var(--text-xl);
+    }
+
+    .page-hero__desc {
+        font-size: var(--text-sm);
+    }
+
+    .bento-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .card--featured,
+    .card--wide {
+        grid-column: span 1;
+    }
+
+    .card--featured .card-title {
+        font-size: var(--text-lg);
+    }
+
+    .card--featured .card-desc {
+        font-size: var(--text-sm);
+    }
+
+    /* Demo sections tighter on small phones */
+    .demo-section {
+        padding: var(--space-4);
+    }
+
+    /* Algorithms sort bars responsive */
+    .sort-element {
+        min-width: 28px;
+        font-size: var(--text-xs);
+    }
+}

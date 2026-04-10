@@ -1,0 +1,225 @@
+/* ===== Page Layout ===== */
+
+/* ── Page Hero (split layout) ── */
+.page-hero {
+    min-height: 45vh;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: var(--space-16) var(--space-8) var(--space-12);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: var(--space-12);
+    position: relative;
+}
+
+/* Hero decorative gradient accent line */
+.page-hero::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: var(--space-8); right: var(--space-8);
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-default), transparent);
+}
+
+.page-hero__text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.page-hero__label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+.page-hero__label--blue { color: var(--accent-blue); }
+.page-hero__label--purple { color: var(--accent-purple); }
+.page-hero__label--green { color: var(--accent-green); }
+.page-hero__label--orange { color: var(--accent-orange); }
+.page-hero__label--teal { color: var(--accent-teal); }
+
+.page-hero__title {
+    font-size: var(--text-4xl);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    color: var(--text-primary);
+}
+
+.page-hero__desc {
+    font-size: var(--text-base);
+    color: var(--text-secondary);
+    line-height: 1.7;
+    max-width: 480px;
+}
+
+.page-hero__visual {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    min-height: 260px;
+}
+
+.page-hero__canvas {
+    width: 100%;
+    max-width: 360px;
+    aspect-ratio: 1;
+    opacity: 0.5;
+}
+
+/* ── Content Sections ── */
+.content-section {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: var(--space-12) var(--space-8);
+}
+
+.content-section + .content-section {
+    padding-top: 0;
+}
+
+/* ── Demo Section (interactive demos) ── */
+.demo-section {
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-10);
+    margin-bottom: var(--space-10);
+    transition: border-color var(--duration-normal) ease;
+}
+
+.demo-section:hover {
+    border-color: var(--border-default);
+}
+
+.demo-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: var(--space-10);
+    align-items: start;
+}
+
+.demo-controls-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.demo-visualization {
+    min-height: 240px;
+}
+
+/* ── Video Section ── */
+.video-section {
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: var(--space-10);
+    transition: border-color var(--duration-normal) ease;
+}
+
+.video-section:hover {
+    border-color: var(--border-default);
+}
+
+.video-section__header {
+    padding: var(--space-6) var(--space-8);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.video-section__header h3 {
+    margin-bottom: var(--space-1);
+}
+
+.video-container {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%;
+    height: 0;
+    overflow: hidden;
+}
+
+.bilibili-video {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    border: none;
+}
+
+/* ── Principle/Steps panel ── */
+.steps-panel {
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-8);
+    margin-bottom: var(--space-8);
+}
+
+.steps-panel__title {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    margin-bottom: var(--space-6);
+}
+
+.steps-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}
+
+.step-item {
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    gap: var(--space-4);
+    align-items: start;
+}
+
+.step-number {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--accent-orange);
+    border: 1.5px solid rgba(196,121,58,0.3);
+    border-radius: var(--radius-default);
+    flex-shrink: 0;
+}
+
+.step-content {
+    padding-top: var(--space-1);
+}
+
+.step-content strong {
+    color: var(--text-primary);
+}
+
+.step-content p {
+    margin: 0;
+    line-height: 1.6;
+    font-size: var(--text-sm);
+}
+
+/* ── Experiments Section ── */
+.experiments-section {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: var(--space-8);
+}
+
+.experiments-section .section-header {
+    margin-bottom: var(--space-8);
+}
