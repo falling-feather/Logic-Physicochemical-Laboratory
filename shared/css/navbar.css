@@ -1,0 +1,119 @@
+/* ===== Navigation ===== */
+.navbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 1000;
+    padding: 0;
+    background: rgba(8,9,14,0.75);
+    border-bottom: 1px solid var(--border-subtle);
+    backdrop-filter: blur(16px) saturate(1.2);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
+    transition: background var(--duration-slow) ease, border-color var(--duration-slow) ease, box-shadow var(--duration-slow) ease;
+}
+
+.navbar:not(.navbar--transparent) {
+    box-shadow: 0 1px 12px rgba(0,0,0,0.3);
+}
+
+/* Transparent on homepage */
+.navbar--transparent {
+    background: transparent;
+    border-bottom-color: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.nav-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 var(--space-6);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 56px;
+}
+
+/* ── Logo ── */
+.nav-logo {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    text-decoration: none;
+    color: var(--text-primary);
+    font-size: var(--text-base);
+    font-weight: 600;
+    font-family: var(--font-display);
+    transition: opacity var(--duration-fast) ease;
+}
+
+.nav-logo:hover {
+    opacity: 0.8;
+}
+
+.logo-icon {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-blue);
+    border-radius: var(--radius-sm);
+    clip-path: polygon(0 0, 100% 0, 100% 75%, 75% 100%, 0 100%);
+}
+
+.logo-icon i {
+    width: 16px;
+    height: 16px;
+    color: white;
+}
+
+.desktop-only {
+    display: inline;
+}
+
+/* ── Nav Menu ── */
+.nav-menu {
+    display: flex;
+    gap: var(--space-1);
+    position: relative;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    text-decoration: none;
+    color: var(--text-tertiary);
+    font-size: var(--text-sm);
+    font-weight: 400;
+    border-radius: var(--radius-default);
+    transition: color var(--duration-fast) ease;
+    position: relative;
+}
+
+.nav-item:hover {
+    color: var(--text-primary);
+}
+
+.nav-item.active {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+/* Active indicator (underline) */
+.nav-indicator {
+    position: absolute;
+    bottom: 0; left: 0;
+    height: 2px;
+    background: var(--accent-blue);
+    border-radius: 1px;
+    transition: left var(--duration-slow) var(--ease-out-expo),
+                width var(--duration-slow) var(--ease-out-expo);
+    pointer-events: none;
+}
+
+.nav-item i {
+    width: 16px;
+    height: 16px;
+}

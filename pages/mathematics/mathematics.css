@@ -1,0 +1,666 @@
+/* ===== Mathematics Page ===== */
+
+/* ── Abacus Controls ── */
+.abacus-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    align-items: center;
+    margin-bottom: var(--space-6);
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.control-group label {
+    font-weight: 500;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.control-group input,
+.control-group select {
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border-default);
+    background: var(--surface-2);
+    color: var(--text-primary);
+    border-radius: var(--radius-default);
+    font-size: var(--text-sm);
+    transition: border-color var(--duration-fast) ease;
+}
+
+.control-group input:focus,
+.control-group select:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px var(--accent-blue-wash);
+}
+
+/* ── Abacus Display ── */
+.abacus-display {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+}
+
+.abacus-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-5);
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-default);
+}
+
+.abacus-row.result-row {
+    border-color: rgba(91,141,206,0.15);
+}
+
+.abacus-label {
+    min-width: 90px;
+    font-weight: 500;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.abacus-sticks {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+.stick {
+    width: 8px;
+    height: 56px;
+    background: linear-gradient(180deg, #b8873a, #c4973f);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    animation: stickAppear 0.3s ease-out;
+}
+
+.stick.horizontal {
+    width: 56px;
+    height: 8px;
+}
+
+@keyframes stickAppear {
+    from { opacity: 0; transform: scale(0) rotate(-3deg); }
+    to { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+/* ── Function Graph ── */
+.graph-controls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.control-group--col {
+    flex-direction: column;
+    align-items: flex-start !important;
+}
+
+.control-group--col label {
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+    color: var(--accent-blue);
+}
+
+.control-group--col .input {
+    width: 100%;
+    font-family: var(--font-mono);
+}
+
+.preset-functions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.btn--ghost {
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--border-default);
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: var(--radius-default);
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    cursor: pointer;
+    transition: all var(--duration-fast) ease;
+}
+
+.btn--ghost:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+    background: var(--accent-blue-wash);
+}
+
+.btn--ghost.active {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+    background: var(--accent-blue-wash);
+}
+
+.btn--sm {
+    font-size: var(--text-xs);
+    padding: var(--space-1) var(--space-2);
+}
+
+.range-inline {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.range-sep {
+    color: var(--text-tertiary);
+}
+
+.input--sm {
+    width: 72px;
+    text-align: center;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.checkbox-group input[type="checkbox"] {
+    accent-color: var(--accent-blue);
+}
+
+/* ── Graph Canvas ── */
+.graph-canvas-wrap {
+    position: relative;
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-default);
+    overflow: hidden;
+}
+
+.graph-canvas {
+    width: 100%;
+    display: block;
+}
+
+.graph-coord-display {
+    position: absolute;
+    bottom: var(--space-2);
+    right: var(--space-3);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+}
+
+.graph-error {
+    color: var(--accent-red);
+    font-size: var(--text-sm);
+    margin-top: var(--space-2);
+    min-height: 1.4em;
+}
+
+/* ══════════════════════════════════════
+   Calculus Visualization
+   ══════════════════════════════════════ */
+#calc-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+    margin-bottom: var(--space-4);
+    padding: var(--space-4) var(--space-5);
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-default);
+}
+
+#calc-controls input[type="text"] {
+    flex: 1;
+    min-width: 140px;
+    padding: var(--space-2) var(--space-3);
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: var(--text-sm);
+    font-family: var(--font-mono);
+}
+
+#calc-controls input[type="text"]:focus {
+    border-color: var(--accent-blue);
+    outline: none;
+}
+
+.calc-mode-btns {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.calc-mode-btn {
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--border-default);
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: var(--radius-default);
+    font-size: var(--text-xs);
+    cursor: pointer;
+    transition: all var(--duration-fast) ease;
+}
+
+.calc-mode-btn:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+}
+
+.calc-mode-btn.active {
+    background: var(--accent-blue-wash);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+}
+
+.calc-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.calc-param-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.calc-param-group input[type="range"] {
+    width: 160px;
+}
+
+.calc-param-group .param-label {
+    font-family: var(--font-mono);
+    min-width: 48px;
+    text-align: right;
+}
+
+.calc-canvas-wrap {
+    position: relative;
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-default);
+    overflow: hidden;
+}
+
+.calc-canvas {
+    width: 100%;
+    display: block;
+    cursor: crosshair;
+}
+
+.calc-info {
+    margin-top: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    min-height: 24px;
+}
+
+.calc-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    margin-top: var(--space-3);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+}
+
+.calc-legend span {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.calc-legend span::before {
+    content: '';
+    display: inline-block;
+    width: 16px;
+    height: 3px;
+    border-radius: 2px;
+}
+
+.cl-func::before { background: #5b8dce !important; }
+.cl-tangent::before { background: #c4793a !important; border-style: dashed; }
+.cl-deriv::before { background: rgba(196,121,58,0.5) !important; }
+.cl-area::before { background: rgba(77,158,126,0.3) !important; width: 16px; height: 12px; border-radius: 2px; }
+
+@media (max-width: 768px) {
+    #calc-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .calc-param-group input[type="range"] { width: 120px; }
+}
+
+/* ══════════════════════════════════════
+   Geometry Transformations
+   ══════════════════════════════════════ */
+.geo-canvas-wrap {
+    position: relative;
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-default);
+    overflow: hidden;
+}
+
+.geo-canvas {
+    width: 100%;
+    display: block;
+}
+
+#geo-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+    padding: var(--space-4) var(--space-5);
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-default);
+}
+
+.geo-param {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.geo-param label {
+    min-width: 24px;
+    font-family: var(--font-mono);
+    font-weight: 500;
+}
+
+.geo-param input[type="range"] {
+    width: 100px;
+}
+
+.geo-param .geo-val {
+    min-width: 36px;
+    text-align: right;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+}
+
+.geo-btn-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+}
+
+.geo-shape-btn, .geo-mirror-btn {
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--border-default);
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: var(--radius-default);
+    font-size: var(--text-xs);
+    cursor: pointer;
+    transition: all var(--duration-fast) ease;
+}
+
+.geo-shape-btn:hover, .geo-mirror-btn:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+}
+
+.geo-shape-btn.active {
+    background: var(--accent-blue-wash);
+    color: var(--accent-blue);
+    border-color: rgba(91,141,206,0.3);
+}
+
+.geo-mirror-btn.active {
+    background: var(--accent-purple-wash);
+    color: var(--accent-purple);
+    border-color: rgba(139,111,192,0.3);
+}
+
+.geo-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    margin-top: var(--space-3);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+}
+
+.geo-legend span {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.geo-legend span::before {
+    content: '';
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+}
+
+.gl-orig::before { background: rgba(91,141,206,0.15) !important; border: 1.5px dashed rgba(91,141,206,0.3); }
+.gl-trans::before { background: rgba(196,121,58,0.15) !important; border: 2px solid #c4793a; }
+
+@media (max-width: 768px) {
+    #geo-controls { flex-direction: column; }
+    .geo-param input[type="range"] { width: 80px; }
+}
+
+/* ===== Complex Numbers ===== */
+.cx-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.cx-op-group {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.cx-op-btn {
+    padding: 6px 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.7);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.cx-op-btn:hover { border-color: var(--accent-blue); color: #fff; }
+.cx-op-btn.active {
+    background: rgba(91,141,206,0.15);
+    border-color: var(--accent-blue);
+    color: #fff;
+}
+
+.cx-inputs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.cx-input-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.cx-input-group label {
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.6);
+    min-width: 22px;
+}
+
+.cx-input-group input[type="number"] {
+    width: 70px;
+    padding: 5px 8px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+    color: #fff;
+    font-size: 0.85rem;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.cx-input-group input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+}
+
+.cx-canvas-wrap {
+    position: relative;
+    background: #0d1017;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+
+.cx-canvas {
+    display: block;
+    width: 100%;
+    cursor: grab;
+}
+
+.cx-canvas:active { cursor: grabbing; }
+
+.cx-presets {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.cx-preset-btn {
+    padding: 5px 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.03);
+    color: rgba(255,255,255,0.6);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.cx-preset-btn:hover { border-color: var(--accent-green); color: #fff; }
+
+.cx-euler-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.cx-euler-controls label {
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.6);
+}
+
+.cx-euler-controls input[type="range"] {
+    width: 180px;
+}
+
+#cx-info {
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.06);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+}
+
+.cx-info-row {
+    display: flex;
+    gap: 8px;
+    padding: 3px 0;
+    color: rgba(255,255,255,0.8);
+}
+
+.cx-label {
+    color: rgba(255,255,255,0.5);
+    min-width: 60px;
+}
+
+.cx-result {
+    color: #4d9e7e;
+    font-weight: 600;
+}
+
+.cx-formula {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.5);
+    font-style: italic;
+    font-size: 0.82rem;
+}
+
+.cx-legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 8px;
+}
+
+.cx-legend span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.6);
+}
+
+.cx-legend span::before {
+    content: '';
+    width: 12px;
+    height: 3px;
+    border-radius: 2px;
+}
+
+.cxl-z1::before { background: #5b8dce; }
+.cxl-z2::before { background: #8b6fc0; }
+.cxl-result::before { background: #4d9e7e; }
+
+@media (max-width: 768px) {
+    .cx-controls { flex-direction: column; align-items: flex-start; }
+    .cx-inputs { flex-direction: column; align-items: flex-start; }
+    .cx-euler-controls { flex-direction: column; align-items: flex-start; }
+    .cx-euler-controls input[type="range"] { width: 100%; }
+}

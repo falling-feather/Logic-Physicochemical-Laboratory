@@ -1,0 +1,69 @@
+/* ===== Biology Module Styles ===== */
+
+.bio-canvas {
+    width: 100%;
+    max-width: 700px;
+    height: auto;
+    border-radius: var(--radius-md);
+    background: rgba(0,0,0,0.2);
+    border: 1px solid rgba(58,158,143,0.15);
+}
+
+.bio-info {
+    margin-top: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-sm);
+    background: rgba(58,158,143,0.06);
+    border-left: 3px solid var(--accent-teal);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    min-height: 2.4em;
+}
+
+.bio-select {
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-sm);
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    font-size: var(--text-sm);
+    font-family: var(--font-sans);
+    cursor: pointer;
+}
+
+.bio-select:focus {
+    outline: none;
+    border-color: var(--accent-teal);
+    box-shadow: 0 0 0 2px rgba(58,158,143,0.2);
+}
+
+/* Punnett Square */
+.punnett-table {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    max-width: 240px;
+    margin: var(--space-3) auto;
+}
+
+.punnett-cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: 600;
+}
+
+.punnett-header {
+    background: rgba(58,158,143,0.12);
+    color: var(--accent-teal);
+}
+
+.punnett-result {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    color: var(--text-primary);
+}

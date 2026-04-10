@@ -1,0 +1,406 @@
+/* ===== Physics Demo ===== */
+
+.physics-canvas {
+    width: 100%;
+    height: 400px;
+    border-radius: var(--radius-default);
+    background: var(--surface-0);
+    border: 1px solid var(--border-subtle);
+    cursor: crosshair;
+    touch-action: none;
+}
+
+.physics-controls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}
+
+.range-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.range {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--surface-3);
+    outline: none;
+}
+
+.range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-purple);
+    cursor: pointer;
+    border: 2px solid var(--surface-0);
+    box-shadow: 0 0 6px rgba(139,111,192,0.4);
+}
+
+.range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-purple);
+    cursor: pointer;
+    border: 2px solid var(--surface-0);
+}
+
+.range-value {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--accent-purple);
+    min-width: 3ch;
+    text-align: right;
+}
+
+.range-unit {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    min-width: 3ch;
+}
+
+.physics-actions {
+    display: flex;
+    gap: var(--space-3);
+}
+
+.physics-actions .btn {
+    flex: 1;
+}
+
+.physics-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--text-sm);
+    color: var(--text-tertiary);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-subtle);
+}
+
+.physics-stats strong {
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+}
+
+/* ===== Electromagnetic Field Demo ===== */
+
+.em-canvas {
+    width: 100%;
+    height: 400px;
+    border-radius: var(--radius-default);
+    background: var(--surface-0);
+    border: 1px solid var(--border-subtle);
+    cursor: default;
+    touch-action: none;
+}
+
+.em-controls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.em-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+}
+
+.em-actions .btn {
+    flex: 1;
+    min-width: 0;
+}
+
+.btn--pos {
+    background: rgba(239, 68, 68, 0.12);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+.btn--pos:hover {
+    background: rgba(239, 68, 68, 0.22);
+}
+
+.btn--neg {
+    background: rgba(59, 130, 246, 0.12);
+    color: #93c5fd;
+    border: 1px solid rgba(59, 130, 246, 0.25);
+}
+.btn--neg:hover {
+    background: rgba(59, 130, 246, 0.22);
+}
+
+.em-toggle-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.em-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.em-toggle input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 36px;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--surface-3);
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+
+.em-toggle input[type="checkbox"]::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+    transition: transform 0.2s, background 0.2s;
+}
+
+.em-toggle input[type="checkbox"]:checked {
+    background: var(--accent-purple);
+}
+
+.em-toggle input[type="checkbox"]:checked::after {
+    transform: translateX(16px);
+    background: #fff;
+}
+
+.em-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--text-sm);
+    color: var(--text-tertiary);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-subtle);
+}
+
+.em-stats strong {
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+}
+
+/* ===== Wave Demo ===== */
+
+.wave-canvas {
+    width: 100%;
+    height: 320px;
+    border-radius: var(--radius-default);
+    background: var(--surface-0);
+    border: 1px solid var(--border-subtle);
+}
+
+.wave-controls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}
+
+.wave-param-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.wave-param-group h4 {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.wave-param-group h4 .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+.dot--w1 { background: #ef4444; }
+.dot--w2 { background: #3b82f6; }
+
+.wave-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.wave-presets .btn {
+    font-size: var(--text-xs);
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+}
+
+.wave-presets .btn.active {
+    background: var(--accent-purple);
+    color: #fff;
+    border-color: var(--accent-purple);
+}
+
+.wave-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+}
+
+/* ===== Relativity Demo ===== */
+
+.rel-mode-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+}
+
+.rel-mode-btn {
+    padding: 0.45rem 1rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.rel-mode-btn:hover {
+    border-color: var(--accent-purple);
+    color: var(--text-primary);
+}
+
+.rel-mode-btn.active {
+    background: var(--accent-purple);
+    color: #fff;
+    border-color: var(--accent-purple);
+}
+
+.rel-velocity-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+.rel-velocity-row label {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.rel-velocity-row input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent-purple);
+}
+
+.rel-velocity-row .rel-val {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent-purple);
+    font-weight: 600;
+    min-width: 4em;
+    text-align: right;
+}
+
+.relativity-canvas-wrap {
+    position: relative;
+    width: 100%;
+    height: 380px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    margin-bottom: var(--space-4);
+}
+
+.relativity-canvas-wrap canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.rel-actions {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+}
+
+.rel-actions button {
+    padding: 0.4rem 1rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.82rem;
+    transition: all 0.2s;
+}
+
+.rel-actions button:hover {
+    border-color: var(--accent-purple);
+    color: var(--text-primary);
+}
+
+.rel-info {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+}
+
+.rel-info h3 {
+    color: var(--accent-purple);
+    margin-bottom: var(--space-2);
+    font-size: 1rem;
+}
+
+.rel-info p {
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    line-height: 1.7;
+    margin-bottom: var(--space-2);
+}
+
+@media (max-width: 768px) {
+    .physics-canvas,
+    .em-canvas {
+        height: 300px;
+    }
+    .wave-canvas {
+        height: 250px;
+    }
+    .relativity-canvas-wrap {
+        height: 300px;
+    }
+}
+
+@media (max-width: 480px) {
+    .physics-canvas,
+    .em-canvas {
+        height: 250px;
+    }
+    .wave-canvas {
+        height: 200px;
+    }
+    .relativity-canvas-wrap {
+        height: 240px;
+    }
+}
