@@ -16,6 +16,17 @@
     border-color: var(--accent-teal);
 }
 
+/* ── Typography Baseline (match other modules) ── */
+#page-biology {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+#page-biology .demo-section {
+    font-family: var(--font-body);
+    font-stretch: normal;
+}
+
 /* ── Canvas ── */
 .bio-canvas {
     display: block;
@@ -267,7 +278,7 @@
     border: 1px solid rgba(58,158,143,.35);
     background: transparent;
     color: var(--text-secondary);
-    font-size: .82rem;
+    font-size: var(--text-sm);
     cursor: pointer;
     transition: all .2s;
 }
@@ -463,7 +474,7 @@
     .dna-mode-btn,
     .photo-mode-btn {
         padding: 2px var(--space-2);
-        font-size: 11px;
+        font-size: var(--text-xs);
     }
 }
 
@@ -552,14 +563,14 @@
 /* ══════ Neural Regulation v2 ══════ */
 .neural-controls { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; justify-content:space-between; }
 .neural-mode-btns { display:flex; gap:6px; }
-.neural-mode-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.neural-mode-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:var(--text-sm); transition:all .2s; }
 .neural-mode-btn.active { background:rgba(58,158,143,.18); color:var(--text-primary); border-color:rgba(58,158,143,.5); }
 .neur-ctrl-right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-.neur-slider-label { display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--text-secondary); }
+.neur-slider-label { display:flex; align-items:center; gap:6px; font-size:var(--text-sm); color:var(--text-secondary); }
 .neur-slider { width:80px; accent-color:var(--accent-teal); }
-.neur-info { margin-top:14px; padding:14px 16px; background:rgba(58,158,143,.04); border:1px solid rgba(58,158,143,.12); border-radius:var(--radius-md); font-size:.84rem; line-height:1.65; }
+.neur-info { margin-top:14px; padding:14px 16px; background:rgba(58,158,143,.04); border:1px solid rgba(58,158,143,.12); border-radius:var(--radius-md); font-size:var(--text-sm); line-height:1.65; }
 .neur-hd { font-weight:600; margin-bottom:6px; }
-.neur-tag { display:inline-block; padding:1px 8px; border-radius:10px; font-size:.76rem; background:rgba(58,158,143,.15); color:var(--accent-teal); margin-right:6px; }
+.neur-tag { display:inline-block; padding:1px 8px; border-radius:10px; font-size:var(--text-xs); background:rgba(58,158,143,.15); color:var(--accent-teal); margin-right:6px; }
 .neur-tag--red { background:rgba(224,108,117,.15); color:#e06c75; }
 .neur-row { padding:3px 0; display:flex; gap:8px; flex-wrap:wrap; }
 .neur-key { flex-shrink:0; font-weight:600; color:var(--accent-teal); }
@@ -568,7 +579,7 @@
 .neur-key--pink { color:#e06c75; }
 .neur-key--blue { color:#61afef; }
 .neur-key--purple { color:#c678dd; }
-.neur-note { margin-top:6px; padding:6px 10px; background:rgba(229,192,123,.06); border-radius:var(--radius-sm); color:var(--text-secondary); font-size:.8rem; }
+.neur-note { margin-top:6px; padding:6px 10px; background:rgba(229,192,123,.06); border-radius:var(--radius-sm); color:var(--text-secondary); font-size:var(--text-sm); }
 @media (max-width: 768px) {
     .neural-controls { flex-direction: column; align-items: flex-start; }
     .neur-slider { width: 60px; }
@@ -577,88 +588,88 @@
 /* ══════ Immune System v2 ══════ */
 .immune-controls { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; justify-content:space-between; }
 .immune-mode-btns { display:flex; gap:6px; }
-.immune-mode-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.immune-mode-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:var(--text-sm); transition:all .2s; }
 .immune-mode-btn.active { background:rgba(58,158,143,.18); color:var(--text-primary); border-color:rgba(58,158,143,.5); }
 .imm-ctrl-right { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-.imm-slider-label { font-size:.78rem; color:var(--text-secondary); display:flex; align-items:center; gap:6px; }
+.imm-slider-label { font-size:var(--text-xs); color:var(--text-secondary); display:flex; align-items:center; gap:6px; }
 .imm-slider { width:70px; accent-color:var(--biology,#3a9e8f); }
-.imm-info { margin-top:.75rem; font-size:.82rem; color:rgba(255,255,255,.6); line-height:1.8; }
-.imm-hd { margin-bottom:.45rem; font-weight:600; font-size:.9rem; color:#fff; }
-.imm-tag { display:inline-block; padding:.1rem .45rem; border-radius:3px; font-size:.72rem; font-weight:600; background:rgba(91,141,206,.15); color:#7eb8f0; margin-right:.4rem; vertical-align:middle; }
+.imm-info { margin-top:.75rem; font-size:var(--text-sm); color:rgba(255,255,255,.6); line-height:1.8; }
+.imm-hd { margin-bottom:.45rem; font-weight:600; font-size:var(--text-sm); color:#fff; }
+.imm-tag { display:inline-block; padding:.1rem .45rem; border-radius:3px; font-size:var(--text-xs); font-weight:600; background:rgba(91,141,206,.15); color:#7eb8f0; margin-right:.4rem; vertical-align:middle; }
 .imm-tag--purple { background:rgba(139,111,192,.15); color:#b48eed; }
 .imm-row { margin-bottom:.3rem; }
-.imm-key { display:inline-block; padding:.1rem .4rem; border-radius:3px; font-size:.72rem; font-weight:600; background:rgba(91,141,206,.12); color:#7eb8f0; margin-right:.35rem; vertical-align:middle; }
+.imm-key { display:inline-block; padding:.1rem .4rem; border-radius:3px; font-size:var(--text-xs); font-weight:600; background:rgba(91,141,206,.12); color:#7eb8f0; margin-right:.35rem; vertical-align:middle; }
 .imm-key--purple { background:rgba(139,111,192,.12); color:#b48eed; }
 .imm-key--green { background:rgba(77,158,126,.12); color:#4d9e7e; }
 .imm-key--orange { background:rgba(229,192,123,.12); color:#e5c07b; }
 .imm-key--amber { background:rgba(229,192,123,.12); color:#e5c07b; }
-.imm-note { margin-top:.5rem; font-size:.78rem; color:rgba(255,255,255,.4); }
+.imm-note { margin-top:.5rem; font-size:var(--text-xs); color:rgba(255,255,255,.4); }
 @media (max-width: 768px) { .immune-controls { flex-direction:column; align-items:flex-start; } .imm-ctrl-right { width:100%; } }
 
 /* ══════ Ecosystem ══════ */
 .eco-controls { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
 .eco-mode-btns { display:flex; gap:6px; }
-.eco-mode-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.eco-mode-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:var(--text-sm); transition:all .2s; }
 .eco-mode-btn.active { background:rgba(58,158,143,.18); color:var(--text-primary); border-color:rgba(58,158,143,.5); }
 @media (max-width: 768px) { .eco-controls { flex-direction: column; align-items: flex-start; } }
 
 /* ══════ Meiosis ══════ */
 .meio-controls { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
-.meio-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.meio-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:var(--text-sm); transition:all .2s; }
 .meio-btn.active { background:rgba(58,158,143,.18); color:var(--text-primary); border-color:rgba(58,158,143,.5); }
-.meio-speed { display:flex; align-items:center; gap:4px; font-size:.82rem; color:var(--text-secondary); }
+.meio-speed { display:flex; align-items:center; gap:4px; font-size:var(--text-sm); color:var(--text-secondary); }
 .meio-speed input[type="range"] { width:60px; accent-color:var(--accent-teal,#3a9e8f); }
 @media (max-width: 768px) { .meio-controls { flex-direction: column; align-items: flex-start; } }
 
 /* ══════ Gene Expression ══════ */
 .genexp-controls { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
-.genexp-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.genexp-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:var(--text-sm); transition:all .2s; }
 .genexp-btn.active { background:rgba(58,158,143,.18); color:var(--text-primary); border-color:rgba(58,158,143,.5); }
-.genexp-speed { display:flex; align-items:center; gap:4px; font-size:.82rem; color:var(--text-secondary); }
+.genexp-speed { display:flex; align-items:center; gap:4px; font-size:var(--text-sm); color:var(--text-secondary); }
 .genexp-speed input[type="range"] { width:60px; accent-color:var(--accent-teal,#3a9e8f); }
 @media (max-width: 768px) { .genexp-controls { flex-direction: column; align-items: flex-start; } }
 
 /* ══════ Cellular Respiration ══════ */
 .cellresp-controls { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
 .cellresp-stage-btns { display:flex; gap:6px; }
-.cellresp-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.cellresp-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:var(--text-sm); transition:all .2s; }
 .cellresp-btn.active { background:rgba(58,158,143,.18); color:var(--text-primary); border-color:rgba(58,158,143,.5); }
-.cellresp-speed { display:flex; align-items:center; gap:4px; font-size:.82rem; color:var(--text-secondary); }
+.cellresp-speed { display:flex; align-items:center; gap:4px; font-size:var(--text-sm); color:var(--text-secondary); }
 .cellresp-speed input[type="range"] { width:60px; accent-color:var(--accent-teal,#3a9e8f); }
 @media (max-width: 768px) { .cellresp-controls { flex-direction: column; align-items: flex-start; } }
 
 /* ══════ Substance Transport ══════ */
 .strans-controls { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
 .strans-mode-btns { display:flex; gap:6px; flex-wrap:wrap; }
-.strans-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.strans-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:var(--text-sm); transition:all .2s; }
 .strans-btn.active { background:rgba(58,158,143,.18); color:var(--text-primary); border-color:rgba(58,158,143,.5); }
-.strans-speed { display:flex; align-items:center; gap:4px; font-size:.82rem; color:var(--text-secondary); }
+.strans-speed { display:flex; align-items:center; gap:4px; font-size:var(--text-sm); color:var(--text-secondary); }
 .strans-speed input[type="range"] { width:60px; accent-color:var(--accent-teal,#3a9e8f); }
 @media (max-width: 768px) { .strans-controls { flex-direction: column; align-items: flex-start; } }
 
 /* ══════ Gene Mutation v2 ══════ */
 .gmut-controls { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
 .gmut-mode-btns { display:flex; gap:6px; }
-.gmut-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.gmut-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:var(--text-sm); transition:all .2s; }
 .gmut-btn:hover { background:rgba(58,158,143,.1); }
 .gmut-btn.active { background:rgba(58,158,143,.18); color:var(--text-primary); border-color:rgba(58,158,143,.5); }
-.gmut-trigger-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(255,180,50,.4); background:rgba(255,180,50,.1); color:rgba(255,200,100,.9); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.gmut-trigger-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(255,180,50,.4); background:rgba(255,180,50,.1); color:rgba(255,200,100,.9); cursor:pointer; font-size:var(--text-sm); transition:all .2s; }
 .gmut-trigger-btn:hover { background:rgba(255,180,50,.2); }
-.gmut-speed { display:flex; align-items:center; gap:4px; font-size:.82rem; color:var(--text-secondary); }
+.gmut-speed { display:flex; align-items:center; gap:4px; font-size:var(--text-sm); color:var(--text-secondary); }
 .gmut-speed input[type="range"] { width:60px; accent-color:var(--accent-teal,#3a9e8f); }
 .gmut-info { background:rgba(15,23,42,.45); border:1px solid rgba(58,158,143,.15); border-radius:var(--radius-md,10px); padding:16px 18px; margin-top:12px; }
 .gmut-info-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; }
 .gmut-info-block { background:rgba(30,41,59,.5); border-radius:var(--radius-sm,6px); padding:10px 12px; }
-.gmut-info-block h4 { margin:0 0 6px; font-size:.88rem; color:var(--text-primary,#e2e8f0); }
-.gmut-info-block p { margin:0; font-size:.8rem; color:var(--text-secondary,#94a3b8); line-height:1.5; }
-.gmut-sub { margin-top:4px!important; font-size:.78rem!important; color:var(--text-tertiary,#64748b)!important; }
+.gmut-info-block h4 { margin:0 0 6px; font-size:var(--text-sm); color:var(--text-primary,#e2e8f0); }
+.gmut-info-block p { margin:0; font-size:var(--text-sm); color:var(--text-secondary,#94a3b8); line-height:1.5; }
+.gmut-sub { margin-top:4px!important; font-size:var(--text-xs)!important; color:var(--text-tertiary,#64748b)!important; }
 .gmut-aa-seq { display:flex; flex-wrap:wrap; gap:2px 4px; align-items:center; font-family:monospace; font-size:.82rem!important; }
 .gmut-aa-seq span { padding:1px 4px; border-radius:3px; }
 .gmut-stop { color:#ef4444!important; background:rgba(239,68,68,.12); }
 .gmut-start { color:#22c55e!important; background:rgba(34,197,94,.12); }
 .gmut-changed { outline:1.5px solid rgba(251,191,36,.5); background:rgba(251,191,36,.1)!important; }
 .gmut-summary { border-left:3px solid rgba(58,158,143,.4); }
-.gmut-table { width:100%; border-collapse:collapse; font-size:.78rem; margin-top:6px; }
+.gmut-table { width:100%; border-collapse:collapse; font-size:var(--text-xs); margin-top:6px; }
 .gmut-table th { text-align:left; padding:4px 6px; border-bottom:1px solid rgba(100,116,139,.25); color:var(--text-primary,#e2e8f0); font-weight:600; }
 .gmut-table td { padding:4px 6px; border-bottom:1px solid rgba(100,116,139,.1); color:var(--text-secondary,#94a3b8); }
 @media (max-width: 768px) { .gmut-controls { flex-direction:column; align-items:flex-start; } .gmut-info-grid { grid-template-columns:1fr; } }
