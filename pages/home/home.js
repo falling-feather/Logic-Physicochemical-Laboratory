@@ -558,16 +558,29 @@ function initShootingStars() {
     setTimeout(spawnStar, 2000 + Math.random() * 3000);
 }
 
-// ===== 首页初始化 =====
+// ===== 首页初始化（分阶段，避免首次加载卡顿）=====
 function initHome() {
-    ParticleNetwork.init();
-    HUDData.init();
-    createStars();
-    initParallax();
-    initEyeTracking();
+    // ── Phase 1 (同步): 关键布局 — 卫星定位 + 主星球已在 DOM 可见 ──
     SatelliteSystem.init();
-    initShootingStars();
-    TaglineTyper.init();
+
+    if (window.__loadProgress) window.__loadProgress(85);
+
+    // ── Phase 2 (下一帧): 背景视觉 ──
+    requestAnimationFrame(function () {
+        ParticleNetwork.init();
+        createStars();
+        initParallax();
+
+        if (window.__loadProgress) window.__loadProgress(95);
+
+        // ── Phase 3 (再下一帧): 细节动效 ──
+        requestAnimationFrame(function () {
+            HUDData.init();
+            initEyeTracking();
+            initShootingStars();
+            TaglineTyper.init();
+        });
+    });
 }
 
 // 导出全局

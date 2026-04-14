@@ -36,8 +36,41 @@
     <link rel="stylesheet" href="pages/biology/biology.css">
     <!-- CSS: Responsive (must be last) -->
     <link rel="stylesheet" href="shared/css/responsive.css">
+
+    <!-- Loading Screen (inline — zero dependency, shows immediately) -->
+    <style id="loading-screen-styles">
+      #loading-screen{position:fixed;inset:0;z-index:99999;background:#0a0e1a;display:flex;flex-direction:column;justify-content:center;align-items:center;transition:opacity .6s ease,visibility .6s ease}
+      #loading-screen.hidden{opacity:0;visibility:hidden;pointer-events:none}
+      .loader-wrap{position:relative;width:140px;height:140px;display:flex;justify-content:center;align-items:center}
+      .loader-planet{width:64px;height:64px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#5b8dce,#1a3a6a 60%,#0d1b3e);box-shadow:0 0 40px rgba(91,141,206,.25),inset -6px -6px 16px rgba(0,0,0,.5);animation:lp-pulse 2s ease-in-out infinite}
+      .loader-ring{position:absolute;border:2px solid transparent;border-radius:50%;border-top-color:rgba(91,141,206,.5);animation:lp-spin 1.2s linear infinite}
+      .loader-ring--outer{width:120px;height:120px}
+      .loader-ring--inner{width:100px;height:100px;border-top-color:rgba(91,141,206,.25);animation-duration:1.8s;animation-direction:reverse}
+      .loader-text{margin-top:28px;color:rgba(180,200,230,.6);font-family:'Inter',system-ui,sans-serif;font-size:13px;letter-spacing:3px;text-transform:uppercase}
+      .loader-bar{margin-top:14px;width:160px;height:2px;background:rgba(91,141,206,.12);border-radius:1px;overflow:hidden}
+      .loader-bar-fill{height:100%;width:5%;background:linear-gradient(90deg,rgba(91,141,206,.7),rgba(130,190,255,.85));border-radius:1px;transition:width .4s cubic-bezier(.4,0,.2,1)}
+      @keyframes lp-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+      @keyframes lp-spin{to{transform:rotate(360deg)}}
+    </style>
 </head>
 <body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" role="status" aria-label="页面加载中">
+        <div class="loader-wrap">
+            <div class="loader-planet"></div>
+            <div class="loader-ring loader-ring--outer"></div>
+            <div class="loader-ring loader-ring--inner"></div>
+        </div>
+        <div class="loader-text">正在加载</div>
+        <div class="loader-bar"><div class="loader-bar-fill" id="loading-bar"></div></div>
+    </div>
+    <script>
+        window.__loadProgress = function(p) {
+            var b = document.getElementById('loading-bar');
+            if (b) b.style.width = Math.min(p, 100) + '%';
+        };
+        window.__loadProgress(5);
+    </script>
     <!-- ═══════════════ Navigation ═══════════════ -->
     <nav class="navbar navbar--transparent" id="navbar">
         <div class="nav-container">
@@ -2414,72 +2447,68 @@
     <script src="shared/js/common.js"></script>
     <!-- Scripts: Home -->
     <script src="pages/home/home.js"></script>
-    <!-- Scripts: Mathematics -->
-    <script src="pages/mathematics/mathematics.js"></script>
-    <script src="pages/mathematics/calculus.js"></script>
-    <script src="pages/mathematics/geometry.js"></script>
-    <script src="pages/mathematics/complex-numbers.js"></script>
-    <script src="pages/mathematics/trigonometry.js"></script>
-    <script src="pages/mathematics/set-operations.js"></script>
-    <script src="pages/mathematics/probability.js"></script>
-    <script src="pages/mathematics/vector-ops.js"></script>
-    <script src="pages/mathematics/inequality.js"></script>
-    <script src="pages/mathematics/conic-sections.js"></script>
-    <script src="pages/mathematics/solid-geometry.js"></script>
-    <script src="pages/mathematics/permutation-combination.js"></script>
-    <script src="pages/mathematics/sequences.js"></script>
-    <!-- Scripts: Physics -->
-    <script src="pages/physics/physics.js"></script>
-    <script src="pages/physics/electromagnetic.js"></script>
-    <script src="pages/physics/waves.js"></script>
-    <script src="pages/physics/relativity.js"></script>
-    <script src="pages/physics/fluid-dynamics.js"></script>
-    <script src="pages/physics/optics.js"></script>
-    <script src="pages/physics/kinematics.js"></script>
-    <script src="pages/physics/projectile.js"></script>
-    <script src="pages/physics/circular-motion.js"></script>
-    <script src="pages/physics/energy-conservation.js"></script>
-    <script src="pages/physics/circuit-analysis.js"></script>
-    <script src="pages/physics/electromagnetic-induction.js"></script>
-    <script src="pages/physics/alternating-current.js"></script>
-    <script src="pages/physics/gravitation.js"></script>
-    <!-- Scripts: Chemistry -->
-    <script src="pages/chemistry/periodic-table.js"></script>
-    <script src="pages/chemistry/molecular-structure.js"></script>
-    <script src="pages/chemistry/chemical-reactions.js"></script>
-    <script src="pages/chemistry/chemical-equilibrium.js"></script>
-    <script src="pages/chemistry/electrochemistry.js"></script>
-    <script src="pages/chemistry/chemical-bond.js"></script>
-    <script src="pages/chemistry/organic-chemistry.js"></script>
-    <script src="pages/chemistry/reaction-rate.js"></script>
-    <script src="pages/chemistry/solution-ionization.js"></script>
-    <script src="pages/chemistry/ionic-reaction.js"></script>
-    <script src="pages/chemistry/redox.js"></script>
-    <!-- Scripts: Algorithms -->
-    <script src="pages/algorithms/algorithms.js"></script>
-    <script src="pages/algorithms/search-algorithms.js"></script>
-    <script src="pages/algorithms/graph-algo.js"></script>
-    <script src="pages/algorithms/data-structures.js"></script>
-    <script src="pages/algorithms/sorting-compare.js"></script>
-    <script src="pages/algorithms/recursion-vis.js"></script>
-    <script src="pages/algorithms/dynamic-programming.js"></script>
-    <script src="pages/algorithms/string-matching.js"></script>
-    <!-- Scripts: Biology -->
-    <script src="pages/biology/biology.js"></script>
-    <script src="pages/biology/cell-structure.js"></script>
-    <script src="pages/biology/dna-helix.js"></script>
-    <script src="pages/biology/photosynthesis.js"></script>
-    <script src="pages/biology/genetics.js"></script>
-    <script src="pages/biology/mitosis.js"></script>
-    <script src="pages/biology/neural-regulation.js"></script>
-    <script src="pages/biology/immune-system.js"></script>
-    <script src="pages/biology/ecosystem.js"></script>
-    <script src="pages/biology/meiosis.js"></script>
-    <script src="pages/biology/gene-expression.js"></script>
-    <script src="pages/biology/cellular-respiration.js"></script>
-    <script src="pages/biology/substance-transport.js"></script>
-    <script src="pages/biology/gene-mutation.js"></script>
-    <!-- Scripts: Bootstrap -->
+    <!-- Scripts: Bootstrap (before deferred modules for fast homepage boot) -->
     <script src="shared/js/main.js"></script>
+    <!-- Scripts: Subject modules (deferred — download in parallel, execute after core) -->
+    <script defer src="pages/mathematics/mathematics.js"></script>
+    <script defer src="pages/mathematics/calculus.js"></script>
+    <script defer src="pages/mathematics/geometry.js"></script>
+    <script defer src="pages/mathematics/complex-numbers.js"></script>
+    <script defer src="pages/mathematics/trigonometry.js"></script>
+    <script defer src="pages/mathematics/set-operations.js"></script>
+    <script defer src="pages/mathematics/probability.js"></script>
+    <script defer src="pages/mathematics/vector-ops.js"></script>
+    <script defer src="pages/mathematics/inequality.js"></script>
+    <script defer src="pages/mathematics/conic-sections.js"></script>
+    <script defer src="pages/mathematics/solid-geometry.js"></script>
+    <script defer src="pages/mathematics/permutation-combination.js"></script>
+    <script defer src="pages/mathematics/sequences.js"></script>
+    <script defer src="pages/physics/physics.js"></script>
+    <script defer src="pages/physics/electromagnetic.js"></script>
+    <script defer src="pages/physics/waves.js"></script>
+    <script defer src="pages/physics/relativity.js"></script>
+    <script defer src="pages/physics/fluid-dynamics.js"></script>
+    <script defer src="pages/physics/optics.js"></script>
+    <script defer src="pages/physics/kinematics.js"></script>
+    <script defer src="pages/physics/projectile.js"></script>
+    <script defer src="pages/physics/circular-motion.js"></script>
+    <script defer src="pages/physics/energy-conservation.js"></script>
+    <script defer src="pages/physics/circuit-analysis.js"></script>
+    <script defer src="pages/physics/electromagnetic-induction.js"></script>
+    <script defer src="pages/physics/alternating-current.js"></script>
+    <script defer src="pages/physics/gravitation.js"></script>
+    <script defer src="pages/chemistry/periodic-table.js"></script>
+    <script defer src="pages/chemistry/molecular-structure.js"></script>
+    <script defer src="pages/chemistry/chemical-reactions.js"></script>
+    <script defer src="pages/chemistry/chemical-equilibrium.js"></script>
+    <script defer src="pages/chemistry/electrochemistry.js"></script>
+    <script defer src="pages/chemistry/chemical-bond.js"></script>
+    <script defer src="pages/chemistry/organic-chemistry.js"></script>
+    <script defer src="pages/chemistry/reaction-rate.js"></script>
+    <script defer src="pages/chemistry/solution-ionization.js"></script>
+    <script defer src="pages/chemistry/ionic-reaction.js"></script>
+    <script defer src="pages/chemistry/redox.js"></script>
+    <script defer src="pages/algorithms/algorithms.js"></script>
+    <script defer src="pages/algorithms/search-algorithms.js"></script>
+    <script defer src="pages/algorithms/graph-algo.js"></script>
+    <script defer src="pages/algorithms/data-structures.js"></script>
+    <script defer src="pages/algorithms/sorting-compare.js"></script>
+    <script defer src="pages/algorithms/recursion-vis.js"></script>
+    <script defer src="pages/algorithms/dynamic-programming.js"></script>
+    <script defer src="pages/algorithms/string-matching.js"></script>
+    <script defer src="pages/biology/biology.js"></script>
+    <script defer src="pages/biology/cell-structure.js"></script>
+    <script defer src="pages/biology/dna-helix.js"></script>
+    <script defer src="pages/biology/photosynthesis.js"></script>
+    <script defer src="pages/biology/genetics.js"></script>
+    <script defer src="pages/biology/mitosis.js"></script>
+    <script defer src="pages/biology/neural-regulation.js"></script>
+    <script defer src="pages/biology/immune-system.js"></script>
+    <script defer src="pages/biology/ecosystem.js"></script>
+    <script defer src="pages/biology/meiosis.js"></script>
+    <script defer src="pages/biology/gene-expression.js"></script>
+    <script defer src="pages/biology/cellular-respiration.js"></script>
+    <script defer src="pages/biology/substance-transport.js"></script>
+    <script defer src="pages/biology/gene-mutation.js"></script>
 </body>
 </html>

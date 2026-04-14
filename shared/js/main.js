@@ -1,6 +1,8 @@
 // ===== Main Application Bootstrap =====
 
 function initApp() {
+    if (window.__loadProgress) window.__loadProgress(30);
+
     // 1. Initialize card system
     initExperimentCards();
 
@@ -16,10 +18,15 @@ function initApp() {
     // 4. Initialize scroll animation system
     if (typeof initScrollAnimations === 'function') initScrollAnimations();
 
-    // 5. Initialize router (page transitions)
+    // 5. Render Lucide icons (before Router so satellite icons are ready)
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    if (window.__loadProgress) window.__loadProgress(50);
+
+    // 6. Initialize router (page transitions — triggers initHome for homepage)
     Router.init();
 
-    // 6. Speed slider for bucket sort
+    // 7. Speed slider for bucket sort
     const speedInput = document.getElementById('sort-speed');
     if (speedInput) {
         speedInput.addEventListener('input', (e) => {
@@ -34,9 +41,6 @@ function initApp() {
             }
         });
     }
-
-    // 7. Render Lucide icons
-    if (typeof lucide !== 'undefined') lucide.createIcons();
 
     // 8. Nav indicator initial position
     requestAnimationFrame(() => {
@@ -59,6 +63,20 @@ function initApp() {
 
     // 11. Footer visibility based on current page
     updateFooterVisibility();
+
+    // 12. Dismiss loading screen (page content is now ready)
+    if (window.__loadProgress) window.__loadProgress(100);
+    requestAnimationFrame(function () {
+        var ls = document.getElementById('loading-screen');
+        if (ls) {
+            ls.classList.add('hidden');
+            ls.addEventListener('transitionend', function () { ls.remove(); }, { once: true });
+            // Fallback removal if transitionend doesn't fire
+            setTimeout(function () { if (ls.parentNode) ls.remove(); }, 800);
+        }
+        // Clean up global helper
+        delete window.__loadProgress;
+    });
 }
 
 // ===== Back to Top =====
@@ -104,5 +122,6 @@ function updateFooterVisibility() {
 
 window.updateFooterVisibility = updateFooterVisibility;
 
-// Launch
-document.addEventListener('DOMContentLoaded', initApp);
+// Launch immediately — DOM is ready (sync script at bottom of body).
+// Do NOT use DOMContentLoaded: deferred experiment scripts would delay it.
+initApp();
