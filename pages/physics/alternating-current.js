@@ -42,6 +42,7 @@ const ACCircuit = {
         if (this._resizeObs) { this._resizeObs.disconnect(); this._resizeObs = null; }
     },
     resize() {
+        if (window.PhysicsZoom && window.PhysicsZoom.movedCanvas === this.canvas) return;
         const wrap = this.canvas.parentElement;
         if (!wrap) return;
         const dpr = window.devicePixelRatio || 1;
@@ -97,6 +98,8 @@ const ACCircuit = {
             pb.textContent = this.paused ? '▶' : '⏸';
             pb.setAttribute('aria-label', this.paused ? '继续' : '暂停');
         });
+        const rb = document.getElementById('ac-reset');
+        if (rb) this._on(rb, 'click', () => this.resetScene());
         // hover
         this._on(this.canvas, 'mousemove', e => {
             const r = this.canvas.getBoundingClientRect();
@@ -121,6 +124,45 @@ const ACCircuit = {
         this._lastT = now;
         this.draw();
         this._raf = requestAnimationFrame(() => this.loop());
+    },
+
+    resetScene() {
+        this.time = 0;
+        this.mode = 'waveform';
+        this.freq = 50;
+        this.phase = 30;
+        this.n1 = 100;
+        this.n2 = 50;
+        this.speed = 1;
+        this.paused = false;
+
+        const setVal = (id, value, outId) => {
+            const el = document.getElementById(id);
+            const out = document.getElementById(outId);
+            if (el) el.value = value;
+            if (out) out.textContent = String(value);
+        };
+        setVal('ac-freq', 50, 'ac-freq-val');
+        setVal('ac-phase', 30, 'ac-phase-val');
+        setVal('ac-n1', 100, 'ac-n1-val');
+        setVal('ac-n2', 50, 'ac-n2-val');
+        const speed = document.getElementById('ac-speed');
+        if (speed) speed.value = '1';
+
+        const pb = document.getElementById('ac-pause');
+        if (pb) {
+            pb.textContent = '⏸';
+            pb.setAttribute('aria-label', '暂停');
+        }
+
+        document.querySelectorAll('.ac-mode-btn').forEach(btn => {
+            const active = btn.dataset.mode === 'waveform';
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+
+        this.updateInfo();
+        this.draw();
     },
 
     draw() {

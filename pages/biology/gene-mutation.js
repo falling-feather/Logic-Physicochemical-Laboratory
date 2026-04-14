@@ -89,7 +89,7 @@ const GeneMutation = (() => {
            hl ? modes[mode].color + '40' : `rgba(${hexRgb(c)},0.15)`,
            hl ? modes[mode].color : c);
         ctx.shadowBlur = 0;
-        ctx.font = `bold ${Math.max(11, bw * 0.42)}px "Noto Sans SC",monospace`;
+        ctx.font = 'bold 12px "Noto Sans SC", monospace';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillStyle = c;
         ctx.fillText(base, bx + bw / 2, by + bh / 2);

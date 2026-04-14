@@ -5,6 +5,7 @@ const EMField = {
     canvas: null, ctx: null, W: 0, H: 0,
     charges: [],
     _animId: null,
+    paused: false,
 
     // 粒子轨迹模式
     particles: [],     // [{x, y, vx, vy, trail:[{x,y}], color}]
@@ -67,6 +68,7 @@ const EMField = {
         this._injectProbeToggle();
         this._injectParticlePanel();
         this._injectMagneticPanel();
+        this._injectGlobalActions();
 
         this._ro = new ResizeObserver(() => {
             this.resizeCanvas();
@@ -89,18 +91,61 @@ const EMField = {
 
     resizeCanvas() {
         if (!this.canvas) return;
+        if (window.PhysicsZoom && window.PhysicsZoom.movedCanvas === this.canvas) return;
         const container = this.canvas.parentElement;
         const rect = container.getBoundingClientRect();
         if (rect.width < 1) return;
+        const h = Math.min(Math.max(rect.width * 0.56, 340), 560);
         const dpr = window.devicePixelRatio || 1;
         this.canvas.width = rect.width * dpr;
-        this.canvas.height = rect.height * dpr;
+        this.canvas.height = h * dpr;
         this.canvas.style.width = rect.width + 'px';
-        this.canvas.style.height = rect.height + 'px';
+        this.canvas.style.height = h + 'px';
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.W = rect.width;
-        this.H = rect.height;
+        this.H = h;
         this._heatDirty = true;
+    },
+
+    _injectGlobalActions() {
+        const ctrl = document.querySelector('.em-controls');
+        if (!ctrl || document.getElementById('em-global-actions')) return;
+        const row = document.createElement('div');
+        row.id = 'em-global-actions';
+        row.className = 'physics-actions';
+        row.innerHTML = `
+            <button id="em-pause" class="btn btn--ghost">暂停</button>
+            <button id="em-reset" class="btn btn--ghost">重置</button>
+        `;
+        ctrl.appendChild(row);
+
+        const pauseBtn = document.getElementById('em-pause');
+        const resetBtn = document.getElementById('em-reset');
+        if (pauseBtn) pauseBtn.addEventListener('click', () => this.togglePause());
+        if (resetBtn) resetBtn.addEventListener('click', () => this.resetScene());
+    },
+
+    togglePause() {
+        this.paused = !this.paused;
+        const btn = document.getElementById('em-pause');
+        if (btn) btn.textContent = this.paused ? '继续' : '暂停';
+    },
+
+    resetScene() {
+        this.paused = false;
+        const btn = document.getElementById('em-pause');
+        if (btn) btn.textContent = '暂停';
+        this.probePos = null;
+        this.particles = [];
+        this.dragIndex = -1;
+        this._magDragIndex = -1;
+        if (this.displayMode === 'magnetic') {
+            this.currents = [];
+            this._magProbePos = null;
+        } else {
+            this.loadPreset('dipole');
+        }
+        this.render();
     },
 
     // ═══════════════════════════════════════════
@@ -1150,7 +1195,7 @@ const EMField = {
             this._lastTime = now;
             const dt = Math.min(rawDt, 0.1);
 
-            this._stepParticles(dt);
+            if (!this.paused) this._stepParticles(dt);
             this.render();
 
             this._animId = requestAnimationFrame(loop);

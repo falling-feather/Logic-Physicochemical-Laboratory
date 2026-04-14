@@ -74,11 +74,12 @@ const WaveDemo = {
 
     resizeCanvas() {
         if (!this.canvas) return;
+        if (window.PhysicsZoom && window.PhysicsZoom.movedCanvas === this.canvas) return;
         const container = this.canvas.parentElement;
         if (!container) return;
         const w = container.clientWidth;
         if (w === 0) return;
-        const h = container.clientHeight || Math.min(Math.round(w * 0.5), 350);
+        const h = Math.min(Math.max(Math.round(w * 0.54), 320), 520);
         const dpr = window.devicePixelRatio || 1;
         this.canvas.width = w * dpr;
         this.canvas.height = h * dpr;

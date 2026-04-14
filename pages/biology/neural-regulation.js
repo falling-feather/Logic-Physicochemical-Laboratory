@@ -282,7 +282,7 @@ const NeuralReg = {
             ctx.fillRect(caChX - 3, cy - 4, 6, 8);
             if (i === 0) {
                 ctx.fillStyle = 'rgba(229,192,123,0.4)';
-                ctx.font = `${Math.max(8, W * 0.008)}px var(--font-mono)`;
+                ctx.font = '10px var(--font-mono)';
                 ctx.textAlign = 'left';
                 ctx.fillText('Ca²⁺', caChX + 7, cy + 3);
             }
@@ -544,10 +544,10 @@ const NeuralReg = {
         ctx.stroke();
         if (naO) {
             ctx.fillStyle = 'rgba(224,108,117,0.45)';
-            ctx.font = `${Math.max(8, s * 0.28)}px var(--font-mono)`; ctx.textAlign = 'center';
+            ctx.font = '10px var(--font-mono)'; ctx.textAlign = 'center';
             ctx.fillText('Na⁺↓', cx - s * 0.65, cy + 3);
         }
-        ctx.fillStyle = 'rgba(224,108,117,0.35)'; ctx.font = `${Math.max(8, s * 0.25)}px var(--font-sans)`; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(224,108,117,0.35)'; ctx.font = '10px var(--font-sans)'; ctx.textAlign = 'center';
         ctx.fillText('Na⁺通道', cx - s * 0.6, cy - s * 0.78);
 
         // K⁺ channel
@@ -559,10 +559,10 @@ const NeuralReg = {
         ctx.stroke();
         if (kO) {
             ctx.fillStyle = 'rgba(97,175,239,0.45)';
-            ctx.font = `${Math.max(8, s * 0.28)}px var(--font-mono)`; ctx.textAlign = 'center';
+            ctx.font = '10px var(--font-mono)'; ctx.textAlign = 'center';
             ctx.fillText('K⁺↑', cx + s * 0.65, cy + 3);
         }
-        ctx.fillStyle = 'rgba(97,175,239,0.35)'; ctx.font = `${Math.max(8, s * 0.25)}px var(--font-sans)`; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(97,175,239,0.35)'; ctx.font = '10px var(--font-sans)'; ctx.textAlign = 'center';
         ctx.fillText('K⁺通道', cx + s * 0.6, cy - s * 0.78);
     },
 

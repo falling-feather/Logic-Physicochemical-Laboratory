@@ -56,16 +56,19 @@ const PhysicsSim = {
 
     resizeCanvas() {
         if (!this.canvas) return;
+        if (window.PhysicsZoom && window.PhysicsZoom.movedCanvas === this.canvas) return;
         const container = this.canvas.parentElement;
-        const rect = container.getBoundingClientRect();
+        const w = container.getBoundingClientRect().width;
+        // 用宽度推算高度，防止 ResizeObserver 循环膨胀
+        const h = Math.min(Math.max(w * 0.56, 320), 560);
         const dpr = window.devicePixelRatio || 1;
-        this.canvas.width = rect.width * dpr;
-        this.canvas.height = rect.height * dpr;
-        this.canvas.style.width = rect.width + 'px';
-        this.canvas.style.height = rect.height + 'px';
+        this.canvas.width = w * dpr;
+        this.canvas.height = h * dpr;
+        this.canvas.style.width = w + 'px';
+        this.canvas.style.height = h + 'px';
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        this.W = rect.width;
-        this.H = rect.height;
+        this.W = w;
+        this.H = h;
     },
 
     bindControls() {
@@ -97,14 +100,39 @@ const PhysicsSim = {
         });
 
         if (clearBtn) clearBtn.addEventListener('click', () => {
-            this.balls = [];
-            this.updateStats();
+            this.resetScene();
         });
 
         if (pauseBtn) pauseBtn.addEventListener('click', () => {
             this.paused = !this.paused;
             pauseBtn.textContent = this.paused ? '继续' : '暂停';
         });
+    },
+
+    resetScene() {
+        this.balls = [];
+        this.gravity = 980;
+        this.restitution = 0.75;
+        this.friction = 0.10;
+        this.ballRadius = 16;
+        this.paused = false;
+
+        const set = (id, value, outId, fmt) => {
+            const el = document.getElementById(id);
+            const out = document.getElementById(outId);
+            if (el) el.value = value;
+            if (out) out.textContent = fmt ? fmt(value) : String(value);
+        };
+        set('gravity-slider', 980, 'gravity-value');
+        set('restitution-slider', 75, 'restitution-value', v => (v / 100).toFixed(2));
+        set('friction-slider', 10, 'friction-value', v => (v / 100).toFixed(2));
+        set('radius-slider', 16, 'radius-value');
+
+        const pauseBtn = document.getElementById('physics-pause');
+        if (pauseBtn) pauseBtn.textContent = '暂停';
+
+        this.updateStats();
+        this.draw();
     },
 
     bindCanvas() {

@@ -99,6 +99,32 @@
     border-color: var(--border-default);
 }
 
+/* 各学科实验卡片：与 1 号实验一致的纵向节奏（标题区 + 主内容块） */
+#page-mathematics .content-section > .demo-section,
+#page-physics .content-section > .demo-section,
+#page-chemistry .content-section > .demo-section,
+#page-algorithms .content-section > .demo-section,
+#page-biology .content-section > .demo-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+}
+
+#page-mathematics .demo-content,
+#page-physics .demo-content,
+#page-chemistry .demo-content,
+#page-algorithms .demo-content,
+#page-biology .demo-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+}
+
+/* 微积分等：控件块较多，避免 flex gap 在每一块之间都拉开；仍保留标题区原有下边距 */
+#calculus-section.demo-section {
+    display: block;
+}
+
 .demo-layout {
     display: grid;
     grid-template-columns: 320px 1fr;

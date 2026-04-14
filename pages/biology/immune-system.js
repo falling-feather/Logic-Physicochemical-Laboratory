@@ -373,7 +373,7 @@ const ImmuneSystem = {
         g.addColorStop(0, 'rgba(255,200,200,' + (a * 0.3) + ')'); g.addColorStop(1, 'rgba(224,108,117,0)');
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, p.r * 0.7, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = 'rgba(255,255,255,' + (a * 0.5) + ')';
-        ctx.font = '7px var(--font-mono)'; ctx.textAlign = 'center';
+        ctx.font = '9px var(--font-mono)'; ctx.textAlign = 'center';
         ctx.fillText('抗原', px, py + 3);
     },
 
@@ -437,14 +437,14 @@ const ImmuneSystem = {
             ctx.fillStyle = 'rgba(77,158,126,0.15)';
             ctx.beginPath(); ctx.arc(ix, iy, ic.r, 0, Math.PI * 2); ctx.fill();
             ctx.strokeStyle = 'rgba(77,158,126,0.3)'; ctx.lineWidth = 1.5; ctx.stroke();
-            ctx.fillStyle = 'rgba(77,158,126,0.4)'; ctx.font = '7px var(--font-mono)';
+            ctx.fillStyle = 'rgba(77,158,126,0.4)'; ctx.font = '9px var(--font-mono)';
             ctx.textAlign = 'center'; ctx.fillText('CD4', ix, iy + 2);
             this._lbl(ix, iy, ic.r, 'Th');
         } else if (ic.type === 'tkiller') {
             ctx.fillStyle = 'rgba(77,158,126,0.2)';
             ctx.beginPath(); ctx.arc(ix, iy, ic.r, 0, Math.PI * 2); ctx.fill();
             ctx.strokeStyle = 'rgba(77,158,126,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
-            ctx.fillStyle = 'rgba(77,158,126,0.5)'; ctx.font = '7px var(--font-mono)';
+            ctx.fillStyle = 'rgba(77,158,126,0.5)'; ctx.font = '9px var(--font-mono)';
             ctx.textAlign = 'center'; ctx.fillText('CD8', ix, iy + 2);
             if (ic.attacking) {
                 ctx.save(); ctx.shadowColor = 'rgba(224,108,117,0.4)'; ctx.shadowBlur = 10;
@@ -458,7 +458,7 @@ const ImmuneSystem = {
     },
 
     _lbl(x, y, r, t) {
-        this.ctx.fillStyle = 'rgba(255,255,255,0.3)'; this.ctx.font = '8px var(--font-sans)';
+        this.ctx.fillStyle = 'rgba(255,255,255,0.3)'; this.ctx.font = '10px var(--font-sans)';
         this.ctx.textAlign = 'center'; this.ctx.fillText(t, x, y + r + 11);
     },
 

@@ -286,7 +286,7 @@ const GeneExpression = {
             ctx.fill();
             ctx.strokeStyle = 'rgba(58,158,143,0.3)';
             ctx.stroke();
-            ctx.font = '8px "Noto Sans SC", sans-serif';
+            ctx.font = '9px "Noto Sans SC", sans-serif';
             ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(58,158,143,0.8)';
             ctx.fillText('\u6838\u7CD6\u4F53', rx, mrnaY - 7);
@@ -327,7 +327,7 @@ const GeneExpression = {
                 ctx.stroke();
             }
             // codon label
-            ctx.font = '8px monospace';
+            ctx.font = '9px "JetBrains Mono", monospace';
             ctx.fillStyle = 'rgba(200,200,200,0.4)';
             ctx.fillText(codon, ax, proteinY + 26);
         }
@@ -349,7 +349,7 @@ const GeneExpression = {
             ctx.strokeStyle = 'rgba(255,200,100,0.5)';
             ctx.lineWidth = 1.5;
             ctx.stroke();
-            ctx.font = '8px monospace';
+            ctx.font = '9px "JetBrains Mono", monospace';
             ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(255,200,100,0.7)';
             ctx.fillText('tRNA', tx, mrnaY + 50);

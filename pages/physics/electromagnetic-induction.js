@@ -44,6 +44,7 @@ const EMInduction = {
     },
 
     resize() {
+        if (window.PhysicsZoom && window.PhysicsZoom.movedCanvas === this.canvas) return;
         const wrap = this.canvas.parentElement;
         if (!wrap) return;
         const dpr = window.devicePixelRatio || 1;
@@ -103,21 +104,49 @@ const EMInduction = {
                 if (this.mode === 'auto') { this.magnetX = 0.2; this.autoDir = 1; }
             });
         });
+
+        const pauseBtn = document.getElementById('emi-pause');
+        if (pauseBtn) {
+            pauseBtn.textContent = '暂停';
+            this._on(pauseBtn, 'click', () => {
+                this.playing = !this.playing;
+                pauseBtn.textContent = this.playing ? '暂停' : '继续';
+            });
+        }
+
+        const resetBtn = document.getElementById('emi-reset');
+        if (resetBtn) {
+            this._on(resetBtn, 'click', () => {
+                this.playing = true;
+                if (pauseBtn) pauseBtn.textContent = '暂停';
+                this.time = 0;
+                this.magnetX = 0.3;
+                this.magnetVx = 0;
+                this.dragging = false;
+                this.mode = 'manual';
+                this.autoDir = 1;
+                document.querySelectorAll('.emi-mode-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.mode === 'manual');
+                });
+            });
+        }
     },
 
     loop() {
         if (!this.running) return;
-        this.time += 0.016;
+        if (this.playing) {
+            this.time += 0.016;
 
-        if (this.mode === 'auto' && this.playing) {
-            this.magnetX += this.autoDir * 0.003;
-            this.magnetVx = this.autoDir * 0.19;
-            if (this.magnetX > 0.85) this.autoDir = -1;
-            if (this.magnetX < 0.15) this.autoDir = 1;
-        }
+            if (this.mode === 'auto') {
+                this.magnetX += this.autoDir * 0.003;
+                this.magnetVx = this.autoDir * 0.19;
+                if (this.magnetX > 0.85) this.autoDir = -1;
+                if (this.magnetX < 0.15) this.autoDir = 1;
+            }
 
-        if (!this.dragging && this.mode === 'manual') {
-            this.magnetVx *= 0.92; // damping
+            if (!this.dragging && this.mode === 'manual') {
+                this.magnetVx *= 0.92; // damping
+            }
         }
 
         this.draw();

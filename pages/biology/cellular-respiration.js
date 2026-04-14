@@ -324,7 +324,7 @@ const CellularResp = {
             ctx.arc(ex, H * 0.45, 4, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(100,200,255,0.8)';
             ctx.fill();
-            ctx.font = '7px monospace';
+            ctx.font = '9px "JetBrains Mono", monospace';
             ctx.fillStyle = '#fff';
             ctx.fillText('e\u207B', ex, H * 0.45 + 2);
         }
@@ -338,7 +338,7 @@ const CellularResp = {
             ctx.arc(hx, hy, 5, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(255,100,100,' + (0.6 - hp * 0.4) + ')';
             ctx.fill();
-            ctx.font = '7px monospace';
+            ctx.font = '9px "JetBrains Mono", monospace';
             ctx.fillStyle = 'rgba(255,255,255,' + (0.8 - hp * 0.5) + ')';
             ctx.fillText('H\u207A', hx, hy + 2);
         }
@@ -350,7 +350,7 @@ const CellularResp = {
         ctx.arc(complexes[4].x, ashy, 5, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(255,200,50,0.7)';
         ctx.fill();
-        ctx.font = '7px monospace';
+        ctx.font = '9px "JetBrains Mono", monospace';
         ctx.fillStyle = '#fff';
         ctx.fillText('H\u207A', complexes[4].x, ashy + 2);
 

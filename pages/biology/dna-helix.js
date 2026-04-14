@@ -598,7 +598,7 @@ const DNAHelix = {
                     ctx.beginPath(); ctx.moveTo(lx - 12, y); ctx.lineTo(lx - 8, y); ctx.stroke();
                     ctx.setLineDash([]);
                     ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 8px "JetBrains Mono", monospace';
+                    ctx.font = 'bold 10px "JetBrains Mono", monospace';
                     ctx.fillText(bp.complement, lx - 20, y);
 
                     // New complement for right
@@ -700,7 +700,7 @@ const DNAHelix = {
             ctx.fillStyle = this.baseColors[bp.complement] + '44';
             ctx.beginPath(); ctx.arc(rx, y, 7, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = 'rgba(255,255,255,0.5)';
-            ctx.font = '8px "JetBrains Mono", monospace';
+            ctx.font = '9px "JetBrains Mono", monospace';
             ctx.fillText(bp.complement, rx, y);
 
             // mRNA being synthesized
@@ -732,7 +732,7 @@ const DNAHelix = {
             ctx.beginPath(); ctx.ellipse(cx + 20, polY, 18, 10, 0, 0, Math.PI * 2); ctx.fill();
             ctx.strokeStyle = 'rgba(184,84,80,0.6)'; ctx.lineWidth = 1.5; ctx.stroke();
             ctx.fillStyle = 'rgba(255,255,255,0.6)';
-            ctx.font = '7px "Noto Sans SC", sans-serif';
+            ctx.font = '9px "Noto Sans SC", sans-serif';
             ctx.textAlign = 'center';
             ctx.fillText('RNA\u805a\u5408\u9176', cx + 20, polY + 2);
         }

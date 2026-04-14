@@ -228,73 +228,14 @@ const Router = {
     },
 
     onPageEnter(page) {
-        // === Lazy Module Initialization ===
-        // Modules are only initialized when their page is navigated to.
-        // They are destroyed in onPageLeave() when navigating away.
+        // === Page Initialization ===
+        // Home page initializes directly; subject pages rely on ModuleSelector
+        // for lazy per-experiment initialization (triggered when user opens an experiment).
         if (page === 'home') {
             if (typeof initHome === 'function') initHome();
-        } else if (page === 'mathematics') {
-            if (typeof updateAbacus === 'function') updateAbacus();
-            if (typeof initFunctionGraph === 'function') initFunctionGraph();
-            if (typeof initCalculus === 'function') initCalculus();
-            if (typeof initGeoTransform === 'function') initGeoTransform();
-            if (typeof initComplexVis === 'function') initComplexVis();
-            if (typeof initTrigVis === 'function') initTrigVis();
-            if (typeof initSetOps === 'function') initSetOps();
-            if (typeof initProbability === 'function') initProbability();
-            if (typeof initVectorOps === 'function') initVectorOps();
-            if (typeof initInequality === 'function') initInequality();
-            if (typeof initConicSections === 'function') initConicSections();
-            if (typeof initSolidGeom === 'function') initSolidGeom();
-            if (typeof initPermComb === 'function') initPermComb();
-            if (typeof initSequences === 'function') initSequences();
-        } else if (page === 'physics') {
-            if (typeof initPhysics === 'function') initPhysics();
-            if (typeof initElectromagnetic === 'function') initElectromagnetic();
-            if (typeof initWaves === 'function') initWaves();
-            if (typeof initRelativity === 'function') initRelativity();
-            if (typeof initFluidDynamics === 'function') initFluidDynamics();
-            if (typeof initOptics === 'function') initOptics();
-            if (typeof initKinematics === 'function') initKinematics();
-            if (typeof initProjectile === 'function') initProjectile();
-            if (typeof initCircularMotion === 'function') initCircularMotion();
-            if (typeof initEnergyConservation === 'function') initEnergyConservation();
-            if (typeof initCircuitAnalysis === 'function') initCircuitAnalysis();
-            if (typeof initEMInduction === 'function') initEMInduction();
-            if (typeof initACCircuit === 'function') initACCircuit();
-            if (typeof initGravitation === 'function') initGravitation();
-        } else if (page === 'chemistry') {
-            if (typeof initPeriodicTable === 'function') initPeriodicTable();
-            if (typeof initMoleculeVis === 'function') initMoleculeVis();
-            if (typeof initChemReaction === 'function') initChemReaction();
-            if (typeof initChemEquilibrium === 'function') initChemEquilibrium();
-            if (typeof initElectrochemistry === 'function') initElectrochemistry();
-            if (typeof initChemBond === 'function') initChemBond();
-            if (typeof initOrganicChem === 'function') initOrganicChem();
-            if (typeof initReactionRate === 'function') initReactionRate();
-            if (typeof initSolutionIon === 'function') initSolutionIon();
-            if (typeof initIonicReaction === 'function') initIonicReaction();
-            if (typeof initRedox === 'function') initRedox();
-        } else if (page === 'algorithms') {
-            if (typeof initSearchAlgorithms === 'function') initSearchAlgorithms();
-            if (typeof initGraphAlgo === 'function') initGraphAlgo();
-            if (typeof initDataStructVis === 'function') initDataStructVis();
-            if (typeof initSortCompare === 'function') initSortCompare();
-            if (typeof initRecursionVis === 'function') initRecursionVis();
-            if (typeof initDPVis === 'function') initDPVis();
-            if (typeof initStringMatch === 'function') initStringMatch();
-        } else if (page === 'biology') {
-            if (typeof initBiology === 'function') initBiology();
-            if (typeof initMitosis === 'function') initMitosis();
-            if (typeof initNeuralReg === 'function') initNeuralReg();
-            if (typeof initImmuneSystem === 'function') initImmuneSystem();
-            if (typeof initEcosystem === 'function') initEcosystem();
-            if (typeof initMeiosis === 'function') initMeiosis();
-            if (typeof initGeneExpression === 'function') initGeneExpression();
-            if (typeof initCellularResp === 'function') initCellularResp();
-            if (typeof initSubstanceTransport === 'function') initSubstanceTransport();
-            if (typeof initGeneMutation === 'function') initGeneMutation();
         }
+        // Subject pages: show sidebar toggle if an experiment was previously open,
+        // but don't eagerly initialize any experiments (ModuleSelector handles it).
 
         // Refresh ScrollTrigger on content pages
         if (typeof ScrollTrigger !== 'undefined') {
@@ -316,68 +257,85 @@ const Router = {
         if (page === 'home') {
             if (typeof ParticleNetwork !== 'undefined' && ParticleNetwork.destroy) ParticleNetwork.destroy();
             if (typeof SatelliteSystem !== 'undefined') SatelliteSystem.isRunning = false;
-        } else if (page === 'mathematics') {
-            if (typeof destroyFunctionGraph === 'function') destroyFunctionGraph();
-            if (typeof Calculus !== 'undefined' && Calculus.destroy) Calculus.destroy();
-            if (typeof GeoTransform !== 'undefined' && GeoTransform.destroy) GeoTransform.destroy();
-            if (typeof ComplexVis !== 'undefined' && ComplexVis.destroy) ComplexVis.destroy();
-            if (typeof TrigVis !== 'undefined' && TrigVis.destroy) TrigVis.destroy();
-            if (typeof SetOps !== 'undefined' && SetOps.destroy) SetOps.destroy();
-            if (typeof Probability !== 'undefined' && Probability.destroy) Probability.destroy();
-            if (typeof VectorOps !== 'undefined' && VectorOps.destroy) VectorOps.destroy();
-            if (typeof Inequality !== 'undefined' && Inequality.destroy) Inequality.destroy();
-            if (typeof ConicSections !== 'undefined' && ConicSections.destroy) ConicSections.destroy();
-            if (typeof SolidGeom !== 'undefined' && SolidGeom.destroy) SolidGeom.destroy();
-            if (typeof PermComb !== 'undefined' && PermComb.destroy) PermComb.destroy();
-            if (typeof Sequences !== 'undefined' && Sequences.destroy) Sequences.destroy();
-        } else if (page === 'physics') {
-            if (typeof destroyPhysics === 'function') destroyPhysics();
-            if (typeof EMField !== 'undefined' && EMField.destroy) EMField.destroy();
-            if (typeof WaveDemo !== 'undefined' && WaveDemo.destroy) WaveDemo.destroy();
-            if (typeof RelativityDemo !== 'undefined' && RelativityDemo.destroy) RelativityDemo.destroy();
-            if (typeof FluidSim !== 'undefined' && FluidSim.destroy) FluidSim.destroy();
-            if (typeof OpticsLab !== 'undefined' && OpticsLab.destroy) OpticsLab.destroy();
-            if (typeof Kinematics !== 'undefined' && Kinematics.destroy) Kinematics.destroy();
-            if (typeof Projectile !== 'undefined' && Projectile.destroy) Projectile.destroy();
-            if (typeof CircularMotion !== 'undefined' && CircularMotion.destroy) CircularMotion.destroy();
-            if (typeof EnergyConservation !== 'undefined' && EnergyConservation.destroy) EnergyConservation.destroy();
-            if (typeof CircuitAnalysis !== 'undefined' && CircuitAnalysis.destroy) CircuitAnalysis.destroy();
-            if (typeof EMInduction !== 'undefined' && EMInduction.destroy) EMInduction.destroy();
-            if (typeof ACCircuit !== 'undefined' && ACCircuit.destroy) ACCircuit.destroy();
-            if (typeof Gravitation !== 'undefined' && Gravitation.destroy) Gravitation.destroy();
-        } else if (page === 'chemistry') {
-            if (typeof PeriodicTable !== 'undefined' && PeriodicTable.destroy) PeriodicTable.destroy();
-            if (typeof MoleculeVis !== 'undefined' && MoleculeVis.destroy) MoleculeVis.destroy();
-            if (typeof ChemReaction !== 'undefined' && ChemReaction.destroy) ChemReaction.destroy();
-            if (typeof ChemEquilibrium !== 'undefined' && ChemEquilibrium.destroy) ChemEquilibrium.destroy();
-            if (typeof Electrochemistry !== 'undefined' && Electrochemistry.destroy) Electrochemistry.destroy();
-            if (typeof ChemBond !== 'undefined' && ChemBond.destroy) ChemBond.destroy();
-            if (typeof OrganicChem !== 'undefined' && OrganicChem.destroy) OrganicChem.destroy();
-            if (typeof ReactionRate !== 'undefined' && ReactionRate.destroy) ReactionRate.destroy();
-            if (typeof SolutionIon !== 'undefined' && SolutionIon.destroy) SolutionIon.destroy();
-            if (typeof IonicReaction !== 'undefined' && IonicReaction.destroy) IonicReaction.destroy();
-            if (typeof Redox !== 'undefined' && Redox.destroy) Redox.destroy();
-        } else if (page === 'algorithms') {
-            if (typeof SearchComparison !== 'undefined' && SearchComparison.destroy) SearchComparison.destroy();
-            if (typeof TreeTraversal !== 'undefined' && TreeTraversal.destroy) TreeTraversal.destroy();
-            if (typeof HashSearch !== 'undefined' && HashSearch.destroy) HashSearch.destroy();
-            if (typeof GraphAlgo !== 'undefined' && GraphAlgo.destroy) GraphAlgo.destroy();
-            if (typeof DataStructVis !== 'undefined' && DataStructVis.destroy) DataStructVis.destroy();
-            if (typeof SortCompare !== 'undefined' && SortCompare.destroy) SortCompare.destroy();
-            if (typeof RecursionVis !== 'undefined' && RecursionVis.destroy) RecursionVis.destroy();
-            if (typeof DPVis !== 'undefined' && DPVis.destroy) DPVis.destroy();
-            if (typeof StringMatch !== 'undefined' && StringMatch.destroy) StringMatch.destroy();
-        } else if (page === 'biology') {
-            if (typeof Biology !== 'undefined' && Biology.destroy) Biology.destroy();
-            if (typeof Mitosis !== 'undefined' && Mitosis.destroy) Mitosis.destroy();
-            if (typeof NeuralReg !== 'undefined' && NeuralReg.destroy) NeuralReg.destroy();
-            if (typeof ImmuneSystem !== 'undefined' && ImmuneSystem.destroy) ImmuneSystem.destroy();
-            if (typeof Ecosystem !== 'undefined' && Ecosystem.destroy) Ecosystem.destroy();
-            if (typeof Meiosis !== 'undefined' && Meiosis.destroy) Meiosis.destroy();
-            if (typeof GeneExpression !== 'undefined' && GeneExpression.destroy) GeneExpression.destroy();
-            if (typeof CellularResp !== 'undefined' && CellularResp.destroy) CellularResp.destroy();
-            if (typeof SubstanceTransport !== 'undefined' && SubstanceTransport.destroy) SubstanceTransport.destroy();
-            if (typeof GeneMutation !== 'undefined' && GeneMutation.destroy) GeneMutation.destroy();
+        } else {
+            // Destroy all modules that were initialized for this page
+            const destroyMap = {
+                mathematics: [
+                    () => { if (typeof destroyFunctionGraph === 'function') destroyFunctionGraph(); },
+                    () => { if (typeof Calculus !== 'undefined' && Calculus.destroy) Calculus.destroy(); },
+                    () => { if (typeof GeoTransform !== 'undefined' && GeoTransform.destroy) GeoTransform.destroy(); },
+                    () => { if (typeof ComplexVis !== 'undefined' && ComplexVis.destroy) ComplexVis.destroy(); },
+                    () => { if (typeof TrigVis !== 'undefined' && TrigVis.destroy) TrigVis.destroy(); },
+                    () => { if (typeof SetOps !== 'undefined' && SetOps.destroy) SetOps.destroy(); },
+                    () => { if (typeof Probability !== 'undefined' && Probability.destroy) Probability.destroy(); },
+                    () => { if (typeof VectorOps !== 'undefined' && VectorOps.destroy) VectorOps.destroy(); },
+                    () => { if (typeof Inequality !== 'undefined' && Inequality.destroy) Inequality.destroy(); },
+                    () => { if (typeof ConicSections !== 'undefined' && ConicSections.destroy) ConicSections.destroy(); },
+                    () => { if (typeof SolidGeom !== 'undefined' && SolidGeom.destroy) SolidGeom.destroy(); },
+                    () => { if (typeof PermComb !== 'undefined' && PermComb.destroy) PermComb.destroy(); },
+                    () => { if (typeof Sequences !== 'undefined' && Sequences.destroy) Sequences.destroy(); },
+                ],
+                physics: [
+                    () => { if (typeof destroyPhysics === 'function') destroyPhysics(); },
+                    () => { if (typeof EMField !== 'undefined' && EMField.destroy) EMField.destroy(); },
+                    () => { if (typeof WaveDemo !== 'undefined' && WaveDemo.destroy) WaveDemo.destroy(); },
+                    () => { if (typeof RelativityDemo !== 'undefined' && RelativityDemo.destroy) RelativityDemo.destroy(); },
+                    () => { if (typeof FluidSim !== 'undefined' && FluidSim.destroy) FluidSim.destroy(); },
+                    () => { if (typeof OpticsLab !== 'undefined' && OpticsLab.destroy) OpticsLab.destroy(); },
+                    () => { if (typeof Kinematics !== 'undefined' && Kinematics.destroy) Kinematics.destroy(); },
+                    () => { if (typeof Projectile !== 'undefined' && Projectile.destroy) Projectile.destroy(); },
+                    () => { if (typeof CircularMotion !== 'undefined' && CircularMotion.destroy) CircularMotion.destroy(); },
+                    () => { if (typeof EnergyConservation !== 'undefined' && EnergyConservation.destroy) EnergyConservation.destroy(); },
+                    () => { if (typeof CircuitAnalysis !== 'undefined' && CircuitAnalysis.destroy) CircuitAnalysis.destroy(); },
+                    () => { if (typeof EMInduction !== 'undefined' && EMInduction.destroy) EMInduction.destroy(); },
+                    () => { if (typeof ACCircuit !== 'undefined' && ACCircuit.destroy) ACCircuit.destroy(); },
+                    () => { if (typeof Gravitation !== 'undefined' && Gravitation.destroy) Gravitation.destroy(); },
+                ],
+                chemistry: [
+                    () => { if (typeof PeriodicTable !== 'undefined' && PeriodicTable.destroy) PeriodicTable.destroy(); },
+                    () => { if (typeof MoleculeVis !== 'undefined' && MoleculeVis.destroy) MoleculeVis.destroy(); },
+                    () => { if (typeof ChemReaction !== 'undefined' && ChemReaction.destroy) ChemReaction.destroy(); },
+                    () => { if (typeof ChemEquilibrium !== 'undefined' && ChemEquilibrium.destroy) ChemEquilibrium.destroy(); },
+                    () => { if (typeof Electrochemistry !== 'undefined' && Electrochemistry.destroy) Electrochemistry.destroy(); },
+                    () => { if (typeof ChemBond !== 'undefined' && ChemBond.destroy) ChemBond.destroy(); },
+                    () => { if (typeof OrganicChem !== 'undefined' && OrganicChem.destroy) OrganicChem.destroy(); },
+                    () => { if (typeof ReactionRate !== 'undefined' && ReactionRate.destroy) ReactionRate.destroy(); },
+                    () => { if (typeof SolutionIon !== 'undefined' && SolutionIon.destroy) SolutionIon.destroy(); },
+                    () => { if (typeof IonicReaction !== 'undefined' && IonicReaction.destroy) IonicReaction.destroy(); },
+                    () => { if (typeof Redox !== 'undefined' && Redox.destroy) Redox.destroy(); },
+                ],
+                algorithms: [
+                    () => { if (typeof SearchComparison !== 'undefined' && SearchComparison.destroy) SearchComparison.destroy(); },
+                    () => { if (typeof TreeTraversal !== 'undefined' && TreeTraversal.destroy) TreeTraversal.destroy(); },
+                    () => { if (typeof HashSearch !== 'undefined' && HashSearch.destroy) HashSearch.destroy(); },
+                    () => { if (typeof GraphAlgo !== 'undefined' && GraphAlgo.destroy) GraphAlgo.destroy(); },
+                    () => { if (typeof DataStructVis !== 'undefined' && DataStructVis.destroy) DataStructVis.destroy(); },
+                    () => { if (typeof SortCompare !== 'undefined' && SortCompare.destroy) SortCompare.destroy(); },
+                    () => { if (typeof RecursionVis !== 'undefined' && RecursionVis.destroy) RecursionVis.destroy(); },
+                    () => { if (typeof DPVis !== 'undefined' && DPVis.destroy) DPVis.destroy(); },
+                    () => { if (typeof StringMatch !== 'undefined' && StringMatch.destroy) StringMatch.destroy(); },
+                ],
+                biology: [
+                    () => { if (typeof Biology !== 'undefined' && Biology.destroy) Biology.destroy(); },
+                    () => { if (typeof Mitosis !== 'undefined' && Mitosis.destroy) Mitosis.destroy(); },
+                    () => { if (typeof NeuralReg !== 'undefined' && NeuralReg.destroy) NeuralReg.destroy(); },
+                    () => { if (typeof ImmuneSystem !== 'undefined' && ImmuneSystem.destroy) ImmuneSystem.destroy(); },
+                    () => { if (typeof Ecosystem !== 'undefined' && Ecosystem.destroy) Ecosystem.destroy(); },
+                    () => { if (typeof Meiosis !== 'undefined' && Meiosis.destroy) Meiosis.destroy(); },
+                    () => { if (typeof GeneExpression !== 'undefined' && GeneExpression.destroy) GeneExpression.destroy(); },
+                    () => { if (typeof CellularResp !== 'undefined' && CellularResp.destroy) CellularResp.destroy(); },
+                    () => { if (typeof SubstanceTransport !== 'undefined' && SubstanceTransport.destroy) SubstanceTransport.destroy(); },
+                    () => { if (typeof GeneMutation !== 'undefined' && GeneMutation.destroy) GeneMutation.destroy(); },
+                ]
+            };
+
+            const fns = destroyMap[page];
+            if (fns) fns.forEach(fn => { try { fn(); } catch(e) { /* ignore */ } });
+
+            // Reset ModuleSelector state for this page
+            if (typeof ModuleSelector !== 'undefined' && ModuleSelector.resetPage) {
+                ModuleSelector.resetPage(page);
+            }
         }
     }
 };

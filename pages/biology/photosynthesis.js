@@ -429,7 +429,7 @@ const Photosynthesis = {
 
         // Calvin cycle labels
         ctx.fillStyle = 'rgba(200,170,80,0.5)';
-        ctx.font = '8px "Noto Sans SC", sans-serif';
+        ctx.font = '9px "Noto Sans SC", sans-serif';
         ctx.textAlign = 'center';
         // C3 and G3P labels on cycle
         const c3a = cycleAngle + Math.PI * 0.5;
@@ -462,7 +462,7 @@ const Photosynthesis = {
         ctx.lineTo(dzX - 10, arrowY + 4);
         ctx.closePath(); ctx.fill();
         ctx.fillStyle = 'rgba(255,200,50,0.4)';
-        ctx.font = '8px "Noto Sans SC", sans-serif';
+        ctx.font = '9px "Noto Sans SC", sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('ATP+NADPH', (lzX + lzW + dzX) / 2, arrowY - 8);
 
@@ -474,13 +474,13 @@ const Photosynthesis = {
             if (p.type === 'co2') {
                 ctx.fillStyle = '#666'; ctx.fill();
                 ctx.fillStyle = '#aaa';
-                ctx.font = 'bold 7px "JetBrains Mono", monospace';
+                ctx.font = 'bold 9px "JetBrains Mono", monospace';
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText('CO\u2082', p.x, p.y);
             } else {
                 ctx.fillStyle = '#4488cc'; ctx.fill();
                 ctx.fillStyle = '#88bbee';
-                ctx.font = 'bold 6px "JetBrains Mono", monospace';
+                ctx.font = 'bold 8px "JetBrains Mono", monospace';
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText('H\u2082O', p.x, p.y);
             }

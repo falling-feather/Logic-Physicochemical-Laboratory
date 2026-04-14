@@ -8,6 +8,7 @@ const CircuitAnalysis = {
     _raf: null,
     time: 0,
     running: true,
+    paused: false,
 
     // Circuit params
     voltage: 12,   // V
@@ -26,6 +27,8 @@ const CircuitAnalysis = {
         this.ctx = this.canvas.getContext('2d');
         this.time = 0;
         this.running = true;
+        this.paused = false;
+        this._applyDefaults();
         this.resize();
         this.bindEvents();
         this.loop();
@@ -40,6 +43,7 @@ const CircuitAnalysis = {
     },
 
     resize() {
+        if (window.PhysicsZoom && window.PhysicsZoom.movedCanvas === this.canvas) return;
         const wrap = this.canvas.parentElement;
         if (!wrap) return;
         const dpr = window.devicePixelRatio || 1;
@@ -81,11 +85,51 @@ const CircuitAnalysis = {
                 this.mode = btn.dataset.mode;
             });
         });
+
+        const pauseBtn = document.getElementById('circuit-pause');
+        if (pauseBtn) {
+            pauseBtn.textContent = '暂停';
+            this._on(pauseBtn, 'click', () => {
+                this.paused = !this.paused;
+                pauseBtn.textContent = this.paused ? '继续' : '暂停';
+            });
+        }
+
+        const resetBtn = document.getElementById('circuit-reset');
+        if (resetBtn) {
+            this._on(resetBtn, 'click', () => {
+                this.paused = false;
+                if (pauseBtn) pauseBtn.textContent = '暂停';
+                this.time = 0;
+                this._applyDefaults();
+            });
+        }
+    },
+
+    _applyDefaults() {
+        this.voltage = 12;
+        this.R1 = 4;
+        this.R2 = 6;
+        this.mode = 'series';
+
+        const setSlider = (id, value) => {
+            const el = document.getElementById(id);
+            const out = document.getElementById(id + '-val');
+            if (el) el.value = value;
+            if (out) out.textContent = value;
+        };
+        setSlider('circuit-voltage', this.voltage);
+        setSlider('circuit-r1', this.R1);
+        setSlider('circuit-r2', this.R2);
+
+        document.querySelectorAll('.circuit-mode-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === this.mode);
+        });
     },
 
     loop() {
         if (!this.running) return;
-        this.time += 0.016;
+        if (!this.paused) this.time += 0.016;
         this.draw();
         this._raf = requestAnimationFrame(() => this.loop());
     },

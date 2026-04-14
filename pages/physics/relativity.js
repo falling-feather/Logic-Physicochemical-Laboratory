@@ -122,15 +122,23 @@ const RelativityDemo = {
     },
 
     resizeCanvas() {
+        if (!this.canvas) return;
+        if (window.PhysicsZoom && window.PhysicsZoom.movedCanvas === this.canvas) return;
         const rect = this.canvas.parentElement.getBoundingClientRect();
+        const w = rect.width;
+        // 优先使用 CSS 容器高度，避免按宽度推算出的高度大于 .relativity-canvas-wrap 导致底部被 overflow 裁切
+        let h = rect.height;
+        if (!Number.isFinite(h) || h < 2) {
+            h = Math.min(Math.max(w * 0.62, 400), 640);
+        }
         const dpr = window.devicePixelRatio || 1;
-        this.canvas.width = rect.width * dpr;
-        this.canvas.height = rect.height * dpr;
-        this.canvas.style.width = rect.width + 'px';
-        this.canvas.style.height = rect.height + 'px';
+        this.canvas.width = w * dpr;
+        this.canvas.height = h * dpr;
+        this.canvas.style.width = w + 'px';
+        this.canvas.style.height = h + 'px';
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        this.W = rect.width;
-        this.H = rect.height;
+        this.W = w;
+        this.H = h;
     },
 
     bindControls() {
@@ -280,6 +288,13 @@ const RelativityDemo = {
         const tPanel = document.getElementById('rel-twin-panel');
         if (uPanel) uPanel.style.display = this.mode === 'velocity' ? 'flex' : 'none';
         if (tPanel) tPanel.style.display = this.mode === 'twins' ? 'flex' : 'none';
+
+        const wrap = this.canvas && this.canvas.parentElement;
+        if (wrap && wrap.classList.contains('relativity-canvas-wrap')) {
+            const tall = this.mode === 'spacetime' || this.mode === 'doppler';
+            wrap.classList.toggle('relativity-canvas-wrap--tall', tall);
+        }
+        this.resizeCanvas();
     },
 
     // ── 鼠标事件处理 ──

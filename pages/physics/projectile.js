@@ -41,6 +41,7 @@ const Projectile = {
     },
 
     resize() {
+        if (window.PhysicsZoom && window.PhysicsZoom.movedCanvas === this.canvas) return;
         const wrap = this.canvas.parentElement;
         if (!wrap) return;
         const dpr = window.devicePixelRatio || 1;

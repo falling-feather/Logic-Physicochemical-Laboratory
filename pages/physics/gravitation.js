@@ -5,6 +5,7 @@ const Gravitation = {
     _listeners: [],
     _on(el, evt, fn, opts) { el.addEventListener(evt, fn, opts); this._listeners.push({ el, evt, fn, opts }); },
     canvas: null, ctx: null, animId: null,
+    paused: false,
     mode: 'orbit', // orbit | field
     // central body
     centralMass: 500,
@@ -19,6 +20,7 @@ const Gravitation = {
         this.canvas = document.getElementById('gravitation-canvas');
         if (!this.canvas) return;
         this.ctx = this.canvas.getContext('2d');
+        this.paused = false;
         this._resize();
         this._on(window, 'resize', () => this._resize());
         this._buildControls();
@@ -33,10 +35,11 @@ const Gravitation = {
         if (c) c.innerHTML = '';
     },
     _resize() {
+        if (window.PhysicsZoom && window.PhysicsZoom.movedCanvas === this.canvas) return;
         const p = this.canvas.parentElement;
         const dpr = window.devicePixelRatio || 1;
         const w = p.clientWidth;
-        const h = p.clientHeight || 420;
+        const h = Math.min(Math.max(w * 0.56, 360), 560);
         this.canvas.width = w * dpr;
         this.canvas.height = h * dpr;
         this.canvas.style.width = w + 'px';
@@ -94,6 +97,24 @@ const Gravitation = {
             vb.classList.toggle('active', this.showVectors);
         });
         ctrl.appendChild(vb);
+
+        const pauseBtn = document.getElementById('grav-pause');
+        if (pauseBtn) {
+            pauseBtn.textContent = '暂停';
+            this._on(pauseBtn, 'click', () => {
+                this.paused = !this.paused;
+                pauseBtn.textContent = this.paused ? '继续' : '暂停';
+            });
+        }
+
+        const resetBtn = document.getElementById('grav-reset');
+        if (resetBtn) {
+            this._on(resetBtn, 'click', () => {
+                this.paused = false;
+                if (pauseBtn) pauseBtn.textContent = '暂停';
+                this._initSatellites();
+            });
+        }
     },
     _initSatellites() {
         this.satellites = [];
@@ -117,6 +138,7 @@ const Gravitation = {
         });
     },
     _stepPhysics() {
+        if (this.paused) return;
         const G = this.G, M = this.centralMass;
         this.satellites.forEach(s => {
             const dx = this.cx - s.x;

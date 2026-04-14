@@ -4,6 +4,7 @@
 const OpticsLab = {
     canvas: null, ctx: null, W: 0, H: 0,
     mode: 'lens',        // 'lens' | 'doubleslit' | 'refraction' | 'prism' | 'grating' | 'polarization'
+    paused: false,
 
     // 透镜成像
     lensFocal: 120,      // 焦距 px
@@ -51,6 +52,7 @@ const OpticsLab = {
         this._injectPrismPanel();
         this._injectGratingPanel();
         this._injectPolarizationPanel();
+        this._injectGlobalActions();
         this.setMode('lens');
 
         if (typeof ResizeObserver !== 'undefined') {
@@ -65,6 +67,7 @@ const OpticsLab = {
     },
 
     resize() {
+        if (window.PhysicsZoom && window.PhysicsZoom.movedCanvas === this.canvas) return;
         const wrap = this.canvas.parentElement;
         if (!wrap) return;
         const w = wrap.clientWidth;
@@ -98,9 +101,66 @@ const OpticsLab = {
         wrap.prepend(bar);
     },
 
+    _injectGlobalActions() {
+        const wrap = document.getElementById('optics-controls');
+        if (!wrap || document.getElementById('optics-global-actions')) return;
+        const row = document.createElement('div');
+        row.id = 'optics-global-actions';
+        row.className = 'physics-actions';
+        row.innerHTML = `
+            <button id="optics-pause" class="btn btn--ghost">暂停</button>
+            <button id="optics-reset" class="btn btn--ghost">重置</button>
+        `;
+        wrap.appendChild(row);
+
+        const pauseBtn = document.getElementById('optics-pause');
+        const resetBtn = document.getElementById('optics-reset');
+        if (pauseBtn) pauseBtn.addEventListener('click', () => {
+            this.paused = !this.paused;
+            pauseBtn.textContent = this.paused ? '继续' : '暂停';
+        });
+        if (resetBtn) resetBtn.addEventListener('click', () => this.resetScene());
+    },
+
+    resetScene() {
+        this.paused = false;
+        const pauseBtn = document.getElementById('optics-pause');
+        if (pauseBtn) pauseBtn.textContent = '暂停';
+
+        this.mode = 'lens';
+        this.lensFocal = 120;
+        this.objDist = 250;
+        this.objHeight = 60;
+
+        this.slitSep = 40;
+        this.wavelength = 16;
+        this._slitTime = 0;
+        this._slitRunning = false;
+        if (this._slitAnimId) { cancelAnimationFrame(this._slitAnimId); this._slitAnimId = null; }
+
+        this.n1 = 1.0;
+        this.n2 = 1.5;
+        this.incidentAngle = 30;
+
+        this.prismApex = 60;
+        this.prismIncident = 50;
+        this.prismMaterial = 'crown';
+
+        this.gratingN = 6;
+        this.gratingD = 30;
+        this.gratingWavelength = 16;
+        this.gratingWhite = false;
+
+        this.polarizerCount = 2;
+        this.polarizerAngles = [0, 90, 45];
+
+        this.setMode('lens');
+        this.render();
+    },
+
     _injectLensPanel() {
         const wrap = document.getElementById('optics-controls');
-        if (!wrap) return;
+        if (!wrap || document.getElementById('optics-lens-panel')) return;
         const panel = document.createElement('div');
         panel.id = 'optics-lens-panel';
         panel.style.cssText = 'display:none;padding:8px 12px;background:rgba(30,41,59,.55);border-radius:8px;font-size:13px;color:#e2e8f0;';
@@ -135,7 +195,7 @@ const OpticsLab = {
 
     _injectSlitPanel() {
         const wrap = document.getElementById('optics-controls');
-        if (!wrap) return;
+        if (!wrap || document.getElementById('optics-slit-panel')) return;
         const panel = document.createElement('div');
         panel.id = 'optics-slit-panel';
         panel.style.cssText = 'display:none;padding:8px 12px;background:rgba(30,41,59,.55);border-radius:8px;font-size:13px;color:#e2e8f0;';
@@ -182,7 +242,7 @@ const OpticsLab = {
 
     _injectRefractionPanel() {
         const wrap = document.getElementById('optics-controls');
-        if (!wrap) return;
+        if (!wrap || document.getElementById('optics-refraction-panel')) return;
         const panel = document.createElement('div');
         panel.id = 'optics-refraction-panel';
         panel.style.cssText = 'display:none;padding:8px 12px;background:rgba(30,41,59,.55);border-radius:8px;font-size:13px;color:#e2e8f0;';
@@ -227,7 +287,7 @@ const OpticsLab = {
 
     _injectPrismPanel() {
         const wrap = document.getElementById('optics-controls');
-        if (!wrap) return;
+        if (!wrap || document.getElementById('optics-prism-panel')) return;
         const panel = document.createElement('div');
         panel.id = 'optics-prism-panel';
         panel.style.cssText = 'display:none;padding:8px 12px;background:rgba(30,41,59,.55);border-radius:8px;font-size:13px;color:#e2e8f0;';
@@ -273,7 +333,7 @@ const OpticsLab = {
 
     _injectGratingPanel() {
         const wrap = document.getElementById('optics-controls');
-        if (!wrap) return;
+        if (!wrap || document.getElementById('optics-grating-panel')) return;
         const panel = document.createElement('div');
         panel.id = 'optics-grating-panel';
         panel.style.cssText = 'display:none;padding:8px 12px;background:rgba(30,41,59,.55);border-radius:8px;font-size:13px;color:#e2e8f0;';
@@ -325,7 +385,7 @@ const OpticsLab = {
 
     _injectPolarizationPanel() {
         const wrap = document.getElementById('optics-controls');
-        if (!wrap) return;
+        if (!wrap || document.getElementById('optics-pol-panel')) return;
         const panel = document.createElement('div');
         panel.id = 'optics-pol-panel';
         panel.style.cssText = 'display:none;padding:8px 12px;background:rgba(30,41,59,.55);border-radius:8px;font-size:13px;color:#e2e8f0;';
@@ -725,6 +785,10 @@ const OpticsLab = {
 
     _runSlitAnim() {
         if (!this._slitRunning) return;
+        if (this.paused) {
+            this._slitAnimId = requestAnimationFrame(() => this._runSlitAnim());
+            return;
+        }
         const now = performance.now();
         if (!this._slitLastTime) this._slitLastTime = now;
         const dt = Math.min((now - this._slitLastTime) / 1000, 0.1);

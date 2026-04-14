@@ -380,12 +380,17 @@
 .relativity-canvas-wrap {
     position: relative;
     width: 100%;
-    height: 380px;
+    height: 520px;
     border-radius: var(--radius-md);
     overflow: hidden;
     background: var(--surface-2);
     border: 1px solid var(--border);
     margin-bottom: var(--space-4);
+}
+
+/* 仅「时空图」「多普勒」模式加高（由 JS 切换 .relativity-canvas-wrap--tall） */
+.relativity-canvas-wrap.relativity-canvas-wrap--tall {
+    height: 640px;
 }
 
 .relativity-canvas-wrap canvas {
@@ -487,7 +492,10 @@
         height: 250px;
     }
     .relativity-canvas-wrap {
-        height: 300px;
+        height: 400px;
+    }
+    .relativity-canvas-wrap.relativity-canvas-wrap--tall {
+        height: 500px;
     }
 }
 
@@ -500,7 +508,10 @@
         height: 200px;
     }
     .relativity-canvas-wrap {
-        height: 240px;
+        height: 320px;
+    }
+    .relativity-canvas-wrap.relativity-canvas-wrap--tall {
+        height: 400px;
     }
 }
 
@@ -702,6 +713,12 @@
     background: rgba(139,111,192,.25); border-color: var(--accent-purple, #8b6fc0); color: #fff;
 }
 
+.circuit-controls .primary-btn.small,
+.emi-controls .primary-btn.small,
+.grav-controls .primary-btn.small {
+    padding: .35rem .9rem;
+}
+
 /* ══════ Alternating Current ══════ */
 .ac-controls { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
 .ac-mode-btns { display:flex; gap:6px; }
@@ -736,3 +753,84 @@
 .grav-param { display:flex; align-items:center; gap:4px; font-size:.82rem; color:var(--text-secondary); }
 .grav-param input[type="range"] { width:80px; accent-color:var(--accent-purple,#8b6fc0); }
 @media (max-width: 768px) { .grav-controls { flex-direction: column; align-items: flex-start; } }
+
+/* ══════ Physics Zoom Modal ══════ */
+.physics-zoom-btn {
+    margin-left: auto;
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(139,111,192,.35);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: .82rem;
+    cursor: pointer;
+    transition: all .2s;
+}
+.physics-zoom-btn:hover {
+    background: rgba(139,111,192,.18);
+    border-color: rgba(139,111,192,.55);
+    color: var(--text-primary);
+}
+
+.physics-zoom-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(9, 12, 18, .72);
+    backdrop-filter: blur(2px);
+    z-index: 300;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.physics-zoom-modal.open {
+    display: flex;
+}
+
+.physics-zoom-modal__inner {
+    width: min(96vw, 1320px);
+    height: min(88vh, 900px);
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    border-radius: 12px;
+    box-shadow: 0 22px 48px rgba(0,0,0,.45);
+    padding: 12px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.physics-zoom-modal__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.physics-zoom-modal__title {
+    font-size: .85rem;
+    color: var(--text-secondary);
+}
+
+.physics-zoom-modal__close {
+    border: 1px solid var(--border-default);
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+}
+
+.physics-zoom-modal__host {
+    flex: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface-0);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.physics-zoom-modal__host canvas {
+    display: block;
+}

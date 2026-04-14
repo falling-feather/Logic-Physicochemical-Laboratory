@@ -8,7 +8,7 @@ const CONFIG = {
             icon: 'calculator',
             title: '数学可视化',
             subtitle: '可视化探索',
-            desc: '通过交互式可视化探索数学的奥秘，从古代算筹到现代函数图像，感受数学之美。'
+            desc: '通过交互式可视化探索数学的奥秘，从函数图像到微积分、几何变换，感受数学之美。'
         },
         physics: {
             label: '物理',

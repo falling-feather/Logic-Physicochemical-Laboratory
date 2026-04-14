@@ -247,7 +247,7 @@
                 <div class="page-hero__text">
                     <span class="page-hero__label page-hero__label--blue">Mathematics</span>
                     <h1 class="page-hero__title">数学可视化</h1>
-                    <p class="page-hero__desc">通过交互式可视化探索数学的奥秘，从古代算筹到现代函数图像，感受数学之美。</p>
+                    <p class="page-hero__desc">通过交互式可视化探索数学的奥秘，从函数图像到微积分、几何变换，感受数学之美。</p>
                 </div>
                 <div class="page-hero__visual">
                     <canvas id="hero-canvas-mathematics" class="page-hero__canvas" role="img" aria-label="数学可视化装饰动画"></canvas>
@@ -255,51 +255,6 @@
             </div>
 
             <div class="content-section" data-module="function-graph">
-                <div class="demo-section">
-                    <div class="section-header">
-                        <h2>算筹加减法演示</h2>
-                        <p>算筹是中国古代的计算工具，通过纵横摆放表示不同数字</p>
-                    </div>
-                    <div class="demo-layout">
-                        <div class="demo-controls-panel">
-                            <div class="abacus-controls">
-                                <div class="control-group">
-                                    <label>第一个数：</label>
-                                    <input type="number" id="num1" class="input" value="5" min="0" max="99" onchange="updateAbacus()">
-                                </div>
-                                <div class="control-group">
-                                    <label>运算符：</label>
-                                    <select id="operator" class="select" onchange="updateAbacus()">
-                                        <option value="add">+ 加法</option>
-                                        <option value="subtract">- 减法</option>
-                                    </select>
-                                </div>
-                                <div class="control-group">
-                                    <label>第二个数：</label>
-                                    <input type="number" id="num2" class="input" value="3" min="0" max="99" onchange="updateAbacus()">
-                                </div>
-                                <button class="btn btn--primary" onclick="calculateAbacus()">计算</button>
-                            </div>
-                        </div>
-                        <div class="demo-visualization">
-                            <div class="abacus-display">
-                                <div class="abacus-row">
-                                    <div class="abacus-label">第一个数：</div>
-                                    <div class="abacus-sticks" id="abacus-num1"></div>
-                                </div>
-                                <div class="abacus-row">
-                                    <div class="abacus-label">第二个数：</div>
-                                    <div class="abacus-sticks" id="abacus-num2"></div>
-                                </div>
-                                <div class="abacus-row result-row">
-                                    <div class="abacus-label">结果：</div>
-                                    <div class="abacus-sticks" id="abacus-result"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <div class="demo-section">
                     <div class="section-header">
                         <h2>函数图像绘制</h2>
@@ -560,30 +515,14 @@
                 </div>
             </div>
 
-            <div class="content-section" data-module="function-graph">
-                <div class="video-section">
-                    <div class="video-section__header">
-                        <h3>计算工具的历史演变</h3>
-                        <p>了解从算筹到现代计算机的计算工具发展历程</p>
-                    </div>
-                    <div class="video-container">
-                        <iframe
-                            src="https://player.bilibili.com/player.html?bvid=BV1PuHXePE7T&page=1&high_quality=1&danmaku=0"
-                            scrolling="no"
-                            border="0"
-                            frameborder="no"
-                            framespacing="0"
-                            allowfullscreen="true"
-                            loading="lazy"
-                            class="bilibili-video">
-                        </iframe>
-                    </div>
-                </div>
-            </div>
 
             <!-- ── 概率统计 ── -->
             <div class="content-section" data-module="probability">
-                <h2 class="section-title">概率统计 <span class="title-badge">Probability</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>概率统计 <span class="title-badge">Probability</span></h2>
+                        <p>抛硬币/掷骰子频率收敛与直方图</p>
+                    </div>
                 <div class="prob-controls">
                     <div class="prob-modes">
                         <button class="prob-mode-btn active" data-mode="coin">🪙 抛硬币</button>
@@ -606,11 +545,16 @@
                 <div class="prob-info">
                     <p id="prob-info-text">点击“开始实验”或“连续实验”</p>
                 </div>
+                </div>
             </div>
 
             <!-- ── 集合运算 ── -->
             <div class="content-section" data-module="set-operations">
-                <h2 class="section-title">集合运算 <span class="title-badge">Set Operations</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>集合运算 <span class="title-badge">Set Operations</span></h2>
+                        <p>Venn 图与集合操作可视化</p>
+                    </div>
                 <div class="setops-controls">
                     <div class="setops-ops-row">
                         <button class="setops-op-btn active" data-op="union">A ∪ B</button>
@@ -634,11 +578,16 @@
                     <p id="setops-op-desc">属于 A 或属于 B 的所有元素</p>
                     <p class="setops-result" id="setops-result">结果 = {1, 2, 3, 4, 5, 6, 7, 8, 9}（8 个元素）</p>
                 </div>
+                </div>
             </div>
 
             <!-- ── 向量运算 ── -->
             <div class="content-section" data-module="vector-ops">
-                <h2 class="section-title">向量运算 <span class="title-badge">Vector Operations</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>向量运算 <span class="title-badge">Vector Operations</span></h2>
+                        <p>向量加减、数量积与投影可视化</p>
+                    </div>
                 <div class="vecops-controls">
                     <div class="vecops-ops-row">
                         <button class="vecops-op-btn active" data-op="add">A + B</button>
@@ -655,11 +604,16 @@
                     <p id="vecops-op-desc">平行四边形法则 / 三角形法则</p>
                     <p class="vecops-result" id="vecops-result"></p>
                 </div>
+                </div>
             </div>
 
             <!-- ── 不等式与线性规划 ── -->
             <div class="content-section" data-module="inequality">
-                <h2 class="section-title">不等式与线性规划 <span class="title-badge">Linear Programming</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>不等式与线性规划 <span class="title-badge">Linear Programming</span></h2>
+                        <p>线性规划可行域与最优解</p>
+                    </div>
                 <div class="ineq-controls">
                     <div class="ineq-sliders">
                         <label>x+y ≤ <input type="range" id="ineq-c0" min="2" max="14" value="8" step="0.5"><span>8</span></label>
@@ -675,10 +629,12 @@
                     <canvas id="ineq-canvas"></canvas>
                 </div>
                 <div class="ineq-info" id="ineq-info"></div>
+                </div>
             </div>
 
             <!-- Conic Sections -->
             <div class="content-section" data-module="conic-sections" id="conic-sections-section">
+                <div class="demo-section">
                 <div class="section-header">
                     <h2>圆锥曲线</h2>
                     <p>椭圆、双曲线、抛物线的焦点与轨迹</p>
@@ -695,11 +651,15 @@
                     <canvas id="conic-canvas"></canvas>
                 </div>
                 <div class="conic-info" id="conic-info"></div>
+                </div>
             </div>
 
             <div class="content-section" data-module="solid-geometry" id="solidgeom-section">
-                <h2 class="section-title">立体几何</h2>
-                <p class="section-desc">三维多面体旋转、截面与体积公式 — 拖拽旋转，双击恢复自动旋转</p>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>立体几何</h2>
+                        <p>三维多面体旋转、截面与体积公式 — 拖拽旋转，双击恢复自动旋转</p>
+                    </div>
                 <div class="sg-controls">
                     <div class="sg-shape-btns" role="group" aria-label="选择几何体">
                         <button class="sg-shape-btn active" data-shape="cube" aria-pressed="true">正方体</button>
@@ -716,11 +676,15 @@
                 </div>
                 <div class="canvas-container"><canvas id="solidgeom-canvas" aria-label="立体几何三维可视化画布"></canvas></div>
                 <div id="sg-info" class="sg-info"></div>
+                </div>
             </div>
 
             <div class="content-section" data-module="permutation-combination" id="permcomb-section">
-                <h2 class="section-title">排列组合</h2>
-                <p class="section-desc">树状图、计数公式与杨辉三角</p>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>排列组合</h2>
+                        <p>树状图、计数公式与杨辉三角</p>
+                    </div>
                 <div class="permcomb-controls">
                     <div class="permcomb-mode-btns" role="group" aria-label="选择模式">
                         <button class="permcomb-mode-btn active" data-mode="permutation" aria-pressed="true">排列 P(n,r)</button>
@@ -732,13 +696,19 @@
                 </div>
                 <div class="canvas-container"><canvas id="permcomb-canvas"></canvas></div>
                 <div id="pc-info" class="pc-info"></div>
+                </div>
             </div>
 
             <div class="content-section" data-module="sequences" id="sequences-section">
-                <h2 class="section-title">数列可视化 <span class="subtitle">等差与等比数列</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>数列可视化 <span class="subtitle">等差与等比数列</span></h2>
+                        <p>等差/等比数列图形化与前 n 项和</p>
+                    </div>
                 <div id="sequences-controls" class="seq-controls"></div>
                 <div class="canvas-container"><canvas id="sequences-canvas"></canvas></div>
                 <div id="sequences-info" class="seq-info"></div>
+                </div>
             </div>
 
             <div class="experiments-section">
@@ -1039,7 +1009,10 @@
             <!-- ── 相对论演示 ── -->
             <div class="content-section" id="relativity-section" data-module="relativity">
                 <div class="demo-section">
-                    <h2>狭义相对论 <span class="formula-badge">Special Relativity</span></h2>
+                    <div class="section-header">
+                        <h2>狭义相对论 <span class="formula-badge">Special Relativity</span></h2>
+                        <p>时间膨胀、长度收缩、质能关系与时空图等交互演示</p>
+                    </div>
 
                     <div class="rel-mode-btns">
                         <button class="rel-mode-btn active" data-mode="time">时间膨胀</button>
@@ -1248,101 +1221,133 @@
 
             <!-- ── 圆周运动 ── -->
             <div class="content-section" data-module="circular-motion">
-                <h2 class="section-title">圆周运动 <span class="title-badge">Circular Motion</span></h2>
-                <div class="circ-controls">
-                    <div class="circ-sliders">
-                        <label>半径 r: <input type="range" id="circ-radius" min="40" max="200" value="120" step="5"><span id="circ-r-val"></span></label>
-                        <label>角速度 ω: <input type="range" id="circ-omega" min="0.3" max="5" value="1.5" step="0.1"><span id="circ-w-val"></span></label>
-                        <label>质量 m: <input type="range" id="circ-mass" min="0.5" max="5" value="1" step="0.1"><span id="circ-m-val"></span></label>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>圆周运动 <span class="title-badge">Circular Motion</span></h2>
+                        <p>向心加速度、向心力与线速度关系可视化</p>
                     </div>
-                    <div class="circ-toggles">
-                        <label class="checkbox-group"><input type="checkbox" id="circ-show-v" checked><span>速度 v</span></label>
-                        <label class="checkbox-group"><input type="checkbox" id="circ-show-a" checked><span>加速度 a</span></label>
-                        <label class="checkbox-group"><input type="checkbox" id="circ-show-f" checked><span>向心力 F</span></label>
+                    <div class="circ-controls">
+                        <div class="circ-sliders">
+                            <label>半径 r: <input type="range" id="circ-radius" min="40" max="200" value="120" step="5"><span id="circ-r-val"></span></label>
+                            <label>角速度 ω: <input type="range" id="circ-omega" min="0.3" max="5" value="1.5" step="0.1"><span id="circ-w-val"></span></label>
+                            <label>质量 m: <input type="range" id="circ-mass" min="0.5" max="5" value="1" step="0.1"><span id="circ-m-val"></span></label>
+                        </div>
+                        <div class="circ-toggles">
+                            <label class="checkbox-group"><input type="checkbox" id="circ-show-v" checked><span>速度 v</span></label>
+                            <label class="checkbox-group"><input type="checkbox" id="circ-show-a" checked><span>加速度 a</span></label>
+                            <label class="checkbox-group"><input type="checkbox" id="circ-show-f" checked><span>向心力 F</span></label>
+                        </div>
+                        <div class="circ-btns">
+                            <button id="circ-play" class="primary-btn small">⏸ 暂停</button>
+                            <button id="circ-reset" class="primary-btn small">↺ 重置</button>
+                        </div>
                     </div>
-                    <div class="circ-btns">
-                        <button id="circ-play" class="primary-btn small">⏸ 暂停</button>
-                        <button id="circ-reset" class="primary-btn small">↺ 重置</button>
+                    <div class="physics-canvas-wrap">
+                        <canvas id="circ-canvas"></canvas>
                     </div>
+                    <div class="circ-stats" id="circ-stats"></div>
                 </div>
-                <div class="physics-canvas-wrap">
-                    <canvas id="circ-canvas"></canvas>
-                </div>
-                <div class="circ-stats" id="circ-stats"></div>
             </div>
 
             <!-- ── 机械能守恒 ── -->
             <div class="content-section" data-module="energy-conservation">
-                <h2 class="section-title">机械能守恒 <span class="title-badge">Energy Conservation</span></h2>
-                <div class="energy-controls">
-                    <label>摩擦系数: <input type="range" id="energy-friction" min="0" max="0.3" value="0" step="0.01"></label>
-                    <button id="energy-play" class="primary-btn small">⏸ 暂停</button>
-                    <button id="energy-reset" class="primary-btn small">↺ 重置</button>
-                </div>
-                <div class="physics-canvas-wrap">
-                    <canvas id="energy-canvas"></canvas>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>机械能守恒 <span class="title-badge">Energy Conservation</span></h2>
+                        <p>重力势能与动能转化，过山车轨道上的能量条</p>
+                    </div>
+                    <div class="energy-controls">
+                        <label>摩擦系数: <input type="range" id="energy-friction" min="0" max="0.3" value="0" step="0.01"></label>
+                        <button id="energy-play" class="primary-btn small">⏸ 暂停</button>
+                        <button id="energy-reset" class="primary-btn small">↺ 重置</button>
+                    </div>
+                    <div class="physics-canvas-wrap">
+                        <canvas id="energy-canvas"></canvas>
+                    </div>
                 </div>
             </div>
 
             <!-- Circuit Analysis -->
             <div class="content-section" data-module="circuit-analysis" id="circuit-analysis-section">
-                <div class="section-header">
-                    <h2>电路分析</h2>
-                    <p>串并联电路与欧姆定律</p>
-                </div>
-                <div class="circuit-controls">
-                    <button class="circuit-mode-btn active" data-mode="series">串联</button>
-                    <button class="circuit-mode-btn" data-mode="parallel">并联</button>
-                    <label>V: <input type="range" id="circuit-voltage" min="1" max="24" value="12" step="1"><span id="circuit-voltage-val">12</span>V</label>
-                    <label>R₁: <input type="range" id="circuit-r1" min="1" max="20" value="4" step="1"><span id="circuit-r1-val">4</span>Ω</label>
-                    <label>R₂: <input type="range" id="circuit-r2" min="1" max="20" value="6" step="1"><span id="circuit-r2-val">6</span>Ω</label>
-                </div>
-                <div class="physics-canvas-wrap">
-                    <canvas id="circuit-canvas"></canvas>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>电路分析</h2>
+                        <p>串并联电路与欧姆定律</p>
+                    </div>
+                    <div class="circuit-controls">
+                        <button class="circuit-mode-btn active" data-mode="series">串联</button>
+                        <button class="circuit-mode-btn" data-mode="parallel">并联</button>
+                        <label>V: <input type="range" id="circuit-voltage" min="1" max="24" value="12" step="1"><span id="circuit-voltage-val">12</span>V</label>
+                        <label>R₁: <input type="range" id="circuit-r1" min="1" max="20" value="4" step="1"><span id="circuit-r1-val">4</span>Ω</label>
+                        <label>R₂: <input type="range" id="circuit-r2" min="1" max="20" value="6" step="1"><span id="circuit-r2-val">6</span>Ω</label>
+                        <button id="circuit-pause" class="primary-btn small">暂停</button>
+                        <button id="circuit-reset" class="primary-btn small">重置</button>
+                    </div>
+                    <div class="physics-canvas-wrap">
+                        <canvas id="circuit-canvas"></canvas>
+                    </div>
                 </div>
             </div>
 
             <!-- Electromagnetic Induction -->
             <div class="content-section" data-module="em-induction" id="em-induction-section">
-                <div class="section-header">
-                    <h2>电磁感应</h2>
-                    <p>法拉第电磁感应定律：磁通量变化产生感应电动力</p>
-                </div>
-                <div class="emi-controls">
-                    <button class="emi-mode-btn active" data-mode="manual">手动拖拽</button>
-                    <button class="emi-mode-btn" data-mode="auto">自动往复</button>
-                </div>
-                <div class="physics-canvas-wrap">
-                    <canvas id="eminduction-canvas"></canvas>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>电磁感应</h2>
+                        <p>法拉第电磁感应定律：磁通量变化产生感应电动力</p>
+                    </div>
+                    <div class="emi-controls">
+                        <button class="emi-mode-btn active" data-mode="manual">手动拖拽</button>
+                        <button class="emi-mode-btn" data-mode="auto">自动往复</button>
+                        <button id="emi-pause" class="primary-btn small">暂停</button>
+                        <button id="emi-reset" class="primary-btn small">重置</button>
+                    </div>
+                    <div class="physics-canvas-wrap">
+                        <canvas id="eminduction-canvas"></canvas>
+                    </div>
                 </div>
             </div>
 
             <div class="content-section" data-module="alternating-current" id="ac-section">
-                <h2 class="section-title">交变电流</h2>
-                <p class="section-desc">AC 波形、相量图与变压器原理</p>
-                <div class="ac-controls">
-                    <div class="ac-mode-btns" role="group" aria-label="选择模式">
-                        <button class="ac-mode-btn active" data-mode="waveform" aria-pressed="true">波形</button>
-                        <button class="ac-mode-btn" data-mode="phasor" aria-pressed="false">相量图</button>
-                        <button class="ac-mode-btn" data-mode="transformer" aria-pressed="false">变压器</button>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>交变电流</h2>
+                        <p>AC 波形、相量图与变压器原理</p>
                     </div>
-                    <label class="ac-label">频率 <input type="range" id="ac-freq" min="10" max="120" value="50"><span id="ac-freq-val">50</span> Hz</label>
-                    <label class="ac-label">φ <input type="range" id="ac-phase" min="-90" max="90" value="30"><span id="ac-phase-val">30</span>°</label>
-                    <label class="ac-label">N₁ <input type="range" id="ac-n1" min="20" max="200" value="100"><span id="ac-n1-val">100</span></label>
-                    <label class="ac-label">N₂ <input type="range" id="ac-n2" min="10" max="200" value="50"><span id="ac-n2-val">50</span></label>
-                    <div class="ac-ctrl-right">
-                        <input type="range" id="ac-speed" min="0.2" max="3" step="0.1" value="1" aria-label="速度">
-                        <button id="ac-pause" class="ac-pause-btn" aria-label="暂停">⏸</button>
+                    <div class="ac-controls">
+                        <div class="ac-mode-btns" role="group" aria-label="选择模式">
+                            <button class="ac-mode-btn active" data-mode="waveform" aria-pressed="true">波形</button>
+                            <button class="ac-mode-btn" data-mode="phasor" aria-pressed="false">相量图</button>
+                            <button class="ac-mode-btn" data-mode="transformer" aria-pressed="false">变压器</button>
+                        </div>
+                        <label class="ac-label">频率 <input type="range" id="ac-freq" min="10" max="120" value="50"><span id="ac-freq-val">50</span> Hz</label>
+                        <label class="ac-label">φ <input type="range" id="ac-phase" min="-90" max="90" value="30"><span id="ac-phase-val">30</span>°</label>
+                        <label class="ac-label">N₁ <input type="range" id="ac-n1" min="20" max="200" value="100"><span id="ac-n1-val">100</span></label>
+                        <label class="ac-label">N₂ <input type="range" id="ac-n2" min="10" max="200" value="50"><span id="ac-n2-val">50</span></label>
+                        <div class="ac-ctrl-right">
+                            <input type="range" id="ac-speed" min="0.2" max="3" step="0.1" value="1" aria-label="速度">
+                            <button id="ac-pause" class="ac-pause-btn" aria-label="暂停">⏸</button>
+                            <button id="ac-reset" class="ac-pause-btn" aria-label="重置">↺</button>
+                        </div>
                     </div>
+                    <div class="canvas-container"><canvas id="ac-canvas" role="img" aria-label="交变电流可视化：波形、相量图与变压器"></canvas></div>
+                    <div id="ac-info" class="ac-info"></div>
                 </div>
-                <div class="canvas-container"><canvas id="ac-canvas" role="img" aria-label="交变电流可视化：波形、相量图与变压器"></canvas></div>
-                <div id="ac-info" class="ac-info"></div>
             </div>
 
             <div class="content-section" data-module="gravitation" id="gravitation-section">
-                <h2 class="section-title">万有引力 <span class="subtitle">轨道模拟与引力场</span></h2>
-                <div id="gravitation-controls" class="grav-controls"></div>
-                <div class="canvas-container"><canvas id="gravitation-canvas"></canvas></div>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>万有引力 <span class="subtitle">轨道模拟与引力场</span></h2>
+                        <p>卫星轨道与引力场可视化</p>
+                    </div>
+                    <div id="gravitation-controls" class="grav-controls"></div>
+                    <div class="grav-controls">
+                        <button id="grav-pause" class="primary-btn small">暂停</button>
+                        <button id="grav-reset" class="primary-btn small">重置</button>
+                    </div>
+                    <div class="canvas-container"><canvas id="gravitation-canvas"></canvas></div>
+                </div>
             </div>
 
             <div class="experiments-section">
@@ -1469,11 +1474,13 @@
                 </div>
             </div>
 
-            </div>
-
             <!-- ── 化学平衡 ── -->
             <div class="content-section" data-module="chemical-equilibrium">
-                <h2 class="section-title">化学平衡 <span class="title-badge">Chemical Equilibrium</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>化学平衡 <span class="title-badge">Chemical Equilibrium</span></h2>
+                        <p>勒夏特列原理与平衡移动</p>
+                    </div>
                 <div class="cheq-controls">
                     <div class="cheq-actions">
                         <button class="btn-primary" id="cheq-start">▶ 开始</button>
@@ -1501,11 +1508,16 @@
                     <p id="cheq-conc-display">[N₂]=1.000  [H₂]=3.000  [NH₃]=0.000</p>
                     <p id="cheq-temp-display">T=450°C  P=1.0atm  Kc=0.5000</p>
                 </div>
+                </div>
             </div>
 
             <!-- ── 电化学 ── -->
             <div class="content-section" data-module="electrochemistry">
-                <h2 class="section-title">电化学 <span class="title-badge">Electrochemistry</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>电化学 <span class="title-badge">Electrochemistry</span></h2>
+                        <p>原电池与电解池电子流动</p>
+                    </div>
                 <div class="echem-controls">
                     <div class="echem-modes">
                         <button class="echem-mode-btn active" data-mode="galvanic">原电池</button>
@@ -1517,10 +1529,12 @@
                     <canvas id="echem-canvas"></canvas>
                 </div>
                 <div class="echem-info" id="echem-info"></div>
+                </div>
             </div>
 
             <!-- Chemical Bond -->
             <div class="content-section" data-module="chemical-bond" id="chemical-bond-section">
+                <div class="demo-section">
                 <div class="section-header">
                     <h2>化学键</h2>
                     <p>离子键、共价键与金属键的微观结构</p>
@@ -1534,10 +1548,12 @@
                     <canvas id="chembond-canvas"></canvas>
                 </div>
                 <div class="chembond-info" id="chembond-info"></div>
+                </div>
             </div>
 
             <!-- Organic Chemistry -->
             <div class="content-section" data-module="organic-chemistry" id="organic-chemistry-section">
+                <div class="demo-section">
                 <div class="section-header">
                     <h2>有机化学初步</h2>
                     <p>碳链结构与常见有机物分子</p>
@@ -1557,12 +1573,16 @@
                     <canvas id="organic-canvas"></canvas>
                 </div>
                 <div class="organic-info" id="organic-info"></div>
+                </div>
             </div>
 
             <!-- Reaction Rate -->
             <div class="content-section" data-module="reaction-rate" id="reaction-rate-section">
-                <h2 class="section-title">化学反应速率</h2>
-                <p class="section-desc">碰撞理论：温度、浓度、催化剂对反应速率的影响</p>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>化学反应速率</h2>
+                        <p>碰撞理论：温度、浓度、催化剂对反应速率的影响</p>
+                    </div>
                 <div class="rxr-controls">
                     <label class="rxr-label">温度 <input type="range" id="rxnrate-temp" min="100" max="800" value="300" step="50"> <span id="rxnrate-temp-val">300</span>K</label>
                     <label class="rxr-label">浓度 <input type="range" id="rxnrate-conc" min="10" max="100" value="50" step="10"> <span id="rxnrate-conc-val">50</span>%</label>
@@ -1575,11 +1595,15 @@
                 </div>
                 <div class="canvas-container"><canvas id="rxnrate-canvas" aria-label="化学反应速率碰撞模拟画布"></canvas></div>
                 <div id="rxr-info" class="rxr-info"></div>
+                </div>
             </div>
 
             <div class="content-section" data-module="solution-ionization" id="solution-section">
-                <h2 class="section-title">溶液与电离</h2>
-                <p class="section-desc">pH 值、离子电离与酸碱指示</p>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>溶液与电离</h2>
+                        <p>pH 指示与强弱电解质</p>
+                    </div>
                 <div class="sol-controls">
                     <div class="sol-substance-btns" role="group" aria-label="选择溶质">
                         <button class="sol-substance-btn active" data-sub="hcl" aria-pressed="true">HCl 强酸</button>
@@ -1597,19 +1621,30 @@
                 </div>
                 <div class="canvas-container"><canvas id="solution-canvas"></canvas></div>
                 <div id="sol-info" class="sol-info"></div>
+                </div>
             </div>
 
             <div class="content-section" data-module="ionic-reaction" id="ionic-reaction-section">
-                <h2 class="section-title">离子反应 <span class="subtitle">离子方程式拆分</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>离子反应 <span class="subtitle">离子方程式拆分</span></h2>
+                        <p>离子方程式拆分与旁观离子</p>
+                    </div>
                 <div id="ionic-reaction-controls" class="ionrxn-controls"></div>
                 <div class="canvas-container"><canvas id="ionic-reaction-canvas"></canvas></div>
+                </div>
             </div>
 
             <div class="content-section" data-module="redox" id="redox-section">
-                <h2 class="section-title">氧化还原 <span class="subtitle">电子转移可视化</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>氧化还原 <span class="subtitle">电子转移可视化</span></h2>
+                        <p>电子转移可视化与双线桥法</p>
+                    </div>
                 <div id="redox-controls" class="redox-controls"></div>
                 <div class="canvas-container"><canvas id="redox-canvas"></canvas></div>
                 <div id="redox-info" class="redox-info"></div>
+                </div>
             </div>
 
             <div class="experiments-section">
@@ -1635,6 +1670,11 @@
             </div>
 
             <div class="content-section" data-module="sorting">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>桶排序</h2>
+                        <p>冒泡、快排、归并等排序过程动画演示</p>
+                    </div>
                 <div class="steps-panel">
                     <h3 class="steps-panel__title">桶排序 — 算法原理</h3>
                     <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
@@ -1662,7 +1702,6 @@
                     </ol>
                 </div>
 
-                <div class="demo-section">
                     <div class="sort-toolbar">
                         <button class="btn btn--orange" onclick="generateRandomArray()">生成随机数组</button>
                         <button class="btn btn--orange" onclick="startBucketSort()">开始排序</button>
@@ -1691,6 +1730,11 @@
 
             <!-- ═══ 搜索算法对比 ═══ -->
             <div class="content-section" id="binary-search-section" data-module="searching">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>搜索算法</h2>
+                        <p>二分查找、DFS/BFS 等搜索过程可视化</p>
+                    </div>
                 <div class="steps-panel">
                     <h3 class="steps-panel__title">搜索算法对比 — 四种经典方法</h3>
                     <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
@@ -1724,7 +1768,6 @@
                     </ol>
                 </div>
 
-                <div class="demo-section">
                     <div id="bs-controls">
                         <div class="sc-modes">
                             <button class="sc-mode-btn" data-mode="linear">线性 O(n)</button>
@@ -1750,6 +1793,11 @@
 
             <!-- ═══ 树遍历 ═══ -->
             <div class="content-section" id="graph-traversal-section" data-module="searching">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>二叉树遍历</h2>
+                        <p>前序、中序、后序与层序遍历动画</p>
+                    </div>
                 <div class="steps-panel">
                     <h3 class="steps-panel__title">二叉树遍历 — 四种经典方式</h3>
                     <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
@@ -1783,7 +1831,6 @@
                     </ol>
                 </div>
 
-                <div class="demo-section">
                     <div id="tree-controls">
                         <button class="btn btn--orange" onclick="TreeTraversal.startTraversal('preorder')">前序</button>
                         <button class="btn btn--orange" onclick="TreeTraversal.startTraversal('inorder')">中序</button>
@@ -1816,6 +1863,11 @@
 
             <!-- ═══ 哈希表查找 ═══ -->
             <div class="content-section" id="hash-search-section" data-module="searching">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>哈希表查找</h2>
+                        <p>冲突处理与负载因子对性能的影响</p>
+                    </div>
                 <div class="steps-panel">
                     <h3 class="steps-panel__title">哈希表查找 — O(1) 的秘密</h3>
                     <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
@@ -1843,7 +1895,6 @@
                     </ol>
                 </div>
 
-                <div class="demo-section">
                     <div id="hash-controls">
                         <input type="number" id="hash-input" placeholder="键值 1~99" min="1" max="99">
                         <button class="btn btn--orange" onclick="HashSearch.insertValue()">插入</button>
@@ -1865,6 +1916,11 @@
 
             <!-- ═══ 图算法: Dijkstra & Prim ═══ -->
             <div class="content-section" id="graph-algo-section" data-module="graph">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>图算法</h2>
+                        <p>最短路径、生成树等图论过程可视化</p>
+                    </div>
                 <div class="steps-panel">
                     <h3 class="steps-panel__title">图算法 — 最短路径 & 最小生成树</h3>
                     <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
@@ -1892,7 +1948,6 @@
                     </ol>
                 </div>
 
-                <div class="demo-section">
                     <div id="ga-controls">
                         <button class="btn btn--orange" onclick="GraphAlgo.startDijkstra()">Dijkstra 最短路径</button>
                         <button class="btn btn--orange" onclick="GraphAlgo.startPrim()">Prim 最小生成树</button>
@@ -1974,7 +2029,11 @@
 
             <!-- ── 排序对比 ── -->
             <div class="content-section" data-module="sorting-compare">
-                <h2 class="section-title">排序算法对比 <span class="title-badge">Sorting Compare</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>排序算法对比 <span class="title-badge">Sorting Compare</span></h2>
+                        <p>5 种排序算法动画对比</p>
+                    </div>
                 <div class="sortcmp-controls">
                     <div class="sortcmp-actions">
                         <button class="btn-primary" id="sortcmp-start">▶ 开始排序</button>
@@ -1995,11 +2054,16 @@
                 <div class="sortcmp-stats-wrap">
                     <p id="sortcmp-stats">点击“开始排序”查看 5 种算法对比</p>
                 </div>
+                </div>
             </div>
 
             <!-- ── 递归可视化 ── -->
             <div class="content-section" data-module="recursion-vis">
-                <h2 class="section-title">递归可视化 <span class="title-badge">Recursion</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>递归可视化 <span class="title-badge">Recursion</span></h2>
+                        <p>Fibonacci 树与汉诺塔动画</p>
+                    </div>
                 <div class="recur-controls">
                     <div class="recur-modes">
                         <button class="recur-mode-btn active" data-mode="fibonacci">Fibonacci 树</button>
@@ -2020,10 +2084,12 @@
                     <canvas id="recur-canvas"></canvas>
                 </div>
                 <div class="recur-info" id="recur-info"></div>
+                </div>
             </div>
 
             <!-- Dynamic Programming -->
             <div class="content-section" data-module="dynamic-programming" id="dynamic-programming-section">
+                <div class="demo-section">
                 <div class="section-header">
                     <h2>动态规划</h2>
                     <p>0/1背包问题 DP 表格填充动画</p>
@@ -2037,11 +2103,15 @@
                 <div class="algo-canvas-wrap">
                     <canvas id="dp-canvas"></canvas>
                 </div>
+                </div>
             </div>
 
             <div class="content-section" data-module="string-matching" id="strmatch-section">
-                <h2 class="section-title">字符串匹配</h2>
-                <p class="section-desc">KMP 与暴力匹配算法可视化</p>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>字符串匹配</h2>
+                        <p>KMP 与暴力匹配算法可视化</p>
+                    </div>
                 <div class="strmatch-controls">
                     <div class="strmatch-algo-btns">
                         <button class="strmatch-algo-btn active" data-algo="kmp">KMP</button>
@@ -2053,6 +2123,7 @@
                     <label>速度 <input type="range" id="strmatch-speed" min="0.3" max="3" value="1" step="0.1"></label>
                 </div>
                 <div class="canvas-container"><canvas id="strmatch-canvas"></canvas></div>
+                </div>
             </div>
 
             <div class="experiments-section">
@@ -2076,6 +2147,11 @@
 
             <!-- ═══ 细胞结构 ═══ -->
             <div class="content-section" data-module="cell-structure">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>细胞结构</h2>
+                        <p>动植物细胞的结构与功能</p>
+                    </div>
                 <div class="steps-panel">
                     <h3 class="steps-panel__title">细胞结构 — 生命的基本单位</h3>
                     <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
@@ -2108,10 +2184,16 @@
                     <canvas id="cell-canvas" class="bio-canvas" width="700" height="500"></canvas>
                     <div class="bio-info" id="cell-info">点击细胞器查看详细信息</div>
                 </div>
+                </div>
             </div>
 
             <!-- ═══ DNA 结构 ═══ -->
             <div class="content-section" data-module="dna">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>DNA 结构</h2>
+                        <p>双螺旋结构与复制过程</p>
+                    </div>
                 <div class="steps-panel">
                     <h3 class="steps-panel__title">DNA 双螺旋 — 遗传信息的载体</h3>
                     <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
@@ -2139,10 +2221,16 @@
                     <canvas id="dna-canvas" class="bio-canvas" width="700" height="500"></canvas>
                     <div class="bio-info" id="dna-info">DNA 双螺旋结构 — 点击按钮开始探索</div>
                 </div>
+                </div>
             </div>
 
             <!-- ═══ 光合作用 ═══ -->
             <div class="content-section" data-module="photosynthesis">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>光合作用</h2>
+                        <p>光反应与暗反应可视化</p>
+                    </div>
                 <div class="steps-panel">
                     <h3 class="steps-panel__title">光合作用 — 能量转化</h3>
                     <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
@@ -2175,10 +2263,16 @@
                     <canvas id="photosynthesis-canvas" class="bio-canvas" width="700" height="500"></canvas>
                     <div class="bio-info" id="photo-info">调节光照强度，观察光合作用速率变化</div>
                 </div>
+                </div>
             </div>
 
             <!-- ═══ 遗传学 ═══ -->
             <div class="content-section" data-module="genetics">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>遗传学</h2>
+                        <p>孟德尔定律与遗传图谱</p>
+                    </div>
                 <div class="steps-panel">
                     <h3 class="steps-panel__title">遗传学 — 孟德尔定律</h3>
                     <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
@@ -2242,11 +2336,16 @@
                     <canvas id="genetics-canvas" class="bio-canvas" width="700" height="500"></canvas>
                     <div class="bio-info" id="genetics-info">选择亲本基因型，点击杂交查看后代比例</div>
                 </div>
+                </div>
             </div>
 
             <!-- ── 有丝分裂 ── -->
             <div class="content-section" data-module="mitosis">
-                <h2 class="section-title">有丝分裂 <span class="title-badge">Mitosis</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>有丝分裂 <span class="title-badge">Mitosis</span></h2>
+                        <p>细胞分裂各时期动画演示</p>
+                    </div>
                 <div class="mito-controls">
                     <div class="mito-transport">
                         <button class="btn-secondary" id="mito-prev">◀ 上一期</button>
@@ -2278,11 +2377,15 @@
                     <h3 id="mito-phase-name">间期 (Interphase)</h3>
                     <p id="mito-phase-desc">DNA复制，细胞生长，染色质松散</p>
                 </div>
+                </div>
             </div>
 
             <div class="content-section" data-module="neural-regulation" id="neural-section">
-                <h2 class="section-title">神经调节</h2>
-                <p class="section-desc">探索突触传递与动作电位的产生过程</p>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>神经调节</h2>
+                        <p>突触传递与动作电位可视化</p>
+                    </div>
                 <div class="neural-controls">
                     <div class="neural-mode-btns">
                         <button class="neural-mode-btn active" data-mode="synapse" aria-pressed="true">突触传递</button>
@@ -2296,11 +2399,15 @@
                 </div>
                 <div class="canvas-container"><canvas id="neural-canvas"></canvas></div>
                 <div id="neural-info" class="neur-info"></div>
+                </div>
             </div>
 
             <div class="content-section" data-module="immune-system" id="immune-section">
-                <h2 class="section-title">免疫系统</h2>
-                <p class="section-desc">非特异性与特异性免疫可视化</p>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>免疫系统</h2>
+                        <p>非特异性与特异性免疫可视化</p>
+                    </div>
                 <div class="immune-controls">
                     <div class="immune-mode-btns">
                         <button class="immune-mode-btn active" data-mode="innate" aria-label="非特异性免疫模式">非特异性免疫</button>
@@ -2314,41 +2421,71 @@
                 </div>
                 <div class="canvas-container"><canvas id="immune-canvas"></canvas></div>
                 <div id="immune-info" class="imm-info"></div>
+                </div>
             </div>
 
             <div class="content-section" data-module="ecosystem" id="ecosystem-section">
-                <h2 class="section-title">生态系统 <span class="subtitle">食物链与种群动态</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>生态系统 <span class="subtitle">食物链与种群动态</span></h2>
+                        <p>食物链能量流动与种群动态模拟</p>
+                    </div>
                 <div id="ecosystem-controls" class="eco-controls"></div>
                 <div class="canvas-container"><canvas id="ecosystem-canvas"></canvas></div>
                 <div id="ecosystem-info" class="eco-info"></div>
+                </div>
             </div>
 
             <div class="content-section" data-module="meiosis" id="meiosis-section">
-                <h2 class="section-title">减数分裂 <span class="subtitle">MeiosisⅠ & Ⅱ</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>减数分裂 <span class="subtitle">MeiosisⅠ & Ⅱ</span></h2>
+                        <p>同源染色体联会与分裂全过程</p>
+                    </div>
                 <div id="meiosis-controls" class="meio-controls"></div>
                 <div class="canvas-container"><canvas id="meiosis-canvas"></canvas></div>
+                </div>
             </div>
 
             <div class="content-section" data-module="gene-expression" id="gene-expression-section">
-                <h2 class="section-title">基因表达 <span class="subtitle">转录 & 翻译</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>基因表达 <span class="subtitle">转录 & 翻译</span></h2>
+                        <p>转录 (DNA→mRNA) 与翻译 (mRNA→蛋白质)</p>
+                    </div>
                 <div id="gene-expression-controls" class="genexp-controls"></div>
                 <div class="canvas-container"><canvas id="gene-expression-canvas"></canvas></div>
+                </div>
             </div>
 
             <div class="content-section" data-module="cellular-respiration" id="cellular-respiration-section">
-                <h2 class="section-title">细胞呼吸 <span class="subtitle">有氧呼吸三阶段</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>细胞呼吸 <span class="subtitle">有氧呼吸三阶段</span></h2>
+                        <p>糖酵解、柠檬酸循环与电子传递链</p>
+                    </div>
                 <div id="cell-resp-controls" class="cellresp-controls"></div>
                 <div class="canvas-container"><canvas id="cell-resp-canvas"></canvas></div>
+                </div>
             </div>
 
             <div class="content-section" data-module="substance-transport" id="substance-transport-section">
-                <h2 class="section-title">物质运输 <span class="subtitle">膜运输方式</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>物质运输 <span class="subtitle">膜运输方式</span></h2>
+                        <p>自由扩散、协助扩散、主动运输与胞吞胞吐</p>
+                    </div>
                 <div id="substance-transport-controls" class="strans-controls"></div>
                 <div class="canvas-container"><canvas id="substance-transport-canvas"></canvas></div>
+                </div>
             </div>
 
             <div class="content-section" data-module="gene-mutation" id="gene-mutation-section">
-                <h2 class="section-title">基因突变 <span class="subtitle">碱基替换/插入/缺失</span></h2>
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>基因突变 <span class="subtitle">碱基替换/插入/缺失</span></h2>
+                        <p>碱基替换、插入、缺失对蛋白质的影响</p>
+                    </div>
                 <div id="gene-mutation-controls" class="gmut-controls">
                     <div class="gmut-mode-btns" role="group" aria-label="突变类型">
                         <button class="gmut-btn active" data-mode="0" aria-pressed="true">碱基替换</button>
@@ -2362,6 +2499,7 @@
                 </div>
                 <div class="canvas-container"><canvas id="gene-mutation-canvas"></canvas></div>
                 <div id="gmut-info" class="gmut-info" aria-live="polite"></div>
+                </div>
             </div>
 
             <div class="experiments-section">
@@ -2477,6 +2615,7 @@
     <script defer src="pages/physics/electromagnetic-induction.js"></script>
     <script defer src="pages/physics/alternating-current.js"></script>
     <script defer src="pages/physics/gravitation.js"></script>
+    <script defer src="pages/physics/physics-zoom.js"></script>
     <script defer src="pages/chemistry/periodic-table.js"></script>
     <script defer src="pages/chemistry/molecular-structure.js"></script>
     <script defer src="pages/chemistry/chemical-reactions.js"></script>

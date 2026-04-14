@@ -1,56 +1,7 @@
 // ===== 数学页面逻辑 =====
 
-// ===== 算筹逻辑 =====
-function numberToAbacus(n) {
-    const s = []; 
-    let r = n;
-    if(r>=10) {
-        const t = Math.floor(r/10);
-        for(let i=0;i<Math.floor(t/5);i++) s.push({type:'h',v:5});
-        for(let i=0;i<t%5;i++) s.push({type:'v',v:1});
-        r%=10;
-    }
-    for(let i=0;i<Math.floor(r/5);i++) s.push({type:'v',v:5});
-    for(let i=0;i<r%5;i++) s.push({type:'h',v:1});
-    return s;
-}
-
-function renderAbacus(id, n) {
-    const c = document.getElementById(id);
-    if(!c) return;
-    c.innerHTML = '';
-    const s = numberToAbacus(n);
-    if(!s.length) c.innerHTML = '<span style="color:#94a3b8">0</span>';
-    s.forEach((k,i) => {
-        const d = document.createElement('div');
-        d.className = `stick ${k.type==='h'?'horizontal':''}`;
-        d.style.animationDelay = i*0.1+'s';
-        c.appendChild(d);
-    });
-}
-
-function updateAbacus() {
-    const num1El = document.getElementById('num1');
-    const num2El = document.getElementById('num2');
-    if(num1El) renderAbacus('abacus-num1', parseInt(num1El.value)||0);
-    if(num2El) renderAbacus('abacus-num2', parseInt(num2El.value)||0);
-}
-
-function calculateAbacus() {
-    const num1El = document.getElementById('num1');
-    const num2El = document.getElementById('num2');
-    const operatorEl = document.getElementById('operator');
-    if(!num1El || !num2El || !operatorEl) return;
-    
-    const n1 = parseInt(num1El.value)||0;
-    const n2 = parseInt(num2El.value)||0;
-    const op = operatorEl.value;
-    renderAbacus('abacus-result', op==='add' ? n1+n2 : Math.max(0, n1-n2));
-}
-
 // ===== 数学页面初始化 =====
 function initMathematics() {
-    updateAbacus();
     initFunctionGraph();
 }
 
@@ -488,8 +439,6 @@ function destroyFunctionGraph() {
 }
 
 // 导出全局
-window.updateAbacus = updateAbacus;
-window.calculateAbacus = calculateAbacus;
 window.drawFunctionGraph = drawFunctionGraph;
 window.setFunction = setFunction;
 window.initFunctionGraph = initFunctionGraph;

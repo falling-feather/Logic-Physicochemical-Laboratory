@@ -4,6 +4,7 @@
 const FluidSim = {
     canvas: null, ctx: null, W: 0, H: 0,
     mode: 'potential',   // 'potential' | 'cylinder' | 'bernoulli'
+    paused: false,
 
     // 势流元素 [{type:'source'|'sink'|'vortex', x, y, m}]
     elements: [],
@@ -40,6 +41,7 @@ const FluidSim = {
         this._injectPotentialPanel();
         this._injectCylinderPanel();
         this._injectBernoulliPanel();
+        this._injectGlobalActions();
         this.bindCanvas();
         this.setMode('potential');
 
@@ -59,6 +61,7 @@ const FluidSim = {
     },
 
     resize() {
+        if (window.PhysicsZoom && window.PhysicsZoom.movedCanvas === this.canvas) return;
         const wrap = this.canvas.parentElement;
         if (!wrap) return;
         const w = wrap.clientWidth;
@@ -93,9 +96,69 @@ const FluidSim = {
         wrap.prepend(bar);
     },
 
+    _injectGlobalActions() {
+        const wrap = document.getElementById('fluid-controls');
+        if (!wrap || document.getElementById('fluid-global-actions')) return;
+        const row = document.createElement('div');
+        row.id = 'fluid-global-actions';
+        row.className = 'physics-actions';
+        row.innerHTML = `
+            <button id="fluid-pause" class="btn btn--ghost">暂停</button>
+            <button id="fluid-reset" class="btn btn--ghost">重置</button>
+        `;
+        wrap.appendChild(row);
+
+        const pauseBtn = document.getElementById('fluid-pause');
+        const resetBtn = document.getElementById('fluid-reset');
+        if (pauseBtn) pauseBtn.addEventListener('click', () => {
+            this.paused = !this.paused;
+            pauseBtn.textContent = this.paused ? '继续' : '暂停';
+        });
+        if (resetBtn) resetBtn.addEventListener('click', () => this.resetScene());
+    },
+
+    resetScene() {
+        this.paused = false;
+        const pauseBtn = document.getElementById('fluid-pause');
+        if (pauseBtn) pauseBtn.textContent = '暂停';
+
+        this.mode = 'potential';
+        this.elements = [];
+        this.uniformU = 60;
+        this._addType = 'source';
+        this._probePos = null;
+        this._elDragIndex = -1;
+
+        this.cylCirculation = 0;
+        this._cylDragging = false;
+
+        this._bernoulliRunning = false;
+        this._bernoulliT = 0;
+        this._bernoulliParticles = [];
+        this._bernoulliConstrict = 0.4;
+        if (this._bernoulliAnimId) { cancelAnimationFrame(this._bernoulliAnimId); this._bernoulliAnimId = null; }
+
+        const fu = document.getElementById('fluid-uniform-u');
+        const fuv = document.getElementById('fluid-u-val');
+        if (fu) fu.value = '60';
+        if (fuv) fuv.textContent = '60';
+        const gamma = document.getElementById('fluid-cyl-gamma');
+        const gammaVal = document.getElementById('fluid-cyl-gamma-val');
+        if (gamma) gamma.value = '0';
+        if (gammaVal) gammaVal.textContent = '0';
+        const constrict = document.getElementById('fluid-bern-constrict');
+        const constrictVal = document.getElementById('fluid-bern-constrict-val');
+        if (constrict) constrict.value = '0.4';
+        if (constrictVal) constrictVal.textContent = '0.40';
+        const bernToggle = document.getElementById('fluid-bern-toggle');
+        if (bernToggle) bernToggle.textContent = '开始';
+
+        this.setMode('potential');
+    },
+
     _injectPotentialPanel() {
         const wrap = document.getElementById('fluid-controls');
-        if (!wrap) return;
+        if (!wrap || document.getElementById('fluid-potential-panel')) return;
         const panel = document.createElement('div');
         panel.id = 'fluid-potential-panel';
         panel.style.cssText = 'display:none;padding:8px 12px;background:rgba(30,41,59,.55);border-radius:8px;font-size:13px;color:#e2e8f0;';
@@ -201,7 +264,7 @@ const FluidSim = {
 
     _injectCylinderPanel() {
         const wrap = document.getElementById('fluid-controls');
-        if (!wrap) return;
+        if (!wrap || document.getElementById('fluid-cylinder-panel')) return;
         const panel = document.createElement('div');
         panel.id = 'fluid-cylinder-panel';
         panel.style.cssText = 'display:none;padding:8px 12px;background:rgba(30,41,59,.55);border-radius:8px;font-size:13px;color:#e2e8f0;';
@@ -245,7 +308,7 @@ const FluidSim = {
 
     _injectBernoulliPanel() {
         const wrap = document.getElementById('fluid-controls');
-        if (!wrap) return;
+        if (!wrap || document.getElementById('fluid-bernoulli-panel')) return;
         const panel = document.createElement('div');
         panel.id = 'fluid-bernoulli-panel';
         panel.style.cssText = 'display:none;padding:8px 12px;background:rgba(30,41,59,.55);border-radius:8px;font-size:13px;color:#e2e8f0;';
@@ -936,6 +999,10 @@ const FluidSim = {
 
     _startBernoulliLoop() {
         if (!this._bernoulliRunning) return;
+        if (this.paused) {
+            this._bernoulliAnimId = requestAnimationFrame(() => this._startBernoulliLoop());
+            return;
+        }
         const now = performance.now();
         if (!this._bernoulliLastTime) this._bernoulliLastTime = now;
         const rawDt = (now - this._bernoulliLastTime) / 1000;

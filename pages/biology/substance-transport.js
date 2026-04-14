@@ -169,7 +169,7 @@ const SubstanceTransport = {
         ctx.arc(mx + 25, H * 0.5 + 20, 8, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(255,200,50,' + (0.4 + ap * 0.3) + ')';
         ctx.fill();
-        ctx.font = 'bold 7px monospace';
+        ctx.font = 'bold 9px "JetBrains Mono", monospace';
         ctx.fillStyle = '#fff';
         ctx.fillText('ATP', mx + 25, H * 0.5 + 22);
         // direction arrow (reversed - low to high)
