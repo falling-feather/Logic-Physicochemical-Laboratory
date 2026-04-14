@@ -1,14 +1,38 @@
 /* ===== Biology Module Styles ===== */
 
+/* ── Buttons (teal accent override) ── */
+#page-biology .btn-primary {
+    background: rgba(58,158,143,0.18);
+    border-color: var(--accent-teal);
+    color: var(--accent-teal);
+}
+
+#page-biology .btn-primary:hover {
+    background: rgba(58,158,143,0.28);
+    box-shadow: 0 0 12px rgba(58,158,143,0.15);
+}
+
+#page-biology .btn-secondary:hover {
+    border-color: var(--accent-teal);
+}
+
+/* ── Canvas ── */
 .bio-canvas {
+    display: block;
     width: 100%;
     max-width: 700px;
     height: auto;
     border-radius: var(--radius-md);
-    background: rgba(0,0,0,0.2);
-    border: 1px solid rgba(58,158,143,0.15);
+    background: #0c100f;
+    border: 1px solid rgba(58,158,143,0.12);
+    transition: border-color var(--duration-fast) ease;
 }
 
+.bio-canvas:hover {
+    border-color: rgba(58,158,143,0.25);
+}
+
+/* ── Info Panel ── */
 .bio-info {
     margin-top: var(--space-3);
     padding: var(--space-3) var(--space-4);
@@ -18,8 +42,11 @@
     font-size: var(--text-sm);
     color: var(--text-secondary);
     min-height: 2.4em;
+    line-height: 1.6;
+    transition: background var(--duration-fast) ease;
 }
 
+/* ── Select Dropdown ── */
 .bio-select {
     padding: var(--space-1) var(--space-3);
     border-radius: var(--radius-sm);
@@ -27,8 +54,9 @@
     border: 1px solid var(--border-subtle);
     color: var(--text-primary);
     font-size: var(--text-sm);
-    font-family: var(--font-sans);
+    font-family: var(--font-body);
     cursor: pointer;
+    transition: border-color var(--duration-fast) ease;
 }
 
 .bio-select:focus {
@@ -37,13 +65,141 @@
     box-shadow: 0 0 0 2px rgba(58,158,143,0.2);
 }
 
-/* Punnett Square */
+/* ── Range Slider (photosynthesis light intensity) ── */
+#page-biology input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 120px;
+    height: 6px;
+    background: var(--surface-3);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+#page-biology input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-teal);
+    border: 2px solid var(--surface-0);
+    box-shadow: 0 0 6px rgba(58,158,143,0.3);
+    transition: box-shadow var(--duration-fast) ease;
+}
+
+#page-biology input[type="range"]::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 10px rgba(58,158,143,0.5);
+}
+
+#page-biology input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-teal);
+    border: 2px solid var(--surface-0);
+    box-shadow: 0 0 6px rgba(58,158,143,0.3);
+}
+
+/* ── Mode Toggle Buttons (shared pattern) ── */
+.genetics-modes,
+.dna-modes,
+.photo-modes {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-3);
+}
+
+.gen-mode-btn,
+.dna-mode-btn,
+.photo-mode-btn {
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-sm);
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: var(--text-xs);
+    cursor: pointer;
+    transition: all var(--duration-fast) ease;
+    white-space: nowrap;
+}
+
+.gen-mode-btn:hover,
+.dna-mode-btn:hover,
+.photo-mode-btn:hover {
+    border-color: var(--accent-teal);
+    color: var(--text-primary);
+    background: rgba(58,158,143,0.08);
+}
+
+.gen-mode-btn.active,
+.dna-mode-btn.active,
+.photo-mode-btn.active {
+    border-color: var(--accent-teal);
+    background: rgba(58,158,143,0.18);
+    color: var(--accent-teal);
+    box-shadow: 0 0 8px rgba(58,158,143,0.12);
+}
+
+/* Legacy compat */
+.genetics-mode-btn {
+    font-size: var(--text-xs) !important;
+    padding: var(--space-1) var(--space-3) !important;
+}
+
+/* ── Controls Sub-groups ── */
+.bio-controls-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+.bio-controls-group label {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    white-space: nowrap;
+}
+
+.bio-controls-group .bio-select {
+    min-width: 120px;
+}
+
+/* ── Genetics Sub-Panels (Punnett / Population / Pedigree) ── */
+#bio-punnett-controls,
+#bio-pop-controls,
+#bio-pedigree-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+#bio-pop-controls label,
+#bio-pedigree-controls label {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    white-space: nowrap;
+}
+
+#bio-pop-controls input[type="range"] {
+    width: 120px;
+}
+
+/* ── Punnett Square ── */
 .punnett-table {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 2px;
     max-width: 240px;
     margin: var(--space-3) auto;
+}
+
+.punnett-table.dihybrid {
+    grid-template-columns: repeat(5, 1fr);
+    max-width: 400px;
 }
 
 .punnett-cell {
@@ -66,4 +222,361 @@
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.06);
     color: var(--text-primary);
+    transition: background var(--duration-fast) ease;
 }
+
+.punnett-result:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+/* ═══ Ecosystem v2 Controls & Info Panel ═══ */
+.eco-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.eco-mode-btns {
+    display: flex;
+    gap: 4px;
+}
+.eco-mode-btn {
+    padding: 6px 14px;
+    border: 1px solid rgba(58,158,143,0.3);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: var(--text-sm);
+    transition: all var(--duration-fast) ease;
+    white-space: nowrap;
+}
+.eco-mode-btn.active,
+.eco-mode-btn:hover {
+    background: rgba(58,158,143,0.18);
+    color: var(--accent-teal);
+    border-color: var(--accent-teal);
+}
+.eco-ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    width: 100%;
+    margin-top: 4px;
+}
+.eco-slider-label {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    min-width: 110px;
+    white-space: nowrap;
+}
+.eco-slider {
+    width: 100px;
+    accent-color: var(--accent-teal);
+    cursor: pointer;
+}
+.eco-slider-val {
+    font-size: var(--text-xs);
+    color: var(--accent-teal);
+    min-width: 48px;
+    font-family: var(--font-mono);
+}
+.eco-param-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    background: rgba(58,158,143,0.04);
+    border: 1px solid rgba(58,158,143,0.12);
+}
+.eco-info {
+    margin-top: 16px;
+    padding: 16px 20px;
+    border-radius: var(--radius-md);
+    background: rgba(58,158,143,0.04);
+    border: 1px solid rgba(58,158,143,0.12);
+}
+.eco-info__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+.eco-info__tag {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+}
+.eco-info__tag--green {
+    background: rgba(50,180,50,0.15);
+    color: #4caf50;
+}
+.eco-info__tag--teal {
+    background: rgba(58,158,143,0.15);
+    color: var(--accent-teal);
+}
+.eco-info__detail {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+.eco-info__formulas {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 8px 0;
+}
+.eco-info__formulas code {
+    display: block;
+    padding: 5px 12px;
+    border-radius: var(--radius-sm);
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+}
+.eco-info__note {
+    margin: 8px 0 0;
+    font-size: var(--text-sm);
+    color: var(--text-tertiary);
+    line-height: 1.6;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    #page-biology .viz-controls {
+        gap: var(--space-2);
+    }
+
+    #page-biology .btn-primary,
+    #page-biology .btn-secondary {
+        padding: var(--space-1) var(--space-3);
+        font-size: var(--text-xs);
+    }
+
+    #page-biology input[type="range"] {
+        width: 90px;
+    }
+
+    .bio-canvas {
+        border-radius: var(--radius-sm);
+    }
+
+    .genetics-modes,
+    .dna-modes,
+    .photo-modes {
+        gap: var(--space-1);
+    }
+
+    .gen-mode-btn,
+    .dna-mode-btn,
+    .photo-mode-btn {
+        padding: 2px var(--space-2);
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 480px) {
+    #page-biology .viz-controls {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .punnett-table.dihybrid {
+        max-width: 100%;
+    }
+
+    .punnett-cell {
+        font-size: var(--text-xs);
+    }
+
+    .bio-select {
+        width: 100%;
+    }
+
+    .genetics-modes,
+    .dna-modes,
+    .photo-modes {
+        width: 100%;
+    }
+
+    .gen-mode-btn,
+    .dna-mode-btn,
+    .photo-mode-btn {
+        flex: 1;
+        text-align: center;
+    }
+
+    .bio-controls-group {
+        width: 100%;
+    }
+}
+
+/* ══════ Mitosis ══════ */
+.mito-controls {
+    display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center;
+    margin-bottom: var(--space-3);
+}
+.mito-transport {
+    display: flex; gap: var(--space-2); flex-wrap: wrap;
+}
+.mito-slider-row {
+    display: flex; align-items: center; gap: var(--space-2);
+}
+.mito-slider-row label {
+    font-size: var(--text-xs); color: var(--text-muted); min-width: 32px;
+}
+.mito-slider-row input[type="range"] {
+    width: 100px;
+}
+.mito-phase-info {
+    text-align: center; margin-top: var(--space-3); padding: var(--space-3);
+    background: rgba(58,158,143,0.06); border-radius: var(--radius-md);
+}
+.mito-phase-info h3 {
+    font-size: var(--text-base); color: var(--accent-teal); margin: var(--space-2) 0 var(--space-1);
+}
+.mito-phase-info p {
+    font-size: var(--text-sm); color: var(--text-muted);
+}
+.mito-phase-dots {
+    display: flex; justify-content: center; gap: var(--space-2);
+}
+.mito-phase-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: rgba(255,255,255,0.12); transition: all 0.3s;
+}
+.mito-phase-dot.active {
+    background: var(--accent-teal); box-shadow: 0 0 8px rgba(58,158,143,0.4); transform: scale(1.3);
+}
+.mito-phase-dot.done {
+    background: rgba(58,158,143,0.5);
+}
+
+@media (max-width: 768px) {
+    .mito-controls { flex-direction: column; align-items: flex-start; }
+    .mito-slider-row input[type="range"] { width: 80px; }
+}
+
+/* ══════ Neural Regulation v2 ══════ */
+.neural-controls { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; justify-content:space-between; }
+.neural-mode-btns { display:flex; gap:6px; }
+.neural-mode-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.neural-mode-btn.active { background:rgba(58,158,143,.18); color:var(--text-primary); border-color:rgba(58,158,143,.5); }
+.neur-ctrl-right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.neur-slider-label { display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--text-secondary); }
+.neur-slider { width:80px; accent-color:var(--accent-teal); }
+.neur-info { margin-top:14px; padding:14px 16px; background:rgba(58,158,143,.04); border:1px solid rgba(58,158,143,.12); border-radius:var(--radius-md); font-size:.84rem; line-height:1.65; }
+.neur-hd { font-weight:600; margin-bottom:6px; }
+.neur-tag { display:inline-block; padding:1px 8px; border-radius:10px; font-size:.76rem; background:rgba(58,158,143,.15); color:var(--accent-teal); margin-right:6px; }
+.neur-tag--red { background:rgba(224,108,117,.15); color:#e06c75; }
+.neur-row { padding:3px 0; display:flex; gap:8px; flex-wrap:wrap; }
+.neur-key { flex-shrink:0; font-weight:600; color:var(--accent-teal); }
+.neur-key--gold { color:#e5c07b; }
+.neur-key--teal { color:var(--accent-teal); }
+.neur-key--pink { color:#e06c75; }
+.neur-key--blue { color:#61afef; }
+.neur-key--purple { color:#c678dd; }
+.neur-note { margin-top:6px; padding:6px 10px; background:rgba(229,192,123,.06); border-radius:var(--radius-sm); color:var(--text-secondary); font-size:.8rem; }
+@media (max-width: 768px) {
+    .neural-controls { flex-direction: column; align-items: flex-start; }
+    .neur-slider { width: 60px; }
+}
+
+/* ══════ Immune System v2 ══════ */
+.immune-controls { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; justify-content:space-between; }
+.immune-mode-btns { display:flex; gap:6px; }
+.immune-mode-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.immune-mode-btn.active { background:rgba(58,158,143,.18); color:var(--text-primary); border-color:rgba(58,158,143,.5); }
+.imm-ctrl-right { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.imm-slider-label { font-size:.78rem; color:var(--text-secondary); display:flex; align-items:center; gap:6px; }
+.imm-slider { width:70px; accent-color:var(--biology,#3a9e8f); }
+.imm-info { margin-top:.75rem; font-size:.82rem; color:rgba(255,255,255,.6); line-height:1.8; }
+.imm-hd { margin-bottom:.45rem; font-weight:600; font-size:.9rem; color:#fff; }
+.imm-tag { display:inline-block; padding:.1rem .45rem; border-radius:3px; font-size:.72rem; font-weight:600; background:rgba(91,141,206,.15); color:#7eb8f0; margin-right:.4rem; vertical-align:middle; }
+.imm-tag--purple { background:rgba(139,111,192,.15); color:#b48eed; }
+.imm-row { margin-bottom:.3rem; }
+.imm-key { display:inline-block; padding:.1rem .4rem; border-radius:3px; font-size:.72rem; font-weight:600; background:rgba(91,141,206,.12); color:#7eb8f0; margin-right:.35rem; vertical-align:middle; }
+.imm-key--purple { background:rgba(139,111,192,.12); color:#b48eed; }
+.imm-key--green { background:rgba(77,158,126,.12); color:#4d9e7e; }
+.imm-key--orange { background:rgba(229,192,123,.12); color:#e5c07b; }
+.imm-key--amber { background:rgba(229,192,123,.12); color:#e5c07b; }
+.imm-note { margin-top:.5rem; font-size:.78rem; color:rgba(255,255,255,.4); }
+@media (max-width: 768px) { .immune-controls { flex-direction:column; align-items:flex-start; } .imm-ctrl-right { width:100%; } }
+
+/* ══════ Ecosystem ══════ */
+.eco-controls { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.eco-mode-btns { display:flex; gap:6px; }
+.eco-mode-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.eco-mode-btn.active { background:rgba(58,158,143,.18); color:var(--text-primary); border-color:rgba(58,158,143,.5); }
+@media (max-width: 768px) { .eco-controls { flex-direction: column; align-items: flex-start; } }
+
+/* ══════ Meiosis ══════ */
+.meio-controls { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.meio-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.meio-btn.active { background:rgba(58,158,143,.18); color:var(--text-primary); border-color:rgba(58,158,143,.5); }
+.meio-speed { display:flex; align-items:center; gap:4px; font-size:.82rem; color:var(--text-secondary); }
+.meio-speed input[type="range"] { width:60px; accent-color:var(--accent-teal,#3a9e8f); }
+@media (max-width: 768px) { .meio-controls { flex-direction: column; align-items: flex-start; } }
+
+/* ══════ Gene Expression ══════ */
+.genexp-controls { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.genexp-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.genexp-btn.active { background:rgba(58,158,143,.18); color:var(--text-primary); border-color:rgba(58,158,143,.5); }
+.genexp-speed { display:flex; align-items:center; gap:4px; font-size:.82rem; color:var(--text-secondary); }
+.genexp-speed input[type="range"] { width:60px; accent-color:var(--accent-teal,#3a9e8f); }
+@media (max-width: 768px) { .genexp-controls { flex-direction: column; align-items: flex-start; } }
+
+/* ══════ Cellular Respiration ══════ */
+.cellresp-controls { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.cellresp-stage-btns { display:flex; gap:6px; }
+.cellresp-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.cellresp-btn.active { background:rgba(58,158,143,.18); color:var(--text-primary); border-color:rgba(58,158,143,.5); }
+.cellresp-speed { display:flex; align-items:center; gap:4px; font-size:.82rem; color:var(--text-secondary); }
+.cellresp-speed input[type="range"] { width:60px; accent-color:var(--accent-teal,#3a9e8f); }
+@media (max-width: 768px) { .cellresp-controls { flex-direction: column; align-items: flex-start; } }
+
+/* ══════ Substance Transport ══════ */
+.strans-controls { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.strans-mode-btns { display:flex; gap:6px; flex-wrap:wrap; }
+.strans-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.strans-btn.active { background:rgba(58,158,143,.18); color:var(--text-primary); border-color:rgba(58,158,143,.5); }
+.strans-speed { display:flex; align-items:center; gap:4px; font-size:.82rem; color:var(--text-secondary); }
+.strans-speed input[type="range"] { width:60px; accent-color:var(--accent-teal,#3a9e8f); }
+@media (max-width: 768px) { .strans-controls { flex-direction: column; align-items: flex-start; } }
+
+/* ══════ Gene Mutation v2 ══════ */
+.gmut-controls { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.gmut-mode-btns { display:flex; gap:6px; }
+.gmut-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.gmut-btn:hover { background:rgba(58,158,143,.1); }
+.gmut-btn.active { background:rgba(58,158,143,.18); color:var(--text-primary); border-color:rgba(58,158,143,.5); }
+.gmut-trigger-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(255,180,50,.4); background:rgba(255,180,50,.1); color:rgba(255,200,100,.9); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.gmut-trigger-btn:hover { background:rgba(255,180,50,.2); }
+.gmut-speed { display:flex; align-items:center; gap:4px; font-size:.82rem; color:var(--text-secondary); }
+.gmut-speed input[type="range"] { width:60px; accent-color:var(--accent-teal,#3a9e8f); }
+.gmut-info { background:rgba(15,23,42,.45); border:1px solid rgba(58,158,143,.15); border-radius:var(--radius-md,10px); padding:16px 18px; margin-top:12px; }
+.gmut-info-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; }
+.gmut-info-block { background:rgba(30,41,59,.5); border-radius:var(--radius-sm,6px); padding:10px 12px; }
+.gmut-info-block h4 { margin:0 0 6px; font-size:.88rem; color:var(--text-primary,#e2e8f0); }
+.gmut-info-block p { margin:0; font-size:.8rem; color:var(--text-secondary,#94a3b8); line-height:1.5; }
+.gmut-sub { margin-top:4px!important; font-size:.78rem!important; color:var(--text-tertiary,#64748b)!important; }
+.gmut-aa-seq { display:flex; flex-wrap:wrap; gap:2px 4px; align-items:center; font-family:monospace; font-size:.82rem!important; }
+.gmut-aa-seq span { padding:1px 4px; border-radius:3px; }
+.gmut-stop { color:#ef4444!important; background:rgba(239,68,68,.12); }
+.gmut-start { color:#22c55e!important; background:rgba(34,197,94,.12); }
+.gmut-changed { outline:1.5px solid rgba(251,191,36,.5); background:rgba(251,191,36,.1)!important; }
+.gmut-summary { border-left:3px solid rgba(58,158,143,.4); }
+.gmut-table { width:100%; border-collapse:collapse; font-size:.78rem; margin-top:6px; }
+.gmut-table th { text-align:left; padding:4px 6px; border-bottom:1px solid rgba(100,116,139,.25); color:var(--text-primary,#e2e8f0); font-weight:600; }
+.gmut-table td { padding:4px 6px; border-bottom:1px solid rgba(100,116,139,.1); color:var(--text-secondary,#94a3b8); }
+@media (max-width: 768px) { .gmut-controls { flex-direction:column; align-items:flex-start; } .gmut-info-grid { grid-template-columns:1fr; } }
+

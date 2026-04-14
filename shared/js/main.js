@@ -7,56 +7,11 @@ function initApp() {
     // 1b. Initialize module selector (gallery-based navigation per subject page)
     if (typeof ModuleSelector !== 'undefined') ModuleSelector.init();
 
-    // 2. Initialize homepage (stars, parallax, eyes, satellites, shooting stars)
-    initHome();
+    // 2. Homepage init moved to Router.onPageEnter('home') for lazy loading
 
-    // 3. Initialize abacus
-    if (typeof updateAbacus === 'function') updateAbacus();
-
-    // 3a. Initialize function graph
-    if (typeof initFunctionGraph === 'function') initFunctionGraph();
-
-    // 3a2. Initialize calculus visualization
-    if (typeof initCalculus === 'function') initCalculus();
-
-    // 3a3. Initialize geometry transformations
-    if (typeof initGeoTransform === 'function') initGeoTransform();
-
-    // 3a4. Initialize complex numbers visualization
-    if (typeof initComplexVis === 'function') initComplexVis();
-
-    // 3b. Initialize physics simulation
-    if (typeof initPhysics === 'function') initPhysics();
-
-    // 3c. Initialize electromagnetic field visualization
-    if (typeof initElectromagnetic === 'function') initElectromagnetic();
-
-    // 3d. Initialize wave demo
-    if (typeof initWaves === 'function') initWaves();
-
-    // 3d2. Initialize relativity
-    if (typeof initRelativity === 'function') initRelativity();
-
-    // 3e. Initialize periodic table
-    if (typeof initPeriodicTable === 'function') initPeriodicTable();
-
-    // 3e2. Initialize molecular structure
-    if (typeof initMoleculeVis === 'function') initMoleculeVis();
-
-    // 3e3. Initialize chemical reactions
-    if (typeof initChemReaction === 'function') initChemReaction();
-
-    // 3f. Initialize search algorithms (binary search + graph traversal)
-    if (typeof initSearchAlgorithms === 'function') initSearchAlgorithms();
-
-    // 3g. Initialize graph algorithms (Dijkstra + Prim)
-    if (typeof initGraphAlgo === 'function') initGraphAlgo();
-
-    // 3h. Initialize data structures
-    if (typeof initDataStructVis === 'function') initDataStructVis();
-
-    // 3i. Initialize biology modules
-    if (typeof initBiology === 'function') initBiology();
+    // 3. All experiment module inits moved to Router.onPageEnter() for lazy loading
+    //    Modules are initialized only when their page is navigated to,
+    //    and destroyed via Router.onPageLeave() when navigating away.
 
     // 4. Initialize scroll animation system
     if (typeof initScrollAnimations === 'function') initScrollAnimations();

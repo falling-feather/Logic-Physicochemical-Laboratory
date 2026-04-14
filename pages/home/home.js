@@ -6,34 +6,58 @@ const ParticleNetwork = {
     particles: [],
     mouse: { x: -1000, y: -1000 },
     maxDist: 140,
+    W: 0, H: 0,
+    running: false,
+    _resizeObs: null,
 
     init() {
         this.canvas = document.getElementById('particle-network');
         if (!this.canvas) return;
         this.ctx = this.canvas.getContext('2d');
         this.resize();
-        window.addEventListener('resize', () => this.resize());
+
+        if (typeof ResizeObserver !== 'undefined') {
+            this._resizeObs = new ResizeObserver(() => { this.resize(); this.spawn(); });
+            this._resizeObs.observe(this.canvas.parentElement);
+        } else {
+            window.addEventListener('resize', () => { this.resize(); this.spawn(); });
+        }
+
         document.addEventListener('mousemove', e => {
             this.mouse.x = e.clientX;
             this.mouse.y = e.clientY;
         });
         this.spawn();
+        this.running = true;
         this.loop();
     },
 
+    destroy() {
+        this.running = false;
+        if (this._resizeObs) { this._resizeObs.disconnect(); this._resizeObs = null; }
+    },
+
     resize() {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+        const dpr = window.devicePixelRatio || 1;
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        this.canvas.width = w * dpr;
+        this.canvas.height = h * dpr;
+        this.canvas.style.width = w + 'px';
+        this.canvas.style.height = h + 'px';
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        this.W = w;
+        this.H = h;
     },
 
     spawn() {
-        const area = this.canvas.width * this.canvas.height;
+        const area = this.W * this.H;
         const count = Math.min(Math.floor(area / 18000), 80);
         this.particles = [];
         for (let i = 0; i < count; i++) {
             this.particles.push({
-                x: Math.random() * this.canvas.width,
-                y: Math.random() * this.canvas.height,
+                x: Math.random() * this.W,
+                y: Math.random() * this.H,
                 vx: (Math.random() - 0.5) * 0.4,
                 vy: (Math.random() - 0.5) * 0.4,
                 r: 1 + Math.random() * 1.5
@@ -42,57 +66,78 @@ const ParticleNetwork = {
     },
 
     loop() {
+        if (!this.running) return;
         requestAnimationFrame(() => this.loop());
-        const { ctx, canvas, particles, mouse, maxDist } = this;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const { ctx, particles, mouse, maxDist, W, H } = this;
+        const maxDist2 = maxDist * maxDist;
+        const mouseDist = maxDist * 1.5;
+        const mouseDist2 = mouseDist * mouseDist;
+        ctx.clearRect(0, 0, W, H);
 
         // Update & draw particles
+        ctx.fillStyle = 'rgba(91,141,206,0.4)';
+        ctx.beginPath();
         for (const p of particles) {
             p.x += p.vx;
             p.y += p.vy;
-            if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
-            if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+            if (p.x < 0 || p.x > W) p.vx *= -1;
+            if (p.y < 0 || p.y > H) p.vy *= -1;
 
-            // Mouse attraction
+            // Mouse attraction (use squared distance)
             const dx = mouse.x - p.x, dy = mouse.y - p.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < 200) {
+            const dist2 = dx * dx + dy * dy;
+            if (dist2 < 40000) { // 200^2
                 p.vx += dx * 0.00005;
                 p.vy += dy * 0.00005;
             }
 
-            ctx.beginPath();
+            ctx.moveTo(p.x + p.r, p.y);
             ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(91,141,206,0.4)';
-            ctx.fill();
         }
+        ctx.fill();
 
-        // Draw connections
+        // Draw connections — batch by opacity bins for fewer state changes
         ctx.lineWidth = 0.5;
+        const bins = [[], [], [], []]; // 4 opacity bins
         for (let i = 0; i < particles.length; i++) {
             for (let j = i + 1; j < particles.length; j++) {
                 const dx = particles[i].x - particles[j].x;
                 const dy = particles[i].y - particles[j].y;
-                const d = Math.sqrt(dx * dx + dy * dy);
-                if (d < maxDist) {
-                    ctx.beginPath();
-                    ctx.moveTo(particles[i].x, particles[i].y);
-                    ctx.lineTo(particles[j].x, particles[j].y);
-                    ctx.strokeStyle = `rgba(91,141,206,${0.12 * (1 - d / maxDist)})`;
-                    ctx.stroke();
+                const d2 = dx * dx + dy * dy;
+                if (d2 < maxDist2) {
+                    const ratio = 1 - Math.sqrt(d2) / maxDist;
+                    const bin = Math.min(3, (ratio * 4) | 0);
+                    bins[bin].push(i, j);
                 }
             }
             // Mouse connections
             const mdx = mouse.x - particles[i].x;
             const mdy = mouse.y - particles[i].y;
-            const md = Math.sqrt(mdx * mdx + mdy * mdy);
-            if (md < maxDist * 1.5) {
-                ctx.beginPath();
-                ctx.moveTo(particles[i].x, particles[i].y);
-                ctx.lineTo(mouse.x, mouse.y);
-                ctx.strokeStyle = `rgba(91,141,206,${0.2 * (1 - md / (maxDist * 1.5))})`;
-                ctx.stroke();
+            const md2 = mdx * mdx + mdy * mdy;
+            if (md2 < mouseDist2) {
+                const ratio = 1 - Math.sqrt(md2) / mouseDist;
+                const bin = Math.min(3, (ratio * 4) | 0);
+                bins[bin].push(i, -1); // -1 = mouse endpoint
             }
+        }
+
+        // Draw each opacity bin as a single batched path
+        const alphas = [0.03, 0.06, 0.09, 0.12];
+        for (let b = 0; b < 4; b++) {
+            const arr = bins[b];
+            if (!arr.length) continue;
+            ctx.strokeStyle = `rgba(91,141,206,${alphas[b]})`;
+            ctx.beginPath();
+            for (let k = 0; k < arr.length; k += 2) {
+                const pi = arr[k], pj = arr[k + 1];
+                ctx.moveTo(particles[pi].x, particles[pi].y);
+                if (pj === -1) {
+                    ctx.lineTo(mouse.x, mouse.y);
+                } else {
+                    ctx.lineTo(particles[pj].x, particles[pj].y);
+                }
+            }
+            ctx.stroke();
         }
     }
 };
@@ -184,7 +229,8 @@ const SatelliteSystem = {
         { radiusX: 320, radiusY: 200, tiltX: 65, tiltZ: 25,  period: 18000, dir:  1 },
         { radiusX: 420, radiusY: 260, tiltX: 60, tiltZ: -15, period: 25000, dir: -1 },
         { radiusX: 520, radiusY: 320, tiltX: 70, tiltZ: 35,  period: 32000, dir:  1 },
-        { radiusX: 450, radiusY: 280, tiltX: 55, tiltZ: -30, period: 22000, dir: -1 }
+        { radiusX: 450, radiusY: 280, tiltX: 55, tiltZ: -30, period: 22000, dir: -1 },
+        { radiusX: 380, radiusY: 240, tiltX: 62, tiltZ: 18,  period: 28000, dir:  1 }
     ],
 
     // 移动端缩放轨道半径
@@ -321,7 +367,8 @@ function selectModule(target) {
                 mathematics: 'rgba(91,141,206,0.25)',
                 physics: 'rgba(139,111,192,0.25)',
                 chemistry: 'rgba(77,158,126,0.25)',
-                algorithms: 'rgba(196,121,58,0.25)'
+                algorithms: 'rgba(196,121,58,0.25)',
+                biology: 'rgba(58,158,143,0.25)'
             };
             homePage.style.transition = 'background 0.8s ease-out';
             homePage.style.background = `radial-gradient(ellipse at center, ${colors[target] || 'rgba(91,141,206,0.25)'} 0%, #08090e 100%)`;

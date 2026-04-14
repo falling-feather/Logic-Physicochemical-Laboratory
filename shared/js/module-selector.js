@@ -44,6 +44,9 @@ const ModuleSelector = {
             const card = document.createElement('div');
             card.className = 'module-card';
             card.dataset.moduleTarget = exp.id;
+            card.setAttribute('role', 'button');
+            card.setAttribute('tabindex', '0');
+            card.setAttribute('aria-label', exp.title);
 
             card.innerHTML = `
                 <div class="module-card__icon"><i data-lucide="${exp.icon || 'box'}"></i></div>
@@ -53,6 +56,12 @@ const ModuleSelector = {
             `;
 
             card.addEventListener('click', () => this.openModule(page, exp.id));
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    this.openModule(page, exp.id);
+                }
+            });
             gallery.appendChild(card);
         });
 
@@ -102,6 +111,7 @@ const ModuleSelector = {
 
         const btn = document.createElement('button');
         btn.className = 'module-back-btn';
+        btn.setAttribute('aria-label', '返回模块列表');
         btn.innerHTML = '<i data-lucide="arrow-left"></i> 返回模块列表';
         btn.addEventListener('click', () => this.closeModule(page));
 

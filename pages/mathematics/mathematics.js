@@ -54,7 +54,26 @@ function initMathematics() {
     initFunctionGraph();
 }
 
-// ===== 函数图像绘制 =====
+// ===== 函数图像绘制（增强版：缩放/平移/多曲线） =====
+
+const _fgColors = ['#5b8dce', '#e06c75', '#4d9e7e', '#c4793a', '#8b6fc0', '#d19a66'];
+let _fgExtraCurves = []; // [{expr, fn, color}]
+let _fgDrag = null;      // pan state
+
+function _readGraphBounds() {
+    return {
+        xmin: parseFloat(document.getElementById('graph-xmin')?.value) || -10,
+        xmax: parseFloat(document.getElementById('graph-xmax')?.value) || 10,
+        ymin: parseFloat(document.getElementById('graph-ymin')?.value) || -5,
+        ymax: parseFloat(document.getElementById('graph-ymax')?.value) || 5,
+    };
+}
+
+function _writeGraphBounds(b) {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = parseFloat(v.toPrecision(6)); };
+    set('graph-xmin', b.xmin); set('graph-xmax', b.xmax);
+    set('graph-ymin', b.ymin); set('graph-ymax', b.ymax);
+}
 function convertPower(expr) {
     // Convert a^b to Math.pow(a,b) by finding ^ and extracting base & exponent
     while (expr.indexOf('^') !== -1) {
@@ -123,14 +142,20 @@ function compileExpression(exprStr) {
     // Replace standalone 'e' (not part of 'exp' or other words)
     s = s.replace(/(?<![a-zA-Z])e(?![a-zA-Z\(])/g, 'Math.E');
 
+    // Defense-in-depth: explicit blocklist for dangerous identifiers
+    if (/\b(eval|Function|constructor|__proto__|prototype|globalThis|window|document|this|import|require|fetch|XMLHttpRequest)\b/i.test(s)) return null;
+    // Max length guard
+    if (s.length > 500) return null;
+
     // Validate: after replacements, strip all allowed tokens, check nothing remains
+    // Use \b after Math tokens to prevent partial matches (e.g. Math.Eval)
     const stripped = s
-        .replace(/Math\.(sin|cos|tan|asin|acos|atan|abs|sqrt|cbrt|log10|log|exp|floor|ceil|round|sign|PI|E|pow|min|max)/g, '')
+        .replace(/Math\.(sin|cos|tan|asin|acos|atan|abs|sqrt|cbrt|log10|log|exp|floor|ceil|round|sign|PI|E|pow|min|max)\b/g, '')
         .replace(/[x\d\s\+\-\*\/\(\)\.\,\%]/g, '');
     if (stripped.length > 0) return null;
 
     try {
-        return new Function('x', 'return (' + s + ')');
+        return new Function('x', '"use strict"; return (' + s + ')');
     } catch (e) {
         return null;
     }
@@ -155,18 +180,22 @@ function drawFunctionGraph() {
 
     // Read parameters
     const exprStr = (document.getElementById('func-expr')?.value || '').trim();
-    const xmin = parseFloat(document.getElementById('graph-xmin')?.value) || -10;
-    const xmax = parseFloat(document.getElementById('graph-xmax')?.value) || 10;
-    const ymin = parseFloat(document.getElementById('graph-ymin')?.value) || -5;
-    const ymax = parseFloat(document.getElementById('graph-ymax')?.value) || 5;
+    const { xmin, xmax, ymin, ymax } = _readGraphBounds();
     const showGrid = document.getElementById('graph-grid')?.checked !== false;
 
-    // Compile expression
+    // Compile main expression
     const fn = compileExpression(exprStr);
     if (errorEl) errorEl.textContent = '';
     if (!fn && exprStr) {
         if (errorEl) errorEl.textContent = '⚠ 无法解析表达式';
     }
+
+    // Build curve list: main + extras
+    const curves = [];
+    if (fn) curves.push({ fn, color: _fgColors[0], label: exprStr });
+    _fgExtraCurves.forEach((c, i) => {
+        if (c.fn) curves.push({ fn: c.fn, color: c.color || _fgColors[(i + 1) % _fgColors.length], label: c.expr });
+    });
 
     // Drawing helpers
     const mapX = (x) => ((x - xmin) / (xmax - xmin)) * w;
@@ -181,13 +210,11 @@ function drawFunctionGraph() {
         ctx.strokeStyle = 'rgba(255,255,255,0.04)';
         ctx.lineWidth = 1;
         const gridStep = niceStep(xmax - xmin);
-        // Vertical grid lines
         for (let gx = Math.ceil(xmin / gridStep) * gridStep; gx <= xmax; gx += gridStep) {
             const px = mapX(gx);
             ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, h); ctx.stroke();
         }
         const gridStepY = niceStep(ymax - ymin);
-        // Horizontal grid lines
         for (let gy = Math.ceil(ymin / gridStepY) * gridStepY; gy <= ymax; gy += gridStepY) {
             const py = mapY(gy);
             ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(w, py); ctx.stroke();
@@ -197,12 +224,10 @@ function drawFunctionGraph() {
     // Axes
     ctx.strokeStyle = 'rgba(255,255,255,0.18)';
     ctx.lineWidth = 1.5;
-    // X axis
     if (ymin <= 0 && ymax >= 0) {
         const ay = mapY(0);
         ctx.beginPath(); ctx.moveTo(0, ay); ctx.lineTo(w, ay); ctx.stroke();
     }
-    // Y axis
     if (xmin <= 0 && xmax >= 0) {
         const ax = mapX(0);
         ctx.beginPath(); ctx.moveTo(ax, 0); ctx.lineTo(ax, h); ctx.stroke();
@@ -237,9 +262,9 @@ function drawFunctionGraph() {
         ctx.fillText('0', mapX(0) - 4, mapY(0) + 4);
     }
 
-    // Draw function curve
-    if (fn) {
-        ctx.strokeStyle = '#5b8dce';
+    // Draw all curves
+    curves.forEach(curve => {
+        ctx.strokeStyle = curve.color;
         ctx.lineWidth = 2;
         ctx.lineJoin = 'round';
         ctx.beginPath();
@@ -248,23 +273,31 @@ function drawFunctionGraph() {
         for (let i = 0; i <= steps; i++) {
             const x = xmin + (xmax - xmin) * (i / steps);
             let y;
-            try { y = fn(x); } catch (e) { drawing = false; continue; }
+            try { y = curve.fn(x); } catch (e) { drawing = false; continue; }
             if (!isFinite(y) || isNaN(y)) { drawing = false; continue; }
-            // Clip to visible range with some margin
             if (y < ymin - (ymax - ymin) * 2 || y > ymax + (ymax - ymin) * 2) {
                 drawing = false;
                 continue;
             }
             const px = mapX(x);
             const py = mapY(y);
-            if (!drawing) {
-                ctx.moveTo(px, py);
-                drawing = true;
-            } else {
-                ctx.lineTo(px, py);
-            }
+            if (!drawing) { ctx.moveTo(px, py); drawing = true; }
+            else ctx.lineTo(px, py);
         }
         ctx.stroke();
+    });
+
+    // Curve legend (when multiple)
+    if (curves.length > 1) {
+        ctx.font = '11px ' + (getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim() || 'monospace');
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        curves.forEach((c, i) => {
+            const ly = 10 + i * 18;
+            ctx.fillStyle = c.color;
+            ctx.fillRect(10, ly, 14, 3);
+            ctx.fillText(c.label, 28, ly - 5);
+        });
     }
 
     // Store mapping for mouse tracking
@@ -287,7 +320,7 @@ function formatNum(n) {
         : parseFloat(n.toPrecision(4)).toString();
 }
 
-function setFunction(expr) {
+function setFunction(expr, ev) {
     const el = document.getElementById('func-expr');
     if (el) {
         el.value = expr;
@@ -295,40 +328,163 @@ function setFunction(expr) {
     }
     // Update active button state
     document.querySelectorAll('.preset-functions .btn--ghost').forEach(btn => btn.classList.remove('active'));
-    event?.target?.classList.add('active');
+    if (ev && ev.target) ev.target.classList.add('active');
 }
 
 function initFunctionGraph() {
     const canvas = document.getElementById('function-graph-canvas');
     if (!canvas) return;
 
-    // Mouse tracking
-    canvas.addEventListener('mousemove', (e) => {
+    // Coordinate tracking helper
+    const trackCoord = (clientX, clientY) => {
         const state = canvas._graphState;
         if (!state) return;
         const rect = canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
+        const mx = clientX - rect.left;
+        const my = clientY - rect.top;
         const x = state.xmin + (mx / state.w) * (state.xmax - state.xmin);
         const y = state.ymax - (my / state.h) * (state.ymax - state.ymin);
         const coordEl = document.getElementById('graph-coord-display');
         if (coordEl) coordEl.textContent = `(${x.toFixed(2)}, ${y.toFixed(2)})`;
-    });
+    };
 
+    // Mouse tracking (only when not dragging)
+    canvas.addEventListener('mousemove', (e) => {
+        if (_fgDrag) return;
+        trackCoord(e.clientX, e.clientY);
+    });
+    canvas.addEventListener('touchmove', (e) => {
+        if (_fgDrag) return;
+        const t = e.touches[0];
+        if (t) trackCoord(t.clientX, t.clientY);
+    }, { passive: true });
     canvas.addEventListener('mouseleave', () => {
         const coordEl = document.getElementById('graph-coord-display');
         if (coordEl) coordEl.textContent = '';
     });
-
-    // Handle resize
-    let resizeTimer;
-    window.addEventListener('resize', () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(drawFunctionGraph, 150);
+    canvas.addEventListener('touchend', () => {
+        const coordEl = document.getElementById('graph-coord-display');
+        if (coordEl) coordEl.textContent = '';
     });
+
+    // ── Zoom (wheel) ──
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const b = _readGraphBounds();
+        const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) / rect.width;
+        const my = (e.clientY - rect.top) / rect.height;
+        const cx = b.xmin + (b.xmax - b.xmin) * mx;
+        const cy = b.ymax - (b.ymax - b.ymin) * my;
+        const rx = (b.xmax - b.xmin) * factor;
+        const ry = (b.ymax - b.ymin) * factor;
+        _writeGraphBounds({
+            xmin: cx - rx * mx, xmax: cx + rx * (1 - mx),
+            ymin: cy - ry * (1 - my), ymax: cy + ry * my
+        });
+        drawFunctionGraph();
+    }, { passive: false });
+
+    // ── Pan (left-click drag) ──
+    canvas.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        const b = _readGraphBounds();
+        _fgDrag = { sx: e.clientX, sy: e.clientY, ...b };
+        canvas.style.cursor = 'grabbing';
+    });
+    canvas.addEventListener('mousemove', (e) => {
+        if (!_fgDrag) return;
+        const rect = canvas.getBoundingClientRect();
+        const dx = (e.clientX - _fgDrag.sx) / rect.width * (_fgDrag.xmax - _fgDrag.xmin);
+        const dy = (e.clientY - _fgDrag.sy) / rect.height * (_fgDrag.ymax - _fgDrag.ymin);
+        _writeGraphBounds({
+            xmin: _fgDrag.xmin - dx, xmax: _fgDrag.xmax - dx,
+            ymin: _fgDrag.ymin + dy, ymax: _fgDrag.ymax + dy
+        });
+        drawFunctionGraph();
+    });
+    window.addEventListener('mouseup', () => {
+        if (_fgDrag) { _fgDrag = null; canvas.style.cursor = ''; }
+    });
+
+    // ── Multi-curve controls injection ──
+    _injectMultiCurveControls();
+
+    // ResizeObserver
+    if (typeof ResizeObserver !== 'undefined') {
+        window._functionGraphRO = new ResizeObserver(() => drawFunctionGraph());
+        window._functionGraphRO.observe(canvas.parentElement);
+    } else {
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(drawFunctionGraph, 150);
+        });
+    }
 
     // Initial draw
     drawFunctionGraph();
+}
+
+// ── Multi-curve controls ──
+function _injectMultiCurveControls() {
+    const wrap = document.querySelector('.graph-controls');
+    if (!wrap || document.getElementById('fg-multi-curves')) return;
+
+    const container = document.createElement('div');
+    container.id = 'fg-multi-curves';
+    container.className = 'fg-multi-curves';
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn btn--ghost btn--sm';
+    addBtn.textContent = '+ 添加曲线';
+    addBtn.onclick = () => _addExtraCurve(container);
+    container.appendChild(addBtn);
+
+    const hint = document.createElement('div');
+    hint.className = 'fg-hint';
+    hint.textContent = '💡 滚轮缩放 · 拖拽平移';
+    container.appendChild(hint);
+
+    wrap.appendChild(container);
+}
+
+function _addExtraCurve(container) {
+    if (_fgExtraCurves.length >= 5) return;
+    const idx = _fgExtraCurves.length;
+    const color = _fgColors[(idx + 1) % _fgColors.length];
+    const entry = { expr: '', fn: null, color };
+    _fgExtraCurves.push(entry);
+
+    const row = document.createElement('div');
+    row.className = 'fg-curve-row';
+    row.innerHTML = `<span class="fg-curve-dot" style="background:${color}"></span>` +
+        `<input type="text" class="input fg-curve-input" placeholder="表达式…">` +
+        `<button class="btn btn--ghost btn--sm fg-curve-remove">✕</button>`;
+
+    const input = row.querySelector('input');
+    input.addEventListener('input', () => {
+        entry.expr = input.value;
+        entry.fn = compileExpression(input.value);
+        drawFunctionGraph();
+    });
+    row.querySelector('.fg-curve-remove').addEventListener('click', () => {
+        const i = _fgExtraCurves.indexOf(entry);
+        if (i >= 0) _fgExtraCurves.splice(i, 1);
+        row.remove();
+        drawFunctionGraph();
+    });
+
+    // Insert before the add button
+    container.insertBefore(row, container.firstChild);
+}
+
+function destroyFunctionGraph() {
+    if (window._functionGraphRO) {
+        window._functionGraphRO.disconnect();
+        window._functionGraphRO = null;
+    }
 }
 
 // 导出全局
@@ -337,4 +493,5 @@ window.calculateAbacus = calculateAbacus;
 window.drawFunctionGraph = drawFunctionGraph;
 window.setFunction = setFunction;
 window.initFunctionGraph = initFunctionGraph;
+window.destroyFunctionGraph = destroyFunctionGraph;
 

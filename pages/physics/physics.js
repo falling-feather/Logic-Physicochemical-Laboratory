@@ -1,4 +1,5 @@
-// ===== 力学模拟引擎 =====
+// ===== 力学模拟引擎 (v2) =====
+// ResizeObserver + DPR + 教育面板 + destroy
 
 const PhysicsSim = {
     canvas: null,
@@ -28,6 +29,8 @@ const PhysicsSim = {
         '#818cf8', '#c084fc', '#e879f9', '#a855f7'
     ],
 
+    _resizeObs: null,
+
     init() {
         this.canvas = document.getElementById('physics-canvas');
         if (!this.canvas) return;
@@ -37,7 +40,18 @@ const PhysicsSim = {
         this.bindControls();
         this.bindCanvas();
 
-        window.addEventListener('resize', () => this.resizeCanvas());
+        // ResizeObserver
+        if (typeof ResizeObserver !== 'undefined') {
+            this._resizeObs = new ResizeObserver(() => this.resizeCanvas());
+            this._resizeObs.observe(this.canvas.parentElement);
+        } else {
+            window.addEventListener('resize', () => this.resizeCanvas());
+        }
+    },
+
+    destroy() {
+        this.running = false;
+        if (this._resizeObs) { this._resizeObs.disconnect(); this._resizeObs = null; }
     },
 
     resizeCanvas() {
@@ -430,6 +444,34 @@ const PhysicsSim = {
     updateStats() {
         const el = document.getElementById('ball-count');
         if (el) el.textContent = this.balls.length;
+        this.updateEdu();
+    },
+
+    updateEdu() {
+        let eduEl = document.getElementById('physics-edu');
+        if (!eduEl) {
+            const parent = document.getElementById('physics-info') || document.getElementById('ball-count')?.closest('.physics-info');
+            if (!parent) return;
+            const container = parent.parentElement || parent;
+            eduEl = document.createElement('div');
+            eduEl.id = 'physics-edu';
+            eduEl.style.cssText = 'font-size:12px;color:#a78bfa;margin-top:8px;line-height:1.5;opacity:0.8;';
+            container.appendChild(eduEl);
+        }
+        if (this.balls.length === 0) {
+            eduEl.innerHTML = `<strong>牵引探索</strong>：在画布上拖拽发射小球，观察牵引力、弹性碰撞与摩擦力的作用。`;
+        } else {
+            const totalKE = this.balls.reduce((s, b) => s + 0.5 * (b.vx * b.vx + b.vy * b.vy), 0);
+            const totalPE = this.balls.reduce((s, b) => s + this.gravity * (this.H - b.y), 0);
+            eduEl.innerHTML =
+                `<strong>牛顿力学</strong>：` +
+                `F=ma，重力 g=${this.gravity} px/s²，恢复系数 e=${this.restitution.toFixed(2)}，摩擦 μ=${this.friction.toFixed(2)}` +
+                `<br>球数: ${this.balls.length}，` +
+                `总动能 ∝ ${totalKE.toFixed(0)}，` +
+                `总势能 ∝ ${totalPE.toFixed(0)}，` +
+                `E<sub>total</sub> ∝ ${(totalKE + totalPE).toFixed(0)}` +
+                `<br>ℹ️ 弹性碰撞守恒动量·非完全弹性碰撞损失动能`;
+        }
     }
 };
 

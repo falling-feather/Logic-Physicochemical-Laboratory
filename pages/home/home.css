@@ -444,10 +444,18 @@
     animation: orbitGlow4 7s ease-in-out infinite;
 }
 
+.orbit-path-5 {
+    width: 760px; height: 480px;
+    border-color: rgba(58,158,143,0.07);
+    transform: translate(-50%, -50%) perspective(1200px) rotateX(62deg) rotateZ(18deg);
+    animation: orbitGlow5 9s ease-in-out infinite;
+}
+
 @keyframes orbitGlow1 { 0%,100%{border-color:rgba(91,141,206,0.08)} 50%{border-color:rgba(91,141,206,0.2)} }
 @keyframes orbitGlow2 { 0%,100%{border-color:rgba(139,111,192,0.07)} 50%{border-color:rgba(139,111,192,0.18)} }
 @keyframes orbitGlow3 { 0%,100%{border-color:rgba(77,158,126,0.06)} 50%{border-color:rgba(77,158,126,0.16)} }
 @keyframes orbitGlow4 { 0%,100%{border-color:rgba(196,121,58,0.07)} 50%{border-color:rgba(196,121,58,0.18)} }
+@keyframes orbitGlow5 { 0%,100%{border-color:rgba(58,158,143,0.07)} 50%{border-color:rgba(58,158,143,0.18)} }
 
 /* ── Satellite container ── */
 .satellites-orbit {
@@ -484,6 +492,7 @@
 .satellite-2 .satellite-glow { background: radial-gradient(circle, rgba(139,111,192,0.3), transparent 70%); }
 .satellite-3 .satellite-glow { background: radial-gradient(circle, rgba(77,158,126,0.3), transparent 70%); }
 .satellite-4 .satellite-glow { background: radial-gradient(circle, rgba(196,121,58,0.3), transparent 70%); }
+.satellite-5 .satellite-glow { background: radial-gradient(circle, rgba(58,158,143,0.3), transparent 70%); }
 
 /* Satellite sphere */
 .satellite-icon {
@@ -524,11 +533,17 @@
     box-shadow: 0 0 18px rgba(196,121,58,0.35), inset -15px -15px 30px rgba(0,0,0,0.45);
 }
 
+.satellite-5 .satellite-icon {
+    background: radial-gradient(circle at 35% 30%, #5cc0b0 0%, #3a9e8f 25%, #2a7d70 50%, #1a5048 100%);
+    box-shadow: 0 0 18px rgba(58,158,143,0.35), inset -15px -15px 30px rgba(0,0,0,0.45);
+}
+
 /* Hover glow enhancement */
 .satellite-1:hover .satellite-icon { box-shadow: 0 0 40px rgba(91,141,206,0.6), inset -15px -15px 30px rgba(0,0,0,0.45); }
 .satellite-2:hover .satellite-icon { box-shadow: 0 0 40px rgba(139,111,192,0.6), inset -15px -15px 30px rgba(0,0,0,0.45); }
 .satellite-3:hover .satellite-icon { box-shadow: 0 0 40px rgba(77,158,126,0.6), inset -15px -15px 30px rgba(0,0,0,0.45); }
 .satellite-4:hover .satellite-icon { box-shadow: 0 0 40px rgba(196,121,58,0.6), inset -15px -15px 30px rgba(0,0,0,0.45); }
+.satellite-5:hover .satellite-icon { box-shadow: 0 0 40px rgba(58,158,143,0.6), inset -15px -15px 30px rgba(0,0,0,0.45); }
 
 /* Saturn-style ring */
 .satellite-ring {
@@ -595,11 +610,13 @@
 .satellite-2 .satellite-label { border-color: rgba(139,111,192,0.25); border-bottom-color: rgba(139,111,192,0.5); }
 .satellite-3 .satellite-label { border-color: rgba(77,158,126,0.25); border-bottom-color: rgba(77,158,126,0.5); }
 .satellite-4 .satellite-label { border-color: rgba(196,121,58,0.25); border-bottom-color: rgba(196,121,58,0.5); }
+.satellite-5 .satellite-label { border-color: rgba(58,158,143,0.25); border-bottom-color: rgba(58,158,143,0.5); }
 
 .satellite-1:hover .satellite-label { border-bottom-color: rgba(91,141,206,0.8); box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 30px rgba(91,141,206,0.2); }
 .satellite-2:hover .satellite-label { border-bottom-color: rgba(139,111,192,0.8); box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 30px rgba(139,111,192,0.2); }
 .satellite-3:hover .satellite-label { border-bottom-color: rgba(77,158,126,0.8); box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 30px rgba(77,158,126,0.2); }
 .satellite-4:hover .satellite-label { border-bottom-color: rgba(196,121,58,0.8); box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 30px rgba(196,121,58,0.2); }
+.satellite-5:hover .satellite-label { border-bottom-color: rgba(58,158,143,0.8); box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 30px rgba(58,158,143,0.2); }
 
 .satellite-desc {
     display: block; color: var(--text-tertiary);

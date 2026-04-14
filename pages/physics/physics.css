@@ -199,6 +199,40 @@
     font-family: var(--font-mono);
 }
 
+.em-mode-btn {
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-subtle);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.em-mode-btn:hover { border-color: var(--physics-primary); }
+.em-mode-btn.active {
+    background: var(--physics-primary);
+    color: #fff;
+    border-color: var(--physics-primary);
+}
+
+.em-presets { margin-top: var(--space-3); }
+.em-preset-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.em-preset-btn {
+    padding: 3px 10px;
+    border-radius: 5px;
+    border: 1px solid var(--border-subtle);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.em-preset-btn:hover {
+    background: rgba(139,111,192,0.12);
+    border-color: var(--physics-primary);
+}
+
 /* ===== Wave Demo ===== */
 
 .wave-canvas {
@@ -260,6 +294,29 @@
 .wave-toggles {
     display: flex;
     flex-wrap: wrap;
+    gap: var(--space-3);
+}
+
+.wave-mode-btn {
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-subtle);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.wave-mode-btn:hover { border-color: var(--physics-primary); }
+.wave-mode-btn.active {
+    background: var(--physics-primary);
+    color: #fff;
+    border-color: var(--physics-primary);
+}
+
+.wave-sw-panel, .wave-dp-panel {
+    display: flex;
+    flex-direction: column;
     gap: var(--space-3);
 }
 
@@ -366,6 +423,48 @@
     padding: var(--space-4);
 }
 
+/* ── Buttons (purple accent override) ── */
+#page-physics .btn-primary {
+    background: rgba(139,111,192,0.18);
+    border-color: var(--accent-purple);
+    color: var(--accent-purple);
+}
+
+#page-physics .btn-primary:hover {
+    background: rgba(139,111,192,0.28);
+    box-shadow: 0 0 12px rgba(139,111,192,0.15);
+}
+
+#page-physics .btn-secondary:hover {
+    border-color: var(--accent-purple);
+}
+
+.rel-extra-panel {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+.rel-extra-panel label {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.rel-extra-panel input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent-purple);
+}
+
+.rel-extra-panel .rel-val {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent-purple);
+    font-weight: 600;
+    min-width: 5em;
+    text-align: right;
+}
+
 .rel-info h3 {
     color: var(--accent-purple);
     margin-bottom: var(--space-2);
@@ -404,3 +503,236 @@
         height: 240px;
     }
 }
+
+/* ═══ Kinematics ═══ */
+.kin-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+    margin-bottom: var(--space-4);
+}
+
+.kin-param {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    min-width: 200px;
+}
+.kin-param label {
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    color: var(--accent-purple);
+    min-width: 120px;
+}
+.kin-param input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent-purple);
+}
+
+.kin-action-row {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.kin-canvas-wrap {
+    position: relative;
+    width: 100%;
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    overflow: hidden;
+}
+
+.kin-canvas {
+    display: block;
+    width: 100%;
+}
+
+.kin-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    padding: var(--space-3) 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.ki-item { display: flex; gap: var(--space-2); align-items: baseline; }
+.ki-label { color: var(--accent-purple); font-weight: 600; }
+.ki-formula { color: rgba(255,255,255,0.4); font-size: var(--text-xs); }
+
+@media (max-width: 768px) {
+    .kin-controls { flex-direction: column; align-items: flex-start; }
+    .kin-param { min-width: 100%; }
+    .kin-info { flex-direction: column; gap: var(--space-2); }
+}
+
+/* ═══ Projectile Motion ═══ */
+.proj-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+    margin-bottom: var(--space-4);
+}
+
+.proj-param {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    min-width: 180px;
+}
+.proj-param label {
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    color: var(--accent-purple);
+    min-width: 100px;
+}
+.proj-param input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent-purple);
+}
+
+.proj-preset-group { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+
+.proj-action-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+}
+.proj-time-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    flex: 1;
+}
+.proj-time-group input[type="range"] { flex: 1; accent-color: var(--accent-purple); }
+
+.proj-toggles {
+    display: flex;
+    gap: var(--space-4);
+    width: 100%;
+}
+
+.proj-canvas-wrap {
+    position: relative;
+    width: 100%;
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    overflow: hidden;
+}
+.proj-canvas { display: block; width: 100%; }
+
+.proj-info {
+    padding: var(--space-3) 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+.pi-row { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-bottom: var(--space-2); }
+.pi-item { display: flex; gap: var(--space-1); }
+.pi-label { color: var(--accent-purple); font-weight: 600; }
+.pi-summary { color: rgba(255,255,255,0.5); font-size: var(--text-xs); }
+
+@media (max-width: 768px) {
+    .proj-controls { flex-direction: column; align-items: flex-start; }
+    .proj-param { min-width: 100%; }
+    .proj-info .pi-row { flex-direction: column; gap: var(--space-1); }
+}
+
+/* ── Circular Motion ── */
+.circ-controls { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; margin-bottom: 1rem; }
+.circ-sliders { display: flex; flex-direction: column; gap: .5rem; }
+.circ-sliders label { font-size: .82rem; color: rgba(255,255,255,.6); display: flex; align-items: center; gap: .5rem; }
+.circ-sliders input[type="range"] { width: 110px; accent-color: var(--accent-purple, #8b6fc0); }
+.circ-toggles { display: flex; flex-direction: column; gap: .4rem; }
+.circ-btns { display: flex; gap: .5rem; }
+.circ-stats {
+    margin-top: .6rem; font-family: var(--font-mono, monospace); font-size: .78rem;
+    color: rgba(255,255,255,.6); line-height: 1.6; word-break: break-all;
+}
+.physics-canvas-wrap { position: relative; border-radius: 8px; overflow: hidden; background: rgba(0,0,0,0.15); }
+.physics-canvas-wrap canvas { display: block; width: 100%; }
+
+@media (max-width: 768px) {
+    .circ-controls { flex-direction: column; }
+    .circ-sliders input[type="range"] { width: 100%; }
+}
+
+/* ── Energy Conservation ── */
+.energy-controls { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-bottom: 1rem; }
+.energy-controls label { font-size: .82rem; color: rgba(255,255,255,.6); display: flex; align-items: center; gap: .5rem; }
+.energy-controls input[type="range"] { width: 100px; accent-color: var(--accent-purple, #8b6fc0); }
+
+/* ── Circuit Analysis ── */
+.circuit-controls {
+    display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-bottom: 1rem;
+}
+.circuit-controls label {
+    font-size: .82rem; color: rgba(255,255,255,.6); display: flex; align-items: center; gap: .35rem;
+}
+.circuit-controls input[type="range"] { width: 80px; accent-color: var(--accent-purple, #8b6fc0); }
+.circuit-mode-btn {
+    padding: .35rem .9rem; border-radius: 6px; border: 1.5px solid rgba(139,111,192,.35);
+    background: transparent; color: rgba(255,255,255,.7); cursor: pointer; font-size: .82rem;
+    transition: all .2s;
+}
+.circuit-mode-btn.active, .circuit-mode-btn:hover {
+    background: rgba(139,111,192,.25); border-color: var(--accent-purple, #8b6fc0); color: #fff;
+}
+
+/* ── EM Induction ── */
+.emi-controls { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .75rem; }
+.emi-mode-btn {
+    padding: .35rem .9rem; border-radius: 6px; border: 1.5px solid rgba(139,111,192,.35);
+    background: transparent; color: rgba(255,255,255,.7); cursor: pointer; font-size: .82rem;
+    transition: all .2s;
+}
+.emi-mode-btn.active, .emi-mode-btn:hover {
+    background: rgba(139,111,192,.25); border-color: var(--accent-purple, #8b6fc0); color: #fff;
+}
+
+/* ══════ Alternating Current ══════ */
+.ac-controls { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.ac-mode-btns { display:flex; gap:6px; }
+.ac-mode-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(139,111,192,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.ac-mode-btn:hover { border-color:rgba(139,111,192,.5); }
+.ac-mode-btn.active { background:rgba(139,111,192,.18); color:var(--text-primary); border-color:rgba(139,111,192,.5); }
+.ac-label { display:flex; align-items:center; gap:4px; font-size:.82rem; color:var(--text-secondary); white-space:nowrap; }
+.ac-label input[type="range"] { width:64px; accent-color:var(--accent-purple,#8b6fc0); }
+.ac-ctrl-right { display:flex; align-items:center; gap:6px; margin-left:auto; }
+.ac-ctrl-right input[type="range"] { width:56px; accent-color:var(--accent-purple,#8b6fc0); }
+.ac-pause-btn { width:28px; height:28px; border-radius:var(--radius-sm); border:1px solid rgba(139,111,192,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.9rem; display:flex; align-items:center; justify-content:center; transition:all .2s; }
+.ac-pause-btn:hover { border-color:rgba(139,111,192,.5); color:var(--text-primary); }
+
+/* education panel */
+.ac-info { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(139,111,192,.06); border:1px solid rgba(139,111,192,.12); font-size:.85rem; line-height:1.65; }
+.ac-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.ac-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(139,111,192,.18); color:rgba(139,111,192,.9); }
+.ac-tag--amber { background:rgba(229,192,123,.15); color:rgba(229,192,123,.9); }
+.ac-tag--red { background:rgba(224,108,117,.15); color:rgba(224,108,117,.9); }
+.ac-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.ac-key { flex-shrink:0; font-weight:600; color:rgba(91,141,206,.85); }
+.ac-key--purple { color:rgba(139,111,192,.85); }
+.ac-key--amber { color:rgba(229,192,123,.85); }
+.ac-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(139,111,192,.1); color:var(--text-tertiary); font-size:.82rem; }
+@media (max-width: 768px) { .ac-controls { flex-direction: column; align-items: flex-start; } .ac-ctrl-right { margin-left:0; } }
+
+/* ══════ Gravitation ══════ */
+.grav-controls { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.grav-mode-btns { display:flex; gap:6px; }
+.grav-mode-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(139,111,192,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.grav-mode-btn.active { background:rgba(139,111,192,.18); color:var(--text-primary); border-color:rgba(139,111,192,.5); }
+.grav-param { display:flex; align-items:center; gap:4px; font-size:.82rem; color:var(--text-secondary); }
+.grav-param input[type="range"] { width:80px; accent-color:var(--accent-purple,#8b6fc0); }
+@media (max-width: 768px) { .grav-controls { flex-direction: column; align-items: flex-start; } }

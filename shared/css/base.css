@@ -36,6 +36,30 @@ input, select, textarea {
 
 img { max-width: 100%; display: block; }
 
+/* ===== Skip Navigation ===== */
+.skip-nav {
+    position: absolute;
+    top: -100%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10000;
+    padding: var(--space-2) var(--space-4);
+    background: var(--accent-blue);
+    color: #fff;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    transition: top 0.2s ease;
+}
+.skip-nav:focus {
+    top: var(--space-2);
+}
+
+/* ===== Focus Visible ===== */
+:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+}
+
 /* ===== Page Structure ===== */
 .main-content {
     min-height: 100vh;
@@ -179,6 +203,67 @@ a:focus:not(:focus-visible) {
     background: var(--surface-2);
     border-color: var(--border-hover);
     color: var(--text-primary);
+}
+
+/* ── Standalone Button Classes (btn-primary / btn-secondary) ── */
+.btn-primary,
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    border-radius: var(--radius-default);
+    cursor: pointer;
+    transition: all var(--duration-fast) ease;
+    white-space: nowrap;
+}
+
+.btn-primary {
+    background: rgba(91,141,206,0.18);
+    border: 1px solid var(--accent-blue);
+    color: var(--accent-blue);
+}
+
+.btn-primary:hover {
+    background: rgba(91,141,206,0.28);
+    box-shadow: 0 0 12px rgba(91,141,206,0.15);
+}
+
+.btn-primary:active {
+    transform: scale(0.97);
+}
+
+.btn-secondary {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border-default);
+    color: var(--text-secondary);
+}
+
+.btn-secondary:hover {
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.06);
+}
+
+.btn-secondary:active {
+    transform: scale(0.97);
+}
+
+/* ── Viz Panel & Controls (shared layout) ── */
+.viz-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.viz-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    align-items: center;
 }
 
 /* ── Back to Top ── */
