@@ -228,6 +228,8 @@ const Router = {
     },
 
     onPageEnter(page) {
+        document.body.classList.toggle('home-scroll-locked', page === 'home');
+
         // === Page Initialization ===
         // Home page initializes directly; subject pages rely on ModuleSelector
         // for lazy per-experiment initialization (triggered when user opens an experiment).
@@ -254,6 +256,10 @@ const Router = {
     },
 
     onPageLeave(page) {
+        if (page === 'home') {
+            document.body.classList.remove('home-scroll-locked');
+        }
+
         if (page === 'home') {
             if (typeof ParticleNetwork !== 'undefined' && ParticleNetwork.destroy) ParticleNetwork.destroy();
             if (typeof SatelliteSystem !== 'undefined') SatelliteSystem.isRunning = false;

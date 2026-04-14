@@ -352,6 +352,9 @@ const ModuleSelector = {
                 if (page === 'physics' && window.PhysicsZoom && typeof window.PhysicsZoom.init === 'function') {
                     window.PhysicsZoom.init();
                 }
+                if (page === 'biology' && window.BiologyZoom && typeof window.BiologyZoom.init === 'function') {
+                    window.BiologyZoom.init();
+                }
             }, 50);
         }
     },

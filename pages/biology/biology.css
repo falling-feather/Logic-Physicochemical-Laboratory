@@ -258,6 +258,89 @@
     color: var(--accent-teal);
     border-color: var(--accent-teal);
 }
+
+/* ══════ Biology Zoom Modal ══════ */
+.biology-zoom-btn {
+    margin-left: auto;
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(58,158,143,.35);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: .82rem;
+    cursor: pointer;
+    transition: all .2s;
+}
+
+.biology-zoom-btn:hover {
+    background: rgba(58,158,143,.18);
+    border-color: rgba(58,158,143,.55);
+    color: var(--text-primary);
+}
+
+.biology-zoom-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(9, 12, 18, .72);
+    backdrop-filter: blur(2px);
+    z-index: 300;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.biology-zoom-modal.open {
+    display: flex;
+}
+
+.biology-zoom-modal__inner {
+    width: min(96vw, 1320px);
+    height: min(88vh, 900px);
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    border-radius: 12px;
+    box-shadow: 0 22px 48px rgba(0,0,0,.45);
+    padding: 12px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.biology-zoom-modal__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.biology-zoom-modal__title {
+    font-size: .85rem;
+    color: var(--text-secondary);
+}
+
+.biology-zoom-modal__close {
+    border: 1px solid var(--border-default);
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+}
+
+.biology-zoom-modal__host {
+    flex: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface-0);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.biology-zoom-modal__host canvas {
+    display: block;
+}
 .eco-ctrl-row {
     display: flex;
     align-items: center;
