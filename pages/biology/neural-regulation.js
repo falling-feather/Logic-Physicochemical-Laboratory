@@ -235,7 +235,7 @@ const NeuralReg = {
     drawSynapse() {
         const { ctx, W, H, phase, vesicles, neurotransmitters, caIons, receptorStates } = this;
         const midY = H * 0.5;
-        const fs = Math.max(9, W * 0.01);
+        const fs = Math.max(14, W * 0.014);
 
         // Presynaptic cell body
         const cellGrad = ctx.createRadialGradient(W * 0.12, midY, 0, W * 0.12, midY, W * 0.16);
@@ -282,7 +282,7 @@ const NeuralReg = {
             ctx.fillRect(caChX - 3, cy - 4, 6, 8);
             if (i === 0) {
                 ctx.fillStyle = 'rgba(229,192,123,0.4)';
-                ctx.font = '15px ' + CF.mono;
+                ctx.font = Math.max(13, W * 0.024) + 'px ' + CF.mono;
                 ctx.textAlign = 'left';
                 ctx.fillText('Ca²⁺', caChX + 7, cy + 3);
             }
@@ -428,7 +428,7 @@ const NeuralReg = {
         const { ctx, W, H, phase } = this;
         const padL = 60, padR = 30, padT = 30, padB = 45;
         const gW = W - padL - padR, gH = H - padT - padB;
-        const fs = Math.max(9, W * 0.009);
+        const fs = Math.max(14, W * 0.013);
 
         const apCurve = (t) => {
             if (t < 0.15) return -70;
@@ -532,6 +532,7 @@ const NeuralReg = {
 
     drawIonChannels(cx, cy, progress) {
         const { ctx } = this;
+        const fs = Math.max(13, this.W * 0.024);
         const s = Math.min(this.W * 0.065, 46);
 
         // Na⁺ channel
@@ -544,10 +545,10 @@ const NeuralReg = {
         ctx.stroke();
         if (naO) {
             ctx.fillStyle = 'rgba(224,108,117,0.45)';
-            ctx.font = '15px ' + CF.mono; ctx.textAlign = 'center';
+            ctx.font = fs + 'px ' + CF.mono; ctx.textAlign = 'center';
             ctx.fillText('Na⁺↓', cx - s * 0.65, cy + 3);
         }
-        ctx.fillStyle = 'rgba(224,108,117,0.35)'; ctx.font = '15px ' + CF.sans; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(224,108,117,0.35)'; ctx.font = fs + 'px ' + CF.sans; ctx.textAlign = 'center';
         ctx.fillText('Na⁺通道', cx - s * 0.6, cy - s * 0.78);
 
         // K⁺ channel
@@ -559,10 +560,10 @@ const NeuralReg = {
         ctx.stroke();
         if (kO) {
             ctx.fillStyle = 'rgba(97,175,239,0.45)';
-            ctx.font = '15px ' + CF.mono; ctx.textAlign = 'center';
+            ctx.font = fs + 'px ' + CF.mono; ctx.textAlign = 'center';
             ctx.fillText('K⁺↑', cx + s * 0.65, cy + 3);
         }
-        ctx.fillStyle = 'rgba(97,175,239,0.35)'; ctx.font = '15px ' + CF.sans; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(97,175,239,0.35)'; ctx.font = fs + 'px ' + CF.sans; ctx.textAlign = 'center';
         ctx.fillText('K⁺通道', cx + s * 0.6, cy - s * 0.78);
     },
 
@@ -588,7 +589,7 @@ const NeuralReg = {
     drawTooltip() {
         if (!this.hoverLabel || this.hoverX < 0) return;
         const { ctx, hoverX, hoverY, W } = this;
-        const fs = Math.max(10, W * 0.011);
+        const fs = Math.max(15, W * 0.015);
         ctx.font = `${fs}px ${CF.sans}`;
         const tw = ctx.measureText(this.hoverLabel).width;
         const px = Math.min(hoverX + 12, W - tw - 20);

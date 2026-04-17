@@ -272,7 +272,7 @@ const Projectile = {
 
         // Grid
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.font = '9px ' + CF.mono;
+        ctx.font = '14px ' + CF.mono;
 
         // X grid
         const xStep = this.niceStep(this.range * 1.1, 5);
@@ -304,7 +304,7 @@ const Projectile = {
 
         // Axis labels
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '10px ' + CF.mono;
+        ctx.font = '15px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('x (m)', ox + gw / 2, oy + 30);
         ctx.save();
@@ -387,7 +387,7 @@ const Projectile = {
             this.drawArrow(pScreen.sx, pScreen.sy, pScreen.sx + vel.vx * vScale, pScreen.sy - vel.vy * vScale, '#c678dd', 2);
 
             // Labels
-            ctx.font = '9px ' + CF.mono;
+            ctx.font = '14px ' + CF.mono;
             ctx.textAlign = 'left';
             ctx.fillStyle = '#61afef';
             ctx.fillText('v\u2093', pScreen.sx + vel.vx * vScale + 4, pScreen.sy + 4);
@@ -406,7 +406,7 @@ const Projectile = {
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.fillStyle = 'rgba(229,192,123,0.5)';
-        ctx.font = '9px ' + CF.sans;
+        ctx.font = '14px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('H\u2098\u2090\u2093 = ' + this.maxH.toFixed(1) + 'm', maxHScreen.sx + 6, maxHScreen.sy - 4);
 
@@ -439,7 +439,7 @@ const Projectile = {
         ctx.arc(ox, oy, angLen, -angRad, 0);
         ctx.stroke();
         ctx.fillStyle = 'rgba(198,120,221,0.6)';
-        ctx.font = '10px ' + CF.mono;
+        ctx.font = '15px ' + CF.mono;
         ctx.textAlign = 'left';
         ctx.fillText(this.theta + '\u00b0', ox + angLen * 0.7, oy - angLen * 0.25);
     },

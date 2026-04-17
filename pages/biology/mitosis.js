@@ -330,8 +330,9 @@ const Mitosis = {
         // DNA replication indicator
         if (p > 0.3) {
             const ctx = this.ctx;
+            const fs = Math.max(13, this.W * 0.024);
             ctx.fillStyle = 'rgba(86,182,194,0.4)';
-            ctx.font = '15px ' + CF.sans;
+            ctx.font = fs + 'px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('DNA \u590d\u5236\u4e2d...', cx, cy + r * 0.75);
 

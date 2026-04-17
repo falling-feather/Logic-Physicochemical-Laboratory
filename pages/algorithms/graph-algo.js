@@ -536,7 +536,7 @@ const GraphAlgo = {
         // Directed indicator
         if (this.directed) {
             ctx.fillStyle = 'rgba(196,121,58,0.15)';
-            ctx.font = '10px ' + CF.sans;
+            ctx.font = '15px ' + CF.sans;
             ctx.textAlign = 'right';
             ctx.fillText('\u6709\u5411\u56fe', w - 10, 16);
         }
@@ -642,14 +642,14 @@ const GraphAlgo = {
 
             // Label
             ctx.fillStyle = '#fff';
-            ctx.font = '600 ' + Math.round(r * 0.85) + 'px ' + CF.sans;
+            ctx.font = '600 ' + Math.max(13, Math.round(r * 0.85)) + 'px ' + CF.sans;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(n.label, nx, ny);
 
             // Dist label (Dijkstra)
             if (self.mode === 'dijkstra' && self.dist[i] !== undefined) {
                 ctx.fillStyle = isVis ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)';
-                ctx.font = '10px ' + CF.mono;
+                ctx.font = '15px ' + CF.mono;
                 ctx.fillText(self.dist[i] === Infinity ? '\u221e' : self.dist[i], nx, ny + r + 12);
             }
 
@@ -658,7 +658,7 @@ const GraphAlgo = {
                 var orderIdx = self.traversalOrder.indexOf(i);
                 if (orderIdx >= 0) {
                     ctx.fillStyle = 'rgba(255,255,255,0.5)';
-                    ctx.font = '9px ' + CF.mono;
+                    ctx.font = '14px ' + CF.mono;
                     ctx.fillText('#' + (orderIdx + 1), nx, ny + r + 12);
                 }
             }
@@ -678,7 +678,7 @@ const GraphAlgo = {
         var ctx = this.ctx;
         var self = this;
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        ctx.font = '11px ' + CF.sans;
+        ctx.font = '16px ' + CF.sans;
         ctx.textAlign = 'left';
 
         var order = [];
@@ -724,14 +724,14 @@ const GraphAlgo = {
         ctx.fill(); ctx.stroke();
 
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = '500 10px ' + CF.sans;
+        ctx.font = '500 15px ' + CF.sans;
         ctx.textAlign = 'left';
         var title = this.mode === 'dijkstra' ? '\u4f18\u5148\u961f\u5217 (dist)' :
                     this.mode === 'bfs' ? '\u961f\u5217 (Queue)' :
                     this.mode === 'dfs' ? '\u6808 (Stack)' : '\u5019\u9009\u8fb9 (weight)';
         ctx.fillText(title, px + 8, py + 14);
 
-        ctx.font = '10px ' + CF.mono;
+        ctx.font = '15px ' + CF.mono;
         items.forEach(function(item, i) {
             ctx.fillStyle = i === 0 ? '#c4793a' : 'rgba(255,255,255,0.4)';
             ctx.fillText(item.text, px + 8, py + 22 + i * itemH + 10);

@@ -547,7 +547,7 @@ const OpticsLab = {
                 ctx.arc(x, axisY, 4, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.fillStyle = 'rgba(245,158,11,0.6)';
-                ctx.font = '10px ' + CF.sans;
+                ctx.font = '15px ' + CF.sans;
                 ctx.textAlign = 'center';
                 ctx.fillText('F', x, axisY + 16);
                 ctx.fillStyle = '#f59e0b';
@@ -673,7 +673,7 @@ const OpticsLab = {
         }
 
         // 标注
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#f43f5e';
         ctx.fillText('物', objX, axisY + 20);
@@ -770,7 +770,7 @@ const OpticsLab = {
 
         // 标签
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('双缝', barrierX, H - 10);
         ctx.fillText('光屏', screenX + 12, H - 10);
@@ -780,7 +780,7 @@ const OpticsLab = {
         // 条纹间距
         const fringeSpacing = (lambda * L / d).toFixed(0);
         ctx.fillStyle = 'rgba(56,189,248,0.5)';
-        ctx.font = '11px ' + CF.mono;
+        ctx.font = '16px ' + CF.mono;
         ctx.fillText(`Δy = λL/d ≈ ${fringeSpacing}px`, W * 0.6, H - 10);
     },
 
@@ -870,7 +870,7 @@ const OpticsLab = {
             ctx.arc(cx, midY, 35, Math.PI / 2 - theta2Rad, Math.PI / 2);
             ctx.stroke();
             ctx.fillStyle = '#22c55e';
-            ctx.font = '11px ' + CF.mono;
+            ctx.font = '16px ' + CF.mono;
             ctx.textAlign = 'left';
             ctx.fillText(`θ₂=${(theta2Rad * 180 / Math.PI).toFixed(1)}°`, cx + 40, midY + 25);
         }
@@ -882,13 +882,13 @@ const OpticsLab = {
         ctx.arc(cx, midY, 30, -Math.PI / 2, -Math.PI / 2 + theta1Rad);
         ctx.stroke();
         ctx.fillStyle = '#fbbf24';
-        ctx.font = '11px ' + CF.mono;
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'right';
         ctx.fillText(`θ₁=${this.incidentAngle}°`, cx - 35, midY - 20);
 
         // 介质标签
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '12px ' + CF.sans;
+        ctx.font = '17px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText(`n₁ = ${this.n1.toFixed(2)}`, 10, 20);
         ctx.fillText(`n₂ = ${this.n2.toFixed(2)}`, 10, midY + 20);
@@ -922,14 +922,14 @@ const OpticsLab = {
             ctx.arc(cx, midY, 50, 0, Math.PI * 2);
             ctx.fill();
             ctx.fillStyle = '#f43f5e';
-            ctx.font = 'bold 12px ' + CF.sans;
+            ctx.font = 'bold 17px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('全反射', cx, midY - 55);
         }
 
         // 方程
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '12px ' + CF.mono;
+        ctx.font = '17px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('n₁ sin θ₁ = n₂ sin θ₂', W / 2, H - 12);
     },
@@ -986,7 +986,7 @@ const OpticsLab = {
 
         // White light label
         ctx.fillStyle = 'rgba(255,255,255,0.45)';
-        ctx.font = '12px ' + CF.sans;
+        ctx.font = '17px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('白光', hit.x - beamIn * 0.5, hit.y - 14);
 
@@ -1051,7 +1051,7 @@ const OpticsLab = {
         // No spectrum path → show hint
         if (pts.length < 3) {
             ctx.fillStyle = 'rgba(244,63,94,0.6)';
-            ctx.font = '12px ' + CF.sans;
+            ctx.font = '17px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('全反射 — 请减小入射角或顶角', W / 2, H / 2);
         }
@@ -1064,14 +1064,14 @@ const OpticsLab = {
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.arc(apex.x, apex.y, aR, a2, a1); ctx.stroke();
         ctx.fillStyle = 'rgba(56,189,248,0.5)';
-        ctx.font = '10px ' + CF.mono;
+        ctx.font = '15px ' + CF.mono;
         ctx.textAlign = 'center';
         const amid = (a1 + a2) / 2;
         ctx.fillText(`${this.prismApex}°`, apex.x + 26 * Math.cos(amid), apex.y + 26 * Math.sin(amid));
 
         // Spectrum labels
         if (pts.length > 4) {
-            ctx.font = '10px ' + CF.mono;
+            ctx.font = '15px ' + CF.mono;
             ctx.textAlign = 'left';
             const vio = pts[0], red = pts[pts.length - 1];
             ctx.fillStyle = vio.col;
@@ -1082,14 +1082,14 @@ const OpticsLab = {
 
         // Screen label
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('光屏', scrX + 8, H - 8);
 
         // Prism label
         const bm = { x: (bl.x + br.x) / 2, y: (bl.y + br.y) / 2 };
         ctx.fillStyle = 'rgba(56,189,248,0.4)';
-        ctx.font = '11px ' + CF.sans;
+        ctx.font = '16px ' + CF.sans;
         ctx.fillText('棱镜', bm.x, bm.y + 18);
 
         // Info panel
@@ -1218,7 +1218,7 @@ const OpticsLab = {
             }
 
             // Order labels: d sinθ = mλ
-            ctx.font = '9px ' + CF.mono;
+            ctx.font = '14px ' + CF.mono;
             ctx.textAlign = 'left';
             ctx.fillStyle = 'rgba(251,191,36,0.6)';
             for (let m = 0; m <= 8; m++) {
@@ -1235,7 +1235,7 @@ const OpticsLab = {
 
         // Labels
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText(`N = ${N}`, gX, H - 8);
         ctx.fillText('光屏', sX + 8, H - 8);
@@ -1244,7 +1244,7 @@ const OpticsLab = {
 
         // Equation
         ctx.fillStyle = 'rgba(56,189,248,0.45)';
-        ctx.font = '11px ' + CF.mono;
+        ctx.font = '16px ' + CF.mono;
         ctx.fillText('d sinθ = mλ', W * 0.53, H - 8);
 
         // Info
@@ -1296,7 +1296,7 @@ const OpticsLab = {
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.arc(srcX, cy, 16, 0, Math.PI * 2); ctx.stroke();
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('光源', srcX, cy + 30);
 
@@ -1338,7 +1338,7 @@ const OpticsLab = {
             }
             // Intensity above midpoint
             ctx.fillStyle = 'rgba(255,255,255,0.3)';
-            ctx.font = '9px ' + CF.mono;
+            ctx.font = '14px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(`${(inten * 100).toFixed(0)}%`, (x1 + x2) / 2, cy - amp - 6);
         }
@@ -1363,12 +1363,12 @@ const OpticsLab = {
             ctx.stroke();
             // Angle label
             ctx.fillStyle = 'rgba(56,189,248,0.55)';
-            ctx.font = '10px ' + CF.mono;
+            ctx.font = '15px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(`${ang[i]}°`, x, cy + plateH / 2 + 14);
             // Name
             ctx.fillStyle = 'rgba(255,255,255,0.35)';
-            ctx.font = '10px ' + CF.sans;
+            ctx.font = '15px ' + CF.sans;
             const nm = i === 0 ? '偏振片' : (nPol === 3 && i === 1 ? '中间片' : '检偏器');
             ctx.fillText(nm, x, cy - plateH / 2 - 8);
         }
@@ -1385,16 +1385,16 @@ const OpticsLab = {
         ctx.fillStyle = 'rgba(251,191,36,0.55)';
         ctx.fillRect(mX, cy + mH / 2 - fH, mW, fH);
         ctx.fillStyle = 'rgba(251,191,36,0.7)';
-        ctx.font = '10px ' + CF.mono;
+        ctx.font = '15px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText(`${(finalI * 100).toFixed(1)}%`, mX + mW / 2, cy + mH / 2 + 14);
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '9px ' + CF.sans;
+        ctx.font = '14px ' + CF.sans;
         ctx.fillText('强度', mX + mW / 2, cy - mH / 2 - 6);
 
         // Formula
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '11px ' + CF.mono;
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('Malus: I = I₀ cos²θ', W / 2, H - 10);
 

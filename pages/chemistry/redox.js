@@ -279,7 +279,7 @@ const Redox = {
         const redX = W * 0.28, oxX = W * 0.72;
         const R = Math.max(24, Math.min(36, W * 0.05));
         const allDone = this.electrons.every(e => e.arrived);
-        const fs = Math.max(10, W * 0.019);
+        const fs = Math.max(15, W * 0.024);
 
         // ── background glow zones ──
         const lg = ctx.createRadialGradient(redX, cy, 0, redX, cy, R * 4);
@@ -294,7 +294,7 @@ const Redox = {
         ctx.fillRect(W / 2, 0, W / 2, H);
 
         // ── title ──
-        ctx.font = `bold ${Math.max(13, W * 0.024)}px ${CF.sans}`;
+        ctx.font = `bold ${Math.max(18, W * 0.030)}px ${CF.sans}`;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(77,158,126,0.9)';
         ctx.fillText(rxn.name, W / 2, 26);
@@ -358,7 +358,7 @@ const Redox = {
             ctx.arc(x, y, R, 0, Math.PI * 2);
             ctx.fillStyle = g;
             ctx.fill();
-            ctx.font = `bold ${Math.max(12, R * 0.65)}px ${CF.mono}`;
+            ctx.font = `bold ${Math.max(17, R * 0.80)}px ${CF.mono}`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = '#fff';
@@ -413,7 +413,7 @@ const Redox = {
             ctx.fillStyle = eg;
             ctx.fill();
 
-            ctx.font = 'bold 8px ' + CF.mono;
+            ctx.font = 'bold 13px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = '#fff';
@@ -422,7 +422,7 @@ const Redox = {
         });
 
         // ── status ──
-        ctx.font = `bold ${Math.max(11, W * 0.02)}px ${CF.mono}`;
+        ctx.font = `bold ${Math.max(16, W * 0.025)}px ${CF.mono}`;
         ctx.textAlign = 'center';
         if (!allDone) {
             ctx.fillStyle = 'rgba(255,200,50,0.75)';
@@ -441,7 +441,7 @@ const Redox = {
         ctx.fillText(rxn.redLine, W / 2, H * 0.86);
 
         if (H > 280) {
-            ctx.font = `${Math.max(9, fs - 1)}px ${CF.mono}`;
+            ctx.font = `${Math.max(14, fs - 1)}px ${CF.mono}`;
             ctx.fillStyle = 'rgba(200,200,200,0.45)';
             ctx.fillText(rxn.halfOx + '  |  ' + rxn.halfRed, W / 2, H * 0.94);
         }

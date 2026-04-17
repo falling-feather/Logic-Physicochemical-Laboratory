@@ -499,7 +499,7 @@ const RelativityDemo = {
         ctx.setLineDash([]);
 
         // 文字背景
-        ctx.font = '11px ' + CF.mono;
+        ctx.font = '16px ' + CF.mono;
         const tw = ctx.measureText(info).width + 12;
         const tx = Math.min(mx + 12, this.W - tw);
         const ty = Math.max(my - 22, 14);
@@ -552,7 +552,7 @@ const RelativityDemo = {
 
         // 标签
         ctx.fillStyle = '#8b9dc3';
-        ctx.font = '14px ' + CF.sans;
+        ctx.font = '19px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('静止观察者', cx1, cy - clockR - 24);
         ctx.fillText('高速运动者 (v = ' + this.beta.toFixed(2) + 'c)', cx2, cy - clockR - 24);
@@ -563,13 +563,13 @@ const RelativityDemo = {
 
         // γ 显示
         ctx.fillStyle = '#e8dcc8';
-        ctx.font = 'bold 18px ' + CF.mono;
+        ctx.font = 'bold 22px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('γ = ' + this.gamma.toFixed(4), W * 0.5, H * 0.12);
 
         // 公式
         ctx.fillStyle = '#8b9dc3';
-        ctx.font = '13px ' + CF.mono;
+        ctx.font = '18px ' + CF.mono;
         ctx.fillText("Δt' = γ · Δt", W * 0.5, H * 0.92);
     },
 
@@ -611,7 +611,7 @@ const RelativityDemo = {
 
         // 标签
         ctx.fillStyle = color;
-        ctx.font = 'bold 14px ' + CF.mono;
+        ctx.font = 'bold 19px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText(label, cx, cy + r + 22);
     },
@@ -626,7 +626,7 @@ const RelativityDemo = {
 
         // 标签
         ctx.fillStyle = '#8b9dc3';
-        ctx.font = '14px ' + CF.sans;
+        ctx.font = '19px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('静止参考系中的飞船', cx, topY - 40);
         ctx.fillText('运动参考系中的飞船 (v = ' + this.beta.toFixed(2) + 'c)', cx, botY - 40);
@@ -649,13 +649,13 @@ const RelativityDemo = {
 
         // γ 显示
         ctx.fillStyle = '#e8dcc8';
-        ctx.font = 'bold 18px ' + CF.mono;
+        ctx.font = 'bold 22px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('γ = ' + this.gamma.toFixed(4), W * 0.5, H * 0.12);
 
         // 公式
         ctx.fillStyle = '#8b9dc3';
-        ctx.font = '13px ' + CF.mono;
+        ctx.font = '18px ' + CF.mono;
         ctx.fillText("L = L₀ / γ = L₀ · √(1 - v²/c²)", W * 0.5, H * 0.92);
     },
 
@@ -724,7 +724,7 @@ const RelativityDemo = {
         ctx.fill();
         // 标签
         ctx.fillStyle = color;
-        ctx.font = '12px ' + CF.mono;
+        ctx.font = '17px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText(label, (x1 + x2) / 2, y + 20);
     },
@@ -740,7 +740,7 @@ const RelativityDemo = {
 
         // γ 显示
         ctx.fillStyle = '#e8dcc8';
-        ctx.font = 'bold 18px ' + CF.mono;
+        ctx.font = 'bold 22px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('γ = ' + this.gamma.toFixed(4), cx, H * 0.1);
 
@@ -778,19 +778,19 @@ const RelativityDemo = {
 
             // 数值
             ctx.fillStyle = bar.color;
-            ctx.font = 'bold 13px ' + CF.mono;
+            ctx.font = 'bold 18px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(bar.val.toFixed(3), bx + barW / 2, barY - bh - 8);
 
             // 标签
             ctx.fillStyle = '#8b9dc3';
-            ctx.font = '12px ' + CF.mono;
+            ctx.font = '17px ' + CF.mono;
             ctx.fillText(bar.label, bx + barW / 2, barY + 18);
         });
 
         // 单位说明
         ctx.fillStyle = '#8b9dc3';
-        ctx.font = '11px ' + CF.sans;
+        ctx.font = '16px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('(单位: mc²)', cx, barY + 36);
 
@@ -808,7 +808,7 @@ const RelativityDemo = {
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.fillStyle = '#5b8dce';
-        ctx.font = '12px ' + CF.mono;
+        ctx.font = '17px ' + CF.mono;
         ctx.fillText('m₀', cx - barGap, ballY + restR + 16);
 
         // 相对论质量球（视觉放大）
@@ -820,12 +820,12 @@ const RelativityDemo = {
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.fillStyle = '#8b6fc0';
-        ctx.font = '12px ' + CF.mono;
+        ctx.font = '17px ' + CF.mono;
         ctx.fillText('γm₀ = ' + relM.toFixed(2), cx + barGap, ballY + relR + 16);
 
         // 公式
         ctx.fillStyle = '#8b9dc3';
-        ctx.font = '13px ' + CF.mono;
+        ctx.font = '18px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('E² = (pc)² + (mc²)²    |    E = γmc²', cx, H * 0.93);
     },
@@ -874,7 +874,7 @@ const RelativityDemo = {
         ctx.lineWidth = 1.5;
         ctx.stroke();
         ctx.fillStyle = earthColor;
-        ctx.font = '12px ' + CF.sans;
+        ctx.font = '17px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('地球', earthX, botY + 46);
 
@@ -952,10 +952,10 @@ const RelativityDemo = {
         ctx.strokeRect(earthX - barW / 2, barY - barMaxH, barW, barMaxH);
 
         ctx.fillStyle = earthColor;
-        ctx.font = 'bold 13px ' + CF.mono;
+        ctx.font = 'bold 18px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText(earthAge.toFixed(2) + '年', earthX, barY + 16);
-        ctx.font = '11px ' + CF.sans;
+        ctx.font = '16px ' + CF.sans;
         ctx.fillText('地球双胞胎', earthX, barY + 32);
 
         // 旅行者
@@ -968,42 +968,42 @@ const RelativityDemo = {
         ctx.strokeRect(travelX - barW / 2, barY - barMaxH, barW, barMaxH);
 
         ctx.fillStyle = travelColor;
-        ctx.font = 'bold 13px ' + CF.mono;
+        ctx.font = 'bold 18px ' + CF.mono;
         ctx.fillText(travelAge.toFixed(2) + '年', travelX, barY + 16);
-        ctx.font = '11px ' + CF.sans;
+        ctx.font = '16px ' + CF.sans;
         ctx.fillText('旅行双胞胎', travelX, barY + 32);
 
         // ── 年龄差 ──
         const ageDiff = earthAge - travelAge;
         if (ageDiff > 0.01) {
             ctx.fillStyle = '#e8dcc8';
-            ctx.font = 'bold 14px ' + CF.mono;
+            ctx.font = 'bold 19px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText('年龄差: ' + ageDiff.toFixed(3) + ' 年', midX, barY + 16);
         }
 
         // ── 旅行距离标注 ──
         ctx.fillStyle = '#8b9dc366';
-        ctx.font = '11px ' + CF.sans;
+        ctx.font = '16px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('D = ' + D.toFixed(1) + ' 光年', midX, botY + 46);
 
         // ── 阶段指示 ──
         ctx.fillStyle = 'rgba(200,210,240,0.6)';
-        ctx.font = '12px ' + CF.sans;
+        ctx.font = '17px ' + CF.sans;
         ctx.textAlign = 'center';
         const stageLabel = leg === 'outbound' ? '🚀 去程中...' : leg === 'return' ? '🔄 返程中...' : '🏠 已返回地球';
         ctx.fillText(stageLabel, midX, topY - 8);
 
         // ── 顶部信息 ──
         ctx.fillStyle = '#e8dcc8';
-        ctx.font = 'bold 18px ' + CF.mono;
+        ctx.font = 'bold 22px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('v = ' + v.toFixed(2) + 'c    γ = ' + g.toFixed(4), midX, H * 0.06);
 
         // ── 底部公式 ──
         ctx.fillStyle = '#8b9dc3';
-        ctx.font = '13px ' + CF.mono;
+        ctx.font = '18px ' + CF.mono;
         const tFmt = v > 0.01 ? properTime.toFixed(2) : '∞';
         ctx.fillText("τ = 2D/(γv) = " + tFmt + " 年    Δt = 2D/v = " + (v > 0.01 ? totalTime.toFixed(2) : '∞') + " 年", midX, H * 0.95);
     },
@@ -1045,7 +1045,7 @@ const RelativityDemo = {
             ctx.lineTo(sourceX + 28, cy + 4);
             ctx.stroke();
             ctx.fillStyle = 'rgba(200,210,240,0.5)';
-            ctx.font = '10px ' + CF.sans;
+            ctx.font = '15px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('v', sourceX + 26, cy - 10);
         }
@@ -1086,7 +1086,7 @@ const RelativityDemo = {
         ctx.lineWidth = 1.5;
         ctx.stroke();
         ctx.fillStyle = '#e74c3c';
-        ctx.font = '11px ' + CF.sans;
+        ctx.font = '16px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('红移观察者', obsLeftX, obsY + 28);
 
@@ -1113,7 +1113,7 @@ const RelativityDemo = {
         ctx.lineWidth = 1;
         ctx.strokeRect(cx - barW / 2, barY, barW, barH);
         ctx.fillStyle = '#e8dcc8';
-        ctx.font = '11px ' + CF.mono;
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('f₀ (原始)', cx, barY - 6);
         ctx.fillText('1.000', cx, barY + barH / 2 + 4);
@@ -1173,7 +1173,7 @@ const RelativityDemo = {
             ctx.lineWidth = 2;
             ctx.beginPath(); ctx.moveTo(redMark, specY - 6); ctx.lineTo(redMark, specY + specH + 6); ctx.stroke();
             ctx.fillStyle = '#e74c3c';
-            ctx.font = '10px ' + CF.sans;
+            ctx.font = '15px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('红移', redMark, specY + specH + 18);
         }
@@ -1186,12 +1186,12 @@ const RelativityDemo = {
             ctx.lineWidth = 2;
             ctx.beginPath(); ctx.moveTo(blueMark, specY - 6); ctx.lineTo(blueMark, specY + specH + 6); ctx.stroke();
             ctx.fillStyle = '#3498db';
-            ctx.font = '10px ' + CF.sans;
+            ctx.font = '15px ' + CF.sans;
             ctx.fillText('蓝移', blueMark, specY + specH + 18);
         }
 
         ctx.fillStyle = 'rgba(200,210,240,0.4)';
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('蓝', specX, specY - 4);
         ctx.textAlign = 'right';
@@ -1199,13 +1199,13 @@ const RelativityDemo = {
 
         // ── 顶部 γ ──
         ctx.fillStyle = '#e8dcc8';
-        ctx.font = 'bold 18px ' + CF.mono;
+        ctx.font = 'bold 22px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('v = ' + beta.toFixed(2) + 'c    γ = ' + this.gamma.toFixed(4), cx, H * 0.06);
 
         // ── 底部公式 ──
         ctx.fillStyle = '#8b9dc3';
-        ctx.font = '13px ' + CF.mono;
+        ctx.font = '18px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText("f_obs = f₀ · √((1±β)/(1∓β))", cx, H * 0.95);
     },
@@ -1258,7 +1258,7 @@ const RelativityDemo = {
 
         // 轴标签
         ctx.fillStyle = '#8b9dc3';
-        ctx.font = '12px ' + CF.mono;
+        ctx.font = '17px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText("u / c  (物体在运动系中的速度)", ox + gW / 2, oy + 36);
         ctx.save();
@@ -1269,7 +1269,7 @@ const RelativityDemo = {
 
         // 刻度
         ctx.fillStyle = 'rgba(200,210,240,0.5)';
-        ctx.font = '10px ' + CF.mono;
+        ctx.font = '15px ' + CF.mono;
         ctx.textAlign = 'center';
         for (let i = 0; i <= 5; i++) {
             const val = (i / 5).toFixed(1);
@@ -1295,7 +1295,7 @@ const RelativityDemo = {
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.fillStyle = limitColor + 'aa';
-        ctx.font = '11px ' + CF.sans;
+        ctx.font = '16px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('c (光速极限)', ox + gW + 4, yLimit + 4);
 
@@ -1374,14 +1374,14 @@ const RelativityDemo = {
             ctx.setLineDash([]);
             const diffVal = classicalVal - relativisticVal;
             ctx.fillStyle = '#e8dcc8aa';
-            ctx.font = '10px ' + CF.mono;
+            ctx.font = '15px ' + CF.mono;
             ctx.textAlign = 'left';
             ctx.fillText('Δ=' + diffVal.toFixed(3) + 'c',
                 markerX + 6, (toY(Math.min(classicalVal, 2)) + toY(relativisticVal)) / 2 + 4);
         }
 
         // ── 数值标注 ──
-        ctx.font = 'bold 12px ' + CF.mono;
+        ctx.font = 'bold 17px ' + CF.mono;
         ctx.textAlign = 'left';
         const labelX = Math.min(markerX + 12, ox + gW - 100);
         ctx.fillStyle = restColor;
@@ -1396,7 +1396,7 @@ const RelativityDemo = {
         ctx.strokeStyle = restColor;
         ctx.beginPath(); ctx.moveTo(legX, legY); ctx.lineTo(legX + 24, legY); ctx.stroke();
         ctx.fillStyle = restColor;
-        ctx.font = '12px ' + CF.sans;
+        ctx.font = '17px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('经典叠加  u+v', legX + 30, legY + 4);
 
@@ -1407,13 +1407,13 @@ const RelativityDemo = {
 
         // ── 顶部 γ + v ──
         ctx.fillStyle = '#e8dcc8';
-        ctx.font = 'bold 18px ' + CF.mono;
+        ctx.font = 'bold 22px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('v = ' + v.toFixed(2) + 'c    γ = ' + this.gamma.toFixed(4), W * 0.5, H * 0.06);
 
         // ── 底部公式 ──
         ctx.fillStyle = '#8b9dc3';
-        ctx.font = '13px ' + CF.mono;
+        ctx.font = '18px ' + CF.mono;
         ctx.fillText("u' = (u + v) / (1 + uv/c²)", W * 0.5, H * 0.95);
     },
 
@@ -1450,7 +1450,7 @@ const RelativityDemo = {
         ctx.beginPath(); ctx.moveTo(cx - axLen, cy); ctx.lineTo(cx + axLen, cy); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(cx, cy + axLen); ctx.lineTo(cx, cy - axLen); ctx.stroke();
         ctx.fillStyle = restColor;
-        ctx.font = '13px ' + CF.mono;
+        ctx.font = '18px ' + CF.mono;
         ctx.textAlign = 'left';
         ctx.fillText('x', cx + axLen + 6, cy + 4);
         ctx.textAlign = 'center';
@@ -1464,7 +1464,7 @@ const RelativityDemo = {
         ctx.beginPath(); ctx.moveTo(cx + axLen, cy - axLen); ctx.lineTo(cx - axLen, cy + axLen); ctx.stroke();
         ctx.setLineDash([]);
         ctx.fillStyle = lightColor + 'aa';
-        ctx.font = '11px ' + CF.sans;
+        ctx.font = '16px ' + CF.sans;
         ctx.textAlign = 'right';
         ctx.fillText('光锥 (v=c)', cx + axLen - 2, cy - axLen + 14);
 
@@ -1504,7 +1504,7 @@ const RelativityDemo = {
             ctx.lineTo(cx + xpDx, cy - xpDy);
             ctx.stroke();
             ctx.fillStyle = moveColor;
-            ctx.font = '13px ' + CF.mono;
+            ctx.font = '18px ' + CF.mono;
             ctx.textAlign = 'left';
             ctx.fillText("x'", cx + xpDx + 6, cy - xpDy + 4);
             ctx.textAlign = 'center';
@@ -1598,12 +1598,12 @@ const RelativityDemo = {
 
             // 标签
             ctx.fillStyle = col;
-            ctx.font = 'bold 11px ' + CF.mono;
+            ctx.font = 'bold 16px ' + CF.mono;
             ctx.textAlign = 'left';
             const labelX = px + 10;
             const labelY = py - 6;
             ctx.fillText(`E${i + 1} (${ev.x.toFixed(2)}, ${ev.ct.toFixed(2)})`, labelX, labelY);
-            ctx.font = '10px ' + CF.sans;
+            ctx.font = '15px ' + CF.sans;
             ctx.fillStyle = col + 'cc';
             ctx.fillText(causal + '  s²=' + s2.toFixed(3), labelX, labelY + 14);
 
@@ -1618,13 +1618,13 @@ const RelativityDemo = {
         // ── 提示文字 ──
         if (this.stEvents.length === 0) {
             ctx.fillStyle = 'rgba(200,210,240,0.35)';
-            ctx.font = '12px ' + CF.sans;
+            ctx.font = '17px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('点击添加事件 · 拖拽移动 · 双击删除', cx, cy + axLen + 24);
         }
 
         // ── 区域标签 ──
-        ctx.font = '11px ' + CF.sans;
+        ctx.font = '16px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(200,210,240,0.25)';
         ctx.fillText('未来 (类时)', cx, cy - axLen * 0.6);
@@ -1634,13 +1634,13 @@ const RelativityDemo = {
 
         // ── 顶部 γ ──
         ctx.fillStyle = '#e8dcc8';
-        ctx.font = 'bold 18px ' + CF.mono;
+        ctx.font = 'bold 22px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('γ = ' + this.gamma.toFixed(4), cx, H * 0.06);
 
         // 底部公式
         ctx.fillStyle = '#8b9dc3';
-        ctx.font = '13px ' + CF.mono;
+        ctx.font = '18px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText("s² = (ct)² - x²  (不变间隔)", cx, H * 0.95);
     },
@@ -1673,7 +1673,7 @@ const RelativityDemo = {
 
         // S 系标签
         ctx.fillStyle = restColor;
-        ctx.font = 'bold 14px ' + CF.mono;
+        ctx.font = 'bold 19px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('S 系 (静止)', lx, H * 0.08);
 
@@ -1706,7 +1706,7 @@ const RelativityDemo = {
         ctx.closePath();
         ctx.fill();
         ctx.fillStyle = 'rgba(200,210,240,0.4)';
-        ctx.font = '11px ' + CF.sans;
+        ctx.font = '16px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('Lorentz', arrowMid, cy - 10);
         ctx.fillText('变换', arrowMid, cy + 18);
@@ -1728,7 +1728,7 @@ const RelativityDemo = {
             ctx.lineWidth = 1.5;
             ctx.stroke();
             ctx.fillStyle = col;
-            ctx.font = 'bold 10px ' + CF.mono;
+            ctx.font = 'bold 15px ' + CF.mono;
             ctx.textAlign = 'left';
             ctx.fillText(`E${i + 1}`, sx + 8, sy - 4);
 
@@ -1755,14 +1755,14 @@ const RelativityDemo = {
             ctx.lineWidth = 1.5;
             ctx.stroke();
             ctx.fillStyle = col;
-            ctx.font = 'bold 10px ' + CF.mono;
+            ctx.font = 'bold 15px ' + CF.mono;
             ctx.textAlign = 'left';
             ctx.fillText(`E${i + 1}'`, tx + 8, ty - 4);
         }
 
         // ── 事件坐标表 ──
         const tableY = cy + half + 20;
-        ctx.font = '11px ' + CF.mono;
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#8b9dc3';
         ctx.fillText('事件', W * 0.15, tableY);
@@ -1792,20 +1792,20 @@ const RelativityDemo = {
         // ── 提示 ──
         if (this.lorentzEvents.length === 0) {
             ctx.fillStyle = 'rgba(200,210,240,0.35)';
-            ctx.font = '12px ' + CF.sans;
+            ctx.font = '17px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('点击左侧坐标系添加事件 · 拖拽移动 · 双击删除', cx, tableY + 10);
         }
 
         // 顶部 γ
         ctx.fillStyle = '#e8dcc8';
-        ctx.font = 'bold 18px ' + CF.mono;
+        ctx.font = 'bold 22px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('v = ' + beta.toFixed(2) + 'c    γ = ' + this.gamma.toFixed(4), cx, H * 0.06);
 
         // 底部公式
         ctx.fillStyle = '#8b9dc3';
-        ctx.font = '13px ' + CF.mono;
+        ctx.font = '18px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText("x' = γ(x - βct)    ct' = γ(ct - βx)", cx, H * 0.95);
     },

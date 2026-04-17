@@ -432,7 +432,7 @@ const TrigVis = {
 
         // Vertical grid lines at pi intervals
         ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '15px ' + CF.mono;
+        ctx.font = '17px ' + CF.mono;
         ctx.textAlign = 'center';
         const piMarks = [0, 0.5, 1, 1.5, 2];
         const piLabels = ['0', '\u03c0/2', '\u03c0', '3\u03c0/2', '2\u03c0'];

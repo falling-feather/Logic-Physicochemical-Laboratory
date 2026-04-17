@@ -6,6 +6,9 @@
     <meta name="description" content="工科实验室 - 交互式可视化科学学习平台，涵盖数学、物理、化学、算法与生物">
     <meta name="theme-color" content="#08090e">
     <title>工科实验室 - 可视化学习平台</title>
+    <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48" type="image/x-icon">
+    <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
     <!-- Resource Hints -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,7 +24,7 @@
 
     <!-- CSS: Shared -->
     <link rel="stylesheet" href="shared/css/tokens.css?v=20260417d">
-    <link rel="stylesheet" href="shared/css/base.css?v=20260417d">
+    <link rel="stylesheet" href="shared/css/base.css?v=20260417f">
     <link rel="stylesheet" href="shared/css/typography.css?v=20260417d">
     <link rel="stylesheet" href="shared/css/navbar.css?v=20260417d">
     <link rel="stylesheet" href="shared/css/page-layout.css?v=20260417d">
@@ -1459,22 +1462,6 @@
                         <div id="periodic-table-grid"></div>
                     </div>
                     <div id="pt-legend" class="pt-legend"></div>
-                    <!-- 元素详情面板 -->
-                    <div id="pt-detail" class="pt-detail">
-                        <button class="pt-detail-close" id="pt-detail-close">&times;</button>
-                        <div class="pt-detail-header">
-                            <div class="pt-detail-big">
-                                <span class="pt-detail-number"></span>
-                                <span class="pt-detail-symbol"></span>
-                                <span class="pt-detail-name"></span>
-                            </div>
-                            <div class="pt-detail-info">
-                                <div class="pt-detail-row"><span class="label">原子量</span><span class="value pt-detail-mass"></span></div>
-                                <div class="pt-detail-row"><span class="label">分类</span><span class="value pt-detail-cat"></span></div>
-                            </div>
-                        </div>
-                        <div class="pt-detail-config"></div>
-                    </div>
                     <div id="pt-edu-info" class="pt-edu-info"></div>
                 </div>
             </div>
@@ -2252,15 +2239,13 @@
                         </li>
                     </ol>
                 </div>
-                <div class="viz-panel">
-                    <div class="viz-controls">
-                        <button class="btn-primary" id="bio-cell-toggle">切换动/植物细胞</button>
-                        <button class="btn-secondary" id="bio-cell-label-toggle">显示/隐藏标注</button>
-                    </div>
-                    <canvas id="cell-canvas" class="bio-canvas" width="700" height="500"></canvas>
-                    <div class="bio-info" id="cell-info">点击细胞器查看详细信息</div>
-                    <div id="cellstr-info" class="cellstr-info" aria-live="polite"></div>
+                <div class="viz-controls">
+                    <button class="btn-primary" id="bio-cell-toggle">切换动/植物细胞</button>
+                    <button class="btn-secondary" id="bio-cell-label-toggle">显示/隐藏标注</button>
                 </div>
+                <div class="canvas-container"><canvas id="cell-canvas"></canvas></div>
+                <div class="bio-info" id="cell-info">点击细胞器查看详细信息</div>
+                <div id="cellstr-info" class="cellstr-info" aria-live="polite"></div>
                 </div>
             </div>
 
@@ -2287,18 +2272,16 @@
                         </li>
                     </ol>
                 </div>
-                <div class="viz-panel">
-                    <div class="viz-controls">
-                        <button class="btn-primary" id="bio-dna-rotate">旋转螺旋</button>
-                        <button class="btn-secondary" id="bio-dna-replicate">模拟复制</button>
-                        <button class="btn-secondary" id="bio-dna-transcribe">转录</button>
-                        <button class="btn-secondary" id="bio-dna-mutate">突变</button>
-                        <button class="btn-secondary" id="bio-dna-reset">重置</button>
-                    </div>
-                    <canvas id="dna-canvas" class="bio-canvas" width="700" height="500"></canvas>
-                    <div class="bio-info" id="dna-info">DNA 双螺旋结构 — 点击按钮开始探索</div>
-                    <div id="dnahelix-info" class="dnahelix-info" aria-live="polite"></div>
+                <div class="viz-controls">
+                    <button class="btn-primary" id="bio-dna-rotate">旋转螺旋</button>
+                    <button class="btn-secondary" id="bio-dna-replicate">模拟复制</button>
+                    <button class="btn-secondary" id="bio-dna-transcribe">转录</button>
+                    <button class="btn-secondary" id="bio-dna-mutate">突变</button>
+                    <button class="btn-secondary" id="bio-dna-reset">重置</button>
                 </div>
+                <div class="canvas-container"><canvas id="dna-canvas"></canvas></div>
+                <div class="bio-info" id="dna-info">DNA 双螺旋结构 — 点击按钮开始探索</div>
+                <div id="dnahelix-info" class="dnahelix-info" aria-live="polite"></div>
                 </div>
             </div>
 
@@ -2325,23 +2308,21 @@
                         </li>
                     </ol>
                 </div>
-                <div class="viz-panel">
-                    <div class="viz-controls" id="bio-photo-sim-controls">
-                        <label style="color: var(--text-secondary); font-size: var(--text-sm);">光照强度:</label>
-                        <input type="range" id="bio-light-intensity" min="0" max="100" value="50">
-                        <button class="btn-primary" id="bio-photo-start">开始模拟</button>
-                        <button class="btn-secondary" id="bio-photo-reset">重置</button>
-                    </div>
-                    <div class="viz-controls" id="bio-photo-curve-controls" style="display:none;">
-                        <label style="color: var(--text-secondary); font-size: var(--text-sm);">温度:</label>
-                        <input type="range" id="bio-photo-temp" min="5" max="50" value="25">
-                        <label style="color: var(--text-secondary); font-size: var(--text-sm);">CO₂:</label>
-                        <input type="range" id="bio-photo-co2" min="0.01" max="0.1" step="0.01" value="0.04">
-                    </div>
-                    <canvas id="photosynthesis-canvas" class="bio-canvas" width="700" height="500"></canvas>
-                    <div class="bio-info" id="photo-info">调节光照强度，观察光合作用速率变化</div>
-                    <div id="photosynth-info" class="photosynth-info" aria-live="polite"></div>
+                <div class="viz-controls" id="bio-photo-sim-controls">
+                    <label style="color: var(--text-secondary); font-size: var(--text-sm);">光照强度:</label>
+                    <input type="range" id="bio-light-intensity" min="0" max="100" value="50">
+                    <button class="btn-primary" id="bio-photo-start">开始模拟</button>
+                    <button class="btn-secondary" id="bio-photo-reset">重置</button>
                 </div>
+                <div class="viz-controls" id="bio-photo-curve-controls" style="display:none;">
+                    <label style="color: var(--text-secondary); font-size: var(--text-sm);">温度:</label>
+                    <input type="range" id="bio-photo-temp" min="5" max="50" value="25">
+                    <label style="color: var(--text-secondary); font-size: var(--text-sm);">CO₂:</label>
+                    <input type="range" id="bio-photo-co2" min="0.01" max="0.1" step="0.01" value="0.04">
+                </div>
+                <div class="canvas-container"><canvas id="photosynthesis-canvas"></canvas></div>
+                <div class="bio-info" id="photo-info">调节光照强度，观察光合作用速率变化</div>
+                <div id="photosynth-info" class="photosynth-info" aria-live="polite"></div>
                 </div>
             </div>
 
@@ -2368,54 +2349,52 @@
                         </li>
                     </ol>
                 </div>
-                <div class="viz-panel">
-                    <div class="viz-controls" id="bio-genetics-controls">
-                        <!-- 孟德尔杂交控制 -->
-                        <div id="bio-punnett-controls">
-                            <button class="btn-secondary" id="bio-genetics-single">单基因</button>
-                            <button class="btn-secondary" id="bio-genetics-double">双基因</button>
-                            <select id="bio-parent1" class="bio-select">
-                                <option value="AA">AA (纯合显性)</option>
-                                <option value="Aa" selected>Aa (杂合)</option>
-                                <option value="aa">aa (纯合隐性)</option>
-                            </select>
-                            <span style="color: var(--text-secondary);">×</span>
-                            <select id="bio-parent2" class="bio-select">
-                                <option value="AA">AA (纯合显性)</option>
-                                <option value="Aa" selected>Aa (杂合)</option>
-                                <option value="aa">aa (纯合隐性)</option>
-                            </select>
-                            <button class="btn-primary" id="bio-cross">杂交</button>
-                        </div>
-                        <!-- 种群遗传控制 -->
-                        <div id="bio-pop-controls" style="display:none">
-                            <label>A等位基因频率(p)：</label>
-                            <input type="range" id="bio-pop-freq" min="0" max="1" step="0.01" value="0.5">
-                            <label>选择压力：</label>
-                            <select id="bio-pop-selection" class="bio-select">
-                                <option value="none">无选择</option>
-                                <option value="against_aa">不利于aa</option>
-                                <option value="for_AA">有利于AA</option>
-                                <option value="heterozygote_advantage">杂合优势</option>
-                            </select>
-                            <button class="btn-primary" id="bio-pop-start">开始演化</button>
-                            <button class="btn-secondary" id="bio-pop-reset">重置</button>
-                        </div>
-                        <!-- 系谱图控制 -->
-                        <div id="bio-pedigree-controls" style="display:none">
-                            <label>遗传方式：</label>
-                            <select id="bio-pedigree-preset" class="bio-select">
-                                <option value="autosomal_dominant">常染色体显性遗传</option>
-                                <option value="autosomal_recessive">常染色体隐性遗传</option>
-                                <option value="x_linked_recessive">X连锁隐性遗传</option>
-                                <option value="x_linked_dominant">X连锁显性遗传</option>
-                            </select>
-                        </div>
+                <div class="viz-controls" id="bio-genetics-controls">
+                    <!-- 孟德尔杂交控制 -->
+                    <div id="bio-punnett-controls">
+                        <button class="btn-secondary" id="bio-genetics-single">单基因</button>
+                        <button class="btn-secondary" id="bio-genetics-double">双基因</button>
+                        <select id="bio-parent1" class="bio-select">
+                            <option value="AA">AA (纯合显性)</option>
+                            <option value="Aa" selected>Aa (杂合)</option>
+                            <option value="aa">aa (纯合隐性)</option>
+                        </select>
+                        <span style="color: var(--text-secondary);">×</span>
+                        <select id="bio-parent2" class="bio-select">
+                            <option value="AA">AA (纯合显性)</option>
+                            <option value="Aa" selected>Aa (杂合)</option>
+                            <option value="aa">aa (纯合隐性)</option>
+                        </select>
+                        <button class="btn-primary" id="bio-cross">杂交</button>
                     </div>
-                    <canvas id="genetics-canvas" class="bio-canvas" width="700" height="500"></canvas>
-                    <div class="bio-info" id="genetics-info">选择亲本基因型，点击杂交查看后代比例</div>
-                    <div id="gen-edu-info" class="gen-edu-info" aria-live="polite"></div>
+                    <!-- 种群遗传控制 -->
+                    <div id="bio-pop-controls" style="display:none">
+                        <label>A等位基因频率(p)：</label>
+                        <input type="range" id="bio-pop-freq" min="0" max="1" step="0.01" value="0.5">
+                        <label>选择压力：</label>
+                        <select id="bio-pop-selection" class="bio-select">
+                            <option value="none">无选择</option>
+                            <option value="against_aa">不利于aa</option>
+                            <option value="for_AA">有利于AA</option>
+                            <option value="heterozygote_advantage">杂合优势</option>
+                        </select>
+                        <button class="btn-primary" id="bio-pop-start">开始演化</button>
+                        <button class="btn-secondary" id="bio-pop-reset">重置</button>
+                    </div>
+                    <!-- 系谱图控制 -->
+                    <div id="bio-pedigree-controls" style="display:none">
+                        <label>遗传方式：</label>
+                        <select id="bio-pedigree-preset" class="bio-select">
+                            <option value="autosomal_dominant">常染色体显性遗传</option>
+                            <option value="autosomal_recessive">常染色体隐性遗传</option>
+                            <option value="x_linked_recessive">X连锁隐性遗传</option>
+                            <option value="x_linked_dominant">X连锁显性遗传</option>
+                        </select>
+                    </div>
                 </div>
+                <div class="canvas-container"><canvas id="genetics-canvas"></canvas></div>
+                <div class="bio-info" id="genetics-info">选择亲本基因型，点击杂交查看后代比例</div>
+                <div id="gen-edu-info" class="gen-edu-info" aria-live="polite"></div>
                 </div>
             </div>
 
@@ -2598,6 +2577,7 @@
     </main>
 
     <!-- ═══════════════ Element Detail Panel ═══════════════ -->
+    <div id="pt-detail-overlay" class="pt-detail-overlay"></div>
     <div id="pt-detail" class="pt-detail">
         <button class="pt-detail-close" id="pt-detail-close">&times;</button>
         <div class="pt-detail-header">
@@ -2652,9 +2632,27 @@
             </div>
             <div class="footer-bottom">
                 <span>&copy; 2026 工科实验室 · 探索科学的星辰大海</span>
+                <p class="footer-credit">Made by <a href="javascript:void(0)" class="footer-author-link" onclick="document.getElementById('qr-modal').classList.add('active')">Falling-feather</a>.</p>
+                <div class="running-time-footer" id="running-time-footer">
+                    <p class="running-time-text">
+                        本站已在随时准备跑路的状态下以极其不稳定的方式运行了
+                        <span id="rt-days">0</span> 天
+                        <span id="rt-hours">0</span> 小时
+                        <span id="rt-minutes">0</span> 分
+                        <span id="rt-seconds">0</span> 秒
+                    </p>
+                </div>
             </div>
         </div>
     </footer>
+
+    <!-- ═══════════════ QR Code Modal ═══════════════ -->
+    <div class="qr-modal-overlay" id="qr-modal" onclick="this.classList.remove('active')">
+        <div class="qr-modal-card" onclick="event.stopPropagation()">
+            <button class="qr-modal-close" onclick="document.getElementById('qr-modal').classList.remove('active')" aria-label="关闭">&times;</button>
+            <img src="UI/add-friend.webp" alt="加好友二维码" width="500" height="706" loading="lazy">
+        </div>
+    </div>
 
     <!-- External Libraries (pinned versions) -->
     <!-- lucide: 本地优先，CDN 回退，确保图标在弱网环境下正常显示 -->
@@ -2666,7 +2664,7 @@
     <!-- Application Scripts: Shared -->
     <script src="shared/js/config.js?v=20260417d"></script>
     <script src="shared/js/module-selector.js?v=20260417d"></script>
-    <script src="shared/js/router.js?v=20260417d"></script>
+    <script src="shared/js/router.js?v=20260417e"></script>
     <script src="shared/js/scroll-animations.js?v=20260417d"></script>
     <script src="shared/js/cards.js?v=20260417d"></script>
     <script src="shared/js/common.js?v=20260417d"></script>

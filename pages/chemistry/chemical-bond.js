@@ -148,7 +148,7 @@ const ChemBond = {
         ctx.arc(naX, cy, 22, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 13px ' + CF.sans;
+        ctx.font = 'bold 18px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('Na\u207a', naX, cy);
@@ -175,7 +175,7 @@ const ChemBond = {
 
         // Force label
         ctx.fillStyle = 'rgba(229,192,123,0.6)';
-        ctx.font = '10px ' + CF.mono;
+        ctx.font = '15px ' + CF.mono;
         ctx.fillText('\u9759\u7535\u5f15\u529b', cx, cy - 20);
 
         // Electron shells hint
@@ -185,7 +185,7 @@ const ChemBond = {
         // Crystal lattice preview (right side)
         const lx = W * 0.8, ly = H * 0.3;
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u6676\u4f53\u7ed3\u6784', lx, ly - 20);
 
@@ -254,7 +254,7 @@ const ChemBond = {
         ctx.arc(oX, oY, 25, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 14px ' + CF.sans;
+        ctx.font = 'bold 19px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('O', oX, oY);
@@ -266,7 +266,7 @@ const ChemBond = {
             ctx.arc(h.x, h.y, 16, 0, Math.PI * 2);
             ctx.fill();
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 12px ' + CF.sans;
+            ctx.font = 'bold 17px ' + CF.sans;
             ctx.fillText('H', h.x, h.y);
         });
 
@@ -303,12 +303,12 @@ const ChemBond = {
         ctx.arc(oX, oY, arcR, aStart, aEnd);
         ctx.stroke();
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '10px ' + CF.mono;
+        ctx.font = '15px ' + CF.mono;
         ctx.fillText('104.5\u00b0', oX, oY + 35);
 
         // Electronegativity hint
         ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.fillText('\u03b4\u207b', oX, oY - 30);
         ctx.fillText('\u03b4\u207a', h1X, h1Y - 20);
         ctx.fillText('\u03b4\u207a', h2X, h2Y - 20);
@@ -333,7 +333,7 @@ const ChemBond = {
                 ctx.arc(x, y, 12, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.fillStyle = 'rgba(255,255,255,0.4)';
-                ctx.font = '9px ' + CF.sans;
+                ctx.font = '14px ' + CF.sans;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText('M\u207a', x, y);
@@ -354,7 +354,7 @@ const ChemBond = {
 
         // Label
         ctx.fillStyle = 'rgba(91,141,206,0.4)';
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u81ea\u7531\u7535\u5b50\u6d77 (e\u207b)', W / 2, H - 10);
     }

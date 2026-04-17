@@ -921,13 +921,13 @@ const DataStructVis = {
 
         // Bottom label
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '11px ' + CF.sans;
+        ctx.font = '16px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u5e95\u90e8', baseX + boxW / 2, baseY + 16);
 
         // Capacity
         ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.font = '10px ' + CF.mono;
+        ctx.font = '15px ' + CF.mono;
         ctx.textAlign = 'right';
         ctx.fillText(this.stack.length + '/' + this.stackMax, baseX + boxW + 40, baseY - cH);
 
@@ -935,7 +935,7 @@ const DataStructVis = {
         if (this.stack.length > 0) {
             var topY = baseY - this.stack.length * boxH;
             ctx.fillStyle = '#c4793a';
-            ctx.font = '12px ' + CF.mono;
+            ctx.font = '17px ' + CF.mono;
             ctx.textAlign = 'right';
             ctx.fillText('TOP \u2192', baseX - 12, topY + boxH / 2 + 4);
         }
@@ -955,19 +955,19 @@ const DataStructVis = {
             ctx.strokeRect(baseX, sy, boxW, boxH - 2);
 
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 14px ' + CF.mono;
+            ctx.font = 'bold 19px ' + CF.mono;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(item.val, baseX + boxW / 2, sy + (boxH - 2) / 2);
 
             // Index
             ctx.fillStyle = 'rgba(255,255,255,0.2)';
-            ctx.font = '9px ' + CF.mono;
+            ctx.font = '14px ' + CF.mono;
             ctx.textAlign = 'left';
             ctx.fillText('[' + i + ']', baseX + boxW + 6, sy + (boxH - 2) / 2 + 3);
         }
 
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.font = '13px ' + CF.sans;
+        ctx.font = '18px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('LIFO \u2014 \u540e\u8fdb\u5148\u51fa', W / 2, 24);
     },
@@ -989,7 +989,7 @@ const DataStructVis = {
         // Front/Rear labels
         if (this.queue.length > 0) {
             ctx.fillStyle = '#4d9e7e';
-            ctx.font = '11px ' + CF.sans; ctx.textAlign = 'center';
+            ctx.font = '16px ' + CF.sans; ctx.textAlign = 'center';
             ctx.fillText('\u2191 FRONT', startX + boxW / 2, midY + boxH / 2 + 20);
             ctx.fillStyle = '#5b8dce';
             ctx.fillText('\u2191 REAR', startX + (this.queue.length - 1) * (boxW + 4) + boxW / 2, midY + boxH / 2 + 20);
@@ -1010,12 +1010,12 @@ const DataStructVis = {
             ctx.strokeRect(qx, midY - boxH / 2, boxW, boxH);
 
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 14px ' + CF.mono;
+            ctx.font = 'bold 19px ' + CF.mono;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(qI.val, qx + boxW / 2, midY);
 
             ctx.fillStyle = 'rgba(255,255,255,0.2)';
-            ctx.font = '9px ' + CF.mono;
+            ctx.font = '14px ' + CF.mono;
             ctx.fillText('[' + i + ']', qx + boxW / 2, midY - boxH / 2 - 6);
         }
 
@@ -1034,11 +1034,11 @@ const DataStructVis = {
         }
 
         ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.font = '10px ' + CF.mono; ctx.textAlign = 'right';
+        ctx.font = '15px ' + CF.mono; ctx.textAlign = 'right';
         ctx.fillText(this.queue.length + '/' + this.queueMax, W - 10, midY - boxH / 2 - 20);
 
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.font = '13px ' + CF.sans; ctx.textAlign = 'center';
+        ctx.font = '18px ' + CF.sans; ctx.textAlign = 'center';
         ctx.fillText('FIFO \u2014 \u5148\u8fdb\u5148\u51fa', W / 2, 24);
     },
 
@@ -1047,7 +1047,7 @@ const DataStructVis = {
         this._llPositions = [];
         if (!this.llHead) {
             ctx.fillStyle = 'rgba(255,255,255,0.2)';
-            ctx.font = '14px ' + CF.sans; ctx.textAlign = 'center';
+            ctx.font = '19px ' + CF.sans; ctx.textAlign = 'center';
             ctx.fillText('\u7a7a\u94fe\u8868 \u2014 \u4f7f\u7528\u201c\u5934\u90e8\u63d2\u5165\u201d\u6216\u201c\u5c3e\u90e8\u63d2\u5165\u201d\u6dfb\u52a0\u8282\u70b9', W / 2, H / 2);
             return;
         }
@@ -1077,7 +1077,7 @@ const DataStructVis = {
             ctx.strokeRect(x, y, nW, nH);
 
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 14px ' + CF.mono;
+            ctx.font = 'bold 19px ' + CF.mono;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(c.val, x + nW * 0.4, midY);
 
@@ -1086,7 +1086,7 @@ const DataStructVis = {
             ctx.beginPath(); ctx.moveTo(x + nW * 0.7, y); ctx.lineTo(x + nW * 0.7, y + nH); ctx.stroke();
 
             ctx.fillStyle = 'rgba(255,255,255,0.2)';
-            ctx.font = '9px ' + CF.mono; ctx.textAlign = 'center';
+            ctx.font = '14px ' + CF.mono; ctx.textAlign = 'center';
             ctx.fillText('[' + idx + ']', x + nW / 2, y - 8);
 
             if (c.next) {
@@ -1099,22 +1099,22 @@ const DataStructVis = {
                 ctx.beginPath(); ctx.arc(x + nW * 0.85, midY, 3, 0, Math.PI * 2); ctx.fill();
             } else {
                 ctx.fillStyle = 'rgba(255,255,255,0.2)';
-                ctx.font = '10px ' + CF.mono; ctx.textAlign = 'left';
+                ctx.font = '15px ' + CF.mono; ctx.textAlign = 'left';
                 ctx.fillText('NULL', x + nW + 6, midY + 3);
             }
             c = c.next; idx++;
         }
 
         ctx.fillStyle = '#4d9e7e';
-        ctx.font = '11px ' + CF.mono; ctx.textAlign = 'center';
+        ctx.font = '16px ' + CF.mono; ctx.textAlign = 'center';
         ctx.fillText('HEAD', sx + nW / 2, midY + nH / 2 + 18);
 
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.font = '13px ' + CF.sans; ctx.textAlign = 'center';
+        ctx.font = '18px ' + CF.sans; ctx.textAlign = 'center';
         ctx.fillText('\u5355\u5411\u94fe\u8868 \u2014 Singly Linked List', W / 2, 24);
 
         ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.font = '10px ' + CF.mono; ctx.textAlign = 'right';
+        ctx.font = '15px ' + CF.mono; ctx.textAlign = 'right';
         ctx.fillText('\u8282\u70b9: ' + this.llCount, W - 10, H - 8);
     },
 
@@ -1122,7 +1122,7 @@ const DataStructVis = {
         var ctx = this.ctx, W = this.W, H = this.H;
         if (!this.bstRoot) {
             ctx.fillStyle = 'rgba(255,255,255,0.2)';
-            ctx.font = '14px ' + CF.sans; ctx.textAlign = 'center';
+            ctx.font = '19px ' + CF.sans; ctx.textAlign = 'center';
             ctx.fillText('\u7a7a\u6811 \u2014 \u70b9\u51fb\u201c\u63d2\u5165\u201d\u6216\u201c\u52a0\u8f7d\u9884\u8bbe\u201d\u6dfb\u52a0\u8282\u70b9', W / 2, H / 2);
             this._bstPositions = null;
             return;
@@ -1188,7 +1188,7 @@ const DataStructVis = {
             }
 
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 13px ' + CF.mono;
+            ctx.font = 'bold 18px ' + CF.mono;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(n.val, p.x, p.y);
 
@@ -1205,17 +1205,17 @@ const DataStructVis = {
             var tx = Math.min(hp.x - tw / 2, W - tw - 4);
             ctx.fillRect(tx, hp.y - nodeR - 28, tw, 20);
             ctx.fillStyle = '#fff';
-            ctx.font = '10px ' + CF.mono;
+            ctx.font = '15px ' + CF.mono;
             ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
             ctx.fillText(info, tx + 8, hp.y - nodeR - 18);
         }
 
         ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '10px ' + CF.mono; ctx.textAlign = 'right';
+        ctx.font = '15px ' + CF.mono; ctx.textAlign = 'right';
         ctx.fillText('\u8282\u70b9: ' + this.bstNodeCount + '  \u6df1\u5ea6: ' + depth, W - 10, H - 8);
 
         ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.font = '10px ' + CF.sans; ctx.textAlign = 'left';
+        ctx.font = '15px ' + CF.sans; ctx.textAlign = 'left';
         ctx.fillText('\u70b9\u51fb\u8282\u70b9\u67e5\u770b\u5b50\u6811\u4fe1\u606f', 10, H - 8);
     },
 
@@ -1224,7 +1224,7 @@ const DataStructVis = {
         this._heapPositions = [];
         if (this.heap.length === 0) {
             ctx.fillStyle = 'rgba(255,255,255,0.2)';
-            ctx.font = '14px ' + CF.sans; ctx.textAlign = 'center';
+            ctx.font = '19px ' + CF.sans; ctx.textAlign = 'center';
             ctx.fillText('\u7a7a\u5806 \u2014 \u70b9\u51fb\u201c\u63d2\u5165\u201d\u6216\u201c\u968f\u673a\u5efa\u5806\u201d', W / 2, H / 2 - 30);
             return;
         }
@@ -1277,7 +1277,7 @@ const DataStructVis = {
             }
 
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 12px ' + CF.mono;
+            ctx.font = 'bold 17px ' + CF.mono;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(this.heap[ni], np.x, np.y);
         }
@@ -1288,7 +1288,7 @@ const DataStructVis = {
         var aSX = (W - n * cellW) / 2;
 
         ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.font = '10px ' + CF.sans; ctx.textAlign = 'center';
+        ctx.font = '15px ' + CF.sans; ctx.textAlign = 'center';
         ctx.fillText('\u6570\u7ec4\u8868\u793a:', W / 2, aTop - 6);
 
         for (var ai = 0; ai < n; ai++) {
@@ -1302,29 +1302,29 @@ const DataStructVis = {
             ctx.strokeRect(ax2, aTop, cellW - 2, 28);
 
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 11px ' + CF.mono;
+            ctx.font = 'bold 16px ' + CF.mono;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(this.heap[ai], ax2 + (cellW - 2) / 2, aTop + 14);
 
             ctx.fillStyle = 'rgba(255,255,255,0.2)';
-            ctx.font = '8px ' + CF.mono;
+            ctx.font = '13px ' + CF.mono;
             ctx.fillText(ai, ax2 + (cellW - 2) / 2, aTop + 38);
         }
 
         // Formula
         ctx.fillStyle = 'rgba(255,255,255,0.12)';
-        ctx.font = '9px ' + CF.mono; ctx.textAlign = 'center';
+        ctx.font = '14px ' + CF.mono; ctx.textAlign = 'center';
         ctx.fillText('parent = \u230a(i-1)/2\u230b    left = 2i+1    right = 2i+2', W / 2, aTop + 52);
 
         // Min label
         if (n > 0) {
             ctx.fillStyle = '#4d9e7e';
-            ctx.font = '10px ' + CF.mono; ctx.textAlign = 'center';
+            ctx.font = '15px ' + CF.mono; ctx.textAlign = 'center';
             ctx.fillText('MIN', this._heapPositions[0].x, this._heapPositions[0].y - nodeR - 6);
         }
 
         ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '10px ' + CF.mono; ctx.textAlign = 'right';
+        ctx.font = '15px ' + CF.mono; ctx.textAlign = 'right';
         ctx.fillText('\u5927\u5c0f: ' + n + '  \u6df1\u5ea6: ' + depth, W - 10, 18);
     },
 

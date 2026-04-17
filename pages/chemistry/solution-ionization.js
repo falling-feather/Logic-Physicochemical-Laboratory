@@ -270,7 +270,7 @@ const SolutionIon = {
 
     drawParticles() {
         const { ctx, W, H } = this;
-        const fs = Math.max(7, W * 0.007);
+        const fs = Math.max(12, W * 0.012);
         for (const p of this.particles) {
             const px = p.x * W, py = p.y * H;
             if (p.isWater) {
@@ -299,7 +299,7 @@ const SolutionIon = {
         const { ctx, W, H } = this;
         const info = this.getInfo();
         const pH = info.pH;
-        const fs = Math.max(8, W * 0.008);
+        const fs = Math.max(13, W * 0.013);
 
         const barL = W * 0.62, barR = W * 0.95, barY = H * 0.14, barH = 14;
 
@@ -339,7 +339,7 @@ const SolutionIon = {
     drawCanvasInfo() {
         const { ctx, W, H } = this;
         const info = this.getInfo();
-        const fs = Math.max(9, W * 0.009);
+        const fs = Math.max(14, W * 0.014);
         const x0 = W * 0.62, y0 = H * 0.45;
 
         ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = `${fs + 1}px ${CF.sans}`; ctx.textAlign = 'left';
@@ -401,7 +401,7 @@ const SolutionIon = {
     drawTooltip() {
         if (!this.hoverLabel || this.hoverX < 0) return;
         const { ctx, hoverX, hoverY, W } = this;
-        const fs = Math.max(10, W * 0.011);
+        const fs = Math.max(15, W * 0.016);
         ctx.font = `${fs}px ${CF.sans}`;
         const tw = ctx.measureText(this.hoverLabel).width;
         const px = Math.min(hoverX + 12, W - tw - 20);

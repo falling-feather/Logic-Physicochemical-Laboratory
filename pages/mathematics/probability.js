@@ -285,7 +285,7 @@ const Probability = {
 
             // Y axis labels
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.font = '15px ' + CF.mono;
+            ctx.font = '17px ' + CF.mono;
             ctx.textAlign = 'right';
             ctx.fillText('100%', x - 3, y + 4);
             ctx.fillText('50%', x - 3, yMid + 3);
@@ -327,14 +327,14 @@ const Probability = {
 
             // X axis label
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.font = '15px ' + CF.sans;
+            ctx.font = '17px ' + CF.sans;
             ctx.textAlign = 'right';
             ctx.fillText('n=' + maxN, x + w, y + h + 14);
         } else {
             // Dice: plot max deviation from 1/6
             const maxDev = Math.max(0.2, ...hist.map(h => h.maxDev));
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.font = '15px ' + CF.mono;
+            ctx.font = '17px ' + CF.mono;
             ctx.textAlign = 'right';
             ctx.fillText((maxDev * 100).toFixed(0) + '%', x - 3, y + 4);
             ctx.fillText('0%', x - 3, y + h + 3);
@@ -362,7 +362,7 @@ const Probability = {
             ctx.stroke();
 
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.font = '15px ' + CF.sans;
+            ctx.font = '17px ' + CF.sans;
             ctx.textAlign = 'right';
             ctx.fillText('n=' + maxN, x + w, y + h + 14);
 

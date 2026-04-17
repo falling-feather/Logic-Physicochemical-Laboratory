@@ -195,7 +195,7 @@ const ReactionRate = {
             ctx.beginPath(); ctx.arc(f.x, f.y, 8 + (1 - f.t) * 6, 0, Math.PI * 2); ctx.fill();
         }
         // legend
-        ctx.font = '9px ' + CF.sans; ctx.textAlign = 'left';
+        ctx.font = '14px ' + CF.sans; ctx.textAlign = 'left';
         ctx.fillStyle = 'rgba(224,108,117,0.7)'; ctx.fillText('● A (反应物)', 8, H - 6);
         ctx.fillStyle = 'rgba(91,141,206,0.7)'; ctx.fillText('● B (反应物)', 80, H - 6);
         ctx.fillStyle = 'rgba(100,100,100,0.4)'; ctx.fillText('● 产物', 152, H - 6);
@@ -214,13 +214,13 @@ const ReactionRate = {
         const { ctx, temperature, catalyst } = this;
         ctx.save();
         // title
-        ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = '9px ' + CF.sans; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = '14px ' + CF.sans; ctx.textAlign = 'center';
         ctx.fillText('Maxwell-Boltzmann 分布', x + w / 2, y + 10);
         // axes
         const ax = x + 4, ay = y + 16, aw = w - 8, ah = h - 22;
         ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.8;
         ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax, ay + ah); ctx.lineTo(ax + aw, ay + ah); ctx.stroke();
-        ctx.font = '8px ' + CF.mono; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.font = '13px ' + CF.mono; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.2)';
         ctx.fillText('动能 E', ax + aw / 2, ay + ah + 10);
         ctx.save(); ctx.translate(ax - 3, ay + ah / 2); ctx.rotate(-Math.PI / 2);
         ctx.fillText('f(E)', 0, 0); ctx.restore();
@@ -277,11 +277,11 @@ const ReactionRate = {
         ctx.setLineDash([2, 2]);
         ctx.beginPath(); ctx.moveTo(eaX, ay); ctx.lineTo(eaX, ay + ah); ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = 'rgba(229,192,123,0.6)'; ctx.font = '8px ' + CF.mono; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(229,192,123,0.6)'; ctx.font = '13px ' + CF.mono; ctx.textAlign = 'center';
         ctx.fillText(catalyst ? 'Ea(催化)' : 'Ea', eaX, ay - 2);
 
         // legend
-        ctx.font = '7px ' + CF.sans; ctx.textAlign = 'right';
+        ctx.font = '12px ' + CF.sans; ctx.textAlign = 'right';
         ctx.fillStyle = 'rgba(91,141,206,0.6)'; ctx.fillText(temperature + 'K', ax + aw, ay + 8);
         ctx.fillStyle = 'rgba(224,108,117,0.3)'; ctx.fillText(T2 + 'K (参考)', ax + aw, ay + 17);
         ctx.restore();
@@ -290,7 +290,7 @@ const ReactionRate = {
     /* reaction progress chart */
     drawProgress(x, y, w, h) {
         const { ctx, history } = this;
-        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = '9px ' + CF.sans; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = '14px ' + CF.sans; ctx.textAlign = 'center';
         ctx.fillText('反应进度 · 统计', x + w / 2, y + 10);
         const ax = x + 4, ay = y + 16, aw = w - 8, ah = h - 24;
         ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 0.6; ctx.strokeRect(ax, ay, aw, ah);
@@ -321,7 +321,7 @@ const ReactionRate = {
         const total = this.particles.length;
         const active = total - this.reacted;
         const lines = [`粒子: ${total}  未反应: ${active}  已反应: ${this.reacted}`, `碰撞: ${this.collisions}  Ea: ${this.catalyst ? '低(催化)' : '高'}`];
-        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = '8px ' + CF.mono; ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = '13px ' + CF.mono; ctx.textAlign = 'left';
         lines.forEach((l, i) => ctx.fillText(l, ax + 2, ay + ah + 10 + i * 11));
     },
 
@@ -344,7 +344,7 @@ const ReactionRate = {
         const tw = ctx.measureText(label).width + 14;
         const tx = Math.min(best.x + 10, simW - tw - 4), ty = Math.max(best.y - 28, 4);
         ctx.fillStyle = 'rgba(20,22,30,0.88)'; ctx.beginPath(); ctx.roundRect(tx, ty, tw, 20, 4); ctx.fill();
-        ctx.fillStyle = 'rgba(229,192,123,0.9)'; ctx.font = '9px ' + CF.mono; ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(229,192,123,0.9)'; ctx.font = '14px ' + CF.mono; ctx.textAlign = 'left';
         ctx.fillText(label, tx + 7, ty + 14);
     },
 

@@ -43,7 +43,7 @@ const CellStructure = {
         if (!wrap) return;
         const w = wrap.clientWidth;
         if (w === 0) return;
-        const h = Math.min(Math.round(w * 0.72), 520);
+        const h = Math.min(Math.max(w * 0.48, 300), 420);
         const dpr = window.devicePixelRatio || 1;
         this.canvas.width = w * dpr;
         this.canvas.height = h * dpr;
@@ -157,7 +157,7 @@ const CellStructure = {
             { id: 'centrosome', name: '中心体', x: .60, y: .69, rx: .03, ry: .03,
               color: 'rgba(79,168,163,0.2)', border: '#4fa8a3',
               desc: '由两个互相垂直的中心粒(9×3微管排列)和周围基质组成。在有丝分裂时形成纺锤体，牵引染色体分离。动物细胞特有。' },
-            { id: 'ribosome', name: '核糖体', x: .55, y: .28, rx: .015, ry: .015,
+            { id: 'ribosome', name: '核糖体', x: .55, y: .22, rx: .015, ry: .015,
               color: 'rgba(255,255,255,0.35)', border: '#aaa',
               desc: '由 rRNA 和蛋白质构成的大小两个亚基(60S+40S)。游离核糖体合成胞内蛋白，附着核糖体合成分泌蛋白。无膜结构。' }
         ];
@@ -201,6 +201,7 @@ const CellStructure = {
         const { ctx, W, H } = this;
         if (!ctx || W === 0) return;
         ctx.clearRect(0, 0, W, H);
+        const fs = Math.max(11, W * 0.019);
 
         const zp = this.zoomProgress;
 
@@ -220,7 +221,7 @@ const CellStructure = {
 
         // Type badge (always)
         ctx.fillStyle = `rgba(255,255,255,${0.4 * (1 - zp)})`;
-        ctx.font = '500 18px ' + CF.sans;
+        ctx.font = '500 ' + (fs + 5) + 'px ' + CF.sans;
         ctx.textAlign = 'right';
         ctx.fillText(this.isPlant ? '🌱 植物细胞' : '🔬 动物细胞', W - 14, H - 12);
     },
@@ -228,6 +229,7 @@ const CellStructure = {
     /* ═══════════ Overview ═══════════ */
 
     drawOverview(ctx, W, H) {
+        const fs = Math.max(11, W * 0.019);
         const list = this.getOrganelles();
         const t = this.time;
 
@@ -252,7 +254,7 @@ const CellStructure = {
             // Label
             if (this.showLabels && !o.hl) {
                 ctx.fillStyle = hov ? '#fff' : o.border;
-                ctx.font = `${hov ? '600 20' : '500 18'}px ${CF.sans}`;
+                ctx.font = `${hov ? '600 ' : '500 '}${fs - 3}px ${CF.sans}`;
                 ctx.textAlign = 'center';
                 ctx.fillText(o.name, cx, cy - ry - 7);
             }
@@ -480,13 +482,14 @@ const CellStructure = {
     /* ═══════════ Detail / Zoomed View ═══════════ */
 
     drawDetail(ctx, W, H, org) {
+        const fs = Math.max(11, W * 0.019);
         const key = org.id.replace(/\d+$/, '');
         ctx.fillStyle = '#0c1018'; ctx.fillRect(0, 0, W, H);
         ctx.fillStyle = org.border;
-        ctx.font = 'bold 24px ' + CF.sans; ctx.textAlign = 'left';
+        ctx.font = 'bold ' + (fs + 11) + 'px ' + CF.sans; ctx.textAlign = 'left';
         ctx.fillText(org.name + ' — 内部结构', 16, 28);
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '17px ' + CF.sans; ctx.textAlign = 'right';
+        ctx.font = fs + 'px ' + CF.sans; ctx.textAlign = 'right';
         ctx.fillText('点击返回  ✕', W - 14, 22);
 
         const pad = 40;
@@ -507,8 +510,9 @@ const CellStructure = {
     },
 
     _label(ctx, x, y, text, color, align) {
+        const fs = Math.max(13, this.W * 0.024);
         ctx.fillStyle = color || 'rgba(255,255,255,0.6)';
-        ctx.font = '500 17px ' + CF.sans;
+        ctx.font = '500 ' + fs + 'px ' + CF.sans;
         ctx.textAlign = align || 'left';
         ctx.fillText(text, x, y);
     },
@@ -844,7 +848,7 @@ const CellStructure = {
             ctx.fillStyle = p.color + '55'; ctx.fill();
             ctx.strokeStyle = p.color; ctx.lineWidth = 1; ctx.stroke();
             ctx.fillStyle = p.color;
-            ctx.font = '500 15px ' + CF.sans; ctx.textAlign = 'center';
+            ctx.font = '500 ' + Math.max(13, this.W * 0.024) + 'px ' + CF.sans; ctx.textAlign = 'center';
             ctx.fillText(p.label, px, py + 14);
         }
 
@@ -880,7 +884,7 @@ const CellStructure = {
                 ctx.restore();
             }
             ctx.fillStyle = layer.border;
-            ctx.font = '500 15px ' + CF.sans; ctx.textAlign = 'center';
+            ctx.font = '500 ' + Math.max(13, this.W * 0.024) + 'px ' + CF.sans; ctx.textAlign = 'center';
             ctx.fillText(layer.name, lx + lw / 2, cy + h * .4 + 14);
             xOff += lw;
         }
@@ -899,9 +903,9 @@ const CellStructure = {
         ctx.fillStyle = org.color; ctx.fill();
         ctx.strokeStyle = org.border; ctx.lineWidth = 2; ctx.stroke();
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = 'bold 27px ' + CF.sans; ctx.textAlign = 'center';
+        ctx.font = 'bold ' + Math.max(13, this.W * 0.024 + 11) + 'px ' + CF.sans; ctx.textAlign = 'center';
         ctx.fillText(org.name, cx, cy);
-        ctx.font = '18px ' + CF.sans;
+        ctx.font = Math.max(13, this.W * 0.024 + 5) + 'px ' + CF.sans;
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
         const desc = org.desc.length > 40 ? org.desc.slice(0, 40) + '…' : org.desc;
         ctx.fillText(desc, cx, cy + 22);

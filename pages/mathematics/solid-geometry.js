@@ -248,7 +248,7 @@ const SolidGeom = {
             const py = this.project(0, yLevel, 0).y;
             ctx.strokeStyle = 'rgba(224,108,117,0.2)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
             ctx.beginPath(); ctx.moveTo(W * 0.12, py); ctx.lineTo(W * 0.88, py); ctx.stroke(); ctx.setLineDash([]);
-            ctx.fillStyle = 'rgba(224,108,117,0.3)'; ctx.font = '15px ' + CF.mono; ctx.textAlign = 'left';
+            ctx.fillStyle = 'rgba(224,108,117,0.3)'; ctx.font = '17px ' + CF.mono; ctx.textAlign = 'left';
             ctx.fillText('截面 h=' + (crossSection * 100).toFixed(0) + '%', W * 0.12, py - 5);
             return;
         }
@@ -268,7 +268,7 @@ const SolidGeom = {
 
         // label
         const labelP = proj2d[0];
-        ctx.fillStyle = 'rgba(224,108,117,0.6)'; ctx.font = '15px ' + CF.mono; ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(224,108,117,0.6)'; ctx.font = '17px ' + CF.mono; ctx.textAlign = 'left';
         ctx.fillText('截面 (' + pts3d.length + '边)', labelP.x + 6, labelP.y - 4);
     },
 
@@ -291,7 +291,7 @@ const SolidGeom = {
         const tw = ctx.measureText(label).width + 14;
         const tx = Math.min(p.x + 10, this.W - tw - 4), ty = Math.max(p.y - 26, 4);
         ctx.fillStyle = 'rgba(20,22,30,0.88)'; ctx.beginPath(); ctx.roundRect(tx, ty, tw, 20, 4); ctx.fill();
-        ctx.fillStyle = 'rgba(229,192,123,0.9)'; ctx.font = '15px ' + CF.mono; ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(229,192,123,0.9)'; ctx.font = '17px ' + CF.mono; ctx.textAlign = 'left';
         ctx.fillText(label, tx + 7, ty + 14);
     },
 

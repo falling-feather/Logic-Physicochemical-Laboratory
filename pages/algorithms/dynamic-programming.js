@@ -210,7 +210,7 @@ const DPVis = {
 
         // Header row (capacity)
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '10px ' + CF.mono;
+        ctx.font = '15px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         for (let j = 0; j < cols; j++) {
@@ -251,7 +251,7 @@ const DPVis = {
                     ctx.fillStyle = activeCell && activeCell.i === i && activeCell.j === j
                         ? '#e5c07b'
                         : 'rgba(255,255,255,0.5)';
-                    ctx.font = '11px ' + CF.mono;
+                    ctx.font = '16px ' + CF.mono;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(visibleTable[i][j].toString(), x + cellW / 2, y + cellH / 2);
@@ -261,7 +261,7 @@ const DPVis = {
 
         // Progress label
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('\u6b65\u9aa4: ' + step + '/' + maxStep, tableX, tableY + (n + 2) * cellH + 14);
 
@@ -278,7 +278,7 @@ const DPVis = {
         const y = 20;
 
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = 'bold 10px ' + CF.sans;
+        ctx.font = 'bold 15px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('\u7269\u54c1\u5217\u8868', x, y);
 
@@ -286,7 +286,7 @@ const DPVis = {
             const iy = y + 18 + i * 22;
             const selected = step >= maxStep && this.selectedItems.includes(i);
             ctx.fillStyle = selected ? 'rgba(77,158,126,0.6)' : 'rgba(255,255,255,0.2)';
-            ctx.font = '10px ' + CF.mono;
+            ctx.font = '15px ' + CF.mono;
             ctx.fillText(item.name + ': w=' + item.w + ' v=' + item.v, x, iy);
             if (selected) {
                 ctx.fillStyle = 'rgba(77,158,126,0.3)';
@@ -295,7 +295,7 @@ const DPVis = {
         });
 
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.font = '10px ' + CF.mono;
+        ctx.font = '15px ' + CF.mono;
         ctx.fillText('\u5bb9\u91cf W=' + this.capacity, x, y + 18 + items.length * 22 + 10);
     },
 

@@ -623,6 +623,7 @@
 
 /* ══════ Gene Expression ══════ */
 .genexp-controls { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.genexp-mode-btns { display:flex; gap:6px; }
 .genexp-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(58,158,143,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:var(--text-sm); transition:all .2s; }
 .genexp-btn.active { background:rgba(58,158,143,.18); color:var(--text-primary); border-color:rgba(58,158,143,.5); }
 .genexp-speed { display:flex; align-items:center; gap:4px; font-size:var(--text-sm); color:var(--text-secondary); }

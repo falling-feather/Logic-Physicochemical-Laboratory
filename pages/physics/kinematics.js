@@ -211,7 +211,7 @@ const Kinematics = {
         const sMax = v0 * tMax + 0.5 * a * tMax * tMax;
         const sMaxAbs = Math.max(Math.abs(sMax), Math.abs(v0 * tMax + 0.5 * a * tMax * tMax), 1);
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.font = '9px ' + CF.mono;
+        ctx.font = '14px ' + CF.mono;
         ctx.textAlign = 'center';
         for (let i = 0; i <= 5; i++) {
             const sx = x + (i / 5) * w;
@@ -260,7 +260,7 @@ const Kinematics = {
 
         // Label
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('\u8fd0\u52a8\u8f68\u8ff9', x, trackY - trackH / 2 - 6);
     },
@@ -302,7 +302,7 @@ const Kinematics = {
 
         // Grid
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.font = '9px ' + CF.mono;
+        ctx.font = '14px ' + CF.mono;
         ctx.textAlign = 'right';
         const vStep = Math.ceil(vRange / 4);
         for (let vv = Math.ceil(vMin); vv <= Math.floor(vMax); vv += Math.max(1, vStep)) {
@@ -371,13 +371,13 @@ const Kinematics = {
 
         // Title
         ctx.fillStyle = 'rgba(198,120,221,0.8)';
-        ctx.font = '11px ' + CF.sans;
+        ctx.font = '16px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('v-t \u56fe', gx + 4, gy - 6);
 
         // Axis label
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '9px ' + CF.mono;
+        ctx.font = '14px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('t/s', gx + gw + 8, gy + gh + 4);
         ctx.save();
@@ -421,7 +421,7 @@ const Kinematics = {
 
         // Grid & labels
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.font = '9px ' + CF.mono;
+        ctx.font = '14px ' + CF.mono;
         ctx.textAlign = 'right';
         const sStep = Math.max(1, Math.ceil(sRange / 5));
         for (let ss = Math.ceil(sMin); ss <= Math.floor(sMax); ss += sStep) {
@@ -488,13 +488,13 @@ const Kinematics = {
 
         // Title
         ctx.fillStyle = 'rgba(86,182,194,0.8)';
-        ctx.font = '11px ' + CF.sans;
+        ctx.font = '16px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('s-t \u56fe', gx + 4, gy - 6);
 
         // Axis label
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '9px ' + CF.mono;
+        ctx.font = '14px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('t/s', gx + gw + 8, gy + gh + 4);
         ctx.save();

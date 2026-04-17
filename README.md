@@ -106,6 +106,13 @@ cmake --build build --config Release
 
 ## 📝 更新日志
 
+### v4.0.2 — 2026-04-17
+- 🐛 修复 FuncProps/ExpLog 浏览器卡死（ResizeObserver 隐藏时 W=0 → 无限循环）
+- 🔤 数学实验 Canvas 字体放大 1.5-2×（15 个文件）
+- 🔤 生物实验 Canvas 字体标准化重构（13 个文件）
+- 🔤 全项目 Canvas 字体统一使用 CSS 变量（`--font-sans` / `--font-mono`）
+- 📄 新增 `doc/UI_TEMPLATES.md` 各学科 UI 基准模板文档
+
 ### v4.0.1 — 2026-04-17
 - 🐛 修复生物模块语法错误（cell-structure.js / gene-mutation.js）
 - ⚡ 回访用户加载加速（localStorage 检测 + 加载屏缩短）

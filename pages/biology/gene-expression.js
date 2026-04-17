@@ -24,7 +24,12 @@ const GeneExpression = {
         if (!this.canvas) return;
         this.ctx = this.canvas.getContext('2d');
         this._resize();
-        this._on(window, 'resize', () => this._resize());
+        if (typeof ResizeObserver !== 'undefined') {
+            this._ro = new ResizeObserver(() => this._resize());
+            this._ro.observe(this.canvas.parentElement);
+        } else {
+            this._on(window, 'resize', () => this._resize());
+        }
         this._buildControls();
         this._injectInfoPanel();
         this._loop();
@@ -33,15 +38,17 @@ const GeneExpression = {
         if (this.animId) { cancelAnimationFrame(this.animId); this.animId = null; }
         this._listeners.forEach(l => l.el.removeEventListener(l.evt, l.fn, l.opts));
         this._listeners.length = 0;
+        if (this._ro) { this._ro.disconnect(); this._ro = null; }
         this.autoPlay = true;
         const c = document.getElementById('gene-expression-controls');
         if (c) c.innerHTML = '';
     },
     _resize() {
         const p = this.canvas.parentElement;
+        if (!p) return;
         const dpr = window.devicePixelRatio || 1;
-        const w = p.clientWidth;
-        const h = p.clientHeight || 420;
+        const w = p.getBoundingClientRect().width;
+        const h = Math.min(Math.max(w * 0.48, 300), 420);
         this.canvas.width = w * dpr;
         this.canvas.height = h * dpr;
         this.canvas.style.width = w + 'px';
@@ -62,13 +69,13 @@ const GeneExpression = {
         btnWrap.className = 'genexp-mode-btns';
         modes.forEach(m => {
             const b = document.createElement('button');
-            b.className = 'genexp-mode-btn' + (m.id === this.mode ? ' active' : '');
+            b.className = m.id === this.mode ? 'btn btn--primary btn--sm' : 'btn btn--ghost btn--sm';
             b.textContent = m.label;
             this._on(b, 'click', () => {
                 this.mode = m.id;
                 this.progress = 0;
-                btnWrap.querySelectorAll('.genexp-mode-btn').forEach(x => x.classList.remove('active'));
-                b.classList.add('active');
+                btnWrap.querySelectorAll('.btn').forEach(x => { x.className = 'btn btn--ghost btn--sm'; });
+                b.className = 'btn btn--primary btn--sm';
                 this._updateInfo();
             });
             btnWrap.appendChild(b);
@@ -85,8 +92,8 @@ const GeneExpression = {
         ctrl.appendChild(label);
         // replay
         const btn = document.createElement('button');
-        btn.className = 'genexp-mode-btn';
-        btn.textContent = '\u91CD\u64AD';
+        btn.className = 'btn btn--ghost btn--sm';
+        btn.textContent = '\u21BA \u91CD\u64AD';
         this._on(btn, 'click', () => { this.progress = 0; });
         ctrl.appendChild(btn);
     },
@@ -102,6 +109,7 @@ const GeneExpression = {
 
     _drawTranscription(t) {
         const ctx = this.ctx, W = this.W, H = this.H;
+        const fs = Math.max(13, W * 0.012);
         const dna = this.dnaTemplate;
         const n = dna.length;
         const bw = Math.min(36, (W - 80) / n);
@@ -110,13 +118,13 @@ const GeneExpression = {
         const mrnaY = H * 0.6;
 
         // title
-        ctx.font = 'bold 21px ' + CF.sans;
+        ctx.font = 'bold ' + (fs + 8) + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(58,158,143,0.9)';
         ctx.fillText('\u8F6C\u5F55\u8FC7\u7A0B: DNA \u2192 mRNA', W / 2, 24);
 
         // labels
-        ctx.font = '18px ' + CF.sans;
+        ctx.font = (fs + 5) + 'px ' + CF.sans;
         ctx.textAlign = 'right';
         ctx.fillStyle = 'rgba(200,200,200,0.6)';
         ctx.fillText('DNA \u6A21\u677F\u94FE (3\u2032\u21925\u2032)', startX - 8, dnaY + 5);
@@ -135,7 +143,7 @@ const GeneExpression = {
             // coding strand (top)
             ctx.fillStyle = i < polyPos ? 'rgba(200,200,200,0.2)' : this._baseColor(comp);
             ctx.fillRect(x + 1, dnaY - 30, bw - 2, 18);
-            ctx.font = 'bold 17px ' + CF.mono;
+            ctx.font = 'bold ' + fs + 'px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillStyle = i < polyPos ? 'rgba(200,200,200,0.3)' : 'rgba(255,255,255,0.9)';
             ctx.fillText(comp, x + bw / 2, dnaY - 18);
@@ -145,7 +153,7 @@ const GeneExpression = {
             const templateOffsetY = isUnwound ? 10 : 0;
             ctx.fillStyle = this._baseColor(base);
             ctx.fillRect(x + 1, dnaY + templateOffsetY, bw - 2, 18);
-            ctx.font = 'bold 17px ' + CF.mono;
+            ctx.font = 'bold ' + fs + 'px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(255,255,255,0.9)';
             ctx.fillText(base, x + bw / 2, dnaY + templateOffsetY + 12);
@@ -167,7 +175,7 @@ const GeneExpression = {
                 const mrnaBase = this._complement(base);
                 ctx.fillStyle = this._baseColor(mrnaBase);
                 ctx.fillRect(x + 1, mrnaY, bw - 2, 18);
-                ctx.font = 'bold 17px ' + CF.mono;
+                ctx.font = 'bold ' + fs + 'px ' + CF.mono;
                 ctx.textAlign = 'center';
                 ctx.fillStyle = 'rgba(255,255,255,0.9)';
                 ctx.fillText(mrnaBase, x + bw / 2, mrnaY + 12);
@@ -184,7 +192,7 @@ const GeneExpression = {
             ctx.strokeStyle = 'rgba(58,158,143,0.6)';
             ctx.lineWidth = 1.5;
             ctx.stroke();
-            ctx.font = '14px ' + CF.sans;
+            ctx.font = (fs - 3) + 'px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(58,158,143,0.9)';
             ctx.fillText('RNA\u805A\u5408\u9176', px, dnaY + 8);
@@ -199,7 +207,7 @@ const GeneExpression = {
         ctx.stroke();
 
         // legend
-        ctx.font = '15px ' + CF.mono;
+        ctx.font = fs + 'px ' + CF.mono;
         ctx.textAlign = 'left';
         const bases = ['A', 'T', 'U', 'C', 'G'];
         bases.forEach((b, i) => {
@@ -212,6 +220,7 @@ const GeneExpression = {
 
     _drawTranslation(t) {
         const ctx = this.ctx, W = this.W, H = this.H;
+        const fs = Math.max(13, W * 0.012);
         const dna = this.dnaTemplate;
         // generate mRNA from DNA template
         const mrna = dna.map(b => this._complement(b));
@@ -221,13 +230,13 @@ const GeneExpression = {
         const mrnaY = H * 0.35;
         const proteinY = H * 0.72;
 
-        ctx.font = 'bold 21px ' + CF.sans;
+        ctx.font = 'bold ' + (fs + 8) + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(58,158,143,0.9)';
         ctx.fillText('\u7FFB\u8BD1\u8FC7\u7A0B: mRNA \u2192 \u86CB\u767D\u8D28 (\u6C28\u57FA\u9178\u94FE)', W / 2, 24);
 
         // draw mRNA strand
-        ctx.font = '15px ' + CF.sans;
+        ctx.font = fs + 'px ' + CF.sans;
         ctx.textAlign = 'right';
         ctx.fillStyle = 'rgba(200,200,200,0.5)';
         ctx.fillText('mRNA', startX - 6, mrnaY + 12);
@@ -236,7 +245,7 @@ const GeneExpression = {
             const x = startX + i * bw;
             ctx.fillStyle = this._baseColor(mrna[i]);
             ctx.fillRect(x + 1, mrnaY, bw - 2, 18);
-            ctx.font = 'bold 15px ' + CF.mono;
+            ctx.font = 'bold ' + fs + 'px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(255,255,255,0.9)';
             ctx.fillText(mrna[i], x + bw / 2, mrnaY + 12);
@@ -264,7 +273,7 @@ const GeneExpression = {
             ctx.lineWidth = 1;
             ctx.stroke();
             // codon text
-            ctx.font = '14px ' + CF.mono;
+            ctx.font = (fs - 3) + 'px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillStyle = i < riboPos ? 'rgba(58,158,143,0.7)' : 'rgba(200,200,200,0.3)';
             ctx.fillText(codons[i], (x1 + x2) / 2, mrnaY + 38);
@@ -288,14 +297,14 @@ const GeneExpression = {
             ctx.fill();
             ctx.strokeStyle = 'rgba(58,158,143,0.3)';
             ctx.stroke();
-            ctx.font = '14px ' + CF.sans;
+            ctx.font = (fs - 3) + 'px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(58,158,143,0.8)';
             ctx.fillText('\u6838\u7CD6\u4F53', rx, mrnaY - 7);
         }
 
         // tRNA + amino acid chain
-        ctx.font = '15px ' + CF.sans;
+        ctx.font = fs + 'px ' + CF.sans;
         ctx.textAlign = 'right';
         ctx.fillStyle = 'rgba(200,200,200,0.5)';
         ctx.fillText('\u6C28\u57FA\u9178\u94FE', startX - 6, proteinY + 5);
@@ -315,7 +324,7 @@ const GeneExpression = {
             ctx.arc(ax, proteinY, 16, 0, Math.PI * 2);
             ctx.fillStyle = aaColors[i % aaColors.length];
             ctx.fill();
-            ctx.font = 'bold 14px ' + CF.mono;
+            ctx.font = 'bold ' + (fs - 3) + 'px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(255,255,255,0.9)';
             ctx.fillText(aa, ax, proteinY + 3);
@@ -329,7 +338,7 @@ const GeneExpression = {
                 ctx.stroke();
             }
             // codon label
-            ctx.font = '14px ' + CF.mono;
+            ctx.font = (fs - 3) + 'px ' + CF.mono;
             ctx.fillStyle = 'rgba(200,200,200,0.4)';
             ctx.fillText(codon, ax, proteinY + 26);
         }
@@ -351,7 +360,7 @@ const GeneExpression = {
             ctx.strokeStyle = 'rgba(255,200,100,0.5)';
             ctx.lineWidth = 1.5;
             ctx.stroke();
-            ctx.font = '14px ' + CF.mono;
+            ctx.font = (fs - 3) + 'px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(255,200,100,0.7)';
             ctx.fillText('tRNA', tx, mrnaY + 50);

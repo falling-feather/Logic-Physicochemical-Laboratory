@@ -294,7 +294,7 @@ const RecursionVis = {
             // Result below
             if (node.state === 'complete') {
                 ctx.fillStyle = 'rgba(152,195,121,0.7)';
-                ctx.font = '9px ' + CF.mono;
+                ctx.font = '14px ' + CF.mono;
                 ctx.fillText('=' + node.result, nx, ny + nodeR + 10);
             }
         };
@@ -346,7 +346,7 @@ const RecursionVis = {
 
             // Peg label
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.font = '12px ' + CF.sans;
+            ctx.font = '17px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText(pegNames[p], px, baseY + 18);
 
@@ -374,7 +374,7 @@ const RecursionVis = {
 
                 // Disk number
                 ctx.fillStyle = '#fff';
-                ctx.font = '10px ' + CF.mono;
+                ctx.font = '15px ' + CF.mono;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(disk, px, dy + diskH / 2);

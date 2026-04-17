@@ -1,6 +1,6 @@
 # 工科实验室 — 开发者文档
 
-> **版本**: v4.0.2 | **最后更新**: 2025-07 | **维护者团队**: EngLab Dev Team
+> **版本**: v4.0.3 | **最后更新**: 2026-04-17 | **维护者团队**: EngLab Dev Team
 
 ---
 
@@ -920,6 +920,31 @@ cmake --build build --config Release
 ---
 
 ## 16. 更新日志
+
+### v4.0.3 — 2026-04-17
+
+- 🎨 **基因表达按钮 UI 统一**：
+  - `gene-expression.js`：自定义 `.genexp-btn` → 标准 `btn btn--primary/ghost btn--sm`，与全平台按钮风格一致
+  - 模式切换按钮改为 primary/ghost 交替高亮
+- 🪟 **周期表元素详情居中模态框**：
+  - `chemistry.css`：底部滑出面板 → 屏幕居中模态，`scale` 缩放 + `opacity` 过渡动画
+  - 新增 `.pt-detail-overlay` 暗色遮罩层（`rgba(0,0,0,0.45)`），点击关闭
+  - `periodic-table.js`：overlay 点击关闭 + `showDetail()`/`closeDetail()` overlay 联动
+  - `index.html`：移除 `.page` 内重复 `pt-detail` 面板（`will-change` 导致 `fixed` 定位失效）
+- 📐 **实验侧边栏固定定位修复**：
+  - `shared/css/base.css`：新增 `.sidebar-fixed` 样式体系，解决 `.page` 容器 `will-change` 创建新包含块导致 `position: fixed` 失效
+  - `shared/js/router.js`：侧边栏动态挂载到 `document.body`，确保滚动时真正固定
+- 🐛 **生物实验 Canvas 修复与优化**：
+  - `genetics.js`：遗传学实验大幅重构（+164 行），修复 Punnett 方格绘制与数据逻辑
+  - `dna-helix.js`：Canvas 下坠 bug 修复、字体大小进一步调优
+  - `photosynthesis.js`：光合作用实验 Canvas 布局重新排版
+  - `cellular-respiration.js`：细胞呼吸实验 Canvas 布局修复
+  - 多个生物实验（cell-structure / ecosystem / meiosis / substance-transport）字体与布局微调
+  - `biology.css`：侧边栏固定定位样式补充
+- 🔤 **全实验字体进一步微调**：
+  - 物理 14 个、化学 11 个、算法 7 个、数学 4 个实验文件字体与布局细节修正
+  - `shared/js/module-selector.js`：模块选择器小修
+- 🖼️ **UI 资源文件**：新增 `UI/` 目录（favicon、apple-touch-icon 等站点图标）
 
 ### v4.0.2 — 2025-07
 

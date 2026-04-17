@@ -25,7 +25,12 @@ const Meiosis = {
         if (!this.canvas) return;
         this.ctx = this.canvas.getContext('2d');
         this._resize();
-        this._on(window, 'resize', () => this._resize());
+        if (typeof ResizeObserver !== 'undefined') {
+            this._ro = new ResizeObserver(() => this._resize());
+            this._ro.observe(this.canvas.parentElement);
+        } else {
+            this._on(window, 'resize', () => this._resize());
+        }
         this._buildControls();
         this._injectInfoPanel();
         this.phase = 0;
@@ -36,15 +41,17 @@ const Meiosis = {
         if (this.animId) { cancelAnimationFrame(this.animId); this.animId = null; }
         this._listeners.forEach(l => l.el.removeEventListener(l.evt, l.fn, l.opts));
         this._listeners.length = 0;
+        if (this._ro) { this._ro.disconnect(); this._ro = null; }
         this.autoPlay = false;
         const c = document.getElementById('meiosis-controls');
         if (c) c.innerHTML = '';
     },
     _resize() {
         const p = this.canvas.parentElement;
+        if (!p) return;
         const dpr = window.devicePixelRatio || 1;
-        const w = p.clientWidth;
-        const h = p.clientHeight || 420;
+        const w = p.getBoundingClientRect().width;
+        const h = Math.min(Math.max(w * 0.48, 300), 420);
         this.canvas.width = w * dpr;
         this.canvas.height = h * dpr;
         this.canvas.style.width = w + 'px';
@@ -158,6 +165,7 @@ const Meiosis = {
     _draw(t) {
         const ctx = this.ctx, W = this.W, H = this.H;
         ctx.clearRect(0, 0, W, H);
+        const fs = Math.max(13, W * 0.012);
         const ph = this.phase;
         const p = this.progress;
 
@@ -189,7 +197,7 @@ const Meiosis = {
                     ctx.strokeStyle = 'rgba(255,255,100,0.5)';
                     ctx.lineWidth = 2;
                     ctx.stroke();
-                    ctx.font = '15px ' + CF.sans;
+                    ctx.font = fs + 'px ' + CF.sans;
                     ctx.fillStyle = 'rgba(255,255,100,0.7)';
                     ctx.textAlign = 'center';
                     ctx.fillText('\u4EA4\u53C9\u4E92\u6362', cx - 15, cy - 30);
@@ -309,7 +317,7 @@ const Meiosis = {
                     this._drawChromosome(pos.x - 6, pos.y, 0.2, chrLen * 0.6, colors[i], false);
                     this._drawChromosome(pos.x + 6, pos.y, -0.2, chrLen * 0.6, colors[i], false);
                     // ploidy label
-                    ctx.font = '15px ' + CF.mono;
+                    ctx.font = fs + 'px ' + CF.mono;
                     ctx.textAlign = 'center';
                     ctx.fillStyle = 'rgba(200,200,200,0.5)';
                     ctx.fillText('n', pos.x, pos.y + smallR + 12);
@@ -319,17 +327,17 @@ const Meiosis = {
 
         // phase info
         const info = this.phases[ph];
-        ctx.font = 'bold 23px ' + CF.sans;
+        ctx.font = 'bold ' + (fs + 8) + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(58,158,143,0.9)';
         ctx.fillText((ph < 4 ? '\u51CF\u6570\u5206\u88C2 I - ' : '\u51CF\u6570\u5206\u88C2 II - ') + info.name, W / 2, 25);
-        ctx.font = '18px ' + CF.sans;
+        ctx.font = (fs + 5) + 'px ' + CF.sans;
         ctx.fillStyle = 'rgba(200,200,200,0.6)';
         ctx.fillText(info.desc, W / 2, 45);
         this._updateInfo();
 
         // phase progress indicator
-        ctx.font = '15px ' + CF.mono;
+        ctx.font = fs + 'px ' + CF.mono;
         ctx.textAlign = 'center';
         for (let i = 0; i < 8; i++) {
             const px = W / 2 - 70 + i * 20;
@@ -343,7 +351,7 @@ const Meiosis = {
         }
 
         // chromosome legend
-        ctx.font = '17px ' + CF.sans;
+        ctx.font = fs + 'px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillStyle = red;
         ctx.fillRect(14, H - 40, 12, 3);

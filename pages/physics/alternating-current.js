@@ -196,15 +196,15 @@ const ACCircuit = {
         ctx.beginPath(); ctx.moveTo(padL, zeroY); ctx.lineTo(padL + gW, zeroY); ctx.stroke();
 
         // y labels
-        ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = '9px ' + CF.mono; ctx.textAlign = 'right';
+        ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = '14px ' + CF.mono; ctx.textAlign = 'right';
         ctx.fillText('+' + peakV + 'V', padL - 5, padT + 12);
         ctx.fillText('0', padL - 5, zeroY + 3);
         ctx.fillText('-' + peakV + 'V', padL - 5, padT + gH - 3);
 
         // x label + period markers
-        ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.font = '10px ' + CF.sans; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.font = '15px ' + CF.sans; ctx.textAlign = 'center';
         ctx.fillText('t (ms)', padL + gW / 2, H - 5);
-        ctx.font = '8px ' + CF.mono; ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.font = '13px ' + CF.mono; ctx.fillStyle = 'rgba(255,255,255,0.15)';
         for (let i = 0; i <= 3; i++) ctx.fillText((i * T * 1000).toFixed(1), padL + i / 3 * gW, padT + gH + 13);
 
         // voltage gradient fill
@@ -243,19 +243,19 @@ const ACCircuit = {
         ctx.strokeStyle = 'rgba(229,192,123,0.22)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
         ctx.beginPath(); ctx.moveTo(padL, rmsY1); ctx.lineTo(padL + gW, rmsY1);
         ctx.moveTo(padL, rmsY2); ctx.lineTo(padL + gW, rmsY2); ctx.stroke(); ctx.setLineDash([]);
-        ctx.fillStyle = 'rgba(229,192,123,0.4)'; ctx.font = '9px ' + CF.mono; ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(229,192,123,0.4)'; ctx.font = '14px ' + CF.mono; ctx.textAlign = 'left';
         ctx.fillText('RMS=' + rmsV.toFixed(0) + 'V', padL + gW - 72, rmsY1 - 4);
 
         // legend
         ctx.fillStyle = 'rgba(91,141,206,0.7)'; ctx.fillRect(padL + 8, padT + 4, 14, 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '9px ' + CF.sans; ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '14px ' + CF.sans; ctx.textAlign = 'left';
         ctx.fillText('电压 u(t)', padL + 26, padT + 9);
         ctx.fillStyle = 'rgba(224,108,117,0.6)'; ctx.fillRect(padL + 8, padT + 16, 14, 2);
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
         ctx.fillText('电流 i(t)  φ=' + phase + '°', padL + 26, padT + 21);
 
         // top-right formula
-        ctx.fillStyle = 'rgba(139,111,192,0.5)'; ctx.font = '10px ' + CF.mono; ctx.textAlign = 'right';
+        ctx.fillStyle = 'rgba(139,111,192,0.5)'; ctx.font = '15px ' + CF.mono; ctx.textAlign = 'right';
         ctx.fillText('f=' + freq + 'Hz  T=' + (T * 1000).toFixed(1) + 'ms  ω=' + omega.toFixed(0) + 'rad/s', padL + gW, padT + 10);
 
         // hover crosshair
@@ -274,7 +274,7 @@ const ACCircuit = {
             // tooltip
             const tx = Math.min(hx + 10, W - 120), ty = Math.max(this.hoverY - 46, padT + 2);
             ctx.fillStyle = 'rgba(20,22,30,0.88)'; ctx.beginPath(); ctx.roundRect(tx, ty, 112, 40, 4); ctx.fill();
-            ctx.font = '9px ' + CF.mono; ctx.textAlign = 'left';
+            ctx.font = '14px ' + CF.mono; ctx.textAlign = 'left';
             ctx.fillStyle = 'rgba(91,141,206,0.95)'; ctx.fillText('u = ' + vH.toFixed(1) + ' V', tx + 6, ty + 14);
             ctx.fillStyle = 'rgba(224,108,117,0.95)'; ctx.fillText('i ∝ ' + (iH / peakV * 100).toFixed(1) + '%', tx + 6, ty + 27);
             ctx.fillStyle = 'rgba(229,192,123,0.8)'; ctx.fillText('p ∝ ' + (vH * iH / peakV / peakV * 100).toFixed(1) + '%', tx + 6, ty + 39);
@@ -303,7 +303,7 @@ const ACCircuit = {
         ctx.strokeStyle = 'rgba(91,141,206,0.9)'; ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(vx, vy); ctx.stroke();
         this._arrow(ctx, cx, cy, vx, vy, 'rgba(91,141,206,0.9)', 8);
-        ctx.fillStyle = 'rgba(91,141,206,0.9)'; ctx.font = 'bold 12px ' + CF.sans; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(91,141,206,0.9)'; ctx.font = 'bold 17px ' + CF.sans; ctx.textAlign = 'center';
         const va = Math.atan2(vy - cy, vx - cx);
         ctx.fillText('U', vx + 12 * Math.cos(va), vy + 12 * Math.sin(va));
 
@@ -314,7 +314,7 @@ const ACCircuit = {
         ctx.strokeStyle = 'rgba(224,108,117,0.8)'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ix, iy); ctx.stroke();
         this._arrow(ctx, cx, cy, ix, iy, 'rgba(224,108,117,0.8)', 7);
-        ctx.fillStyle = 'rgba(224,108,117,0.9)'; ctx.font = 'bold 12px ' + CF.sans;
+        ctx.fillStyle = 'rgba(224,108,117,0.9)'; ctx.font = 'bold 17px ' + CF.sans;
         const iaA = Math.atan2(iy - cy, ix - cx);
         ctx.fillText('I', ix + 12 * Math.cos(iaA), iy + 12 * Math.sin(iaA));
 
@@ -325,7 +325,7 @@ const ACCircuit = {
             const aStart = -angle, aEnd = -iAngle;
             ctx.beginPath(); ctx.arc(cx, cy, arcR, aStart, aEnd, phase > 0); ctx.stroke();
             const midA = -(angle - phiRad / 2);
-            ctx.fillStyle = 'rgba(229,192,123,0.7)'; ctx.font = '10px ' + CF.mono;
+            ctx.fillStyle = 'rgba(229,192,123,0.7)'; ctx.font = '15px ' + CF.mono;
             ctx.fillText('φ=' + phase + '°', cx + arcR * 1.4 * Math.cos(midA), cy + arcR * 1.4 * Math.sin(midA));
         }
 
@@ -364,12 +364,12 @@ const ACCircuit = {
         ctx.fillStyle = 'rgba(91,141,206,1)'; ctx.beginPath(); ctx.arc(projX, vy, 4, 0, Math.PI * 2); ctx.fill();
 
         // labels
-        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = '10px ' + CF.sans; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = '15px ' + CF.sans; ctx.textAlign = 'center';
         ctx.fillText('旋转相量', cx, H - 8);
         ctx.fillText('正弦投影', projX + projW / 2, H - 8);
 
         // ω info
-        ctx.fillStyle = 'rgba(139,111,192,0.5)'; ctx.font = '10px ' + CF.mono; ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(139,111,192,0.5)'; ctx.font = '15px ' + CF.mono; ctx.textAlign = 'left';
         ctx.fillText('ω = 2πf = ' + omega.toFixed(0) + ' rad/s', 10, 18);
 
         // rotation arrow hint
@@ -451,24 +451,24 @@ const ACCircuit = {
         ctx.beginPath(); ctx.moveTo(ldX, cy - 18);
         for (let i = 0; i < 5; i++) ctx.lineTo(ldX + (i % 2 === 0 ? 7 : -7), cy - 18 + (i + 1) * 7.2);
         ctx.lineTo(ldX, cy + 18); ctx.stroke();
-        ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.font = '9px ' + CF.sans; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.font = '14px ' + CF.sans; ctx.textAlign = 'center';
         ctx.fillText('R', ldX + 14, cy + 3);
 
         // labels
-        ctx.font = '10px ' + CF.sans; ctx.textAlign = 'center';
+        ctx.font = '15px ' + CF.sans; ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(91,141,206,0.6)'; ctx.fillText('初级 N₁=' + n1, pX - 20, cy + coreH / 2 + 22);
         ctx.fillStyle = 'rgba(224,108,117,0.6)'; ctx.fillText('次级 N₂=' + n2, sX + 20, cy + coreH / 2 + 22);
 
         // voltage info
         const ratio = n2 / n1;
         const v1r = (peakV / Math.SQRT2).toFixed(0), v2r = (peakV * ratio / Math.SQRT2).toFixed(0);
-        ctx.fillStyle = 'rgba(229,192,123,0.5)'; ctx.font = '11px ' + CF.mono;
+        ctx.fillStyle = 'rgba(229,192,123,0.5)'; ctx.font = '16px ' + CF.mono;
         ctx.fillText('U₁/U₂ = N₁/N₂', cx, cy - coreH / 2 - 28);
         ctx.fillText(v1r + 'V → ' + v2r + 'V  (' + (ratio > 1 ? '升压' : ratio < 1 ? '降压' : '等压') + ')', cx, cy - coreH / 2 - 12);
-        ctx.fillStyle = 'rgba(229,192,123,0.3)'; ctx.font = '9px ' + CF.sans; ctx.fillText('Φ', cx, cy + 2);
+        ctx.fillStyle = 'rgba(229,192,123,0.3)'; ctx.font = '14px ' + CF.sans; ctx.fillText('Φ', cx, cy + 2);
 
         // power
-        ctx.fillStyle = 'rgba(139,111,192,0.4)'; ctx.font = '10px ' + CF.mono;
+        ctx.fillStyle = 'rgba(139,111,192,0.4)'; ctx.font = '15px ' + CF.mono;
         ctx.fillText('理想变压器: P₁ = P₂  →  I₁/I₂ = N₂/N₁', cx, H - 10);
 
         // hover tooltip
@@ -484,7 +484,7 @@ const ACCircuit = {
                 const tw = ctx.measureText(tip).width + 16;
                 const tx2 = Math.min(this.hoverX + 12, W - tw - 5), ty2 = Math.max(this.hoverY - 28, 5);
                 ctx.fillStyle = 'rgba(20,22,30,0.88)'; ctx.beginPath(); ctx.roundRect(tx2, ty2, tw, 22, 4); ctx.fill();
-                ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '9px ' + CF.sans; ctx.textAlign = 'left';
+                ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '14px ' + CF.sans; ctx.textAlign = 'left';
                 ctx.fillText(tip, tx2 + 8, ty2 + 15);
             }
         }

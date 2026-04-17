@@ -185,7 +185,7 @@ const EMInduction = {
 
         // Labels
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'center';
         if (this.mode === 'manual') {
             ctx.fillText('\u62d6\u62fd\u78c1\u94c1\u2190\u2192', mx, cy + H * 0.35);
@@ -193,7 +193,7 @@ const EMInduction = {
 
         // Faraday's law
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.font = '11px ' + CF.mono;
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'left';
         ctx.fillText('\u03b5 = -d\u03a6/dt', 10, H - 10);
     },
@@ -215,7 +215,7 @@ const EMInduction = {
         ctx.fill();
 
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 12px ' + CF.sans;
+        ctx.font = 'bold 17px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('N', x - mw / 4, cy);
@@ -250,7 +250,7 @@ const EMInduction = {
         ctx.stroke();
 
         ctx.fillStyle = 'rgba(196,149,102,0.4)';
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u7ebf\u5708', x, cy + h / 2 + 14);
     },
@@ -302,7 +302,7 @@ const EMInduction = {
         ctx.stroke();
 
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '9px ' + CF.mono;
+        ctx.font = '14px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('\u03b5=' + emf.toFixed(1), x, cy + r + 12);
         ctx.fillText('EMF', x, cy - r - 4);
@@ -321,7 +321,7 @@ const EMInduction = {
         ctx.fillRect(x - barW / 2, y + barH - fillH, barW, fillH);
 
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        ctx.font = '9px ' + CF.mono;
+        ctx.font = '14px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('\u03a6', x, y - 4);
         ctx.fillText((flux * 100).toFixed(0) + '%', x, y + barH + 12);

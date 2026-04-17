@@ -73,7 +73,7 @@ const Genetics = {
         if (!wrap) return;
         const w = wrap.clientWidth;
         if (w === 0) return;
-        const h = Math.min(Math.round(w * 0.72), 520);
+        const h = Math.min(Math.max(w * 0.48, 300), 420);
         const dpr = window.devicePixelRatio || 1;
         this.canvas.width = w * dpr;
         this.canvas.height = h * dpr;
@@ -276,7 +276,7 @@ const Genetics = {
         const counts = {};
         for (const a of g1) {
             for (const b of g2) {
-                const genotype = this._normalizeGenotype(a + b);
+                const genotype = this._combineGametes(a, b);
                 grid.push(genotype);
                 counts[genotype] = (counts[genotype] || 0) + 1;
             }
@@ -291,10 +291,29 @@ const Genetics = {
         };
 
         if (this.info) {
-            const ratios = Object.entries(counts).map(([k, v]) => k + ':' + v).join(' , ');
+            const ratios = Object.entries(counts).sort().map(([k, v]) => k + ':' + v).join(' , ');
             this.info.innerHTML = '<strong>\u540e\u4ee3\u57fa\u56e0\u578b\u6bd4\u4f8b</strong>\uff1a' + ratios
                 + '<br><span style="opacity:0.6">\u8868\u73b0\u578b\u6bd4\u4f8b\uff1a' + this._phenotypeRatio(counts) + '</span>';
         }
+    },
+
+    _combineGametes(g1, g2) {
+        if (g1.length === 1) {
+            // Single gene: g1='A', g2='a' → 'Aa'
+            return this._normalizePair(g1, g2);
+        }
+        // Double gene: g1='AB', g2='ab' → gene1: A+a='Aa', gene2: B+b='Bb' → 'AaBb'
+        let result = '';
+        for (let i = 0; i < g1.length; i++) {
+            result += this._normalizePair(g1[i], g2[i]);
+        }
+        return result;
+    },
+
+    _normalizePair(c1, c2) {
+        // Uppercase before lowercase: 'a'+'A' → 'Aa'
+        if (c1 === c1.toLowerCase() && c2 === c2.toUpperCase()) return c2 + c1;
+        return c1 + c2;
     },
 
     _getGametes(genotype) {
@@ -331,18 +350,41 @@ const Genetics = {
     },
 
     _genotypeType(g) {
-        const upper = g.replace(/[a-z]/g, '').length;
-        const lower = g.replace(/[A-Z]/g, '').length;
-        if (lower === 0) return 'dominant';
-        if (upper === 0) return 'recessive';
-        return 'carrier';
+        if (g.length <= 2) {
+            const upper = g.replace(/[a-z]/g, '').length;
+            const lower = g.replace(/[A-Z]/g, '').length;
+            if (lower === 0) return 'dominant';
+            if (upper === 0) return 'recessive';
+            return 'carrier';
+        }
+        // Double gene: check each gene pair independently
+        const dom1 = g[0] === g[0].toUpperCase();
+        const dom2 = g[2] === g[2].toUpperCase();
+        if (dom1 && dom2) return 'dom_dom';
+        if (dom1 && !dom2) return 'dom_rec';
+        if (!dom1 && dom2) return 'rec_dom';
+        return 'rec_rec';
     },
 
     _phenotypeRatio(counts) {
+        const isSingle = this.punnettMode === 'single';
         const phenoCounts = {};
         for (const [g, c] of Object.entries(counts)) {
-            const type = this._genotypeType(g);
-            const label = type === 'recessive' ? '\u9690\u6027' : '\u663e\u6027';
+            let label;
+            if (isSingle) {
+                label = this._genotypeType(g) === 'recessive' ? '\u9690\u6027' : '\u663e\u6027';
+            } else {
+                // Double gene: classify each gene pair independently
+                // g = 'AaBb' → gene1 = 'Aa', gene2 = 'Bb'
+                const gene1 = g.slice(0, 2);
+                const gene2 = g.slice(2, 4);
+                const dom1 = gene1[0] === gene1[0].toUpperCase();
+                const dom2 = gene2[0] === gene2[0].toUpperCase();
+                if (dom1 && dom2) label = 'A_B_';
+                else if (dom1 && !dom2) label = 'A_bb';
+                else if (!dom1 && dom2) label = 'aaB_';
+                else label = 'aabb';
+            }
             phenoCounts[label] = (phenoCounts[label] || 0) + c;
         }
         const values = Object.values(phenoCounts);
@@ -690,12 +732,13 @@ const Genetics = {
     /* ── Punnett Draw ── */
 
     _drawPunnett(ctx, W, H) {
+        const fs = Math.max(11, W * 0.019);
         if (!this.crossResult) {
             // Placeholder
             ctx.fillStyle = 'rgba(58,158,143,0.08)';
             ctx.fillRect(0, 0, W, H);
             ctx.fillStyle = 'rgba(255,255,255,0.3)';
-            ctx.font = '500 21px ' + CF.sans;
+            ctx.font = '500 ' + (fs + 8) + 'px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('\u9009\u62e9\u4eb2\u672c\u57fa\u56e0\u578b\uff0c\u70b9\u51fb\u201c\u6742\u4ea4\u201d\u67e5\u770b\u7ed3\u679c', W / 2, H / 2);
             return;
@@ -704,24 +747,25 @@ const Genetics = {
         const { g1, g2, grid, counts, total } = this.crossResult;
         const cols = g2.length, rows = g1.length;
         const isSingle = this.punnettMode === 'single';
-        const cellSize = Math.min((W * 0.5) / (cols + 1), (H * 0.55) / (rows + 1), 80);
+        const gridFrac = isSingle ? 0.5 : 0.46;
+        const cellSize = Math.min((W * gridFrac) / (cols + 1), (H * (isSingle ? 0.55 : 0.66)) / (rows + 1), isSingle ? 80 : 96);
         const gridW = (cols + 1) * cellSize;
         const gridH = (rows + 1) * cellSize;
-        const ox = (W * 0.55 - gridW) / 2 + cellSize;
-        const oy = (H * 0.55 - gridH) / 2 + cellSize + 30;
+        const ox = (W * (gridFrac + 0.05) - gridW) / 2 + cellSize;
+        const oy = ((H * (isSingle ? 0.55 : 0.66)) - gridH) / 2 + cellSize + 30;
 
         const animPhase = this.crossAnim ? this.crossAnim.phase : 'done';
         const animT = this.crossAnim ? this.crossAnim.t : 1;
 
         // Title
         ctx.fillStyle = 'rgba(58,158,143,0.7)';
-        ctx.font = 'bold 20px ' + CF.sans;
-        ctx.textAlign = 'center';
-        ctx.fillText(isSingle ? '\u5355\u57fa\u56e0\u6742\u4ea4' : '\u53cc\u57fa\u56e0\u6742\u4ea4', W * 0.27, 20);
+        ctx.font = 'bold ' + (fs + 3) + 'px ' + CF.sans;
+        ctx.textAlign = 'left';
+        ctx.fillText(isSingle ? '\u5355\u57fa\u56e0\u6742\u4ea4' : '\u53cc\u57fa\u56e0\u6742\u4ea4', 10, fs + 5);
 
         // Parent labels
         ctx.fillStyle = 'rgba(58,158,143,0.6)';
-        ctx.font = '600 18px ' + CF.mono;
+        ctx.font = '600 ' + (fs + 5) + 'px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('\u2640 ' + this.parent2, ox + gridW / 2 - cellSize / 2, oy - cellSize - 6);
         ctx.save();
@@ -736,7 +780,7 @@ const Genetics = {
             ctx.fillStyle = 'rgba(58,158,143,0.12)';
             ctx.fillRect(x, y, cellSize - 2, cellSize - 2);
             ctx.fillStyle = '#3a9e8f';
-            ctx.font = '600 20px ' + CF.mono;
+            ctx.font = '600 ' + (fs + 3) + 'px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(g2[c], x + cellSize / 2 - 1, y + cellSize / 2 + 4);
         }
@@ -747,7 +791,7 @@ const Genetics = {
             ctx.fillStyle = 'rgba(58,158,143,0.12)';
             ctx.fillRect(x, y, cellSize - 2, cellSize - 2);
             ctx.fillStyle = '#3a9e8f';
-            ctx.font = '600 20px ' + CF.mono;
+            ctx.font = '600 ' + (fs + 3) + 'px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(g1[r], x + cellSize / 2 - 1, y + cellSize / 2 + 4);
         }
@@ -768,7 +812,11 @@ const Genetics = {
                 const colors = {
                     dominant: 'rgba(58,158,143,0.2)',
                     carrier: 'rgba(139,111,192,0.15)',
-                    recessive: 'rgba(196,121,58,0.15)'
+                    recessive: 'rgba(196,121,58,0.15)',
+                    dom_dom: 'rgba(58,158,143,0.2)',
+                    dom_rec: 'rgba(78,130,196,0.18)',
+                    rec_dom: 'rgba(196,170,58,0.18)',
+                    rec_rec: 'rgba(196,121,58,0.2)'
                 };
 
                 ctx.globalAlpha = alpha;
@@ -779,7 +827,8 @@ const Genetics = {
                 ctx.strokeRect(x, y, cellSize - 2, cellSize - 2);
 
                 ctx.fillStyle = '#fff';
-                ctx.font = '600 ' + Math.min(21, cellSize * 0.42) + 'px ' + CF.mono;
+                const cellFs = Math.min(fs + 5, cellSize * (genotype.length > 2 ? 0.28 : 0.48));
+                ctx.font = '600 ' + cellFs + 'px ' + CF.mono;
                 ctx.textAlign = 'center';
                 ctx.fillText(genotype, x + cellSize / 2 - 1, y + cellSize / 2 + 4);
                 ctx.globalAlpha = 1;
@@ -793,20 +842,27 @@ const Genetics = {
     },
 
     _drawPunnettStats(ctx, W, H, counts, total) {
+        const fs = Math.max(11, W * 0.019);
         const entries = Object.entries(counts).sort();
-        const barArea = { x: W * 0.6, y: 50, w: W * 0.35, h: H * 0.55 };
-        const barW = Math.min(barArea.w / (entries.length * 1.8), 50);
-        const gap = barW * 0.6;
+        const isDouble = this.punnettMode !== 'single';
+        const many = entries.length > 9 || isDouble;
+        const labelFs = many ? Math.max(10, fs * 0.65) : fs;
+        const pctFs = many ? Math.max(9, fs * 0.6) : fs;
+        const statX = many ? W * 0.50 : W * 0.6;
+        const statW = many ? W * 0.48 : W * 0.35;
+        const barArea = { x: statX, y: 30, w: statW, h: many ? H * 0.75 : H * 0.55 };
+        const barW = Math.min(barArea.w / (entries.length * 1.4), many ? 30 : 50);
+        const gap = barW * (many ? 0.35 : 0.6);
         const totalW = entries.length * barW + (entries.length - 1) * gap;
         const startX = barArea.x + (barArea.w - totalW) / 2;
 
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '500 17px ' + CF.sans;
+        ctx.font = '500 ' + (many ? labelFs + 2 : fs) + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u540e\u4ee3\u7edf\u8ba1', barArea.x + barArea.w / 2, barArea.y - 6);
 
         const maxCount = Math.max(...entries.map(e => e[1]));
-        const maxBarH = barArea.h - 40;
+        const maxBarH = barArea.h - (many ? 60 : 40);
 
         entries.forEach(([g, count], i) => {
             const x = startX + i * (barW + gap);
@@ -817,7 +873,11 @@ const Genetics = {
             const colors = {
                 dominant: '#3a9e8f',
                 carrier: '#8b6fc0',
-                recessive: '#c4793a'
+                recessive: '#c4793a',
+                dom_dom: '#3a9e8f',
+                dom_rec: '#4e82c4',
+                rec_dom: '#c4aa3a',
+                rec_rec: '#c4793a'
             };
             const color = colors[type] || '#3a9e8f';
 
@@ -828,21 +888,37 @@ const Genetics = {
             ctx.lineWidth = 1.5;
             ctx.strokeRect(x, barArea.y + maxBarH - barH + 20, barW, barH);
 
-            // Genotype label
+            // Genotype label (rotated for many entries)
             ctx.fillStyle = color;
-            ctx.font = '600 17px ' + CF.mono;
-            ctx.textAlign = 'center';
-            ctx.fillText(g, x + barW / 2, barArea.y + maxBarH + 36);
+            if (many) {
+                ctx.save();
+                ctx.font = '600 ' + labelFs + 'px ' + CF.mono;
+                ctx.textAlign = 'right';
+                ctx.translate(x + barW / 2 + 3, barArea.y + maxBarH + 26);
+                ctx.rotate(-Math.PI / 4);
+                ctx.fillText(g, 0, 0);
+                ctx.restore();
+            } else {
+                ctx.font = '600 ' + fs + 'px ' + CF.mono;
+                ctx.textAlign = 'center';
+                ctx.fillText(g, x + barW / 2, barArea.y + maxBarH + 36);
+            }
 
             // Percentage
             ctx.fillStyle = 'rgba(255,255,255,0.6)';
-            ctx.font = '500 15px ' + CF.mono;
+            ctx.font = '500 ' + pctFs + 'px ' + CF.mono;
+            ctx.textAlign = 'center';
             ctx.fillText((ratio * 100).toFixed(1) + '%', x + barW / 2, barArea.y + maxBarH - barH + 14);
         });
 
         // Legend
-        const legendY = barArea.y + barArea.h + 30;
-        const legendItems = [
+        const legendY = barArea.y + barArea.h + (many ? 50 : 30);
+        const legendItems = many ? [
+            ['A_B_(\u53cc\u663e)', '#3a9e8f'],
+            ['A_bb', '#4e82c4'],
+            ['aaB_', '#c4aa3a'],
+            ['aabb(\u53cc\u9690)', '#c4793a']
+        ] : [
             ['\u663e\u6027\u7eaf\u5408', '#3a9e8f'],
             ['\u6742\u5408', '#8b6fc0'],
             ['\u9690\u6027\u7eaf\u5408', '#c4793a']
@@ -852,10 +928,10 @@ const Genetics = {
             ctx.fillStyle = color;
             ctx.fillRect(lx, legendY, 10, 10);
             ctx.fillStyle = 'rgba(255,255,255,0.5)';
-            ctx.font = '15px ' + CF.sans;
+            ctx.font = (many ? labelFs : fs) + 'px ' + CF.sans;
             ctx.textAlign = 'left';
             ctx.fillText(label, lx + 14, legendY + 9);
-            lx += 70;
+            lx += ctx.measureText(label).width + 28;
         }
 
         // Edu panel (bottom)
@@ -885,6 +961,7 @@ const Genetics = {
     },
 
     _drawPopGraph(ctx, W, H) {
+        const fs = Math.max(11, W * 0.019);
         const gx = W * 0.6, gy = 20, gw = W * 0.36, gh = H * 0.45;
 
         ctx.fillStyle = 'rgba(255,255,255,0.04)';
@@ -894,7 +971,7 @@ const Genetics = {
         ctx.strokeRect(gx, gy, gw, gh);
 
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '500 15px ' + CF.sans;
+        ctx.font = '500 ' + fs + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u7b49\u4f4d\u57fa\u56e0\u9891\u7387\u53d8\u5316', gx + gw / 2, gy - 4);
 
@@ -907,7 +984,7 @@ const Genetics = {
 
         // Y labels (0, 0.5, 1)
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '14px ' + CF.mono;
+        ctx.font = (fs - 3) + 'px ' + CF.mono;
         ctx.textAlign = 'right';
         ctx.fillText('1.0', gx - 3, gy + 4);
         ctx.fillText('0.5', gx - 3, gy + gh / 2 + 3);
@@ -943,7 +1020,7 @@ const Genetics = {
         ctx.fillStyle = '#3a9e8f';
         ctx.fillRect(gx + 10, ly, 12, 3);
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '14px ' + CF.sans;
+        ctx.font = (fs - 3) + 'px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('p (A)', gx + 26, ly + 4);
 
@@ -960,9 +1037,10 @@ const Genetics = {
     /* ── Pedigree Draw ── */
 
     _drawPedigree(ctx, W, H) {
+        const fs = Math.max(11, W * 0.019);
         if (!this.pedigreeData) {
             ctx.fillStyle = 'rgba(255,255,255,0.3)';
-            ctx.font = '21px ' + CF.sans;
+            ctx.font = (fs + 8) + 'px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('\u9009\u62e9\u9057\u4f20\u65b9\u5f0f\u67e5\u770b\u7cfb\u8c31\u56fe', W / 2, H / 2);
             return;
@@ -975,7 +1053,7 @@ const Genetics = {
 
         // Title
         ctx.fillStyle = 'rgba(58,158,143,0.6)';
-        ctx.font = 'bold 20px ' + CF.sans;
+        ctx.font = 'bold ' + (fs + 3) + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText(title, W / 2, 22);
 
@@ -1074,7 +1152,7 @@ const Genetics = {
             // Generation label
             if (node.pos === 0) {
                 ctx.fillStyle = 'rgba(255,255,255,0.2)';
-                ctx.font = '15px ' + CF.sans;
+                ctx.font = fs + 'px ' + CF.sans;
                 ctx.textAlign = 'right';
                 const genLabels = ['I', 'II', 'III', 'IV'];
                 ctx.fillText(genLabels[node.gen] || '', W * 0.1, y + 4);

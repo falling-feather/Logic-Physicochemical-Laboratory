@@ -545,7 +545,7 @@ const FluidSim = {
 
         if (this.elements.length === 0 && this.uniformU === 0) {
             ctx.fillStyle = 'rgba(255,255,255,0.3)';
-            ctx.font = '14px ' + CF.sans;
+            ctx.font = '19px ' + CF.sans;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText('点击画布放置流体元素（源、汇、涡）', W / 2, H / 2);
             return;
@@ -677,7 +677,7 @@ const FluidSim = {
 
             // 符号
             ctx.fillStyle = ctx.strokeStyle;
-            ctx.font = 'bold 14px ' + CF.sans;
+            ctx.font = 'bold 19px ' + CF.sans;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             if (el.type === 'source') ctx.fillText('+', el.x, el.y);
             else if (el.type === 'sink') ctx.fillText('−', el.x, el.y);
@@ -685,7 +685,7 @@ const FluidSim = {
 
             // 标签
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.font = '10px ' + CF.sans;
+            ctx.font = '15px ' + CF.sans;
             const labels = { source: '源', sink: '汇', vortex: '涡' };
             ctx.fillText(labels[el.type], el.x, el.y - r - 5);
         }
@@ -746,7 +746,7 @@ const FluidSim = {
 
             // 标签
             ctx.fillStyle = '#f43f5e';
-            ctx.font = '12px ' + CF.sans;
+            ctx.font = '17px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('升力 F_L', cx, ey + liftDir * 16);
 
@@ -764,7 +764,7 @@ const FluidSim = {
 
         // 信息
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = '11px ' + CF.mono;
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'left';
         ctx.fillText(`U = ${this.uniformU} px/s`, 8, H - 24);
         ctx.fillText(`Γ = ${this.cylCirculation}`, 8, H - 10);
@@ -854,7 +854,7 @@ const FluidSim = {
         ctx.roundRect(tx - 6, ty - 18, 175, 62, 6);
         ctx.fill();
 
-        ctx.font = '500 11px ' + CF.mono;
+        ctx.font = '500 16px ' + CF.mono;
         ctx.textAlign = 'left';
         ctx.fillStyle = '#38bdf8';
         ctx.fillText(`|v| = ${vMag.toFixed(1)} px/s`, tx, ty);
@@ -863,7 +863,7 @@ const FluidSim = {
         ctx.fillStyle = '#f43f5e';
         ctx.fillText(`P = ${P.toFixed(1)}  (Bernoulli)`, tx, ty + 32);
         ctx.fillStyle = '#94a3b8';
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.fillText(`vx=${v.x.toFixed(1)}  vy=${v.y.toFixed(1)}`, tx, ty + 46);
     },
 
@@ -951,7 +951,7 @@ const FluidSim = {
 
             // 数值
             ctx.fillStyle = 'rgba(255,255,255,0.5)';
-            ctx.font = '10px ' + CF.mono;
+            ctx.font = '15px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(sec.label, sec.x, pipeTop - 20);
             ctx.fillStyle = '#38bdf8';
@@ -990,10 +990,10 @@ const FluidSim = {
 
         // 方程
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = '13px ' + CF.mono;
+        ctx.font = '18px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('P₁ + ½ρv₁² = P₂ + ½ρv₂²', W / 2, H - 10);
-        ctx.font = '11px ' + CF.sans;
+        ctx.font = '16px ' + CF.sans;
         ctx.fillText('A₁v₁ = A₂v₂  (连续性方程)', W / 2, H - 26);
     },
 

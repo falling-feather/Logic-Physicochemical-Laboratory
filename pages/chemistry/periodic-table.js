@@ -156,6 +156,10 @@ const PeriodicTable = {
 
         const closeBtn = document.getElementById('pt-detail-close');
         this._on(closeBtn, 'click', () => this.closeDetail());
+
+        // Click overlay to close
+        const overlay = document.getElementById('pt-detail-overlay');
+        if (overlay) this._on(overlay, 'click', () => this.closeDetail());
     },
 
     destroy() {
@@ -438,12 +442,16 @@ const PeriodicTable = {
         panel.querySelector('.pt-detail-config').innerHTML = configHTML;
 
         panel.classList.add('active');
+        const overlay = document.getElementById('pt-detail-overlay');
+        if (overlay) overlay.classList.add('active');
         this.selectedElement = el;
     },
 
     closeDetail() {
         const panel = document.getElementById('pt-detail');
         if (panel) panel.classList.remove('active');
+        const overlay = document.getElementById('pt-detail-overlay');
+        if (overlay) overlay.classList.remove('active');
         this.selectedElement = null;
     },
 

@@ -206,7 +206,7 @@ const PermComb = {
     drawTree() {
         const { ctx, W, H, n, r, mode, treeLayout, animProgress } = this;
         const isPerm = mode === 'permutation';
-        const fs = Math.max(15, W * 0.015);
+        const fs = Math.max(17, W * 0.017);
 
         // Formula
         const label = isPerm ? `P(${n},${r})` : `C(${n},${r})`;
@@ -263,7 +263,7 @@ const PermComb = {
     drawPascal() {
         const { ctx, W, H, pascalLayout, pascalRows, animProgress, hoverX, hoverY } = this;
         const rows = Math.min(pascalRows, 10);
-        const fs = Math.max(14, W * 0.014);
+        const fs = Math.max(16, W * 0.016);
 
         // Title
         ctx.fillStyle = 'rgba(91,141,206,0.55)'; ctx.font = `${fs + 3}px ${CF.sans}`; ctx.textAlign = 'center';

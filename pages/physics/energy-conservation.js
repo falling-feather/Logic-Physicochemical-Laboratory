@@ -219,7 +219,7 @@ const EnergyConservation = {
 
         // h label
         ctx.fillStyle = 'rgba(91,141,206,0.5)';
-        ctx.font = '10px ' + CF.mono;
+        ctx.font = '15px ' + CF.mono;
         ctx.textAlign = 'left';
         ctx.fillText('h=' + (h * 5).toFixed(1) + 'm', x + 8, (y + area.y + area.h) / 2);
     },
@@ -254,12 +254,12 @@ const EnergyConservation = {
 
             // Label
             ctx.fillStyle = colors[i];
-            ctx.font = 'bold 11px ' + CF.sans;
+            ctx.font = 'bold 16px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText(label, x + barW / 2, area.y + area.h + 16);
 
             // Value
-            ctx.font = '10px ' + CF.mono;
+            ctx.font = '15px ' + CF.mono;
             ctx.fillText(values[i].toFixed(1) + 'J', x + barW / 2, y - 4);
         });
     },
@@ -269,7 +269,7 @@ const EnergyConservation = {
         const h = this.getHeight(this.ballPos);
         const v = Math.abs(this.ballSpeed) * 0.15 * 5;
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '10px ' + CF.mono;
+        ctx.font = '15px ' + CF.mono;
         ctx.textAlign = 'left';
         ctx.fillText('v = ' + v.toFixed(2) + ' m/s', area.x, area.y + area.h + 16);
     },

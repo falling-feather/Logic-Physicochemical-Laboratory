@@ -78,7 +78,7 @@ const Photosynthesis = {
         if (!wrap) return;
         const w = wrap.clientWidth;
         if (w === 0) return;
-        const h = Math.min(Math.round(w * 0.72), 520);
+        const h = Math.min(Math.max(w * 0.48, 300), 420);
         const dpr = window.devicePixelRatio || 1;
         this.canvas.width = w * dpr;
         this.canvas.height = h * dpr;
@@ -329,6 +329,7 @@ const Photosynthesis = {
     /* ── Simulation Draw ── */
 
     _drawSimulation(ctx, W, H) {
+        const fs = Math.max(11, W * 0.019);
         const sunBrightness = this.lightIntensity / 100;
 
         // Background
@@ -392,11 +393,11 @@ const Photosynthesis = {
 
         // Light zone labels
         ctx.fillStyle = 'rgba(100,220,190,0.6)';
-        ctx.font = '17px ' + CF.sans;
+        ctx.font = fs + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u5149\u53cd\u5e94', lzX + lzW / 2, lzY - 6);
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        ctx.font = '14px ' + CF.sans;
+        ctx.font = (fs - 3) + 'px ' + CF.sans;
         ctx.fillText('\u7c7b\u56ca\u4f53\u8584\u819c', lzX + lzW / 2, lzY + lzH + 14);
 
         // Dark Reaction Zone
@@ -429,7 +430,7 @@ const Photosynthesis = {
 
         // Calvin cycle labels
         ctx.fillStyle = 'rgba(200,170,80,0.5)';
-        ctx.font = '14px ' + CF.sans;
+        ctx.font = (fs - 3) + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         // C3 and G3P labels on cycle
         const c3a = cycleAngle + Math.PI * 0.5;
@@ -438,10 +439,10 @@ const Photosynthesis = {
         ctx.fillText('G3P', ccX + Math.cos(g3pa) * ccR * 0.65, ccY + Math.sin(g3pa) * ccR * 0.65);
 
         ctx.fillStyle = 'rgba(200,170,80,0.6)';
-        ctx.font = '17px ' + CF.sans;
+        ctx.font = fs + 'px ' + CF.sans;
         ctx.fillText('\u6697\u53cd\u5e94', dzX + dzW / 2, dzY - 6);
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        ctx.font = '14px ' + CF.sans;
+        ctx.font = (fs - 3) + 'px ' + CF.sans;
         ctx.fillText('Calvin \u5faa\u73af', ccX, ccY);
         ctx.fillText('\u53f6\u7eff\u4f53\u57fa\u8d28', dzX + dzW / 2, dzY + dzH + 14);
 
@@ -462,7 +463,7 @@ const Photosynthesis = {
         ctx.lineTo(dzX - 10, arrowY + 4);
         ctx.closePath(); ctx.fill();
         ctx.fillStyle = 'rgba(255,200,50,0.4)';
-        ctx.font = '14px ' + CF.sans;
+        ctx.font = (fs - 3) + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('ATP+NADPH', (lzX + lzW + dzX) / 2, arrowY - 8);
 
@@ -474,13 +475,13 @@ const Photosynthesis = {
             if (p.type === 'co2') {
                 ctx.fillStyle = '#666'; ctx.fill();
                 ctx.fillStyle = '#aaa';
-                ctx.font = 'bold 14px ' + CF.mono;
+                ctx.font = 'bold ' + (fs - 3) + 'px ' + CF.mono;
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText('CO\u2082', p.x, p.y);
             } else {
                 ctx.fillStyle = '#4488cc'; ctx.fill();
                 ctx.fillStyle = '#88bbee';
-                ctx.font = 'bold 13px ' + CF.mono;
+                ctx.font = 'bold ' + (fs - 3) + 'px ' + CF.mono;
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText('H\u2082O', p.x, p.y);
             }
@@ -493,7 +494,7 @@ const Photosynthesis = {
             ctx.fillStyle = 'rgba(255,200,50,' + (alpha * 0.7) + ')';
             ctx.beginPath(); ctx.arc(a.x, a.y, 3, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = 'rgba(255,220,100,' + (alpha * 0.6) + ')';
-            ctx.font = 'bold 10px ' + CF.mono;
+            ctx.font = 'bold ' + (fs - 3) + 'px ' + CF.mono;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(a.label, a.x, a.y - 6);
         });
@@ -505,7 +506,7 @@ const Photosynthesis = {
             ctx.fillStyle = 'rgba(100,200,255,0.5)'; ctx.fill();
             ctx.strokeStyle = 'rgba(150,230,255,0.3)'; ctx.lineWidth = 0.5; ctx.stroke();
             ctx.fillStyle = 'rgba(220,240,255,0.8)';
-            ctx.font = 'bold 10px ' + CF.mono;
+            ctx.font = 'bold ' + (fs - 3) + 'px ' + CF.mono;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText('O\u2082', b.x, b.y);
             ctx.globalAlpha = 1;
@@ -515,14 +516,14 @@ const Photosynthesis = {
         if (this.glucoseCount > 0) {
             const gx = dzX + dzW + 20, gy = dzY + dzH / 2;
             ctx.fillStyle = 'rgba(200,170,80,0.5)';
-            ctx.font = '15px ' + CF.sans;
+            ctx.font = fs + 'px ' + CF.sans;
             ctx.textAlign = 'left';
             ctx.fillText('C\u2086H\u2081\u2082O\u2086 \u00d7 ' + Math.floor(this.glucoseCount / 6), gx, gy);
         }
 
         // Input/output labels
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '14px ' + CF.sans;
+        ctx.font = (fs - 3) + 'px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('CO\u2082 \u2192', 4, H * 0.28);
         ctx.fillText('H\u2082O \u2191', W * 0.16, H * 0.95);
@@ -531,19 +532,19 @@ const Photosynthesis = {
 
         // Equation
         ctx.fillStyle = 'rgba(255,255,255,0.45)';
-        ctx.font = '18px ' + CF.mono;
+        ctx.font = (fs + 5) + 'px ' + CF.mono;
         ctx.textAlign = 'center';
-        ctx.fillText('6CO\u2082 + 6H\u2082O  \u2500\u2500\u5149\u2500\u2500\u25b6  C\u2086H\u2081\u2082O\u2086 + 6O\u2082', W / 2, H * 0.72);
+        ctx.fillText('6CO\u2082 + 6H\u2082O  \u2500\u2500\u5149\u2500\u2500\u25b6  C\u2086H\u2081\u2082O\u2086 + 6O\u2082', W / 2, H * 0.78);
 
         // Rate bar
         const rate = Math.round(this.lightIntensity * 0.8);
-        const barX = W * 0.02, barY = H * 0.72 + 12, barW = W * 0.12, barH = 6;
+        const barX = W * 0.02, barY = H * 0.78 + 12, barW = W * 0.12, barH = 6;
         ctx.fillStyle = 'rgba(255,255,255,0.08)';
         ctx.fillRect(barX, barY, barW, barH);
         ctx.fillStyle = 'rgba(58,158,143,0.6)';
         ctx.fillRect(barX, barY, barW * (rate / 80), barH);
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '14px ' + CF.sans;
+        ctx.font = (fs - 3) + 'px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('\u5149\u5408\u901f\u7387 ' + rate + '%', barX, barY - 4);
     },
@@ -551,6 +552,7 @@ const Photosynthesis = {
     /* ── Light Curve ── */
 
     _drawCurve(ctx, W, H) {
+        const fs = Math.max(11, W * 0.019);
         ctx.fillStyle = '#0a0f15';
         ctx.fillRect(0, 0, W, H);
 
@@ -565,7 +567,7 @@ const Photosynthesis = {
 
         // Title
         ctx.fillStyle = 'rgba(58,158,143,0.7)';
-        ctx.font = '600 20px ' + CF.sans;
+        ctx.font = (fs + 3) + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u5149\u5408\u901f\u7387 - \u5149\u7167\u5f3a\u5ea6\u66f2\u7ebf', gx + gw / 2, gy - 10);
 
@@ -574,14 +576,14 @@ const Photosynthesis = {
         ctx.translate(gx - 30, gy + gh / 2);
         ctx.rotate(-Math.PI / 2);
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '15px ' + CF.sans;
+        ctx.font = fs + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('CO\u2082 \u5438\u6536\u91cf (\u76f8\u5bf9\u503c)', 0, 0);
         ctx.restore();
 
         // X axis label
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '15px ' + CF.sans;
+        ctx.font = fs + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u5149\u7167\u5f3a\u5ea6 (klux)', gx + gw / 2, gy + gh + 28);
 
@@ -618,7 +620,7 @@ const Photosynthesis = {
         ctx.lineTo(gx + gw, zeroY);
         ctx.stroke();
         ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '14px ' + CF.sans;
+        ctx.font = (fs - 3) + 'px ' + CF.sans;
         ctx.textAlign = 'right';
         ctx.fillText('0', gx - 4, zeroY + 3);
 
@@ -648,7 +650,7 @@ const Photosynthesis = {
                 ctx.fillStyle = 'rgba(255,200,50,0.6)';
                 ctx.beginPath(); ctx.arc(cpx, zeroY, 4, 0, Math.PI * 2); ctx.fill();
                 ctx.fillStyle = 'rgba(255,200,50,0.5)';
-                ctx.font = '14px ' + CF.sans;
+                ctx.font = (fs - 3) + 'px ' + CF.sans;
                 ctx.textAlign = 'center';
                 ctx.fillText('\u5149\u8865\u507f\u70b9', cpx, zeroY + 14);
             }
@@ -667,7 +669,7 @@ const Photosynthesis = {
                 ctx.fillStyle = 'rgba(139,111,192,0.6)';
                 ctx.beginPath(); ctx.arc(spx, spy, 4, 0, Math.PI * 2); ctx.fill();
                 ctx.fillStyle = 'rgba(139,111,192,0.5)';
-                ctx.font = '14px ' + CF.sans;
+                ctx.font = (fs - 3) + 'px ' + CF.sans;
                 ctx.textAlign = 'center';
                 ctx.fillText('\u5149\u9971\u548c\u70b9', spx, spy - 10);
             }
@@ -683,7 +685,7 @@ const Photosynthesis = {
 
         // Labels
         ctx.fillStyle = 'rgba(196,121,58,0.5)';
-        ctx.font = '14px ' + CF.sans;
+        ctx.font = (fs - 3) + 'px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('\u547c\u5438\u901f\u7387', gx + gw + 5, zeroY + respOffset + 3);
 
@@ -693,19 +695,19 @@ const Photosynthesis = {
         // Right panel: factor display
         const rx = W * 0.72, ry = 40;
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '600 17px ' + CF.sans;
+        ctx.font = '600 ' + fs + 'px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('\u5f53\u524d\u53c2\u6570', rx, ry);
 
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '17px ' + CF.sans;
+        ctx.font = fs + 'px ' + CF.sans;
         ctx.fillText('\u5149\u7167: ' + this.lightIntensity + ' klux', rx, ry + 24);
         ctx.fillText('\u6e29\u5ea6: ' + this.temperature + '\u00b0C', rx, ry + 46);
         ctx.fillText('CO\u2082: ' + this.co2Concentration + '%', rx, ry + 68);
 
         // Temperature effect note
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.font = '14px ' + CF.sans;
+        ctx.font = (fs - 3) + 'px ' + CF.sans;
         const tempNote = this.temperature < 15 ? '\u4f4e\u6e29\u2192\u9176\u6d3b\u6027\u4f4e' :
             this.temperature > 40 ? '\u9ad8\u6e29\u2192\u9176\u53d8\u6027' : '\u9002\u5b9c\u6e29\u5ea6';
         ctx.fillText(tempNote, rx, ry + 88);
@@ -714,6 +716,7 @@ const Photosynthesis = {
     /* ── Comparison Draw ── */
 
     _drawComparison(ctx, W, H) {
+        const fs = Math.max(11, W * 0.019);
         ctx.fillStyle = '#0a0f15';
         ctx.fillRect(0, 0, W, H);
 
@@ -724,7 +727,7 @@ const Photosynthesis = {
 
         // Title
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = '600 20px ' + CF.sans;
+        ctx.font = (fs + 3) + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u5149\u5408\u4f5c\u7528 vs \u7ec6\u80de\u547c\u5438', midX, 24);
 
@@ -736,7 +739,7 @@ const Photosynthesis = {
         ctx.strokeRect(leftX, topY, boxW, boxH);
 
         ctx.fillStyle = 'rgba(58,158,143,0.7)';
-        ctx.font = '600 18px ' + CF.sans;
+        ctx.font = (fs + 5) + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u5149\u5408\u4f5c\u7528', leftX + boxW / 2, topY + 20);
 
@@ -748,14 +751,14 @@ const Photosynthesis = {
         ];
         pItems.forEach(item => {
             ctx.fillStyle = item.color;
-            ctx.font = '17px ' + CF.mono;
+            ctx.font = fs + 'px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(item.label, leftX + boxW / 2, topY + boxH * item.y);
         });
 
         // Location
         ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '14px ' + CF.sans;
+        ctx.font = (fs - 3) + 'px ' + CF.sans;
         ctx.fillText('\u573a\u6240: \u53f6\u7eff\u4f53', leftX + boxW / 2, topY + boxH * 0.82);
         ctx.fillText('\u80fd\u91cf\u8f6c\u5316: \u5149\u80fd \u2192 \u5316\u5b66\u80fd', leftX + boxW / 2, topY + boxH * 0.92);
 
@@ -767,7 +770,7 @@ const Photosynthesis = {
         ctx.strokeRect(rightX, topY, boxW, boxH);
 
         ctx.fillStyle = 'rgba(196,121,58,0.7)';
-        ctx.font = '600 18px ' + CF.sans;
+        ctx.font = (fs + 5) + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u7ec6\u80de\u547c\u5438', rightX + boxW / 2, topY + 20);
 
@@ -778,13 +781,13 @@ const Photosynthesis = {
         ];
         rItems.forEach(item => {
             ctx.fillStyle = item.color;
-            ctx.font = '17px ' + CF.mono;
+            ctx.font = fs + 'px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(item.label, rightX + boxW / 2, topY + boxH * item.y);
         });
 
         ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '14px ' + CF.sans;
+        ctx.font = (fs - 3) + 'px ' + CF.sans;
         ctx.fillText('\u573a\u6240: \u7ebf\u7c92\u4f53 (\u6709\u6c27)', rightX + boxW / 2, topY + boxH * 0.82);
         ctx.fillText('\u80fd\u91cf\u8f6c\u5316: \u5316\u5b66\u80fd \u2192 ATP', rightX + boxW / 2, topY + boxH * 0.92);
 
@@ -818,7 +821,7 @@ const Photosynthesis = {
 
         // Arrow labels
         ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '13px ' + CF.sans;
+        ctx.font = (fs - 3) + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('O\u2082 + \u8461\u8404\u7cd6', midX, arrowY1 - 6);
         ctx.fillText('CO\u2082 + H\u2082O', midX, arrowY2 - 6);
@@ -839,7 +842,7 @@ const Photosynthesis = {
         ctx.fillStyle = 'rgba(255,255,255,0.15)';
         ctx.fillRect(leftX, tableY, W * 0.9, 20);
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = '600 10px ' + CF.sans;
+        ctx.font = '600 ' + (fs - 3) + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u6bd4\u8f83\u9879\u76ee', leftX + W * 0.12, tableY + 14);
         ctx.fillStyle = 'rgba(58,158,143,0.7)';
@@ -850,7 +853,7 @@ const Photosynthesis = {
         rows.forEach((row, i) => {
             const y = tableY + 22 + i * 20;
             ctx.fillStyle = 'rgba(255,255,255,0.3)';
-            ctx.font = '15px ' + CF.sans;
+            ctx.font = fs + 'px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText(row[0], leftX + W * 0.12, y + 14);
             ctx.fillStyle = 'rgba(58,158,143,0.5)';

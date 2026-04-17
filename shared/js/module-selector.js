@@ -85,8 +85,10 @@ const ModuleSelector = {
         toggle.innerHTML = '<i data-lucide="panel-left"></i>';
         toggle.addEventListener('click', () => this.toggleSidebar(page));
 
-        pageEl.appendChild(sidebar);
-        pageEl.appendChild(toggle);
+        // Append sidebar & toggle to document.body so position:fixed works
+        // (pageEl has will-change:transform which breaks fixed positioning)
+        document.body.appendChild(sidebar);
+        document.body.appendChild(toggle);
         this._sidebars[page] = sidebar;
 
         if (typeof lucide !== 'undefined') lucide.createIcons();

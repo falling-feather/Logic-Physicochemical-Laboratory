@@ -4,6 +4,7 @@ const Router = {
     currentPage: 'home',
     isTransitioning: false,
     _initialEnterFired: false,
+    _runningTimeId: null,
     // Store origin point for radial wipe (set by selectModule or default center)
     transitionOrigin: { x: 50, y: 50 },
 
@@ -57,6 +58,9 @@ const Router = {
         this._initialEnterFired = true;
         this.onPageEnter(initialPage);
 
+        // Show running time footer for non-home pages
+        this._toggleRunningTime(initialPage !== 'home');
+
         window.addEventListener('hashchange', () => this.handleHash());
 
         // Handle popstate (back/forward)
@@ -95,6 +99,9 @@ const Router = {
                 navbar.classList.remove('navbar--transparent');
             }
         }
+
+        // Toggle running time footer
+        this._toggleRunningTime(page !== 'home');
 
         const prevPage = this.currentPage;
         this.currentPage = page;
@@ -385,6 +392,41 @@ const Router = {
             // Reset ModuleSelector state for this page
             if (typeof ModuleSelector !== 'undefined' && ModuleSelector.resetPage) {
                 ModuleSelector.resetPage(page);
+            }
+        }
+    },
+
+    // ── Running Time Footer ──
+    _toggleRunningTime(show) {
+        const el = document.getElementById('running-time-footer');
+        if (!el) return;
+        if (show) {
+            el.classList.add('visible');
+            if (!this._runningTimeId) {
+                const START = new Date('2026-04-14T00:00:00').getTime();
+                const dEl = document.getElementById('rt-days');
+                const hEl = document.getElementById('rt-hours');
+                const mEl = document.getElementById('rt-minutes');
+                const sEl = document.getElementById('rt-seconds');
+                const tick = () => {
+                    const diff = Math.max(0, Date.now() - START);
+                    const d = Math.floor(diff / 86400000);
+                    const h = Math.floor((diff % 86400000) / 3600000);
+                    const m = Math.floor((diff % 3600000) / 60000);
+                    const s = Math.floor((diff % 60000) / 1000);
+                    if (dEl) dEl.textContent = d;
+                    if (hEl) hEl.textContent = h;
+                    if (mEl) mEl.textContent = m;
+                    if (sEl) sEl.textContent = s;
+                };
+                tick();
+                this._runningTimeId = setInterval(tick, 1000);
+            }
+        } else {
+            el.classList.remove('visible');
+            if (this._runningTimeId) {
+                clearInterval(this._runningTimeId);
+                this._runningTimeId = null;
             }
         }
     }

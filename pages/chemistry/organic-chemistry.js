@@ -360,7 +360,7 @@ const OrganicChem = {
         // Hint
         if (this.autoRot && !this.paused) {
             ctx.fillStyle = 'rgba(255,255,255,0.13)';
-            ctx.font = '11px ' + CF.sans; ctx.textAlign = 'center';
+            ctx.font = '16px ' + CF.sans; ctx.textAlign = 'center';
             ctx.fillText('🖱 拖拽旋转分子 · 悬停查看原子', cx, H - 10);
         }
     },
@@ -411,14 +411,14 @@ const OrganicChem = {
         ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fill();
         // Label
         ctx.fillStyle = '#fff';
-        ctx.font = (el.length === 1 ? 'bold ' : '') + Math.round(r * 0.82) + 'px ' + CF.sans;
+        ctx.font = (el.length === 1 ? 'bold ' : '') + Math.max(13, Math.round(r * 0.82)) + 'px ' + CF.sans;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(el, x, y + 1);
     },
 
     _drawTip(x, y, lines) {
         const ctx = this.ctx;
-        ctx.font = '11px ' + CF.sans;
+        ctx.font = '16px ' + CF.sans;
         const w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 16;
         const h = lines.length * 16 + 8;
         const tx = Math.max(4, Math.min(x - w / 2, this.W - w - 4));

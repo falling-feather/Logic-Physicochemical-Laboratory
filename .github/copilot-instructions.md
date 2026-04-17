@@ -8,7 +8,7 @@
 - **渲染**：所有实验使用 Canvas 2D API + requestAnimationFrame + performance.now() dt 驱动
 - **动画**：GSAP 3.12.7 驱动页面转场（径向裁剪遮罩）
 - **服务器**：C++ httplib 静态文件服务器（生产端口 910）；开发用 `python -m http.server 8080`
-- **当前版本**：v4.0.1
+- **当前版本**：v4.0.2
 
 ## 快速了解项目必读
 

@@ -203,6 +203,7 @@ const Ecosystem = {
 
     _drawFoodChain(dt, t) {
         const ctx = this.ctx, W = this.W, H = this.H;
+        const fs = Math.max(13, W * 0.012);
         const spd = this._speed;
         /* sky */
         const sky = ctx.createLinearGradient(0, 0, 0, H);
@@ -363,7 +364,7 @@ const Ecosystem = {
         });
 
         /* trophic labels */
-        ctx.font = 'bold 18px ' + CF.sans;
+        ctx.font = 'bold ' + (fs + 5) + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         const labels = [
             { text: '☀ 太阳能', x: sunX, y: sunY + sunR + 22, color: 'rgba(255,200,50,0.9)' },
@@ -389,7 +390,7 @@ const Ecosystem = {
             ctx.beginPath(); ctx.moveTo(a.x1, a.y1); ctx.lineTo(a.x2, a.y2);
             ctx.strokeStyle = a.color; ctx.stroke();
             const mx = (a.x1 + a.x2) / 2, my = (a.y1 + a.y2) / 2;
-            ctx.font = '15px ' + CF.sans;
+            ctx.font = fs + 'px ' + CF.sans;
             ctx.fillStyle = a.color.replace('0.45', '0.7').replace('0.35', '0.6');
             ctx.fillText(a.lbl, mx + 10, my - 5);
         });
@@ -403,7 +404,7 @@ const Ecosystem = {
             { ratio: 0.45, color: 'rgba(180,140,100,0.25)', label: '~10%', name: '二级营养级' },
             { ratio: 0.75, color: 'rgba(50,180,50,0.25)', label: '~100%', name: '一级营养级' }
         ];
-        ctx.font = '15px ' + CF.sans;
+        ctx.font = fs + 'px ' + CF.sans;
         levels.forEach((lv, i) => {
             const ly = py + (ph / 3) * i;
             const lw = pw * lv.ratio;
@@ -420,7 +421,7 @@ const Ecosystem = {
             ctx.fillText(lv.label + ' ' + lv.name, px, ly + ph / 6 + 3);
         });
         ctx.fillStyle = 'rgba(58,158,143,0.8)';
-        ctx.font = 'bold 17px ' + CF.sans;
+        ctx.font = 'bold ' + fs + 'px ' + CF.sans;
         ctx.fillText('能量金字塔', px, py - 12);
 
         /* hover detection */
@@ -449,7 +450,7 @@ const Ecosystem = {
             const h = this._hover;
             const trophicNames = { 0: '分解者', 1: '生产者（第一营养级）', 2: '初级消费者（第二营养级）', 3: '高级消费者（第三营养级）' };
             const tip = trophicNames[h.trophic] || h.label;
-            ctx.font = '18px ' + CF.sans;
+            ctx.font = (fs + 5) + 'px ' + CF.sans;
             const tw = ctx.measureText(tip).width + 16;
             const tx = Math.min(mx + 12, W - tw - 4), ty = Math.max(my - 28, 10);
             ctx.fillStyle = 'rgba(20,25,35,0.85)';
@@ -490,6 +491,7 @@ const Ecosystem = {
     },
     _drawPopulation(dt) {
         const ctx = this.ctx, W = this.W, H = this.H;
+        const fs = Math.max(13, W * 0.012);
         if (!this._paused) this._stepPopulation(dt);
 
         const margin = { top: 50, right: 30, bottom: 55, left: 60 };
@@ -500,7 +502,7 @@ const Ecosystem = {
         ctx.fillRect(margin.left, margin.top, gw, gh);
 
         /* title */
-        ctx.font = 'bold 21px ' + CF.sans;
+        ctx.font = 'bold ' + (fs + 8) + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(58,158,143,0.9)';
         ctx.fillText('Lotka-Volterra 种群动态模型', W / 2, 30);
@@ -518,12 +520,12 @@ const Ecosystem = {
         ctx.save();
         ctx.translate(18, H / 2);
         ctx.rotate(-Math.PI / 2);
-        ctx.font = '17px ' + CF.sans;
+        ctx.font = fs + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(200,200,200,0.6)';
         ctx.fillText('种群数量', 0, 0);
         ctx.restore();
-        ctx.font = '17px ' + CF.sans;
+        ctx.font = fs + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(200,200,200,0.6)';
         ctx.fillText('时间步', margin.left + gw / 2, H - 8);
@@ -534,7 +536,7 @@ const Ecosystem = {
         const maxVal = Math.max(...allVals, 10);
 
         /* grid */
-        ctx.font = '15px ' + CF.mono;
+        ctx.font = fs + 'px ' + CF.mono;
         ctx.textAlign = 'right';
         ctx.fillStyle = 'rgba(200,200,200,0.5)';
         for (let i = 0; i <= 4; i++) {
@@ -592,7 +594,7 @@ const Ecosystem = {
         });
 
         /* legend */
-        ctx.font = '18px ' + CF.sans;
+        ctx.font = (fs + 5) + 'px ' + CF.sans;
         ctx.textAlign = 'left';
         const lx = margin.left + gw - 160, ly = margin.top + 20;
         ctx.fillStyle = 'rgba(50,180,50,0.8)';
@@ -603,7 +605,7 @@ const Ecosystem = {
         ctx.fillText('捕食者 y = ' + Math.round(this.popState.predator), lx + 22, ly + 20);
 
         /* equations */
-        ctx.font = '18px ' + CF.mono;
+        ctx.font = (fs + 5) + 'px ' + CF.mono;
         ctx.textAlign = 'right';
         ctx.fillStyle = 'rgba(200,200,200,0.55)';
         ctx.fillText('dx/dt = αx − βxy', margin.left + gw, margin.top + gh + 28);
@@ -623,7 +625,7 @@ const Ecosystem = {
                 ctx.strokeStyle = 'rgba(200,200,200,0.2)'; ctx.lineWidth = 1; ctx.stroke();
                 const pv = Math.round(this.popData.prey[idx]);
                 const cv = Math.round(this.popData.predator[idx]);
-                ctx.font = '17px ' + CF.sans;
+                ctx.font = fs + 'px ' + CF.sans;
                 ctx.textAlign = 'left';
                 ctx.fillStyle = 'rgba(20,25,35,0.85)';
                 const tipW = 120, tipH = 40;

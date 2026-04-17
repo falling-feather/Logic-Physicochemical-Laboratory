@@ -589,7 +589,7 @@ const ChemReaction = {
 
         // Equation
         ctx.fillStyle = 'rgba(255,255,255,0.55)';
-        ctx.font = '13px ' + CF.mono;
+        ctx.font = '18px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText(this.currentReaction.equation, W / 2, H - 14);
 
@@ -597,7 +597,7 @@ const ChemReaction = {
         if (t > 0.20 && t < 0.80) {
             const mechOpacity = Math.min(1, Math.min((t - 0.20) / 0.1, (0.80 - t) / 0.1));
             ctx.fillStyle = `rgba(255,200,100,${mechOpacity * 0.7})`;
-            ctx.font = '11px ' + CF.sans;
+            ctx.font = '16px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText(this.currentReaction.mechanism, W / 2, H - 34);
         }
@@ -628,7 +628,7 @@ const ChemReaction = {
 
         // Phase labels
         ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '9px ' + CF.sans;
+        ctx.font = '14px ' + CF.sans;
         ctx.textAlign = 'center';
         const labels = ['反应物', '键断裂', '重排', '键形成', '生成物'];
         const positions = [0.125, 0.35, 0.50, 0.65, 0.875];
@@ -728,7 +728,7 @@ const ChemReaction = {
 
         // Label
         ctx.fillStyle = textColor || '#fff';
-        ctx.font = `bold ${Math.max(8, r - 2)}px ${CF.mono}`;
+        ctx.font = `bold ${Math.max(13, r)}px ${CF.mono}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(label, x, y);
@@ -835,7 +835,7 @@ const ChemReaction = {
 
         // Title
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = '9px ' + CF.sans;
+        ctx.font = '14px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('能量图', ox + dw / 2, oy);
 
@@ -899,7 +899,7 @@ const ChemReaction = {
 
         // Labels
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '8px ' + CF.sans;
+        ctx.font = '13px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('Ea', ox + dw * 0.38, peakY - 3);
 

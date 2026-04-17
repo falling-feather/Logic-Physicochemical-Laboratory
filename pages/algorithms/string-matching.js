@@ -215,17 +215,17 @@ const StringMatch = {
 
         // Title
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText(this.algo === 'kmp' ? 'KMP \u7b97\u6cd5' : '\u66b4\u529b\u5339\u914d', 10, 18);
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.font = '9px ' + CF.mono;
+        ctx.font = '14px ' + CF.mono;
         ctx.fillText('\u6b65\u9aa4 ' + (currentStep + 1) + '/' + steps.length, 10, 32);
 
         // Text row
         const textY = 60;
         ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.font = '9px ' + CF.mono;
+        ctx.font = '14px ' + CF.mono;
         ctx.textAlign = 'left';
         ctx.fillText('\u6587\u672c:', startX, textY - 8);
 
@@ -242,20 +242,20 @@ const StringMatch = {
             ctx.fillRect(x, textY, cellW - 1, cellH);
 
             ctx.fillStyle = 'rgba(255,255,255,0.5)';
-            ctx.font = '12px ' + CF.mono;
+            ctx.font = '17px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(text[i], x + cellW / 2, textY + cellH / 2 + 4);
 
             // Index
             ctx.fillStyle = 'rgba(255,255,255,0.15)';
-            ctx.font = '7px ' + CF.mono;
+            ctx.font = '12px ' + CF.mono;
             ctx.fillText(i, x + cellW / 2, textY + cellH + 10);
         }
 
         // Pattern row (shifted by pOffset)
         const patY = textY + cellH + 22;
         ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.font = '9px ' + CF.mono;
+        ctx.font = '14px ' + CF.mono;
         ctx.textAlign = 'left';
         ctx.fillText('\u6a21\u5f0f:', startX, patY - 8);
 
@@ -273,7 +273,7 @@ const StringMatch = {
             ctx.fillRect(x, patY, cellW - 1, cellH);
 
             ctx.fillStyle = 'rgba(196,121,58,0.6)';
-            ctx.font = '12px ' + CF.mono;
+            ctx.font = '17px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(pattern[j], x + cellW / 2, patY + cellH / 2 + 4);
         }
@@ -298,7 +298,7 @@ const StringMatch = {
 
         // Status message
         const statusY = patY + cellH + 30;
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'left';
         if (step.found) {
             ctx.fillStyle = 'rgba(77,158,126,0.5)';
@@ -320,7 +320,7 @@ const StringMatch = {
         const startX = 20;
 
         ctx.fillStyle = 'rgba(196,121,58,0.3)';
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('LPS \u8868 (\u524d\u7f00\u51fd\u6570):', startX, y);
 
@@ -330,7 +330,7 @@ const StringMatch = {
             ctx.fillStyle = 'rgba(196,121,58,0.08)';
             ctx.fillRect(x, y + 5, cellW - 1, 18);
             ctx.fillStyle = 'rgba(196,121,58,0.5)';
-            ctx.font = '10px ' + CF.mono;
+            ctx.font = '15px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(pattern[i], x + cellW / 2, y + 18);
         }
@@ -340,7 +340,7 @@ const StringMatch = {
             ctx.fillStyle = 'rgba(255,255,255,0.05)';
             ctx.fillRect(x, y + 24, cellW - 1, 18);
             ctx.fillStyle = 'rgba(229,192,123,0.5)';
-            ctx.font = '10px ' + CF.mono;
+            ctx.font = '15px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(lps[i], x + cellW / 2, y + 37);
         }

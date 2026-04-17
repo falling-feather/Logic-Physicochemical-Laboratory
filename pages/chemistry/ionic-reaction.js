@@ -198,7 +198,7 @@ const IonicReaction = {
         ctx.fillStyle = 'rgba(200,200,200,0.4)';
         ctx.fill();
 
-        ctx.font = '10px ' + CF.sans;
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(200,200,200,0.5)';
         ctx.fillText('\u53CD\u5E94\u524D', W * 0.24, H * 0.36);
@@ -231,7 +231,7 @@ const IonicReaction = {
                 ctx.setLineDash([]);
             }
             // symbol
-            ctx.font = 'bold 10px ' + CF.mono;
+            ctx.font = 'bold 15px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillStyle = isSpectator ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.9)';
             ctx.fillText(p.symbol, p.x, p.y + 4);
@@ -243,7 +243,7 @@ const IonicReaction = {
         else if (this.phase === 'ionic') eqParts = rxn.ionic;
         else eqParts = rxn.netIonic;
 
-        ctx.font = 'bold 14px ' + CF.mono;
+        ctx.font = 'bold 19px ' + CF.mono;
         ctx.textAlign = 'center';
         const eqStr = eqParts.join(' ');
         ctx.fillStyle = 'rgba(77,158,126,0.9)';
@@ -251,14 +251,14 @@ const IonicReaction = {
 
         // spectator ions annotation
         if (this.phase === 'net-ionic') {
-            ctx.font = '11px ' + CF.sans;
+            ctx.font = '16px ' + CF.sans;
             ctx.fillStyle = 'rgba(200,200,200,0.5)';
             ctx.fillText('\u65C1\u89C2\u79BB\u5B50: ' + rxn.spectator.join(', ') + ' (\u4E0D\u53C2\u4E0E\u53CD\u5E94)', W / 2, H * 0.92);
         }
 
         // phase indicator
         const phaseLabels = { 'molecular': '\u5316\u5B66\u65B9\u7A0B\u5F0F', 'ionic': '\u5168\u79BB\u5B50\u65B9\u7A0B\u5F0F', 'net-ionic': '\u51C0\u79BB\u5B50\u65B9\u7A0B\u5F0F' };
-        ctx.font = '12px ' + CF.sans;
+        ctx.font = '17px ' + CF.sans;
         ctx.textAlign = 'right';
         ctx.fillStyle = 'rgba(77,158,126,0.7)';
         ctx.fillText(phaseLabels[this.phase], W - 14, H * 0.92);

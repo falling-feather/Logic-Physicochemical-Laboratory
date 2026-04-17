@@ -460,10 +460,10 @@ const PhysicsSim = {
         // Empty state hint
         if (this.balls.length === 0 && !this.isDragging) {
             ctx.fillStyle = 'rgba(255,255,255,0.15)';
-            ctx.font = '16px ' + CF.sans;
+            ctx.font = '20px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('在画布上拖拽来发射小球', this.W / 2, this.H / 2 - 10);
-            ctx.font = '13px ' + CF.sans;
+            ctx.font = '18px ' + CF.sans;
             ctx.fillStyle = 'rgba(255,255,255,0.08)';
             ctx.fillText('拖拽方向和距离决定发射速度', this.W / 2, this.H / 2 + 15);
         }
