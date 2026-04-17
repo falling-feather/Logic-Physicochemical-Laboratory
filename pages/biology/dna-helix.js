@@ -433,7 +433,7 @@ const DNAHelix = {
                         ctx.stroke();
                     }
                     ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 10px "JetBrains Mono", monospace';
+                    ctx.font = 'bold 15px ' + CF.mono;
                     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                     ctx.fillText(bp.base, lx, y);
 
@@ -489,7 +489,7 @@ const DNAHelix = {
 
         // Direction arrows
         ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '10px "Noto Sans SC", sans-serif';
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText("5' \u2192 3'", cx + radius + 20, topY + 10);
         ctx.textAlign = 'right';
@@ -500,7 +500,7 @@ const DNAHelix = {
         const grooveAngle = rot + (n * 0.45 * 0.4);
         if (Math.cos(grooveAngle) > 0.3) {
             ctx.fillStyle = 'rgba(255,255,255,0.15)';
-            ctx.font = '9px "Noto Sans SC", sans-serif';
+            ctx.font = '14px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('\u5927\u6c9f', cx + radius * 0.5, midY - 8);
             ctx.fillText('\u5c0f\u6c9f', cx - radius * 0.5, midY + 8);
@@ -513,7 +513,7 @@ const DNAHelix = {
     _drawLegend(ctx, W, H) {
         const lx = W * 0.75, ly = 20;
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        ctx.font = '600 11px "Noto Sans SC", sans-serif';
+        ctx.font = '600 17px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('\u78b1\u57fa\u56fe\u4f8b', lx, ly);
 
@@ -529,11 +529,11 @@ const DNAHelix = {
             ctx.fillStyle = color + '88';
             ctx.beginPath(); ctx.arc(lx + 6, y - 3, 7, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 9px "JetBrains Mono", monospace';
+            ctx.font = 'bold 14px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(letter, lx + 6, y);
             ctx.fillStyle = 'rgba(255,255,255,0.5)';
-            ctx.font = '10px "Noto Sans SC", sans-serif';
+            ctx.font = '15px ' + CF.sans;
             ctx.textAlign = 'left';
             ctx.fillText(name, lx + 18, y);
         });
@@ -541,7 +541,7 @@ const DNAHelix = {
         // H-bond info
         const by = ly + 22 + items.length * 24 + 10;
         ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '10px "Noto Sans SC", sans-serif';
+        ctx.font = '15px ' + CF.sans;
         ctx.fillText('A=T : 2\u4e2a\u6c22\u952e', lx, by);
         ctx.fillText('G\u2261C : 3\u4e2a\u6c22\u952e', lx, by + 16);
 
@@ -577,7 +577,7 @@ const DNAHelix = {
                 ctx.fillStyle = this.baseColors[bp.base] + '88';
                 ctx.beginPath(); ctx.arc(lx, y, 8, 0, Math.PI * 2); ctx.fill();
                 ctx.fillStyle = '#fff';
-                ctx.font = 'bold 9px "JetBrains Mono", monospace';
+                ctx.font = 'bold 14px ' + CF.mono;
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText(bp.base, lx, y);
 
@@ -601,7 +601,7 @@ const DNAHelix = {
                     ctx.beginPath(); ctx.moveTo(lx - 12, y); ctx.lineTo(lx - 8, y); ctx.stroke();
                     ctx.setLineDash([]);
                     ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 10px "JetBrains Mono", monospace';
+                    ctx.font = 'bold 15px ' + CF.mono;
                     ctx.fillText(bp.complement, lx - 20, y);
 
                     // New complement for right
@@ -631,7 +631,7 @@ const DNAHelix = {
                 ctx.fillStyle = this.baseColors[bp.base] + '66';
                 ctx.beginPath(); ctx.arc(lx, y, 8, 0, Math.PI * 2); ctx.fill();
                 ctx.fillStyle = '#fff';
-                ctx.font = 'bold 9px "JetBrains Mono", monospace';
+                ctx.font = 'bold 14px ' + CF.mono;
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText(bp.base, lx, y);
 
@@ -651,14 +651,14 @@ const DNAHelix = {
             ctx.lineTo(cx, forkY); ctx.closePath(); ctx.fill();
 
             ctx.fillStyle = 'rgba(255,200,50,0.5)';
-            ctx.font = '9px "Noto Sans SC", sans-serif';
+            ctx.font = '14px ' + CF.sans;
             ctx.textAlign = 'right';
             ctx.fillText('\u89e3\u65cb\u9176', cx - 10, forkY - 2);
         }
 
         // Labels
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '10px "Noto Sans SC", sans-serif';
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u6bcd\u94fe', cx - radius * 0.5 - 28, topY + 10);
         ctx.fillText('\u6bcd\u94fe', cx + radius * 0.5 + 28, topY + 10);
@@ -694,7 +694,7 @@ const DNAHelix = {
             ctx.fillStyle = this.baseColors[bp.base] + (isActive ? 'cc' : '55');
             ctx.beginPath(); ctx.arc(lx, y, isActive ? 10 : 8, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 9px "JetBrains Mono", monospace';
+            ctx.font = 'bold 14px ' + CF.mono;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(bp.base, lx, y);
 
@@ -703,7 +703,7 @@ const DNAHelix = {
             ctx.fillStyle = this.baseColors[bp.complement] + '44';
             ctx.beginPath(); ctx.arc(rx, y, 7, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = 'rgba(255,255,255,0.5)';
-            ctx.font = '9px "JetBrains Mono", monospace';
+            ctx.font = '14px ' + CF.mono;
             ctx.fillText(bp.complement, rx, y);
 
             // mRNA being synthesized
@@ -715,7 +715,7 @@ const DNAHelix = {
                 ctx.fillStyle = (this.baseColors[mBase] || '#b85450') + 'aa';
                 ctx.beginPath(); ctx.arc(mx, y, 8, 0, Math.PI * 2); ctx.fill();
                 ctx.fillStyle = '#fff';
-                ctx.font = 'bold 9px "JetBrains Mono", monospace';
+                ctx.font = 'bold 14px ' + CF.mono;
                 ctx.fillText(mBase, mx, y);
 
                 // Arrow from template to mRNA
@@ -735,14 +735,14 @@ const DNAHelix = {
             ctx.beginPath(); ctx.ellipse(cx + 20, polY, 18, 10, 0, 0, Math.PI * 2); ctx.fill();
             ctx.strokeStyle = 'rgba(184,84,80,0.6)'; ctx.lineWidth = 1.5; ctx.stroke();
             ctx.fillStyle = 'rgba(255,255,255,0.6)';
-            ctx.font = '9px "Noto Sans SC", sans-serif';
+            ctx.font = '14px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('RNA\u805a\u5408\u9176', cx + 20, polY + 2);
         }
 
         // Labels
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '10px "Noto Sans SC", sans-serif';
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText("\u6a21\u677f\u94fe 3'\u21925'", cx - 15, topY - 8);
         ctx.fillText("\u7f16\u7801\u94fe 5'\u21923'", cx + 15, topY - 8);
@@ -758,7 +758,7 @@ const DNAHelix = {
             ctx.strokeRect(W * 0.6, 20, W * 0.36, H * 0.4);
 
             ctx.fillStyle = 'rgba(184,84,80,0.6)';
-            ctx.font = '600 11px "Noto Sans SC", sans-serif';
+            ctx.font = '600 17px ' + CF.sans;
             ctx.textAlign = 'left';
             ctx.fillText('mRNA \u5e8f\u5217', W * 0.62, 36);
 
@@ -774,7 +774,7 @@ const DNAHelix = {
                 ctx.fillStyle = (this.baseColors[base] || '#b85450') + '55';
                 ctx.fillRect(bx, by, cellW - 2, 18);
                 ctx.fillStyle = '#fff';
-                ctx.font = 'bold 10px "JetBrains Mono", monospace';
+                ctx.font = 'bold 15px ' + CF.mono;
                 ctx.textAlign = 'center';
                 ctx.fillText(base, bx + cellW / 2 - 1, by + 13);
             }
@@ -786,7 +786,7 @@ const DNAHelix = {
                     codons.push(this.mRNA.slice(i, i + 3));
                 }
                 ctx.fillStyle = 'rgba(255,255,255,0.3)';
-                ctx.font = '10px "Noto Sans SC", sans-serif';
+                ctx.font = '15px ' + CF.sans;
                 ctx.textAlign = 'left';
                 ctx.fillText('\u5bc6\u7801\u5b50: ' + codons.join(' - '), W * 0.62, 50 + Math.ceil(this.mRNA.length / cols) * 22 + 16);
             }
@@ -836,12 +836,12 @@ const DNAHelix = {
 
         const content = eduContent[this.mode] || eduContent.helix;
         ctx.fillStyle = 'rgba(58,158,143,0.6)';
-        ctx.font = '600 11px "Noto Sans SC", sans-serif';
+        ctx.font = '600 17px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText(content.title, 18, y0 + 16);
 
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '11px "Noto Sans SC", sans-serif';
+        ctx.font = '17px ' + CF.sans;
         content.lines.forEach((line, i) => {
             ctx.fillText(line, 18, y0 + 34 + i * 18);
         });

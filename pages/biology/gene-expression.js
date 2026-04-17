@@ -110,13 +110,13 @@ const GeneExpression = {
         const mrnaY = H * 0.6;
 
         // title
-        ctx.font = 'bold 14px "Noto Sans SC", sans-serif';
+        ctx.font = 'bold 21px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(58,158,143,0.9)';
         ctx.fillText('\u8F6C\u5F55\u8FC7\u7A0B: DNA \u2192 mRNA', W / 2, 24);
 
         // labels
-        ctx.font = '12px "Noto Sans SC", sans-serif';
+        ctx.font = '18px ' + CF.sans;
         ctx.textAlign = 'right';
         ctx.fillStyle = 'rgba(200,200,200,0.6)';
         ctx.fillText('DNA \u6A21\u677F\u94FE (3\u2032\u21925\u2032)', startX - 8, dnaY + 5);
@@ -135,7 +135,7 @@ const GeneExpression = {
             // coding strand (top)
             ctx.fillStyle = i < polyPos ? 'rgba(200,200,200,0.2)' : this._baseColor(comp);
             ctx.fillRect(x + 1, dnaY - 30, bw - 2, 18);
-            ctx.font = 'bold 11px monospace';
+            ctx.font = 'bold 17px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillStyle = i < polyPos ? 'rgba(200,200,200,0.3)' : 'rgba(255,255,255,0.9)';
             ctx.fillText(comp, x + bw / 2, dnaY - 18);
@@ -145,7 +145,7 @@ const GeneExpression = {
             const templateOffsetY = isUnwound ? 10 : 0;
             ctx.fillStyle = this._baseColor(base);
             ctx.fillRect(x + 1, dnaY + templateOffsetY, bw - 2, 18);
-            ctx.font = 'bold 11px monospace';
+            ctx.font = 'bold 17px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(255,255,255,0.9)';
             ctx.fillText(base, x + bw / 2, dnaY + templateOffsetY + 12);
@@ -167,7 +167,7 @@ const GeneExpression = {
                 const mrnaBase = this._complement(base);
                 ctx.fillStyle = this._baseColor(mrnaBase);
                 ctx.fillRect(x + 1, mrnaY, bw - 2, 18);
-                ctx.font = 'bold 11px monospace';
+                ctx.font = 'bold 17px ' + CF.mono;
                 ctx.textAlign = 'center';
                 ctx.fillStyle = 'rgba(255,255,255,0.9)';
                 ctx.fillText(mrnaBase, x + bw / 2, mrnaY + 12);
@@ -184,7 +184,7 @@ const GeneExpression = {
             ctx.strokeStyle = 'rgba(58,158,143,0.6)';
             ctx.lineWidth = 1.5;
             ctx.stroke();
-            ctx.font = '9px "Noto Sans SC", sans-serif';
+            ctx.font = '14px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(58,158,143,0.9)';
             ctx.fillText('RNA\u805A\u5408\u9176', px, dnaY + 8);
@@ -199,7 +199,7 @@ const GeneExpression = {
         ctx.stroke();
 
         // legend
-        ctx.font = '10px monospace';
+        ctx.font = '15px ' + CF.mono;
         ctx.textAlign = 'left';
         const bases = ['A', 'T', 'U', 'C', 'G'];
         bases.forEach((b, i) => {
@@ -221,13 +221,13 @@ const GeneExpression = {
         const mrnaY = H * 0.35;
         const proteinY = H * 0.72;
 
-        ctx.font = 'bold 14px "Noto Sans SC", sans-serif';
+        ctx.font = 'bold 21px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(58,158,143,0.9)';
         ctx.fillText('\u7FFB\u8BD1\u8FC7\u7A0B: mRNA \u2192 \u86CB\u767D\u8D28 (\u6C28\u57FA\u9178\u94FE)', W / 2, 24);
 
         // draw mRNA strand
-        ctx.font = '10px "Noto Sans SC", sans-serif';
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'right';
         ctx.fillStyle = 'rgba(200,200,200,0.5)';
         ctx.fillText('mRNA', startX - 6, mrnaY + 12);
@@ -236,7 +236,7 @@ const GeneExpression = {
             const x = startX + i * bw;
             ctx.fillStyle = this._baseColor(mrna[i]);
             ctx.fillRect(x + 1, mrnaY, bw - 2, 18);
-            ctx.font = 'bold 10px monospace';
+            ctx.font = 'bold 15px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(255,255,255,0.9)';
             ctx.fillText(mrna[i], x + bw / 2, mrnaY + 12);
@@ -264,7 +264,7 @@ const GeneExpression = {
             ctx.lineWidth = 1;
             ctx.stroke();
             // codon text
-            ctx.font = '9px monospace';
+            ctx.font = '14px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillStyle = i < riboPos ? 'rgba(58,158,143,0.7)' : 'rgba(200,200,200,0.3)';
             ctx.fillText(codons[i], (x1 + x2) / 2, mrnaY + 38);
@@ -288,14 +288,14 @@ const GeneExpression = {
             ctx.fill();
             ctx.strokeStyle = 'rgba(58,158,143,0.3)';
             ctx.stroke();
-            ctx.font = '9px "Noto Sans SC", sans-serif';
+            ctx.font = '14px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(58,158,143,0.8)';
             ctx.fillText('\u6838\u7CD6\u4F53', rx, mrnaY - 7);
         }
 
         // tRNA + amino acid chain
-        ctx.font = '10px "Noto Sans SC", sans-serif';
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'right';
         ctx.fillStyle = 'rgba(200,200,200,0.5)';
         ctx.fillText('\u6C28\u57FA\u9178\u94FE', startX - 6, proteinY + 5);
@@ -315,7 +315,7 @@ const GeneExpression = {
             ctx.arc(ax, proteinY, 16, 0, Math.PI * 2);
             ctx.fillStyle = aaColors[i % aaColors.length];
             ctx.fill();
-            ctx.font = 'bold 9px monospace';
+            ctx.font = 'bold 14px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(255,255,255,0.9)';
             ctx.fillText(aa, ax, proteinY + 3);
@@ -329,7 +329,7 @@ const GeneExpression = {
                 ctx.stroke();
             }
             // codon label
-            ctx.font = '9px "JetBrains Mono", monospace';
+            ctx.font = '14px ' + CF.mono;
             ctx.fillStyle = 'rgba(200,200,200,0.4)';
             ctx.fillText(codon, ax, proteinY + 26);
         }
@@ -351,7 +351,7 @@ const GeneExpression = {
             ctx.strokeStyle = 'rgba(255,200,100,0.5)';
             ctx.lineWidth = 1.5;
             ctx.stroke();
-            ctx.font = '9px "JetBrains Mono", monospace';
+            ctx.font = '14px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(255,200,100,0.7)';
             ctx.fillText('tRNA', tx, mrnaY + 50);

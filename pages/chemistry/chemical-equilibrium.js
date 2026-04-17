@@ -281,7 +281,7 @@ const ChemEquilibrium = {
         // Y axis label
         ctx.save();
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '11px var(--font-sans, sans-serif)';
+        ctx.font = '11px ' + CF.sans;
         ctx.translate(12, margin + graphH / 2);
         ctx.rotate(-Math.PI / 2);
         ctx.textAlign = 'center';
@@ -290,13 +290,13 @@ const ChemEquilibrium = {
 
         // X axis label
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '11px var(--font-sans, sans-serif)';
+        ctx.font = '11px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u65f6\u95f4', margin + graphW / 2, H - 5);
 
         if (this.history.length < 2) {
             ctx.fillStyle = 'rgba(255,255,255,0.3)';
-            ctx.font = '13px var(--font-sans, sans-serif)';
+            ctx.font = '13px ' + CF.sans;
             ctx.fillText('\u70b9\u51fb\u201c\u5f00\u59cb\u201d\u89c2\u5bdf\u53cd\u5e94\u8fbe\u5230\u5e73\u8861\u7684\u8fc7\u7a0b', W / 2, H / 2);
             this.drawReactionLabel(W / 2, margin - 8);
             return;
@@ -319,7 +319,7 @@ const ChemEquilibrium = {
             ctx.lineTo(margin + graphW, yy);
             ctx.stroke();
             ctx.fillStyle = 'rgba(255,255,255,0.3)';
-            ctx.font = '9px var(--font-mono, monospace)';
+            ctx.font = '9px ' + CF.mono;
             ctx.textAlign = 'right';
             ctx.fillText((maxConc * i / 4).toFixed(2), margin - 3, yy + 3);
         }
@@ -371,7 +371,7 @@ const ChemEquilibrium = {
             { label: 'H\u2082', color: this.colors.H2 },
             { label: 'NH\u2083', color: this.colors.NH3 }
         ];
-        ctx.font = '11px var(--font-sans, sans-serif)';
+        ctx.font = '11px ' + CF.sans;
         let cx = x;
         for (const item of items) {
             ctx.fillStyle = item.color;
@@ -386,7 +386,7 @@ const ChemEquilibrium = {
     drawReactionLabel(cx, y) {
         const ctx = this.ctx;
         ctx.fillStyle = 'rgba(255,255,255,0.6)';
-        ctx.font = '12px var(--font-sans, sans-serif)';
+        ctx.font = '12px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('N\u2082 + 3H\u2082 \u21cc 2NH\u2083  (\u0394H < 0, \u653e\u70ed)', cx, y);
     }

@@ -203,7 +203,7 @@ const Electrochemistry = {
 
         // Salt bridge label
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '10px var(--font-sans, sans-serif)';
+        ctx.font = '10px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText(mode === 'galvanic' ? '\u76d0\u6865' : '\u9694\u819c', midX, cellY + cellH + 14);
 
@@ -228,7 +228,7 @@ const Electrochemistry = {
 
         // Electrode labels
         ctx.fillStyle = '#ddd';
-        ctx.font = 'bold 11px var(--font-sans, sans-serif)';
+        ctx.font = 'bold 11px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText(cell.anode.label, anodeX, electrodeY - 6);
         ctx.fillText(cell.cathode.label, cathodeX, electrodeY - 6);
@@ -246,7 +246,7 @@ const Electrochemistry = {
 
         // Direction label on wire
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        ctx.font = '10px var(--font-sans, sans-serif)';
+        ctx.font = '10px ' + CF.sans;
         ctx.textAlign = 'center';
         const arrowDir = mode === 'galvanic' ? '\u2192' : '\u2190';
         ctx.fillText('e\u207b ' + arrowDir, midX, wireY - 4);
@@ -269,7 +269,7 @@ const Electrochemistry = {
             ctx.fillStyle = '#e06c75';
             ctx.fillRect(midX - 7, wireY - 3, 14, 6);
             ctx.fillStyle = '#fff';
-            ctx.font = '8px var(--font-sans, sans-serif)';
+            ctx.font = '8px ' + CF.sans;
             ctx.fillText('\u7535\u6e90', midX, wireY + 16);
         }
 
@@ -278,7 +278,7 @@ const Electrochemistry = {
 
         // Reactions at bottom
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = '11px var(--font-mono, monospace)';
+        ctx.font = '11px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText(cell.anode.reaction, anodeX, cellY + cellH + 14);
         ctx.fillText(cell.cathode.reaction, cathodeX, cellY + cellH + 14);
@@ -322,7 +322,7 @@ const Electrochemistry = {
 
                 // e- label
                 ctx.fillStyle = 'rgba(91,141,206,0.6)';
-                ctx.font = '8px var(--font-sans)';
+                ctx.font = '8px ' + CF.sans;
                 ctx.textAlign = 'center';
                 ctx.fillText('e\u207b', x, y - 5);
             } else if (p.type === 'cation') {
@@ -338,7 +338,7 @@ const Electrochemistry = {
                 ctx.arc(x, y, 3.5, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.fillStyle = 'rgba(196,149,102,0.5)';
-                ctx.font = '7px var(--font-sans)';
+                ctx.font = '7px ' + CF.sans;
                 ctx.textAlign = 'center';
                 ctx.fillText('+', x, y - 5);
             } else if (p.type === 'anion') {
@@ -353,7 +353,7 @@ const Electrochemistry = {
                 ctx.arc(x, y, 3, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.fillStyle = 'rgba(77,158,126,0.5)';
-                ctx.font = '7px var(--font-sans)';
+                ctx.font = '7px ' + CF.sans;
                 ctx.textAlign = 'center';
                 ctx.fillText('\u2212', x, y - 5);
             }

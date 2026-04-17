@@ -39,6 +39,7 @@
 
     /* ── Typography ── */
     --font-display: 'Noto Sans SC', 'Inter', system-ui, -apple-system, sans-serif;
+    --font-sans: 'Inter', 'Noto Sans SC', system-ui, sans-serif;
     --font-body: 'Inter', 'Noto Sans SC', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
 

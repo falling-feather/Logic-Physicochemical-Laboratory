@@ -1,3 +1,11 @@
+// ===== Canvas Font Resolution =====
+// CSS var() does not work in ctx.font — resolve once via getComputedStyle
+const CF = {
+    _s: null, _m: null,
+    get sans() { return this._s || (this._s = getComputedStyle(document.documentElement).getPropertyValue('--font-sans').trim() || 'sans-serif'); },
+    get mono() { return this._m || (this._m = getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim() || 'monospace'); }
+};
+
 // ===== Application Configuration =====
 const CONFIG = {
     // Page metadata

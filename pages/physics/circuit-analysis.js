@@ -192,7 +192,7 @@ const CircuitAnalysis = {
 
         // Current direction arrow
         ctx.fillStyle = 'rgba(229,192,123,0.4)';
-        ctx.font = '10px var(--font-sans)';
+        ctx.font = '10px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('I = ' + I.toFixed(2) + ' A \u2192', midX, top - 8);
     },
@@ -269,7 +269,7 @@ const CircuitAnalysis = {
         this.drawCurrentParticles(pathBot, I2 * 8, 10);
 
         ctx.fillStyle = 'rgba(229,192,123,0.4)';
-        ctx.font = '10px var(--font-sans)';
+        ctx.font = '10px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('I\u2081=' + I1.toFixed(2) + 'A', splitR + 5, branchTop - 5);
         ctx.fillText('I\u2082=' + I2.toFixed(2) + 'A', splitR + 5, branchBot - 5);
@@ -295,7 +295,7 @@ const CircuitAnalysis = {
         ctx.stroke();
 
         ctx.fillStyle = 'rgba(229,192,123,0.5)';
-        ctx.font = '9px var(--font-mono)';
+        ctx.font = '9px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText(V + 'V', mx + 18, my + 3);
         ctx.fillText('+', mx - 14, my - 3);
@@ -322,7 +322,7 @@ const CircuitAnalysis = {
         ctx.stroke();
 
         ctx.fillStyle = 'rgba(139,111,192,0.5)';
-        ctx.font = '10px var(--font-mono)';
+        ctx.font = '10px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText(label, (x1 + x2) / 2, y + amp + 14);
     },
@@ -382,7 +382,7 @@ const CircuitAnalysis = {
         ];
 
         ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '11px var(--font-mono)';
+        ctx.font = '11px ' + CF.mono;
         ctx.textAlign = 'right';
         lines.forEach((l, i) => {
             ctx.fillText(l, W - 15, H - 10 - (lines.length - 1 - i) * 16);

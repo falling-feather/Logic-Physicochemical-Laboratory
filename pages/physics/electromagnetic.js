@@ -531,10 +531,10 @@ const EMField = {
     drawEmptyHint() {
         const ctx = this.ctx;
         ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.font = '500 16px Inter, Noto Sans SC, sans-serif';
+        ctx.font = '500 16px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('添加电荷或选择预设以查看电场分布', this.W / 2, this.H / 2);
-        ctx.font = '12px Inter, sans-serif';
+        ctx.font = '12px ' + CF.sans;
         ctx.fillText('双击电荷可删除', this.W / 2, this.H / 2 + 24);
         ctx.textAlign = 'left';
     },
@@ -818,7 +818,7 @@ const EMField = {
         ctx.beginPath();
         ctx.roundRect(tx - 4, ty - 16, 150, 50, 6);
         ctx.fill();
-        ctx.font = '500 11px "JetBrains Mono", monospace';
+        ctx.font = '500 11px ' + CF.mono;
         ctx.fillStyle = '#fbbf24';
         ctx.textAlign = 'left';
         ctx.fillText(`|E| = ${eMag.toFixed(1)}`, tx, ty);
@@ -854,7 +854,7 @@ const EMField = {
 
             // +/- 符号
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 16px Inter, sans-serif';
+            ctx.font = 'bold 16px ' + CF.sans;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(c.q > 0 ? '+' : '−', c.x, c.y + 1);
         }
@@ -963,7 +963,7 @@ const EMField = {
 
         if (this.currents.length === 0) {
             ctx.fillStyle = 'rgba(255,255,255,0.3)';
-            ctx.font = '14px "Noto Sans SC", Inter, sans-serif';
+            ctx.font = '14px ' + CF.sans;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText('点击画布放置载流导线', W / 2, H / 2);
             return;
@@ -1102,7 +1102,7 @@ const EMField = {
         ctx.roundRect(tx - 6, ty - 18, 170, 62, 6);
         ctx.fill();
 
-        ctx.font = '500 11px "JetBrains Mono", monospace';
+        ctx.font = '500 11px ' + CF.mono;
         ctx.textAlign = 'left';
         ctx.fillStyle = '#38bdf8';
         ctx.fillText(`|B| = ${(bMag * 1000).toFixed(2)} mT`, tx, ty);
@@ -1111,7 +1111,7 @@ const EMField = {
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
         ctx.fillText(`Bx=${(B.x * 1000).toFixed(2)}  By=${(B.y * 1000).toFixed(2)}`, tx, ty + 32);
         ctx.fillStyle = '#94a3b8';
-        ctx.font = '10px "Noto Sans SC", Inter, sans-serif';
+        ctx.font = '10px ' + CF.sans;
         ctx.fillText(`\u5bfc\u7ebf\u6570: ${this.currents.length}`, tx, ty + 46);
     },
 
@@ -1130,7 +1130,7 @@ const EMField = {
 
             // 符号：⊙(出屏, 中心一点) 或 ⊗(入屏, ×)
             ctx.fillStyle = c.I > 0 ? '#fbbf24' : '#a78bfa';
-            ctx.font = 'bold 14px Inter, sans-serif';
+            ctx.font = 'bold 14px ' + CF.sans;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             if (c.I > 0) {
                 // 圆心点
@@ -1150,7 +1150,7 @@ const EMField = {
 
             // 标签
             ctx.fillStyle = 'rgba(255,255,255,0.5)';
-            ctx.font = '10px Inter, sans-serif';
+            ctx.font = '10px ' + CF.sans;
             ctx.fillText(c.I > 0 ? 'I ⊙' : 'I ⊗', c.x, c.y - r - 6);
         }
         ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
@@ -1287,7 +1287,7 @@ const EMField = {
             ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
 
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 8px Inter, sans-serif';
+            ctx.font = 'bold 8px ' + CF.sans;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(p.sign > 0 ? '+' : '−', p.x, p.y + 0.5);
         }

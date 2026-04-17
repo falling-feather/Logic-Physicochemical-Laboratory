@@ -220,7 +220,7 @@ const CellStructure = {
 
         // Type badge (always)
         ctx.fillStyle = `rgba(255,255,255,${0.4 * (1 - zp)})`;
-        ctx.font = '500 12px "Noto Sans SC", sans-serif';
+        ctx.font = '500 18px ' + CF.sans;
         ctx.textAlign = 'right';
         ctx.fillText(this.isPlant ? '🌱 植物细胞' : '🔬 动物细胞', W - 14, H - 12);
     },
@@ -252,7 +252,7 @@ const CellStructure = {
             // Label
             if (this.showLabels && !o.hl) {
                 ctx.fillStyle = hov ? '#fff' : o.border;
-                ctx.font = `${hov ? '600 13' : '500 12'}px "Noto Sans SC", Inter, sans-serif`;
+                ctx.font = `${hov ? '600 20' : '500 18'}px ${CF.sans}`;
                 ctx.textAlign = 'center';
                 ctx.fillText(o.name, cx, cy - ry - 7);
             }
@@ -483,10 +483,10 @@ const CellStructure = {
         const key = org.id.replace(/\d+$/, '');
         ctx.fillStyle = '#0c1018'; ctx.fillRect(0, 0, W, H);
         ctx.fillStyle = org.border;
-        ctx.font = 'bold 16px "Noto Sans SC", Inter, sans-serif'; ctx.textAlign = 'left';
+        ctx.font = 'bold 24px ' + CF.sans; ctx.textAlign = 'left';
         ctx.fillText(org.name + ' — 内部结构', 16, 28);
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '11px "Noto Sans SC", sans-serif'; ctx.textAlign = 'right';
+        ctx.font = '17px ' + CF.sans; ctx.textAlign = 'right';
         ctx.fillText('点击返回  ✕', W - 14, 22);
 
         const pad = 40;
@@ -508,7 +508,7 @@ const CellStructure = {
 
     _label(ctx, x, y, text, color, align) {
         ctx.fillStyle = color || 'rgba(255,255,255,0.6)';
-        ctx.font = '500 11px "Noto Sans SC", Inter, sans-serif';
+        ctx.font = '500 17px ' + CF.sans;
         ctx.textAlign = align || 'left';
         ctx.fillText(text, x, y);
     },
@@ -844,7 +844,7 @@ const CellStructure = {
             ctx.fillStyle = p.color + '55'; ctx.fill();
             ctx.strokeStyle = p.color; ctx.lineWidth = 1; ctx.stroke();
             ctx.fillStyle = p.color;
-            ctx.font = '500 10px "Noto Sans SC", sans-serif'; ctx.textAlign = 'center';
+            ctx.font = '500 15px ' + CF.sans; ctx.textAlign = 'center';
             ctx.fillText(p.label, px, py + 14);
         }
 
@@ -880,7 +880,7 @@ const CellStructure = {
                 ctx.restore();
             }
             ctx.fillStyle = layer.border;
-            ctx.font = '500 10px "Noto Sans SC", sans-serif'; ctx.textAlign = 'center';
+            ctx.font = '500 15px ' + CF.sans; ctx.textAlign = 'center';
             ctx.fillText(layer.name, lx + lw / 2, cy + h * .4 + 14);
             xOff += lw;
         }
@@ -899,9 +899,9 @@ const CellStructure = {
         ctx.fillStyle = org.color; ctx.fill();
         ctx.strokeStyle = org.border; ctx.lineWidth = 2; ctx.stroke();
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = 'bold 18px "Noto Sans SC", sans-serif'; ctx.textAlign = 'center';
+        ctx.font = 'bold 27px ' + CF.sans; ctx.textAlign = 'center';
         ctx.fillText(org.name, cx, cy);
-        ctx.font = '12px "Noto Sans SC", sans-serif';
+        ctx.font = '18px ' + CF.sans;
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
         const desc = org.desc.length > 40 ? org.desc.slice(0, 40) + '…' : org.desc;
         ctx.fillText(desc, cx, cy + 22);

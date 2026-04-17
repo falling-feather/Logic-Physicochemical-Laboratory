@@ -207,7 +207,7 @@ ${opEdu[this.operation]}
         ctx.strokeRect(margin, margin, W - margin * 2, H - margin * 2);
         ctx.setLineDash([]);
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '13px var(--font-sans, sans-serif)';
+        ctx.font = '20px ' + CF.sans;
         ctx.fillText('U', margin + 6, margin + 16);
 
         // Draw highlight FIRST (behind circles)
@@ -233,7 +233,7 @@ ${opEdu[this.operation]}
 
         // Labels
         ctx.fillStyle = this.colors.text;
-        ctx.font = 'bold 16px var(--font-sans, sans-serif)';
+        ctx.font = 'bold 24px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('A', c.A.x - c.A.r * 0.55, c.A.y);
@@ -247,7 +247,7 @@ ${opEdu[this.operation]}
 
         // Formula display
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = '15px var(--font-sans, sans-serif)';
+        ctx.font = '23px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         ctx.fillText(this.opInfo[operation].symbol, W / 2, H - 30);
@@ -320,7 +320,7 @@ ${opEdu[this.operation]}
         const both = [...A].filter(x => B.has(x));
         const outside = [...U].filter(x => !A.has(x) && !B.has(x));
 
-        ctx.font = '11px var(--font-mono, monospace)';
+        ctx.font = '17px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
@@ -346,7 +346,7 @@ ${opEdu[this.operation]}
         // Outside elements (near corners)
         if (outside.length) {
             ctx.fillStyle = inResult.has(outside[0]) ? '#56b6c2' : 'rgba(255,255,255,0.3)';
-            ctx.font = '10px var(--font-mono, monospace)';
+            ctx.font = '16px ' + CF.mono;
             const outs = outside.sort((a, b) => a - b).join(', ');
             ctx.fillText(outs, this.W / 2, this.H - 50);
         }
@@ -374,7 +374,7 @@ ${opEdu[this.operation]}
         const sorted = elements.sort((a, b) => a - b);
         const text = label + ' = {' + sorted.join(', ') + '}';
         ctx.fillStyle = 'rgba(30,30,30,0.85)';
-        ctx.font = '12px var(--font-sans, sans-serif)';
+        ctx.font = '18px ' + CF.sans;
         const tw = ctx.measureText(text).width + 16;
         const tx = this.W / 2 - tw / 2;
         const ty = 30;

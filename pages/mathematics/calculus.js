@@ -424,7 +424,7 @@ const Calculus = {
             ctx.beginPath(); ctx.moveTo(ax, 0); ctx.lineTo(ax, h); ctx.stroke();
         }
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.font = '10px monospace';
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         const step = this.niceStep(this.xmax - this.xmin);
@@ -497,7 +497,7 @@ const Calculus = {
         ctx.shadowBlur = 0;
 
         ctx.fillStyle = 'rgba(255,255,255,0.7)';
-        ctx.font = '12px Inter, sans-serif';
+        ctx.font = '18px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText(`斜率 = ${slope.toFixed(3)}`, px + 10, py - 10);
     },
@@ -532,7 +532,7 @@ const Calculus = {
             ctx.restore();
 
             ctx.fillStyle = color;
-            ctx.font = 'bold 10px Inter, sans-serif';
+            ctx.font = 'bold 16px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText(label, px, py - 14);
         }
@@ -557,7 +557,7 @@ const Calculus = {
             ctx.shadowBlur = 0;
 
             ctx.fillStyle = '#8b6fc0';
-            ctx.font = 'bold 10px Inter, sans-serif';
+            ctx.font = 'bold 16px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('拐点', px, py - 14);
         }
@@ -602,7 +602,7 @@ const Calculus = {
         const midX = this.mapX((lo + hi) / 2, w);
         const midY = this.mapY(0, h) - 20;
         ctx.fillStyle = area >= 0 ? '#4d9e7e' : '#b85450';
-        ctx.font = 'bold 13px Inter, sans-serif';
+        ctx.font = 'bold 20px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText(`∫ = ${area.toFixed(4)}`, midX, midY);
     },
@@ -692,7 +692,7 @@ const Calculus = {
         const exactArea = this.numericalIntegral(Math.min(a, b), Math.max(a, b)) * (b >= a ? 1 : -1);
         const error = Math.abs(riemannSum - exactArea);
         ctx.fillStyle = 'rgba(91,141,206,0.8)';
-        ctx.font = '11px Inter, sans-serif';
+        ctx.font = '17px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText(`Riemann(${type}, N=${N}) = ${riemannSum.toFixed(4)}  误差 ≈ ${error.toFixed(6)}`, 10, 16);
     },
@@ -771,7 +771,7 @@ const Calculus = {
         ctx.shadowBlur = 0;
 
         ctx.fillStyle = 'rgba(255,255,255,0.6)';
-        ctx.font = '11px Inter, sans-serif';
+        ctx.font = '17px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText(`a = ${a}`, px + 8, py - 8);
     },

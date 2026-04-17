@@ -128,7 +128,7 @@ const Inequality = {
 
         // Labels
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '10px var(--font-sans)';
+        ctx.font = '16px ' + CF.sans;
         ctx.textAlign = 'center';
         for (let i = 2; i <= 14; i += 2) {
             const p = this.worldToScreen(i, 0);
@@ -233,7 +233,7 @@ const Inequality = {
             }
             const ls = this.worldToScreen(lx, ly);
             ctx.fillStyle = c.color;
-            ctx.font = '11px var(--font-mono)';
+            ctx.font = '17px ' + CF.mono;
             ctx.textAlign = 'left';
             const label = (c.a !== 0 ? (c.a === 1 ? 'x' : c.a + 'x') : '') +
                           (c.b !== 0 ? (c.a !== 0 ? '+' : '') + (c.b === 1 ? 'y' : c.b + 'y') : '') +
@@ -276,7 +276,7 @@ const Inequality = {
 
             // z label
             ctx.fillStyle = 'rgba(152,195,121,0.6)';
-            ctx.font = '10px var(--font-mono)';
+            ctx.font = '16px ' + CF.mono;
             ctx.textAlign = 'left';
             ctx.fillText('z=' + z.toFixed(1), s1.x + 4, s1.y - 4);
         }
@@ -289,7 +289,7 @@ const Inequality = {
             ctx.arc(s.x, s.y, 6, 0, Math.PI * 2);
             ctx.fill();
             ctx.fillStyle = '#98c379';
-            ctx.font = 'bold 11px var(--font-mono)';
+            ctx.font = 'bold 17px ' + CF.mono;
             ctx.textAlign = 'left';
             ctx.fillText('max z=' + maxZ.toFixed(1) + ' (' + optPt.x.toFixed(1) + ',' + optPt.y.toFixed(1) + ')', s.x + 10, s.y - 4);
         }

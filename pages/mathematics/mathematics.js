@@ -186,7 +186,7 @@ function drawFunctionGraph() {
 
     // Axis labels
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
-    ctx.font = '11px ' + (getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim() || 'monospace');
+    ctx.font = '16px ' + CF.mono;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const labelStepX = niceStep(xmax - xmin);
@@ -240,7 +240,7 @@ function drawFunctionGraph() {
 
     // Curve legend (when multiple)
     if (curves.length > 1) {
-        ctx.font = '11px ' + (getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim() || 'monospace');
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
         curves.forEach((c, i) => {

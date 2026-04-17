@@ -324,7 +324,7 @@ const TrigVis = {
             const lx = cx + r * 0.28 * Math.cos(labelAngle);
             const ly = cy - r * 0.28 * Math.sin(labelAngle);
             ctx.fillStyle = 'rgba(91,141,206,0.8)';
-            ctx.font = '11px var(--font-mono, monospace)';
+            ctx.font = '17px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText((angle * 180 / Math.PI).toFixed(0) + '\u00b0', lx, ly);
         }
@@ -394,7 +394,7 @@ const TrigVis = {
         ctx.stroke();
 
         // Labels
-        ctx.font = '10px var(--font-mono, monospace)';
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'center';
         // sin label
         ctx.fillStyle = '#e06c75';
@@ -405,7 +405,7 @@ const TrigVis = {
 
         // Axis labels
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        ctx.font = '10px var(--font-mono, monospace)';
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('1', cx + r + 10, cy + 12);
         ctx.fillText('-1', cx - r - 10, cy + 12);
@@ -432,7 +432,7 @@ const TrigVis = {
 
         // Vertical grid lines at pi intervals
         ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '9px var(--font-mono, monospace)';
+        ctx.font = '15px ' + CF.mono;
         ctx.textAlign = 'center';
         const piMarks = [0, 0.5, 1, 1.5, 2];
         const piLabels = ['0', '\u03c0/2', '\u03c0', '3\u03c0/2', '2\u03c0'];
@@ -531,7 +531,7 @@ const TrigVis = {
         }
 
         // Graph legend
-        ctx.font = '11px var(--font-sans, sans-serif)';
+        ctx.font = '17px ' + CF.sans;
         ctx.textAlign = 'left';
         let legendX = left + 8;
         const legendY = cy - ampY - 6;

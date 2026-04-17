@@ -206,14 +206,14 @@ const PermComb = {
     drawTree() {
         const { ctx, W, H, n, r, mode, treeLayout, animProgress } = this;
         const isPerm = mode === 'permutation';
-        const fs = Math.max(9, W * 0.009);
+        const fs = Math.max(15, W * 0.015);
 
         // Formula
         const label = isPerm ? `P(${n},${r})` : `C(${n},${r})`;
         const value = isPerm ? this.perm(n, r) : this.comb(n, r);
-        ctx.fillStyle = 'rgba(91,141,206,0.55)'; ctx.font = `${fs + 3}px var(--font-mono)`; ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(91,141,206,0.55)'; ctx.font = `${fs + 3}px ${CF.mono}`; ctx.textAlign = 'left';
         ctx.fillText(`${label} = ${value}`, 10, 22);
-        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = `${fs}px var(--font-mono)`;
+        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = `${fs}px ${CF.mono}`;
         if (isPerm) ctx.fillText(`A(${n},${r}) = ${n}!/(${n}-${r})! = ${value}`, 10, 40);
         else ctx.fillText(`C(${n},${r}) = ${n}!/(${r}!·(${n}-${r})!) = ${value}`, 10, 40);
 
@@ -247,7 +247,7 @@ const PermComb = {
                 ctx.beginPath(); ctx.arc(nd.x, nd.y, 8, 0, Math.PI * 2); ctx.fill();
 
                 ctx.fillStyle = 'rgba(255,255,255,0.7)';
-                ctx.font = `${fs}px var(--font-mono)`; ctx.textAlign = 'center';
+                ctx.font = `${fs}px ${CF.mono}`; ctx.textAlign = 'center';
                 ctx.fillText(nd.label, nd.x, nd.y + 3);
             }
             ctx.globalAlpha = 1;
@@ -255,7 +255,7 @@ const PermComb = {
 
         // Truncation note
         if (r > Math.min(r, 3)) {
-            ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.font = `${fs - 1}px var(--font-sans)`; ctx.textAlign = 'center';
+            ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.font = `${fs - 1}px ${CF.sans}`; ctx.textAlign = 'center';
             ctx.fillText(`(树截断在第${Math.min(r, 3)}层, 实际深度=${r})`, W / 2, H - 5);
         }
     },
@@ -263,10 +263,10 @@ const PermComb = {
     drawPascal() {
         const { ctx, W, H, pascalLayout, pascalRows, animProgress, hoverX, hoverY } = this;
         const rows = Math.min(pascalRows, 10);
-        const fs = Math.max(8, W * 0.008);
+        const fs = Math.max(14, W * 0.014);
 
         // Title
-        ctx.fillStyle = 'rgba(91,141,206,0.55)'; ctx.font = `${fs + 3}px var(--font-sans)`; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(91,141,206,0.55)'; ctx.font = `${fs + 3}px ${CF.sans}`; ctx.textAlign = 'center';
         ctx.fillText('杨辉三角 / 帕斯卡三角', W / 2, 22);
 
         // Detect hovered row
@@ -295,7 +295,7 @@ const PermComb = {
             ctx.lineWidth = isHoveredRow ? 1 : 0.5; ctx.stroke();
 
             ctx.fillStyle = isHoveredRow ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.5)';
-            ctx.font = (c.val > 99 ? `${fs - 2}` : `${fs}`) + 'px var(--font-mono)';
+            ctx.font = (c.val > 99 ? `${fs - 2}` : `${fs}`) + 'px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(c.val, c.x, c.y + 3);
 
@@ -312,7 +312,7 @@ const PermComb = {
         ctx.globalAlpha = 1;
 
         // Properties
-        ctx.fillStyle = 'rgba(229,192,123,0.3)'; ctx.font = `${fs}px var(--font-mono)`; ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(229,192,123,0.3)'; ctx.font = `${fs}px ${CF.mono}`; ctx.textAlign = 'left';
         ctx.fillText('C(n,0)=C(n,n)=1', 10, H - 30);
         ctx.fillText('C(n,k)=C(n-1,k-1)+C(n-1,k)', 10, H - 14);
 
@@ -354,8 +354,8 @@ const PermComb = {
     drawTooltip() {
         if (!this.hoverLabel || this.hoverX < 0) return;
         const { ctx, hoverX, hoverY, W } = this;
-        const fs = Math.max(10, W * 0.011);
-        ctx.font = `${fs}px var(--font-sans)`;
+        const fs = Math.max(16, W * 0.018);
+        ctx.font = `${fs}px ${CF.sans}`;
         const tw = ctx.measureText(this.hoverLabel).width;
         const px = Math.min(hoverX + 12, W - tw - 20);
         const py = Math.max(hoverY - 20, 16);

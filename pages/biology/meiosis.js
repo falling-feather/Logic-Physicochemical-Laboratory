@@ -189,7 +189,7 @@ const Meiosis = {
                     ctx.strokeStyle = 'rgba(255,255,100,0.5)';
                     ctx.lineWidth = 2;
                     ctx.stroke();
-                    ctx.font = '10px "Noto Sans SC", sans-serif';
+                    ctx.font = '15px ' + CF.sans;
                     ctx.fillStyle = 'rgba(255,255,100,0.7)';
                     ctx.textAlign = 'center';
                     ctx.fillText('\u4EA4\u53C9\u4E92\u6362', cx - 15, cy - 30);
@@ -309,7 +309,7 @@ const Meiosis = {
                     this._drawChromosome(pos.x - 6, pos.y, 0.2, chrLen * 0.6, colors[i], false);
                     this._drawChromosome(pos.x + 6, pos.y, -0.2, chrLen * 0.6, colors[i], false);
                     // ploidy label
-                    ctx.font = '10px monospace';
+                    ctx.font = '15px ' + CF.mono;
                     ctx.textAlign = 'center';
                     ctx.fillStyle = 'rgba(200,200,200,0.5)';
                     ctx.fillText('n', pos.x, pos.y + smallR + 12);
@@ -319,17 +319,17 @@ const Meiosis = {
 
         // phase info
         const info = this.phases[ph];
-        ctx.font = 'bold 15px "Noto Sans SC", sans-serif';
+        ctx.font = 'bold 23px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(58,158,143,0.9)';
         ctx.fillText((ph < 4 ? '\u51CF\u6570\u5206\u88C2 I - ' : '\u51CF\u6570\u5206\u88C2 II - ') + info.name, W / 2, 25);
-        ctx.font = '12px "Noto Sans SC", sans-serif';
+        ctx.font = '18px ' + CF.sans;
         ctx.fillStyle = 'rgba(200,200,200,0.6)';
         ctx.fillText(info.desc, W / 2, 45);
         this._updateInfo();
 
         // phase progress indicator
-        ctx.font = '10px monospace';
+        ctx.font = '15px ' + CF.mono;
         ctx.textAlign = 'center';
         for (let i = 0; i < 8; i++) {
             const px = W / 2 - 70 + i * 20;
@@ -343,7 +343,7 @@ const Meiosis = {
         }
 
         // chromosome legend
-        ctx.font = '11px "Noto Sans SC", sans-serif';
+        ctx.font = '17px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillStyle = red;
         ctx.fillRect(14, H - 40, 12, 3);

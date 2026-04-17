@@ -695,7 +695,7 @@ const Genetics = {
             ctx.fillStyle = 'rgba(58,158,143,0.08)';
             ctx.fillRect(0, 0, W, H);
             ctx.fillStyle = 'rgba(255,255,255,0.3)';
-            ctx.font = '500 14px "Noto Sans SC", sans-serif';
+            ctx.font = '500 21px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('\u9009\u62e9\u4eb2\u672c\u57fa\u56e0\u578b\uff0c\u70b9\u51fb\u201c\u6742\u4ea4\u201d\u67e5\u770b\u7ed3\u679c', W / 2, H / 2);
             return;
@@ -715,13 +715,13 @@ const Genetics = {
 
         // Title
         ctx.fillStyle = 'rgba(58,158,143,0.7)';
-        ctx.font = 'bold 13px "Noto Sans SC", sans-serif';
+        ctx.font = 'bold 20px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText(isSingle ? '\u5355\u57fa\u56e0\u6742\u4ea4' : '\u53cc\u57fa\u56e0\u6742\u4ea4', W * 0.27, 20);
 
         // Parent labels
         ctx.fillStyle = 'rgba(58,158,143,0.6)';
-        ctx.font = '600 12px "JetBrains Mono", monospace';
+        ctx.font = '600 18px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('\u2640 ' + this.parent2, ox + gridW / 2 - cellSize / 2, oy - cellSize - 6);
         ctx.save();
@@ -736,7 +736,7 @@ const Genetics = {
             ctx.fillStyle = 'rgba(58,158,143,0.12)';
             ctx.fillRect(x, y, cellSize - 2, cellSize - 2);
             ctx.fillStyle = '#3a9e8f';
-            ctx.font = '600 13px "JetBrains Mono", monospace';
+            ctx.font = '600 20px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(g2[c], x + cellSize / 2 - 1, y + cellSize / 2 + 4);
         }
@@ -747,7 +747,7 @@ const Genetics = {
             ctx.fillStyle = 'rgba(58,158,143,0.12)';
             ctx.fillRect(x, y, cellSize - 2, cellSize - 2);
             ctx.fillStyle = '#3a9e8f';
-            ctx.font = '600 13px "JetBrains Mono", monospace';
+            ctx.font = '600 20px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(g1[r], x + cellSize / 2 - 1, y + cellSize / 2 + 4);
         }
@@ -779,7 +779,7 @@ const Genetics = {
                 ctx.strokeRect(x, y, cellSize - 2, cellSize - 2);
 
                 ctx.fillStyle = '#fff';
-                ctx.font = '600 ' + Math.min(14, cellSize * 0.28) + 'px "JetBrains Mono", monospace';
+                ctx.font = '600 ' + Math.min(21, cellSize * 0.42) + 'px ' + CF.mono;
                 ctx.textAlign = 'center';
                 ctx.fillText(genotype, x + cellSize / 2 - 1, y + cellSize / 2 + 4);
                 ctx.globalAlpha = 1;
@@ -801,7 +801,7 @@ const Genetics = {
         const startX = barArea.x + (barArea.w - totalW) / 2;
 
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '500 11px "Noto Sans SC", sans-serif';
+        ctx.font = '500 17px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u540e\u4ee3\u7edf\u8ba1', barArea.x + barArea.w / 2, barArea.y - 6);
 
@@ -830,13 +830,13 @@ const Genetics = {
 
             // Genotype label
             ctx.fillStyle = color;
-            ctx.font = '600 11px "JetBrains Mono", monospace';
+            ctx.font = '600 17px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(g, x + barW / 2, barArea.y + maxBarH + 36);
 
             // Percentage
             ctx.fillStyle = 'rgba(255,255,255,0.6)';
-            ctx.font = '500 10px "JetBrains Mono", monospace';
+            ctx.font = '500 15px ' + CF.mono;
             ctx.fillText((ratio * 100).toFixed(1) + '%', x + barW / 2, barArea.y + maxBarH - barH + 14);
         });
 
@@ -852,7 +852,7 @@ const Genetics = {
             ctx.fillStyle = color;
             ctx.fillRect(lx, legendY, 10, 10);
             ctx.fillStyle = 'rgba(255,255,255,0.5)';
-            ctx.font = '10px "Noto Sans SC", sans-serif';
+            ctx.font = '15px ' + CF.sans;
             ctx.textAlign = 'left';
             ctx.fillText(label, lx + 14, legendY + 9);
             lx += 70;
@@ -894,7 +894,7 @@ const Genetics = {
         ctx.strokeRect(gx, gy, gw, gh);
 
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '500 10px "Noto Sans SC", sans-serif';
+        ctx.font = '500 15px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u7b49\u4f4d\u57fa\u56e0\u9891\u7387\u53d8\u5316', gx + gw / 2, gy - 4);
 
@@ -907,7 +907,7 @@ const Genetics = {
 
         // Y labels (0, 0.5, 1)
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '9px "JetBrains Mono", monospace';
+        ctx.font = '14px ' + CF.mono;
         ctx.textAlign = 'right';
         ctx.fillText('1.0', gx - 3, gy + 4);
         ctx.fillText('0.5', gx - 3, gy + gh / 2 + 3);
@@ -943,7 +943,7 @@ const Genetics = {
         ctx.fillStyle = '#3a9e8f';
         ctx.fillRect(gx + 10, ly, 12, 3);
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '9px "Noto Sans SC", sans-serif';
+        ctx.font = '14px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('p (A)', gx + 26, ly + 4);
 
@@ -962,7 +962,7 @@ const Genetics = {
     _drawPedigree(ctx, W, H) {
         if (!this.pedigreeData) {
             ctx.fillStyle = 'rgba(255,255,255,0.3)';
-            ctx.font = '14px "Noto Sans SC", sans-serif';
+            ctx.font = '21px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('\u9009\u62e9\u9057\u4f20\u65b9\u5f0f\u67e5\u770b\u7cfb\u8c31\u56fe', W / 2, H / 2);
             return;
@@ -975,7 +975,7 @@ const Genetics = {
 
         // Title
         ctx.fillStyle = 'rgba(58,158,143,0.6)';
-        ctx.font = 'bold 13px "Noto Sans SC", sans-serif';
+        ctx.font = 'bold 20px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText(title, W / 2, 22);
 
@@ -1074,7 +1074,7 @@ const Genetics = {
             // Generation label
             if (node.pos === 0) {
                 ctx.fillStyle = 'rgba(255,255,255,0.2)';
-                ctx.font = '10px "Noto Sans SC", sans-serif';
+                ctx.font = '15px ' + CF.sans;
                 ctx.textAlign = 'right';
                 const genLabels = ['I', 'II', 'III', 'IV'];
                 ctx.fillText(genLabels[node.gen] || '', W * 0.1, y + 4);

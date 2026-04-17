@@ -494,7 +494,7 @@ const WaveDemo = {
 
     drawAmplitudeMarkers(midY) {
         const ctx = this.ctx;
-        ctx.font = '500 11px JetBrains Mono, monospace';
+        ctx.font = '500 11px ' + CF.mono;
         ctx.fillStyle = 'rgba(255,255,255,0.25)';
         ctx.textAlign = 'left';
         const maxA = Math.max(this.A1, this.A2);
@@ -541,7 +541,7 @@ const WaveDemo = {
         }
 
         const tx = px < this.W - 120 ? px + 10 : px - 110;
-        ctx.font = '500 10px JetBrains Mono, Consolas, monospace';
+        ctx.font = '500 10px ' + CF.mono;
         ctx.textAlign = 'left';
         vals.forEach((v, i) => {
             ctx.fillStyle = v.color;
@@ -631,7 +631,7 @@ const WaveDemo = {
             ctx.strokeStyle = this.COLOR_NODE; ctx.lineWidth = 1.5; ctx.stroke();
             // 标签
             if (m > 0 && m < n) {
-                ctx.font = '500 9px JetBrains Mono, monospace';
+                ctx.font = '500 9px ' + CF.mono;
                 ctx.fillStyle = this.COLOR_NODE;
                 ctx.textAlign = 'center';
                 ctx.fillText('N', nx, midY + 18);
@@ -649,7 +649,7 @@ const WaveDemo = {
             ctx.beginPath(); ctx.moveTo(ax, midY - arr); ctx.lineTo(ax, midY + arr); ctx.stroke();
             ctx.setLineDash([]);
             // 标签
-            ctx.font = '500 9px JetBrains Mono, monospace';
+            ctx.font = '500 9px ' + CF.mono;
             ctx.fillStyle = this.COLOR_ENV;
             ctx.textAlign = 'center';
             ctx.fillText('A', ax, midY - arr - 6);
@@ -695,7 +695,7 @@ const WaveDemo = {
         ctx.fillStyle = this.COLOR_SUM; ctx.fill();
 
         const tx = px < this.W - 140 ? px + 10 : px - 140;
-        ctx.font = '500 10px JetBrains Mono, monospace';
+        ctx.font = '500 10px ' + CF.mono;
         ctx.textAlign = 'left';
         ctx.fillStyle = this.COLOR_SUM;
         ctx.fillText(`y = ${yVal.toFixed(1)}`, tx, 20);
@@ -801,7 +801,7 @@ const WaveDemo = {
         ctx.beginPath(); ctx.arc(x, midY, 10, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(59,130,246,0.2)'; ctx.fill();
         ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 1.5; ctx.stroke();
-        ctx.font = '10px Inter, sans-serif';
+        ctx.font = '10px ' + CF.sans;
         ctx.fillStyle = '#93c5fd';
         ctx.textAlign = 'center';
         ctx.fillText('O', x, midY + 3.5);
@@ -818,7 +818,7 @@ const WaveDemo = {
             fObs = approaching ? f0 * v / (v - Math.abs(vs)) : f0 * v / (v + Math.abs(vs));
         }
         const fStr = isFinite(fObs) ? fObs.toFixed(2) : '∞';
-        ctx.font = '500 10px JetBrains Mono, monospace';
+        ctx.font = '500 10px ' + CF.mono;
         ctx.fillStyle = approaching ? '#ef4444' : '#3b82f6';
         ctx.fillText(`f'=${fStr}`, x, midY + 26);
     },

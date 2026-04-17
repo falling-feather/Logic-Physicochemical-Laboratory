@@ -1,4 +1,4 @@
-﻿/* ═══════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════
    Sequences – Arithmetic & Geometric Visualization  v2
    ResizeObserver · Smooth Lerp · Education Panel
    ═══════════════════════════════════════════════════ */
@@ -270,7 +270,7 @@ const Sequences = {
         ctx.stroke();
 
         // y-axis ticks
-        ctx.font = '10px monospace';
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'right';
         ctx.fillStyle = 'rgba(200,200,200,0.45)';
         for (let i = 0; i <= 4; i++) {
@@ -326,7 +326,7 @@ const Sequences = {
 
             // value on top
             ctx.fillStyle = 'rgba(200,200,200,0.7)';
-            ctx.font = (barW > 35 ? '10' : '8') + 'px monospace';
+            ctx.font = (barW > 35 ? '16' : '13') + 'px ' + CF.mono;
             ctx.textAlign = 'center';
             if (barH > 14) ctx.fillText(terms[i].toFixed(1), x + w / 2, y - 4);
 
@@ -358,8 +358,8 @@ const Sequences = {
         }
 
         // formulas (top)
-        const fs = Math.max(12, W * 0.022);
-        ctx.font = 'bold ' + fs + 'px "Noto Sans SC", sans-serif';
+        const fs = Math.max(18, W * 0.033);
+        ctx.font = 'bold ' + fs + 'px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillStyle = accentRgba(0.9);
         const { a1, d, r } = this.params;
@@ -382,7 +382,7 @@ const Sequences = {
 
             // background pill
             const txt = 'a' + (i + 1) + ' = ' + val.toFixed(2) + '   S' + (i + 1) + ' = ' + partialSum.toFixed(2);
-            ctx.font = '12px "Noto Sans SC", sans-serif';
+            ctx.font = '18px ' + CF.sans;
             const tm = ctx.measureText(txt);
             const pw = tm.width + 16, ph = 22;
             const px = Math.max(margin.left, Math.min(W - margin.right - pw, tx - pw / 2));

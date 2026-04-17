@@ -194,7 +194,7 @@ const Probability = {
 
         // Title
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = '12px var(--font-sans, sans-serif)';
+        ctx.font = '18px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u9891\u7387\u76f4\u65b9\u56fe', x + w / 2, y - 2);
 
@@ -215,13 +215,13 @@ const Probability = {
 
             // Ratio label
             ctx.fillStyle = 'rgba(255,255,255,0.8)';
-            ctx.font = '10px var(--font-mono, monospace)';
+            ctx.font = '16px ' + CF.mono;
             ctx.textAlign = 'center';
             if (n > 0) ctx.fillText((ratio * 100).toFixed(1) + '%', bx + barW / 2, by - 4);
 
             // Face label
             ctx.fillStyle = 'rgba(255,255,255,0.6)';
-            ctx.font = '11px var(--font-sans, sans-serif)';
+            ctx.font = '17px ' + CF.sans;
             ctx.fillText(labels[i], bx + barW / 2, y + h + 14);
         }
 
@@ -237,7 +237,7 @@ const Probability = {
             ctx.stroke();
             ctx.setLineDash([]);
             ctx.fillStyle = '#56b6c2';
-            ctx.font = '10px var(--font-sans, sans-serif)';
+            ctx.font = '16px ' + CF.sans;
             ctx.textAlign = 'left';
             ctx.fillText('\u7406\u8bba: ' + (expected * 100).toFixed(1) + '%', x + 2, ey - 4);
         }
@@ -248,7 +248,7 @@ const Probability = {
         const hist = this.convergenceHistory;
         if (!hist || hist.length === 0) {
             ctx.fillStyle = 'rgba(255,255,255,0.3)';
-            ctx.font = '12px var(--font-sans, sans-serif)';
+            ctx.font = '18px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('\u6536\u655b\u66f2\u7ebf', x + w / 2, y - 2);
             ctx.fillText('\u5f00\u59cb\u5b9e\u9a8c\u540e\u663e\u793a', x + w / 2, y + h / 2);
@@ -256,7 +256,7 @@ const Probability = {
         }
 
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = '12px var(--font-sans, sans-serif)';
+        ctx.font = '18px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('\u6536\u655b\u66f2\u7ebf', x + w / 2, y - 2);
 
@@ -285,7 +285,7 @@ const Probability = {
 
             // Y axis labels
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.font = '9px var(--font-mono, monospace)';
+            ctx.font = '15px ' + CF.mono;
             ctx.textAlign = 'right';
             ctx.fillText('100%', x - 3, y + 4);
             ctx.fillText('50%', x - 3, yMid + 3);
@@ -327,14 +327,14 @@ const Probability = {
 
             // X axis label
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.font = '9px var(--font-sans, sans-serif)';
+            ctx.font = '15px ' + CF.sans;
             ctx.textAlign = 'right';
             ctx.fillText('n=' + maxN, x + w, y + h + 14);
         } else {
             // Dice: plot max deviation from 1/6
             const maxDev = Math.max(0.2, ...hist.map(h => h.maxDev));
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.font = '9px var(--font-mono, monospace)';
+            ctx.font = '15px ' + CF.mono;
             ctx.textAlign = 'right';
             ctx.fillText((maxDev * 100).toFixed(0) + '%', x - 3, y + 4);
             ctx.fillText('0%', x - 3, y + h + 3);
@@ -362,7 +362,7 @@ const Probability = {
             ctx.stroke();
 
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.font = '9px var(--font-sans, sans-serif)';
+            ctx.font = '15px ' + CF.sans;
             ctx.textAlign = 'right';
             ctx.fillText('n=' + maxN, x + w, y + h + 14);
 

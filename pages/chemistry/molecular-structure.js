@@ -526,12 +526,12 @@ const MoleculeVis = {
 
         // Molecule name badge
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        ctx.font = '600 12px "Noto Sans SC", sans-serif';
+        ctx.font = '600 12px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText(mol.name, 12, 24);
         if (mol.hybridization) {
             ctx.fillStyle = 'rgba(77,158,126,0.5)';
-            ctx.font = '11px "JetBrains Mono", monospace';
+            ctx.font = '11px ' + CF.mono;
             ctx.fillText(mol.hybridization + ' | ' + mol.shape + ' | ' + mol.polarity, 12, 42);
         }
     },
@@ -593,13 +593,13 @@ const MoleculeVis = {
 
         // Label
         ctx.fillStyle = a.el === 'H' ? '#333' : '#fff';
-        ctx.font = 'bold ' + Math.round(11 * a.depth) + 'px "JetBrains Mono", monospace';
+        ctx.font = 'bold ' + Math.round(11 * a.depth) + 'px ' + CF.mono;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(a.el, a.x, a.y);
 
         if (hov && r > 5) {
             ctx.fillStyle = 'rgba(255,255,255,0.7)';
-            ctx.font = '500 11px "Noto Sans SC", sans-serif';
+            ctx.font = '500 11px ' + CF.sans;
             ctx.fillText(style.name || a.el, a.x, a.y - r - 8);
         }
     },
@@ -619,7 +619,7 @@ const MoleculeVis = {
                 + (this.molecule.atoms[i].y - this.molecule.atoms[j].y)**2
                 + (this.molecule.atoms[i].z - this.molecule.atoms[j].z)**2);
             ctx.fillStyle = 'rgba(77,158,126,0.8)';
-            ctx.font = '600 12px "JetBrains Mono", monospace';
+            ctx.font = '600 12px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(dist.toFixed(3) + ' \u00c5', (a.x + b.x) / 2, (a.y + b.y) / 2 - 10);
         } else if (this.measureAtoms.length === 3) {
@@ -641,7 +641,7 @@ const MoleculeVis = {
             const angle = Math.acos(Math.max(-1, Math.min(1, dot / (m1 * m2)))) * 180 / Math.PI;
 
             ctx.fillStyle = 'rgba(77,158,126,0.8)';
-            ctx.font = '600 12px "JetBrains Mono", monospace';
+            ctx.font = '600 12px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(angle.toFixed(1) + '\u00b0', b.x, b.y - 20);
         }
@@ -676,7 +676,7 @@ const MoleculeVis = {
 
         // Hybridization label
         ctx.fillStyle = 'rgba(100,200,255,0.4)';
-        ctx.font = '10px "JetBrains Mono", monospace';
+        ctx.font = '10px ' + CF.mono;
         ctx.textAlign = 'right';
         ctx.fillText('\u6742\u5316: ' + mol.hybridization, this.W - 12, this.H - 12);
     },

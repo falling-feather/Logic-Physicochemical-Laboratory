@@ -600,14 +600,14 @@ var TreeTraversal = {
             if (isVis) {
                 const order = this.visited.indexOf(n.id) + 1;
                 ctx.fillStyle = 'rgba(255,255,255,0.4)';
-                ctx.font = '500 9px JetBrains Mono, monospace';
+                ctx.font = '500 9px ' + CF.mono;
                 ctx.textAlign = 'center';
                 ctx.fillText(order, n.x, n.y - r - 6);
             }
 
             /* \u6807\u7b7e */
             ctx.fillStyle = isCur || isVis || isHov ? '#fff' : 'rgba(255,255,255,0.5)';
-            ctx.font = '600 ' + Math.round(r * 0.9) + 'px Inter, sans-serif';
+            ctx.font = '600 ' + Math.round(r * 0.9) + 'px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(n.val, n.x, n.y);
@@ -615,7 +615,7 @@ var TreeTraversal = {
 
         /* \u5e95\u90e8\u8bbf\u95ee\u5e8f\u5217 */
         if (this.visited.length > 0) {
-            ctx.font = '12px Inter, sans-serif';
+            ctx.font = '12px ' + CF.sans;
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
             ctx.textAlign = 'left';
             const seq = this.visited.map(id => {
@@ -639,7 +639,7 @@ var TreeTraversal = {
             ctx.roundRect(tx - 6, ty - 12, tw + 12, 18, 4);
             ctx.fill(); ctx.stroke();
             ctx.fillStyle = 'rgba(255,255,255,0.7)';
-            ctx.font = '10px JetBrains Mono, monospace';
+            ctx.font = '10px ' + CF.mono;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
             ctx.fillText(info, tx, ty);
@@ -987,7 +987,7 @@ var HashSearch = {
 
             /* \u69fd\u6807\u7b7e */
             ctx.fillStyle = isHL ? '#c4793a' : 'rgba(255,255,255,0.5)';
-            ctx.font = '600 12px JetBrains Mono, monospace';
+            ctx.font = '600 12px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('[' + i + ']', padLeft + slotW / 2, sy + slotH / 2);
@@ -1027,7 +1027,7 @@ var HashSearch = {
 
                 /* \u503c */
                 ctx.fillStyle = isHLVal ? '#4d9e7e' : isCheck ? '#c4793a' : 'rgba(255,255,255,0.6)';
-                ctx.font = '600 12px JetBrains Mono, monospace';
+                ctx.font = '600 12px ' + CF.mono;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(v, cx + nodeW / 2, sy + slotH / 2);
@@ -1038,7 +1038,7 @@ var HashSearch = {
             /* \u7a7a\u69fd\u6807\u8bb0 */
             if (chain.length === 0) {
                 ctx.fillStyle = 'rgba(255,255,255,0.15)';
-                ctx.font = '10px Inter, sans-serif';
+                ctx.font = '10px ' + CF.sans;
                 ctx.textAlign = 'left';
                 ctx.fillText('null', padLeft + slotW + 16, sy + slotH / 2);
             }
@@ -1046,7 +1046,7 @@ var HashSearch = {
 
         /* \u6807\u9898 */
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '500 11px Inter, sans-serif';
+        ctx.font = '500 11px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('hash(key) = key % ' + this.tableSize, padLeft, 24);
 

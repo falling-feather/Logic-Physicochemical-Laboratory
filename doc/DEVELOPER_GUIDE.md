@@ -1,6 +1,6 @@
 # 工科实验室 — 开发者文档
 
-> **版本**: v4.0.0 | **最后更新**: 2026-04-15 | **维护者团队**: EngLab Dev Team
+> **版本**: v4.0.2 | **最后更新**: 2025-07 | **维护者团队**: EngLab Dev Team
 
 ---
 
@@ -30,11 +30,13 @@
 **工科实验室**是一个基于 HTML/CSS/JavaScript 的交互式科学学习平台，面向高中阶段学生，涵盖**数学、物理、化学、算法、生物**五大学科，提供 **60 个可视化交互实验**，全面覆盖人教版（2019 新课标）高中必修及选择性必修核心知识点。
 
 ### 核心理念
+
 - **玩中学** (Learn by Play)：所有实验均可实时交互操作
 - **从抽象到直觉**：将公式和理论转化为可视化动画
 - **低门槛高上限**：从基础概念到深入原理的分层教学
 
 ### 技术特点
+
 - 纯前端渲染，无框架依赖（Vanilla JS + Canvas 2D）
 - GSAP 驱动的丝滑页面转场
 - C++ httplib 高性能静态服务器（部署端口 910）
@@ -75,15 +77,15 @@
 
 ### 技术栈
 
-| 层级 | 技术 | 版本 | 用途 |
-|------|------|------|------|
-| 前端核心 | HTML5 / CSS3 / ES6+ | — | 页面结构与交互 |
-| 动画引擎 | GSAP | 3.12.7 | 页面转场、元素动画 |
-| 图标库 | Lucide Icons | 0.454 | UI 图标（CDN） |
-| 字体 | Inter + Noto Sans SC + JetBrains Mono | — | UI/中文/代码字体 |
-| 后端 | cpp-httplib | 0.18.3 | HTTP 服务器 |
-| 构建 | CMake | 3.14+ | C++ 构建 |
-| 可视化 | Canvas 2D API | — | 所有实验渲染 |
+| 层级     | 技术                                  | 版本   | 用途               |
+| -------- | ------------------------------------- | ------ | ------------------ |
+| 前端核心 | HTML5 / CSS3 / ES6+                   | —     | 页面结构与交互     |
+| 动画引擎 | GSAP                                  | 3.12.7 | 页面转场、元素动画 |
+| 图标库   | Lucide Icons                          | 0.454  | UI 图标（CDN）     |
+| 字体     | Inter + Noto Sans SC + JetBrains Mono | —     | UI/中文/代码字体   |
+| 后端     | cpp-httplib                           | 0.18.3 | HTTP 服务器        |
+| 构建     | CMake                                 | 3.14+  | C++ 构建           |
+| 可视化   | Canvas 2D API                         | —     | 所有实验渲染       |
 
 ---
 
@@ -92,11 +94,14 @@
 ```
 工科实验室/
 ├── index.html                  # 【核心】单页入口，包含所有页面 HTML 结构
+├── sw.js                       # Service Worker（离线缓存 + stale-while-revalidate）
 ├── README.md                   # 项目简介
-├── DEVELOPER_GUIDE.md          # 本文档
-├── UPDATE_PLAN.md              # 后续更新计划
-├── DEPLOY.md                   # 服务器部署文档
 ├── deploy.ps1                  # Windows 一键部署脚本（端口 910）
+│
+├── doc/                        # 项目文档
+│   ├── DEVELOPER_GUIDE.md      # 本文档
+│   ├── UPDATE_PLAN.md          # 后续更新计划
+│   └── DEPLOY.md               # 服务器部署文档
 │
 ├── shared/                     # 全局共享资源
 │   ├── css/
@@ -260,6 +265,7 @@
 ```
 
 **加载时序**：
+
 1. 浏览器解析 `<head>`，内联 CSS 立即渲染加载屏
 2. CDN + 框架脚本同步执行，建立 `CONFIG`、`Router`、`ModuleSelector` 等核心对象
 3. `home.js` 同步加载，注册 `initHome()` 函数
@@ -300,6 +306,7 @@ CONFIG = {
 ### 4.4 Canvas 渲染模式
 
 所有实验均使用 Canvas 2D API 进行绘制：
+
 - **DPR 适配**：`canvas.width = rect.width * dpr`，`ctx.setTransform(dpr, 0, 0, dpr, 0, 0)`
 - **动画循环**：`requestAnimationFrame` + `performance.now()` dt 驱动
 - **交互检测**：鼠标/触摸位置映射到画布坐标，几何碰撞检测
@@ -316,6 +323,7 @@ CONFIG = {
 基于 `cpp-httplib` 的轻量级 HTTP 服务器。
 
 **启动命令**：
+
 ```bash
 cd server
 cmake -B build -S .
@@ -324,18 +332,19 @@ cmake --build build --config Release
 ```
 
 **参数**：
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `-p PORT` | 监听端口 | 9527 |
+
+| 参数        | 说明           | 默认值 |
+| ----------- | -------------- | ------ |
+| `-p PORT` | 监听端口       | 9527   |
 | `-r ROOT` | 静态文件根目录 | `..` |
-| `-h` | 显示帮助 | — |
+| `-h`      | 显示帮助       | —     |
 
 ### 5.2 API 端点
 
-| 方法 | 路径 | 响应 |
-|------|------|------|
-| GET | `/api/health` | `{"status":"ok","server":"englab-cpp"}` |
-| GET | `/api/info` | 服务器信息、根目录、时间戳 |
+| 方法 | 路径            | 响应                                      |
+| ---- | --------------- | ----------------------------------------- |
+| GET  | `/api/health` | `{"status":"ok","server":"englab-cpp"}` |
+| GET  | `/api/info`   | 服务器信息、根目录、时间戳                |
 
 ### 5.3 替代方案（开发用）
 
@@ -354,88 +363,88 @@ npx serve -p 8080
 
 ### 6.1 数学模块 (Mathematics) — 13 个实验
 
-| 实验 | 文件 | 对应教材 | 功能 | 交互方式 |
-|------|------|----------|------|----------|
-| 算筹演示 | `mathematics.js` | 文化拓展 | 中国古代算筹加减法 | 输入框 + 按钮 |
-| 函数图像 | `mathematics.js` | 必修一 第3章 | 实时绘制数学函数 | 表达式输入 + 预设 + 范围调整 |
-| 微积分 | `calculus.js` | 选必二 第4章 | 导数切线 + 定积分面积 + Taylor 级数 | 模式切换 + 滑块 + 缩放平移 |
-| 几何变换 | `geometry.js` | 必修二 第6章 | 仿射变换 + 三角形几何（欧拉线） | 参数滑块 + 顶点拖拽 |
-| 复数运算 | `complex-numbers.js` | 必修二 第5章 | 运算 + 单位根 + 域着色三模式 | 拖拽 + 缩放 + 函数选择 |
-| 三角函数 | `trigonometry.js` | 必修一 第5章 | 单位圆联动正弦曲线 | 角度拖拽 + 参数调整 |
-| 集合运算 | `set-operations.js` | 必修一 第1章 | 韦恩图交互 | 元素拖拽 + 运算选择 |
-| 概率统计 | `probability.js` | 必修二 第9-10章 | 频率→概率收敛 + 直方图 | 实验选择 + 次数调整 |
-| 向量运算 | `vector-ops.js` | 必修二 第6章 | 加减法/数量积/投影 | 向量拖拽 + 运算选择 |
-| 不等式 | `inequality.js` | 必修一 第2章 | 线性规划可行域 + 最优解 | 约束条件编辑 |
-| 圆锥曲线 | `conic-sections.js` | 选必一 第3章 | 椭圆/双曲线/抛物线焦点轨迹 | 参数滑块 + 类型切换 |
-| 立体几何 | `solid-geometry.js` | 选必一 第1章 | 5 形体 + 截面 + 法线光照 | 鼠标拖拽旋转 + 截面滑块 |
-| 排列组合 | `permutation-combination.js` | 选必二 第5章 | 树状图 + 杨辉三角 | n/r 调整 + hover 详情 |
-| 数列 | `sequences.js` | 选必二 第3章 | 等差/等比数列 + 前 n 项和面积 | 类型切换 + 参数调整 |
+| 实验     | 文件                           | 对应教材        | 功能                                | 交互方式                     |
+| -------- | ------------------------------ | --------------- | ----------------------------------- | ---------------------------- |
+| 算筹演示 | `mathematics.js`             | 文化拓展        | 中国古代算筹加减法                  | 输入框 + 按钮                |
+| 函数图像 | `mathematics.js`             | 必修一 第3章    | 实时绘制数学函数                    | 表达式输入 + 预设 + 范围调整 |
+| 微积分   | `calculus.js`                | 选必二 第4章    | 导数切线 + 定积分面积 + Taylor 级数 | 模式切换 + 滑块 + 缩放平移   |
+| 几何变换 | `geometry.js`                | 必修二 第6章    | 仿射变换 + 三角形几何（欧拉线）     | 参数滑块 + 顶点拖拽          |
+| 复数运算 | `complex-numbers.js`         | 必修二 第5章    | 运算 + 单位根 + 域着色三模式        | 拖拽 + 缩放 + 函数选择       |
+| 三角函数 | `trigonometry.js`            | 必修一 第5章    | 单位圆联动正弦曲线                  | 角度拖拽 + 参数调整          |
+| 集合运算 | `set-operations.js`          | 必修一 第1章    | 韦恩图交互                          | 元素拖拽 + 运算选择          |
+| 概率统计 | `probability.js`             | 必修二 第9-10章 | 频率→概率收敛 + 直方图             | 实验选择 + 次数调整          |
+| 向量运算 | `vector-ops.js`              | 必修二 第6章    | 加减法/数量积/投影                  | 向量拖拽 + 运算选择          |
+| 不等式   | `inequality.js`              | 必修一 第2章    | 线性规划可行域 + 最优解             | 约束条件编辑                 |
+| 圆锥曲线 | `conic-sections.js`          | 选必一 第3章    | 椭圆/双曲线/抛物线焦点轨迹          | 参数滑块 + 类型切换          |
+| 立体几何 | `solid-geometry.js`          | 选必一 第1章    | 5 形体 + 截面 + 法线光照            | 鼠标拖拽旋转 + 截面滑块      |
+| 排列组合 | `permutation-combination.js` | 选必二 第5章    | 树状图 + 杨辉三角                   | n/r 调整 + hover 详情        |
+| 数列     | `sequences.js`               | 选必二 第3章    | 等差/等比数列 + 前 n 项和面积       | 类型切换 + 参数调整          |
 
 ### 6.2 物理模块 (Physics) — 14 个实验
 
-| 实验 | 文件 | 对应教材 | 功能 | 交互方式 |
-|------|------|----------|------|----------|
-| 力学模拟 | `physics.js` | 必修一 第3-4章 | 重力、碰撞、弹簧系统 | 参数调整 + 实时模拟 |
-| 匀变速运动 | `kinematics.js` | 必修一 第1-2章 | v-t/s-t 图联动，自由落体/竖直上抛 | 初始参数 + 播放控制 |
-| 抛体运动 | `projectile.js` | 必修二 第1章 | 斜抛轨迹分解（水平+竖直） | 角度/速度滑块 |
-| 圆周运动 | `circular-motion.js` | 必修二 第2章 | 向心力/向心加速度 | 半径/速度调整 |
-| 万有引力 | `gravitation.js` | 必修二 第3章 | 卫星轨道模拟 + 引力场 | 质量调整 |
-| 机械能守恒 | `energy-conservation.js` | 必修二 第4章 | 过山车 PE/KE 能量条 | 轨道编辑 + 播放 |
-| 电磁场 | `electromagnetic.js` | 必修三 第1-3章 | 电力线 + 等势线 + 电势热图 | 电荷拖拽 + 预设 + 探针 |
-| 电路分析 | `circuit-analysis.js` | 必修三 第2章 | 串并联电路 + 欧姆定律 | 组件拖拽 + 参数调整 |
-| 电磁感应 | `electromagnetic-induction.js` | 选必二 第1章 | 法拉第电磁感应定律 | 磁通量滑块 |
-| 交变电流 | `alternating-current.js` | 选必二 第2章 | 波形 + 相量图 + 变压器 | 模式切换 + 参数调整 |
-| 波动演示 | `waves.js` | 选必一 第2-3章 | 叠加 + 驻波分析 + 多普勒效应 | 模式切换 + 频率/振幅调整 |
-| 光学 | `optics.js` | 选必一 第4章 | 折射/反射/全反射/双缝干涉/色散/偏振 | 光源拖拽 + 参数调整 |
-| 流体力学 | `fluid-dynamics.js` | 课外拓展 | 势流叠加、圆柱绕流 + 伯努利方程 | 流场参数 + 模式切换 |
-| 相对论 | `relativity.js` | 课外拓展 | 时间膨胀/长度收缩 | 速度滑块 |
+| 实验       | 文件                             | 对应教材       | 功能                                | 交互方式                 |
+| ---------- | -------------------------------- | -------------- | ----------------------------------- | ------------------------ |
+| 力学模拟   | `physics.js`                   | 必修一 第3-4章 | 重力、碰撞、弹簧系统                | 参数调整 + 实时模拟      |
+| 匀变速运动 | `kinematics.js`                | 必修一 第1-2章 | v-t/s-t 图联动，自由落体/竖直上抛   | 初始参数 + 播放控制      |
+| 抛体运动   | `projectile.js`                | 必修二 第1章   | 斜抛轨迹分解（水平+竖直）           | 角度/速度滑块            |
+| 圆周运动   | `circular-motion.js`           | 必修二 第2章   | 向心力/向心加速度                   | 半径/速度调整            |
+| 万有引力   | `gravitation.js`               | 必修二 第3章   | 卫星轨道模拟 + 引力场               | 质量调整                 |
+| 机械能守恒 | `energy-conservation.js`       | 必修二 第4章   | 过山车 PE/KE 能量条                 | 轨道编辑 + 播放          |
+| 电磁场     | `electromagnetic.js`           | 必修三 第1-3章 | 电力线 + 等势线 + 电势热图          | 电荷拖拽 + 预设 + 探针   |
+| 电路分析   | `circuit-analysis.js`          | 必修三 第2章   | 串并联电路 + 欧姆定律               | 组件拖拽 + 参数调整      |
+| 电磁感应   | `electromagnetic-induction.js` | 选必二 第1章   | 法拉第电磁感应定律                  | 磁通量滑块               |
+| 交变电流   | `alternating-current.js`       | 选必二 第2章   | 波形 + 相量图 + 变压器              | 模式切换 + 参数调整      |
+| 波动演示   | `waves.js`                     | 选必一 第2-3章 | 叠加 + 驻波分析 + 多普勒效应        | 模式切换 + 频率/振幅调整 |
+| 光学       | `optics.js`                    | 选必一 第4章   | 折射/反射/全反射/双缝干涉/色散/偏振 | 光源拖拽 + 参数调整      |
+| 流体力学   | `fluid-dynamics.js`            | 课外拓展       | 势流叠加、圆柱绕流 + 伯努利方程     | 流场参数 + 模式切换      |
+| 相对论     | `relativity.js`                | 课外拓展       | 时间膨胀/长度收缩                   | 速度滑块                 |
 
 ### 6.3 化学模块 (Chemistry) — 11 个实验
 
-| 实验 | 文件 | 对应教材 | 功能 | 交互方式 |
-|------|------|----------|------|----------|
-| 元素周期表 | `periodic-table.js` | 必修一 第4章 | 118 元素交互式周期表 | 点击元素 + 分类过滤 |
-| 分子结构 | `molecular-structure.js` | 选必二 第2章 | 8 种分子 3D 模型 | 鼠标拖拽旋转 + 缩放 |
-| 化学反应 | `chemical-reactions.js` | 必修二 第1章 | 5 种反应 + 化学键断裂/形成 + 能量曲线 | 反应选择 + 速度控制 |
-| 化学键 | `chemical-bond.js` | 必修一 第4章 | 离子键/共价键/金属键 | 键型切换 + 参数调整 |
-| 离子反应 | `ionic-reaction.js` | 必修一 第2章 | 离子方程式拆分 + 旁观离子 | 反应选择 |
-| 氧化还原 | `redox.js` | 必修一 第2章 | 电子转移 + 双线桥法 + 5 种反应 | 反应选择 + 速度/暂停 |
-| 化学平衡 | `chemical-equilibrium.js` | 选必一 第2章 | 勒夏特列原理 | 浓度/温度/压强调整 |
-| 电化学 | `electrochemistry.js` | 选必一 第4章 | 原电池/电解池电子流向 | 类型切换 + 参数调整 |
-| 有机化学 | `organic-chemistry.js` | 必修二 第2章 | 3D 碳链 + 6 种分子 + 官能团高亮 | 拖拽旋转 + 分子选择 |
-| 反应速率 | `reaction-rate.js` | 选必一 第2章 | Maxwell-Boltzmann 分布 + 碰撞理论 | 温度/浓度/催化剂调整 |
-| 溶液与电离 | `solution-ionization.js` | 选必一 第3章 | 6 种物质 + pH 计算 + 离子计数 | 物质选择 + hover 详情 |
+| 实验       | 文件                        | 对应教材     | 功能                                  | 交互方式              |
+| ---------- | --------------------------- | ------------ | ------------------------------------- | --------------------- |
+| 元素周期表 | `periodic-table.js`       | 必修一 第4章 | 118 元素交互式周期表                  | 点击元素 + 分类过滤   |
+| 分子结构   | `molecular-structure.js`  | 选必二 第2章 | 8 种分子 3D 模型                      | 鼠标拖拽旋转 + 缩放   |
+| 化学反应   | `chemical-reactions.js`   | 必修二 第1章 | 5 种反应 + 化学键断裂/形成 + 能量曲线 | 反应选择 + 速度控制   |
+| 化学键     | `chemical-bond.js`        | 必修一 第4章 | 离子键/共价键/金属键                  | 键型切换 + 参数调整   |
+| 离子反应   | `ionic-reaction.js`       | 必修一 第2章 | 离子方程式拆分 + 旁观离子             | 反应选择              |
+| 氧化还原   | `redox.js`                | 必修一 第2章 | 电子转移 + 双线桥法 + 5 种反应        | 反应选择 + 速度/暂停  |
+| 化学平衡   | `chemical-equilibrium.js` | 选必一 第2章 | 勒夏特列原理                          | 浓度/温度/压强调整    |
+| 电化学     | `electrochemistry.js`     | 选必一 第4章 | 原电池/电解池电子流向                 | 类型切换 + 参数调整   |
+| 有机化学   | `organic-chemistry.js`    | 必修二 第2章 | 3D 碳链 + 6 种分子 + 官能团高亮       | 拖拽旋转 + 分子选择   |
+| 反应速率   | `reaction-rate.js`        | 选必一 第2章 | Maxwell-Boltzmann 分布 + 碰撞理论     | 温度/浓度/催化剂调整  |
+| 溶液与电离 | `solution-ionization.js`  | 选必一 第3章 | 6 种物质 + pH 计算 + 离子计数         | 物质选择 + hover 详情 |
 
 ### 6.4 算法模块 (Algorithms) — 8 个实验
 
-| 实验 | 文件 | 功能 | 交互方式 |
-|------|------|------|----------|
-| 排序算法 | `algorithms.js` | 桶排序动画 | 速度滑块 + 数据重置 |
-| 搜索算法 | `search-algorithms.js` | 二分查找 + BFS/DFS | 图遍历起点选择 |
-| 图算法 | `graph-algo.js` | Dijkstra/Prim | 图节点选择 + 参数调整 |
-| 数据结构 | `data-structures.js` | 栈/队列/树可视化 | 入栈/出栈/遍历操作 |
-| 排序对比 | `sorting-compare.js` | 冒泡/选择/插入/快排/归并对比 | 同时播放对比 |
-| 递归可视化 | `recursion-vis.js` | Fibonacci 递归树 + 汉诺塔 | 参数调整 + 单步/连续 |
-| 动态规划 | `dynamic-programming.js` | 0/1 背包 DP 表填充 | 物品/容量配置 + 单步 |
-| 字符串匹配 | `string-matching.js` | KMP 算法逐步动画 | 文本/模式串输入 + 单步 |
+| 实验       | 文件                       | 功能                         | 交互方式               |
+| ---------- | -------------------------- | ---------------------------- | ---------------------- |
+| 排序算法   | `algorithms.js`          | 桶排序动画                   | 速度滑块 + 数据重置    |
+| 搜索算法   | `search-algorithms.js`   | 二分查找 + BFS/DFS           | 图遍历起点选择         |
+| 图算法     | `graph-algo.js`          | Dijkstra/Prim                | 图节点选择 + 参数调整  |
+| 数据结构   | `data-structures.js`     | 栈/队列/树可视化             | 入栈/出栈/遍历操作     |
+| 排序对比   | `sorting-compare.js`     | 冒泡/选择/插入/快排/归并对比 | 同时播放对比           |
+| 递归可视化 | `recursion-vis.js`       | Fibonacci 递归树 + 汉诺塔    | 参数调整 + 单步/连续   |
+| 动态规划   | `dynamic-programming.js` | 0/1 背包 DP 表填充           | 物品/容量配置 + 单步   |
+| 字符串匹配 | `string-matching.js`     | KMP 算法逐步动画             | 文本/模式串输入 + 单步 |
 
 ### 6.5 生物模块 (Biology) — 13 个实验
 
-| 实验 | 文件 | 对应教材 | 功能 | 交互方式 |
-|------|------|----------|------|----------|
-| 细胞结构 | `cell-structure.js` | 必修一 第3章 | 动物/植物细胞对比 | 器官 hover + 类型切换 |
-| DNA 结构 | `dna-helix.js` | 必修二 第3章 | 双螺旋 3D 旋转 + 复制 | 旋转/复制/重置按钮 |
-| 光合作用 | `photosynthesis.js` | 必修一 第5章 | 光反应 + 暗反应(Calvin 循环) | 光强度滑块 + 播放控制 |
-| 遗传学 | `genetics.js` | 必修二 第1章 | 单/双基因 Punnett + 种群遗传 + 系谱图 | 基因型选择 + 模式切换 |
-| 有丝分裂 | `mitosis.js` | 必修一 第6章 | 前/中/后/末期动画 | 自动/手动步进 |
-| 减数分裂 | `meiosis.js` | 必修二 第2章 | 减数 Ⅰ/Ⅱ + 联会 + 交叉互换 | 阶段控制 + 速度调整 |
-| 基因表达 | `gene-expression.js` | 必修二 第4章 | 转录(DNA→mRNA) + 翻译(mRNA→蛋白质) | 步骤控制 |
-| 细胞呼吸 | `cellular-respiration.js` | 必修一 第5章 | 糖酵解 + 柠檬酸循环 + 电子传递链 | 阶段切换 + 播放 |
-| 物质运输 | `substance-transport.js` | 必修一 第4章 | 自由扩散/协助扩散/主动运输/胞吞胞吐 | 模式切换 + 浓度调整 |
-| 基因突变 | `gene-mutation.js` | 必修二 第5章 | 碱基替换/插入/缺失 + 64 密码子表 | 突变类型选择 + hover 详情 |
-| 神经调节 | `neural-regulation.js` | 选必一 第2章 | 突触传递 + 动作电位 | 模式切换 + 速度/暂停 |
-| 免疫系统 | `immune-system.js` | 选必一 第4章 | 固有免疫 + 适应性免疫(B/T 细胞) | 速度/暂停 + hover 详情 |
-| 生态系统 | `ecosystem.js` | 选必二 第3章 | 能量流动 + 种群动态 | 4 参数滑块 + hover 详情 |
+| 实验     | 文件                        | 对应教材     | 功能                                  | 交互方式                  |
+| -------- | --------------------------- | ------------ | ------------------------------------- | ------------------------- |
+| 细胞结构 | `cell-structure.js`       | 必修一 第3章 | 动物/植物细胞对比                     | 器官 hover + 类型切换     |
+| DNA 结构 | `dna-helix.js`            | 必修二 第3章 | 双螺旋 3D 旋转 + 复制                 | 旋转/复制/重置按钮        |
+| 光合作用 | `photosynthesis.js`       | 必修一 第5章 | 光反应 + 暗反应(Calvin 循环)          | 光强度滑块 + 播放控制     |
+| 遗传学   | `genetics.js`             | 必修二 第1章 | 单/双基因 Punnett + 种群遗传 + 系谱图 | 基因型选择 + 模式切换     |
+| 有丝分裂 | `mitosis.js`              | 必修一 第6章 | 前/中/后/末期动画                     | 自动/手动步进             |
+| 减数分裂 | `meiosis.js`              | 必修二 第2章 | 减数 Ⅰ/Ⅱ + 联会 + 交叉互换          | 阶段控制 + 速度调整       |
+| 基因表达 | `gene-expression.js`      | 必修二 第4章 | 转录(DNA→mRNA) + 翻译(mRNA→蛋白质)  | 步骤控制                  |
+| 细胞呼吸 | `cellular-respiration.js` | 必修一 第5章 | 糖酵解 + 柠檬酸循环 + 电子传递链      | 阶段切换 + 播放           |
+| 物质运输 | `substance-transport.js`  | 必修一 第4章 | 自由扩散/协助扩散/主动运输/胞吞胞吐   | 模式切换 + 浓度调整       |
+| 基因突变 | `gene-mutation.js`        | 必修二 第5章 | 碱基替换/插入/缺失 + 64 密码子表      | 突变类型选择 + hover 详情 |
+| 神经调节 | `neural-regulation.js`    | 选必一 第2章 | 突触传递 + 动作电位                   | 模式切换 + 速度/暂停      |
+| 免疫系统 | `immune-system.js`        | 选必一 第4章 | 固有免疫 + 适应性免疫(B/T 细胞)       | 速度/暂停 + hover 详情    |
+| 生态系统 | `ecosystem.js`            | 选必二 第3章 | 能量流动 + 种群动态                   | 4 参数滑块 + hover 详情   |
 
 ---
 
@@ -450,7 +459,7 @@ Router = {
     currentPage: 'home',
     isTransitioning: false,
     transitionOrigin: { x: 50, y: 50 },
-    
+  
     init()          // 初始化：绑定导航点击、监听 hashchange、创建图标
     navigateTo()    // 页面切换（带/不带动画）
     handleHash()    // 处理 URL hash 变化
@@ -485,6 +494,7 @@ Router = {
 ### 8.1 工作原理
 
 每个学科页面分为两种视图：
+
 - **画廊视图** (Gallery)：显示所有实验卡片（支持键盘 Enter/Space 激活）
 - **实验视图** (Module)：显示单个实验的完整内容
 
@@ -527,31 +537,32 @@ Router = {
 
 ### 9.1 视觉组件
 
-| 组件 | 类/ID | 说明 |
-|------|-------|------|
-| 粒子网络 | `#particle-network` | Canvas 粒子连线 + 鼠标吸引 |
-| 三层星空 | `.star-layer-far/mid/near` | CSS 闪烁星星 + 鼠标视差 |
-| 星云 | `.nebula-1/2/3` | CSS 模糊渐变漂浮 |
-| 流星 | `#shooting-stars` | JS 随机生成 + CSS 动画 |
-| HUD 框架 | `.hud-frame` | 四角装饰 + 扫描线 + 数据流 |
-| 主星 | `#main-star` | 脉冲动画 + 表面纹理滚动 |
-| 眼睛 | `.star-eyes` | 瞳孔跟随鼠标 + 眨眼 |
-| 打字机标语 | `#tagline-text` | 循环 6 段文案 |
-| 卫星轨道 | `#satellites-orbit` | 5 颗行星独立 3D 轨道 |
+| 组件       | 类/ID                        | 说明                       |
+| ---------- | ---------------------------- | -------------------------- |
+| 粒子网络   | `#particle-network`        | Canvas 粒子连线 + 鼠标吸引 |
+| 三层星空   | `.star-layer-far/mid/near` | CSS 闪烁星星 + 鼠标视差    |
+| 星云       | `.nebula-1/2/3`            | CSS 模糊渐变漂浮           |
+| 流星       | `#shooting-stars`          | JS 随机生成 + CSS 动画     |
+| HUD 框架   | `.hud-frame`               | 四角装饰 + 扫描线 + 数据流 |
+| 主星       | `#main-star`               | 脉冲动画 + 表面纹理滚动    |
+| 眼睛       | `.star-eyes`               | 瞳孔跟随鼠标 + 眨眼        |
+| 打字机标语 | `#tagline-text`            | 循环 6 段文案              |
+| 卫星轨道   | `#satellites-orbit`        | 5 颗行星独立 3D 轨道       |
 
 ### 9.2 卫星系统
 
 5 个卫星分别对应 5 个学科，各有独立轨道参数（半径、倾角、周期、旋转方向）：
 
-| 卫星 | 学科 | 颜色 | 轨道半径X/Y | 周期 |
-|------|------|------|-------------|------|
-| satellite-1 | 数学 | 蓝色 | 320/200 | 18s |
-| satellite-2 | 物理 | 紫色 | 420/260 | 25s |
-| satellite-3 | 化学 | 绿色 | 520/320 | 32s |
-| satellite-4 | 算法 | 橙色 | 450/280 | 22s |
-| satellite-5 | 生物 | 青色 | 380/240 | 28s |
+| 卫星        | 学科 | 颜色 | 轨道半径X/Y | 周期 |
+| ----------- | ---- | ---- | ----------- | ---- |
+| satellite-1 | 数学 | 蓝色 | 320/200     | 18s  |
+| satellite-2 | 物理 | 紫色 | 420/260     | 25s  |
+| satellite-3 | 化学 | 绿色 | 520/320     | 32s  |
+| satellite-4 | 算法 | 橙色 | 450/280     | 22s  |
+| satellite-5 | 生物 | 青色 | 380/240     | 28s  |
 
 **点击卫星动画流程**：
+
 1. 粒子喷发效果
 2. 主星摇晃 + 淡出
 3. 其他卫星缩小消失
@@ -587,6 +598,7 @@ Router = {
 ```
 
 **特点**：
+
 - CSS 内联在 `<head>` 中，**首帧即可渲染**，无需等待任何外部资源
 - 加载屏位于 DOM 顶层 (`z-index: 99999`)
 - 旋转动画 + 脉冲文字提供视觉反馈
@@ -601,13 +613,13 @@ function initHome() {
     requestAnimationFrame(() => {
         initParticleNetwork();
         SatelliteSystem.init();
-        
+      
         // Phase 2: 星空 / 流星 / HUD
         requestAnimationFrame(() => {
             StarField.init();
             initShootingStars();
             initHUD();
-            
+          
             // Phase 3: 打字机 + 视差 + 交互绑定
             requestAnimationFrame(() => {
                 initTypewriter();
@@ -619,9 +631,47 @@ function initHome() {
 }
 ```
 
-### 10.3 加载屏消除
+### 10.3 回访用户优化（localStorage + Service Worker）
+
+v4.0.1 新增两层缓存优化，显著提升回访用户加载体验：
+
+#### 第一层：localStorage 回访检测
+
+`index.html` 内联脚本在解析早期读取 `englab-cache-meta`（JSON），判断是否为回访用户：
+
+```javascript
+// 存储结构
+{ visitCount: number, lastVisit: ISO_string, hasSeenSplash: boolean }
+```
+
+- **回访用户标识**：`html.return-visit` CSS 类 + `window.__englabCache.returning = true`
+- **加载屏加速**：回访用户使用更短的过渡动画（0.26s vs 0.5s）、更小的 loader
+- **`main.js` 自适应**：回访用户的轮询间隔更短（60ms vs 90ms）、fallback 超时更短（900ms vs 1800ms）
+- **`home.js` 自适应**：回访用户减少星星数量，延迟加载粒子网络/流星等非关键动画
+
+#### 第二层：Service Worker 离线缓存
+
+`sw.js` 实现完整的缓存策略：
+
+- **安装阶段**：预缓存 APP_SHELL（index.html、核心 JS/CSS、首页资源）
+- **激活阶段**：清理旧版本缓存，立即接管所有客户端
+- **请求策略**：
+  - 导航请求：network-first + cache fallback
+  - 静态资源（.js/.css/.png/.jpg/.svg/.woff2）：stale-while-revalidate
+- **缓存命名**：`englab-static-v{版本号}`，更新代码时需同步更新
+- **注册时机**：`main.js` 中通过 `requestIdleCallback` 延迟注册，不阻塞首屏
+
+#### 版本管理
+
+更新代码后需同步更新以下位置的版本号：
+
+1. `sw.js` 中的 `CACHE_NAME`（如 `englab-static-v20260416b`）
+2. `index.html` 中 `<script>` 标签的 `?v=` 查询参数
+
+### 10.4 加载屏消除
 
 加载屏在以下条件满足后淡出移除：
+
 1. `main.js` 执行完毕（`Router.init()` + `initHome()` 调度完成）
 2. 通过 `setTimeout + rAF` 确保至少一帧渲染完成
 3. 加载屏 `opacity` 过渡到 0，`transitionend` 后从 DOM 移除
@@ -705,7 +755,6 @@ function initNewExp() { NewExp.init(); }
 ```
 
 5. **在 router.js 中注册 init/destroy 调用**
-
 6. **测试**：启动服务器，访问对应学科页面 → 点击卡片进入实验
 
 ### 11.2 编码规范
@@ -787,7 +836,8 @@ cmake --build build --config Release
 # 访问 http://服务器IP:910
 ```
 
-详见 [DEPLOY.md](DEPLOY.md) 获取完整部署指南，包括：
+详见 [DEPLOY.md](doc/DEPLOY.md) 获取完整部署指南，包括：
+
 - 环境要求（Git、CMake、MSVC/MinGW）
 - 一键部署 / 手动部署步骤
 - 防火墙 & 安全组配置
@@ -795,6 +845,7 @@ cmake --build build --config Release
 - 常见问题排查
 
 #### 其他部署方式
+
 - **GitHub Pages**：直接推送到 `gh-pages` 分支（不含 C++ 后端）
 - **Vercel / Netlify**：连接仓库自动部署前端
 - **Nginx**：指向项目根目录做反向代理
@@ -805,13 +856,13 @@ cmake --build build --config Release
 
 ### 14.1 常见任务
 
-| 任务 | 操作 |
-|------|------|
-| 修改实验内容 | 编辑对应 `pages/学科/xxx.js` |
-| 新增实验 | 见 §11.1 |
-| 修改导航 | 编辑 `index.html` 的 `<nav>` + `config.js` |
-| 调整主题色 | 编辑 `tokens.css` |
-| 新增学科 | 见 §14.2 |
+| 任务         | 操作                                             |
+| ------------ | ------------------------------------------------ |
+| 修改实验内容 | 编辑对应 `pages/学科/xxx.js`                   |
+| 新增实验     | 见 §11.1                                        |
+| 修改导航     | 编辑 `index.html` 的 `<nav>` + `config.js` |
+| 调整主题色   | 编辑 `tokens.css`                              |
+| 新增学科     | 见 §14.2                                        |
 
 ### 14.2 新增学科
 
@@ -837,11 +888,14 @@ cmake --build build --config Release
 
 ### 15.1 已完成 ✅
 
-- [x] 60 个实验全部实现并通过测试
-- [x] 12 个模块 v2 重写（OPT-01~12），质量提升至 11-12/12
-- [x] Bug 修复 BF-01~11（语法错误、DPR 适配、ARIA 无障碍、防抖锁等）
-- [x] 首页加载优化（内联 CSS 加载屏 + defer 脚本 + 分阶段 initHome）
-- [x] Windows 云服务器部署准备（deploy.ps1 + DEPLOY.md）
+- [X] 60 个实验全部实现并通过测试
+- [X] 12 个模块 v2 重写（OPT-01~12），质量提升至 11-12/12
+- [X] Bug 修复 BF-01~11（语法错误、DPR 适配、ARIA 无障碍、防抖锁等）
+- [X] 首页加载优化（内联 CSS 加载屏 + defer 脚本 + 分阶段 initHome）
+- [X] Windows 云服务器部署准备（deploy.ps1 + DEPLOY.md）
+- [X] 生物模块语法修复（cell-structure.js / gene-mutation.js）
+- [X] localStorage 回访用户检测 + 加载屏加速
+- [X] Service Worker 离线缓存（stale-while-revalidate）
 
 ### 15.2 近期计划 (v4.1)
 
@@ -854,21 +908,60 @@ cmake --build build --config Release
 
 - [ ] 学习进度系统（localStorage 记录已完成实验）
 - [ ] 实验数据导出（截图/CSV 导出功能）
-- [ ] PWA 离线支持（Service Worker + 缓存策略）
+- [X] ~~PWA 离线支持（Service Worker + 缓存策略）~~ → v4.0.1 已完成基础实现
 - [ ] Canvas OffscreenCanvas + Web Worker（复杂实验性能优化）
 
 ### 15.4 远期计划 (v5.0)
 
 - [ ] 小测验模块（每个实验后附带概念检测题）
 - [ ] 暗/亮主题切换（`prefers-color-scheme`）
-- [ ] 国际化 (i18n) 支持
 - [ ] 实验分享功能（生成实验截图 + 配置链接）
 
 ---
 
 ## 16. 更新日志
 
+### v4.0.2 — 2025-07
+
+- 🐛 **关键 Bug 修复 — FuncProps/ExpLog 浏览器卡死**：
+  - `function-properties.js` / `exp-log.js`：当切换实验时 ResizeObserver 在 section 隐藏后触发 → `W=0` → `_plotFunc()` 中 `step=0` → 无限 `for` 循环冻结浏览器
+  - 修复：`resize()` 添加 `W<=0 || H<=0` 提前返回守卫；`_plotFunc()` 添加 `W<=0` 和 `step<=0` 守卫
+- 🔤 **数学实验 Canvas 字体放大 1.5-2×**：
+  - 15 个数学实验文件全部更新字体大小（8→14, 9→15, 10→16, 11→17, 12→18, 13→20, 14→22）
+  - 动态计算字体同步调整（如 `Math.max(9, W*0.009)` → `Math.max(15, W*0.015)`）
+- 🔤 **生物实验 Canvas 字体标准化重构**：
+  - 13 个生物实验文件全部消除硬编码字体族引用（`"Noto Sans SC"` → `var(--font-sans)`，`"JetBrains Mono"` → `var(--font-mono)`）
+  - 字体大小统一放大 1.5-1.7×，与数学实验保持一致
+  - 动态 `fs` 计算（neural-regulation、gene-mutation）同步调整
+- 🔤 **全项目 Canvas 字体标准化**：
+  - 消除物理、化学、算法所有实验 JS 文件中的硬编码字体族引用
+  - 统一使用 CSS 变量 `var(--font-sans, sans-serif)` 和 `var(--font-mono, monospace)`
+- 🐛 **ionic-reaction.js `_resize()` 安全守卫**：添加 `w<=0 || h<=0` 提前返回，防止 section 隐藏时 ResizeObserver 触发异常
+- 📄 **新增 `doc/UI_TEMPLATES.md`**：各学科实验 UI 基准模板文档，包含 Canvas 字体规范、DPR 适配模板、面板注入模式、resize 安全守卫等标准化参考
+
+### v4.0.1 — 2026-04-17
+
+- 🐛 **生物模块语法修复**：
+  - `cell-structure.js`：修复 `_detGeneric()` 与 `_injectInfoPanel()` 方法间缺少逗号导致的 SyntaxError
+  - `gene-mutation.js`：修复 `updInfo()` 中模板字面量闭合引号不匹配（反引号误写为单引号）导致的 SyntaxError
+  - 补充 `window.CellStructure` / `window.initCellStructure` / `window.initGeneMutation` 全局导出
+  - 修正 `module-selector.js` 中生物模块 init 函数映射
+- ⚡ **首页加载优化 — 回访用户加速**：
+  - 新增 `index.html` 内联脚本：localStorage `englab-cache-meta` 检测回访用户
+  - 回访用户加载屏过渡时间从 0.5s 降至 0.26s，loader 缩小
+  - `main.js` 回访用户轮询间隔缩短（60ms vs 90ms），fallback 超时缩短（900ms vs 1800ms）
+  - `home.js` 回访用户减少星星数量，延迟加载粒子网络/流星等非关键动画
+  - 新增重复绑定防护（parallax / eye-tracking / shooting-stars）
+- 🌐 **Service Worker 离线缓存**（`sw.js` 新增文件）：
+  - 安装阶段预缓存 APP_SHELL（index.html、核心 JS/CSS、首页资源）
+  - 导航请求 network-first + cache fallback
+  - 静态资源 stale-while-revalidate（.js/.css/.png/.jpg/.svg/.woff2）
+  - `main.js` 通过 `requestIdleCallback` 延迟注册 SW
+  - 缓存版本 `englab-static-v20260416b`
+- 📁 **文档整理**：所有文档（除 README.md）迁移至 `doc/` 目录
+
 ### v4.0.0 — 2026-04-15
+
 - 🚀 **大版本更新**：知识点全面填充，60 个实验全部完成
 - ✅ 12 个模块 v2 深度重写（OPT-01~12），质量全线提升：
   - **OPT-01** redox.js：ResizeObserver + dt 驱动 + 5 反应 + 3D 原子 + 电子trail + 教育面板
@@ -900,17 +993,20 @@ cmake --build build --config Release
   - `DEPLOY.md` 完整部署文档
 
 ### v3.0.2 — 2026-04-14
+
 - ✅ 一致性审计修复（BF-06~10）
 - ✅ DPR 高分屏适配（10 个模块）
 - ✅ ARIA 无障碍属性添加（BF-11）
 
 ### v3.0.1 — 2026-04-14
+
 - ✅ 全面功能测试 + Bug 修复（BF-01~05）
 - ✅ 57 个 `<script>` 引用验证
 - ✅ 55 个 config 条目与 HTML `data-module` 一致性验证
 - ✅ 58 个 router init/destroy 调用匹配验证
 
 ### v3.0 — 2026-04-14
+
 - 🎉 **全部 P0/P1/P2 实验完成**，达到 60 个实验
 - 新增数学实验 9 个：集合运算、三角函数、数列、概率统计、向量运算、不等式、圆锥曲线、立体几何、排列组合
 - 新增物理实验 10 个：匀变速运动、抛体运动、万有引力、圆周运动、机械能守恒、电路分析、电磁感应、交变电流、光学、流体力学
@@ -919,6 +1015,7 @@ cmake --build build --config Release
 - 新增生物实验 9 个：有丝分裂、减数分裂、基因表达、细胞呼吸、物质运输、基因突变、神经调节、免疫系统、生态系统
 
 ### v2.7 — 2026-04-13
+
 - ✅ 重写：波动演示模块（waves.js）— 三模式：叠加 + 驻波分析 + 多普勒效应
 - ✅ 重写：电磁场可视化（electromagnetic.js）— 三模式：电力线 + 等势线 + 电势热图 + 测量探针
 - ✅ 重写：复数可视化（complex-numbers.js）— 三模式：运算 + 单位根 + 域着色
@@ -928,16 +1025,19 @@ cmake --build build --config Release
 - ✅ 重写：光合作用（photosynthesis.js）— 光反应/暗反应分区 + Calvin 循环
 
 ### v2.2 — 2026-04-13
+
 - ✅ 新增：首页生物卫星跳转（第 5 轨道）
 - ✅ 重写：化学反应模块 — 化学键可视化 + 5 阶段动画 + 能量曲线
 - 🔒 安全：mathematics.js / calculus.js 表达式编译加固
 - 🔧 修复：router.js 导航竞态条件
 
 ### v2.1 — 优化网页交互逻辑
+
 - 新增生物模块（细胞、DNA、光合作用、遗传学）
 - 优化模块选择器
 
 ### v2.0 — 项目重构
+
 - SPA 架构 + hash 路由
 - GSAP 径向裁剪转场
 - 模块化实验系统

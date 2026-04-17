@@ -182,14 +182,128 @@ function updateFooterVisibility() {
 
 window.updateFooterVisibility = updateFooterVisibility;
 
+const ENGLAB_ASSET_VERSION = '20260417c';
+const HTTP_FALLBACK_ASSETS = [
+    './',
+    './index.html',
+    './shared/css/tokens.css?v=' + ENGLAB_ASSET_VERSION,
+    './shared/css/base.css?v=' + ENGLAB_ASSET_VERSION,
+    './shared/css/typography.css?v=' + ENGLAB_ASSET_VERSION,
+    './shared/css/navbar.css?v=' + ENGLAB_ASSET_VERSION,
+    './shared/css/page-layout.css?v=' + ENGLAB_ASSET_VERSION,
+    './shared/css/cards.css?v=' + ENGLAB_ASSET_VERSION,
+    './shared/css/module-selector.css?v=' + ENGLAB_ASSET_VERSION,
+    './shared/css/responsive.css?v=' + ENGLAB_ASSET_VERSION,
+    './pages/home/home.css?v=' + ENGLAB_ASSET_VERSION,
+    './shared/js/lucide.min.js?v=' + ENGLAB_ASSET_VERSION,
+    './shared/js/config.js?v=' + ENGLAB_ASSET_VERSION,
+    './shared/js/module-selector.js?v=' + ENGLAB_ASSET_VERSION,
+    './shared/js/router.js?v=' + ENGLAB_ASSET_VERSION,
+    './shared/js/scroll-animations.js?v=' + ENGLAB_ASSET_VERSION,
+    './shared/js/cards.js?v=' + ENGLAB_ASSET_VERSION,
+    './shared/js/common.js?v=' + ENGLAB_ASSET_VERSION,
+    './shared/js/main.js?v=' + ENGLAB_ASSET_VERSION,
+    './pages/home/home.js?v=' + ENGLAB_ASSET_VERSION
+];
+
+function updateCacheDiagnostics(patch) {
+    window.__englabCache = window.__englabCache || {};
+    Object.assign(window.__englabCache, patch || {});
+    try {
+        const raw = JSON.parse(localStorage.getItem('englab-cache-diagnostics') || '{}');
+        const next = Object.assign(raw, patch || {}, { updatedAt: Date.now() });
+        localStorage.setItem('englab-cache-diagnostics', JSON.stringify(next));
+    } catch (_) {}
+}
+
+function warmHttpCacheFallback() {
+    updateCacheDiagnostics({
+        cacheMode: 'http-fallback',
+        transport: 'browser-http-cache',
+        swRegistered: false
+    });
+
+    const runWarmup = function () {
+        Promise.all(HTTP_FALLBACK_ASSETS.map(function (url) {
+            return fetch(url, {
+                credentials: 'same-origin',
+                cache: 'force-cache'
+            }).then(function (response) {
+                return response && response.ok ? response.url : null;
+            }).catch(function () {
+                return null;
+            });
+        })).then(function (results) {
+            const warmedUrls = results.filter(Boolean);
+            updateCacheDiagnostics({
+                warmedAssetCount: warmedUrls.length,
+                warmedAssetUrls: warmedUrls.slice(0, 12),
+                lastWarmupAt: Date.now()
+            });
+        });
+    };
+
+    if (window.requestIdleCallback) {
+        window.requestIdleCallback(runWarmup, { timeout: 1500 });
+    } else {
+        setTimeout(runWarmup, 500);
+    }
+}
+
 function registerServiceWorker() {
-    if (!('serviceWorker' in navigator)) return;
     if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
 
+    const hostname = location.hostname;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+    let forcedMode = null;
+    try {
+        forcedMode = new URLSearchParams(location.search).get('cacheMode') || localStorage.getItem('englab-force-cache-mode');
+    } catch (_) {}
+
+    const supportsSW = 'serviceWorker' in navigator;
+    const canUseSW = supportsSW && (window.isSecureContext || isLocalhost) && forcedMode !== 'fallback';
+
+    updateCacheDiagnostics({
+        origin: location.origin,
+        protocol: location.protocol,
+        secureContext: !!window.isSecureContext,
+        supportsSW: supportsSW,
+        cacheMode: canUseSW ? 'service-worker-pending' : 'http-fallback'
+    });
+
+    if (!canUseSW) {
+        warmHttpCacheFallback();
+        return;
+    }
+
     const doRegister = function () {
-        navigator.serviceWorker.register('./sw.js?v=20260416b').catch(function () {
-            // ignore registration failures in unsupported dev environments
-        });
+        navigator.serviceWorker.register('./sw.js?v=' + ENGLAB_ASSET_VERSION)
+            .then(function (registration) {
+                updateCacheDiagnostics({
+                    cacheMode: 'service-worker',
+                    transport: 'cache-storage',
+                    swRegistered: true,
+                    swScope: registration.scope,
+                    controller: !!navigator.serviceWorker.controller
+                });
+                if (navigator.serviceWorker.ready) {
+                    navigator.serviceWorker.ready.then(function () {
+                        updateCacheDiagnostics({
+                            swReady: true,
+                            controller: !!navigator.serviceWorker.controller
+                        });
+                    }).catch(function () {});
+                }
+            })
+            .catch(function (error) {
+                updateCacheDiagnostics({
+                    cacheMode: 'http-fallback',
+                    transport: 'browser-http-cache',
+                    swRegistered: false,
+                    swError: String(error && error.message ? error.message : error)
+                });
+                warmHttpCacheFallback();
+            });
     };
 
     if (window.requestIdleCallback) {

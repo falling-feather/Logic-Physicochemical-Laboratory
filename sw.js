@@ -1,25 +1,25 @@
-const CACHE_NAME = 'englab-static-v20260416b';
+const CACHE_NAME = 'englab-static-v20260417d';
 const APP_SHELL = [
   './',
   './index.html',
-  './shared/js/lucide.min.js',
-  './shared/js/config.js',
-  './shared/js/module-selector.js?v=20260416b',
-  './shared/js/router.js?v=20260416b',
-  './shared/js/scroll-animations.js?v=20260416b',
-  './shared/js/cards.js',
-  './shared/js/common.js',
-  './shared/js/main.js?v=20260416b',
-  './pages/home/home.js?v=20260416b',
-  './shared/css/tokens.css',
-  './shared/css/base.css',
-  './shared/css/typography.css',
-  './shared/css/navbar.css',
-  './shared/css/page-layout.css',
-  './shared/css/cards.css',
-  './shared/css/module-selector.css',
-  './shared/css/responsive.css',
-  './pages/home/home.css'
+  './shared/js/lucide.min.js?v=20260417c',
+  './shared/js/config.js?v=20260417c',
+  './shared/js/module-selector.js?v=20260417c',
+  './shared/js/router.js?v=20260417c',
+  './shared/js/scroll-animations.js?v=20260417c',
+  './shared/js/cards.js?v=20260417c',
+  './shared/js/common.js?v=20260417c',
+  './shared/js/main.js?v=20260417c',
+  './pages/home/home.js?v=20260417c',
+  './shared/css/tokens.css?v=20260417c',
+  './shared/css/base.css?v=20260417c',
+  './shared/css/typography.css?v=20260417c',
+  './shared/css/navbar.css?v=20260417c',
+  './shared/css/page-layout.css?v=20260417c',
+  './shared/css/cards.css?v=20260417c',
+  './shared/css/module-selector.css?v=20260417c',
+  './shared/css/responsive.css?v=20260417c',
+  './pages/home/home.css?v=20260417c'
 ];
 
 self.addEventListener('install', (event) => {

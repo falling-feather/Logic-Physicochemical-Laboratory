@@ -8,8 +8,12 @@
 ```
 工科实验室/
 ├── index.html              # 单页入口（含所有页面结构）
-├── DEPLOY.md               # 服务器部署文档
+├── sw.js                   # Service Worker（离线缓存 + stale-while-revalidate）
 ├── deploy.ps1              # Windows 一键部署脚本
+├── doc/                    # 项目文档
+│   ├── DEVELOPER_GUIDE.md  # 完整开发者文档
+│   ├── UPDATE_PLAN.md      # 后续更新计划
+│   └── DEPLOY.md           # 服务器部署文档
 ├── shared/                 # 全局共享资源
 │   ├── css/                # 设计系统（tokens → base → components → responsive）
 │   └── js/                 # 核心框架（config / router / module-selector / main）
@@ -46,7 +50,7 @@ cmake --build build --config Release
 
 ```powershell
 .\deploy.ps1
-# 详见 DEPLOY.md
+# 详见 doc/DEPLOY.md
 ```
 
 ## ✨ 功能特性
@@ -86,6 +90,7 @@ cmake --build build --config Release
 - GSAP 驱动的径向裁剪转场动画
 - Canvas 2D 实时绘图引擎 + DPR 高分屏适配
 - 60 个实验 defer 加载 + 分阶段初始化，首屏无阻塞
+- Service Worker 离线缓存 + localStorage 回访用户加速
 - 纯 CSS 星球渲染（渐变 + 动画）
 - C++ httplib 高性能静态服务器
 - ARIA 无障碍属性 + focus-visible 样式
@@ -101,12 +106,18 @@ cmake --build build --config Release
 
 ## 📝 更新日志
 
+### v4.0.1 — 2026-04-17
+- 🐛 修复生物模块语法错误（cell-structure.js / gene-mutation.js）
+- ⚡ 回访用户加载加速（localStorage 检测 + 加载屏缩短）
+- 🌐 新增 Service Worker 离线缓存（stale-while-revalidate）
+- 📁 文档迁移至 `doc/` 目录
+
 ### v4.0.0 — 2026-04-15
 - 🚀 60 个实验全部完成，覆盖人教版高中五大学科核心知识点
 - ✅ 12 个模块深度 v2 重写，质量提升至 11-12/12
 - ✅ Bug 修复 BF-01~11（DPR 适配、ARIA 无障碍、防抖锁等）
 - ✅ 首页加载优化（内联 CSS 加载屏 + defer 脚本 + 分阶段初始化）
-- ✅ Windows 云服务器部署（deploy.ps1 + DEPLOY.md，端口 910）
+- ✅ Windows 云服务器部署（deploy.ps1 + doc/DEPLOY.md，端口 910）
 
 ### v3.0 — 2026-04-14
 - 全部 P0/P1/P2 实验完成

@@ -358,16 +358,16 @@ const ImmuneSystem = {
 
         // HUD
         const alive = this.pathogens.filter(p => p.alive).length;
-        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = '10px var(--font-sans)'; ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = '15px ' + CF.sans; ctx.textAlign = 'left';
         ctx.fillText(mode === 'innate' ? '非特异性免疫 (巨噬细胞吞噬)' : '特异性免疫 (抗体 + T 细胞)', 8, 16);
-        ctx.fillStyle = 'rgba(224,108,117,0.4)'; ctx.font = '10px var(--font-mono)';
+        ctx.fillStyle = 'rgba(224,108,117,0.4)'; ctx.font = '15px ' + CF.mono;
         ctx.fillText('病原体: ' + alive + '/' + this.pathogens.length + '  已清除: ' + this.killed, 8, 30);
         if (mode === 'adaptive') {
             ctx.fillStyle = 'rgba(229,192,123,0.4)';
             ctx.fillText('抗体: ' + this.antibodies.filter(a => !a.bound || (a.target && a.target.alive)).length, 8, 44);
         }
         if (alive === 0) {
-            ctx.fillStyle = 'rgba(77,158,126,0.5)'; ctx.font = '14px var(--font-sans)'; ctx.textAlign = 'center';
+            ctx.fillStyle = 'rgba(77,158,126,0.5)'; ctx.font = '21px ' + CF.sans; ctx.textAlign = 'center';
             ctx.fillText('✅ 免疫成功！病原体已清除', W / 2, H - 12);
         }
 
@@ -406,7 +406,7 @@ const ImmuneSystem = {
         g.addColorStop(0, 'rgba(255,200,200,' + (a * 0.3) + ')'); g.addColorStop(1, 'rgba(224,108,117,0)');
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, p.r * 0.7, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = 'rgba(255,255,255,' + (a * 0.5) + ')';
-        ctx.font = '9px var(--font-mono)'; ctx.textAlign = 'center';
+        ctx.font = '14px ' + CF.mono; ctx.textAlign = 'center';
         ctx.fillText('抗原', px, py + 3);
     },
 
@@ -470,14 +470,14 @@ const ImmuneSystem = {
             ctx.fillStyle = 'rgba(77,158,126,0.15)';
             ctx.beginPath(); ctx.arc(ix, iy, ic.r, 0, Math.PI * 2); ctx.fill();
             ctx.strokeStyle = 'rgba(77,158,126,0.3)'; ctx.lineWidth = 1.5; ctx.stroke();
-            ctx.fillStyle = 'rgba(77,158,126,0.4)'; ctx.font = '9px var(--font-mono)';
+            ctx.fillStyle = 'rgba(77,158,126,0.4)'; ctx.font = '14px ' + CF.mono;
             ctx.textAlign = 'center'; ctx.fillText('CD4', ix, iy + 2);
             this._lbl(ix, iy, ic.r, 'Th');
         } else if (ic.type === 'tkiller') {
             ctx.fillStyle = 'rgba(77,158,126,0.2)';
             ctx.beginPath(); ctx.arc(ix, iy, ic.r, 0, Math.PI * 2); ctx.fill();
             ctx.strokeStyle = 'rgba(77,158,126,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
-            ctx.fillStyle = 'rgba(77,158,126,0.5)'; ctx.font = '9px var(--font-mono)';
+            ctx.fillStyle = 'rgba(77,158,126,0.5)'; ctx.font = '14px ' + CF.mono;
             ctx.textAlign = 'center'; ctx.fillText('CD8', ix, iy + 2);
             if (ic.attacking) {
                 ctx.save(); ctx.shadowColor = 'rgba(224,108,117,0.4)'; ctx.shadowBlur = 10;
@@ -491,7 +491,7 @@ const ImmuneSystem = {
     },
 
     _lbl(x, y, r, t) {
-        this.ctx.fillStyle = 'rgba(255,255,255,0.3)'; this.ctx.font = '10px var(--font-sans)';
+        this.ctx.fillStyle = 'rgba(255,255,255,0.3)'; this.ctx.font = '15px ' + CF.sans;
         this.ctx.textAlign = 'center'; this.ctx.fillText(t, x, y + r + 11);
     },
 
@@ -509,7 +509,7 @@ const ImmuneSystem = {
 
     _drawTip(x, y, lines) {
         const ctx = this.ctx;
-        ctx.font = '11px var(--font-sans)';
+        ctx.font = '17px ' + CF.sans;
         const w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 16;
         const h = lines.length * 16 + 8;
         const tx = Math.max(4, Math.min(x - w / 2, this.W - w - 4));

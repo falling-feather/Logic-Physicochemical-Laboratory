@@ -124,6 +124,7 @@ const FuncProps = {
         const rect = wrap.getBoundingClientRect();
         this.W = rect.width;
         this.H = Math.min(rect.width * 0.55, 500);
+        if (this.W <= 0 || this.H <= 0) return;
         this.canvas.width = this.W * dpr;
         this.canvas.height = this.H * dpr;
         this.canvas.style.width = this.W + 'px';
@@ -293,7 +294,7 @@ const FuncProps = {
 
         // Labels
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        ctx.font = '11px sans-serif';
+        ctx.font = '17px ' + CF.sans;
         ctx.textAlign = 'center'; ctx.textBaseline = 'top';
         for (let i = xMin; i <= xMax; i++) {
             if (i === 0) continue;
@@ -310,9 +311,11 @@ const FuncProps = {
 
     _plotFunc(f, color, dash, lw, xRange) {
         const { ctx, W, origin, scale, H } = this;
+        if (W <= 0) return;
         const xMin = xRange ? xRange[0] : (0 - origin.x) / scale;
         const xMax = xRange ? xRange[1] : (W - origin.x) / scale;
         const step = (xMax - xMin) / Math.max(W * 2, 800);
+        if (step <= 0) return;
 
         ctx.save();
         ctx.strokeStyle = color;
@@ -375,13 +378,13 @@ const FuncProps = {
         // Interval verdict
         const verdict = allInc ? '↗ 单调递增' : allDec ? '↘ 单调递减' : '⚡ 非单调';
         ctx.fillStyle = 'rgba(255,255,255,0.7)';
-        ctx.font = 'bold 13px sans-serif';
+        ctx.font = 'bold 20px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText(`[${intA}, ${intB}] ${verdict}`, (sxA + sxB) / 2, 18);
 
         // f'(x) legend
         ctx.fillStyle = 'rgba(229,192,123,0.8)';
-        ctx.font = '11px sans-serif';
+        ctx.font = '17px ' + CF.sans;
         ctx.textAlign = 'right';
         ctx.fillText("f'(x)", W - 12, 18);
     },
@@ -411,7 +414,7 @@ const FuncProps = {
 
         // Value label
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 10px sans-serif';
+        ctx.font = 'bold 16px ' + CF.sans;
         ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
         ctx.fillText(x % 1 === 0 ? x : x.toFixed(2), sx, sy - 12);
     },
@@ -447,7 +450,7 @@ const FuncProps = {
         }
 
         // Legend
-        ctx.font = '12px sans-serif';
+        ctx.font = '18px ' + CF.sans;
         ctx.textAlign = 'left';
         const lx = 12;
         ctx.fillStyle = '#5b9bd5'; ctx.fillText('● f(x)', lx, 20);
@@ -461,7 +464,7 @@ const FuncProps = {
                   fn.parity === 'odd'  ? '奇函数 — f(-x) = -f(x)' :
                   '非奇非偶函数';
         ctx.fillStyle = 'rgba(255,255,255,0.75)';
-        ctx.font = 'bold 13px sans-serif';
+        ctx.font = 'bold 20px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText(v, W / 2, H - 12);
     },
@@ -506,7 +509,7 @@ const FuncProps = {
                 ctx.lineTo(sx + d * 7, arrowY + 4);
                 ctx.closePath(); ctx.fill();
             });
-            ctx.font = 'bold 13px sans-serif';
+            ctx.font = 'bold 20px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(91,155,213,0.9)';
             ctx.fillText('T = ' + (T === 2 * Math.PI ? '2π' : T.toFixed(2)), (sx0 + sxT) / 2, arrowY - 8);
@@ -516,7 +519,7 @@ const FuncProps = {
             this._plotFunc(x => fn.f(x + T), 'rgba(80,200,120,0.45)', [4, 3], 1.5);
         } else {
             ctx.fillStyle = 'rgba(255,255,255,0.55)';
-            ctx.font = 'bold 14px sans-serif';
+            ctx.font = 'bold 22px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('该函数不具有周期性', W / 2, H - 14);
         }

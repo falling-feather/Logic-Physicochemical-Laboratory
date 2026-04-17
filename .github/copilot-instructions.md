@@ -8,16 +8,16 @@
 - **渲染**：所有实验使用 Canvas 2D API + requestAnimationFrame + performance.now() dt 驱动
 - **动画**：GSAP 3.12.7 驱动页面转场（径向裁剪遮罩）
 - **服务器**：C++ httplib 静态文件服务器（生产端口 910）；开发用 `python -m http.server 8080`
-- **当前版本**：v4.0.0
+- **当前版本**：v4.0.1
 
 ## 快速了解项目必读
 
 | 文档/文件 | 内容 | 何时阅读 |
 |-----------|------|----------|
-| `DEVELOPER_GUIDE.md` | **完整开发者文档**（~940 行）：架构、目录结构、60 个实验清单、JS 加载顺序、路由/模块选择器/首页系统、加载屏优化、开发指南、CSS 设计系统、部署、更新日志 | 首次接触项目时通读 |
-| `UPDATE_PLAN.md` | 后续更新计划：已完成实验汇总、人教版课标覆盖度分析、Phase 2 待开发实验列表、架构优化路线图、Bug 审查清单 | 规划新功能/新实验时 |
+| `doc/DEVELOPER_GUIDE.md` | **完整开发者文档**（~940 行）：架构、目录结构、60 个实验清单、JS 加载顺序、路由/模块选择器/首页系统、加载屏优化、开发指南、CSS 设计系统、部署、更新日志 | 首次接触项目时通读 |
+| `doc/UPDATE_PLAN.md` | 后续更新计划：已完成实验汇总、人教版课标覆盖度分析、Phase 2 待开发实验列表、架构优化路线图、Bug 审查清单 | 规划新功能/新实验时 |
 | `README.md` | 项目简介 + 快速开始 + 60 个实验一览表 | 快速概览 |
-| `DEPLOY.md` + `deploy.ps1` | Windows 云服务器一键部署文档与脚本 | 部署相关工作时 |
+| `doc/DEPLOY.md` + `deploy.ps1` | Windows 云服务器一键部署文档与脚本 | 部署相关工作时 |
 
 ## 关键文件速查
 
@@ -27,6 +27,7 @@ shared/js/config.js             → 全局配置（5 学科元数据 + 60 个实
 shared/js/router.js             → hash 路由 + GSAP 页面转场 + onPageEnter 实验初始化
 shared/js/module-selector.js    → 画廊↔实验视图切换
 shared/js/main.js               → 应用启动入口（lucide.createIcons → Router.init → initHome）
+sw.js                            → Service Worker（离线缓存 + stale-while-revalidate）
 pages/home/home.js              → 首页逻辑（粒子网络、卫星轨道、打字机、分阶段初始化）
 pages/{学科}/{实验}.js           → 各实验模块（独立对象，init/destroy 生命周期）
 shared/css/tokens.css           → CSS 设计令牌（颜色/间距/字体变量）

@@ -102,7 +102,7 @@ const CellularResp = {
         ctx.strokeStyle = 'rgba(100,200,100,0.2)';
         ctx.lineWidth = 1.5;
         ctx.strokeRect(20, 50, W - 40, H - 80);
-        ctx.font = '10px "Noto Sans SC", sans-serif';
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillStyle = 'rgba(100,200,100,0.5)';
         ctx.fillText('\u7EC6\u80DE\u8D28\u57FA\u8D28', 28, 68);
@@ -123,7 +123,7 @@ const CellularResp = {
         ctx.fill();
         ctx.strokeStyle = 'rgba(100,200,100,0.6)';
         ctx.stroke();
-        ctx.font = 'bold 11px monospace';
+        ctx.font = 'bold 17px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(255,255,255,0.8)';
         if (p < 0.5) ctx.fillText('C\u2086H\u2081\u2082O\u2086', gx, gy + 4);
@@ -137,7 +137,7 @@ const CellularResp = {
         ctx.lineWidth = 2;
         ctx.stroke();
         // enzyme label
-        ctx.font = '10px "Noto Sans SC", sans-serif';
+        ctx.font = '15px ' + CF.sans;
         ctx.fillStyle = 'rgba(200,200,200,0.5)';
         ctx.fillText('\u2193 10\u6B65\u9176\u4FC3\u53CD\u5E94', (gx + 30 + arrowX) / 2, gy - 15);
 
@@ -150,7 +150,7 @@ const CellularResp = {
         ctx.ellipse(px1, py1, 18, 12, 0, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(200,150,50,' + (prodAlpha * 0.6) + ')';
         ctx.fill();
-        ctx.font = '10px monospace';
+        ctx.font = '15px ' + CF.mono;
         ctx.fillStyle = 'rgba(255,255,255,' + prodAlpha * 0.8 + ')';
         ctx.fillText('\u4E19\u916E\u9178', px1, py1 + 4);
         // pyruvate 2
@@ -169,13 +169,13 @@ const CellularResp = {
             ctx.arc(atpX, ay, 16, 0, Math.PI * 2);
             ctx.fillStyle = i === 0 ? 'rgba(255,200,50,' + (prodAlpha * 0.6) + ')' : 'rgba(100,150,255,' + (prodAlpha * 0.6) + ')';
             ctx.fill();
-            ctx.font = 'bold 10px monospace';
+            ctx.font = 'bold 15px ' + CF.mono;
             ctx.fillStyle = 'rgba(255,255,255,' + prodAlpha * 0.8 + ')';
             ctx.fillText(label, atpX, ay + 4);
         });
 
         // net equation
-        ctx.font = '11px monospace';
+        ctx.font = '17px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(100,200,100,0.7)';
         ctx.fillText('C\u2086H\u2081\u2082O\u2086 + 2NAD\u207A + 2ADP \u2192 2CH\u2083COCOO\u207B + 2NADH + 2ATP', W / 2, H - 20);
@@ -190,7 +190,7 @@ const CellularResp = {
         ctx.strokeStyle = 'rgba(255,180,50,0.2)';
         ctx.lineWidth = 2;
         ctx.stroke();
-        ctx.font = '10px "Noto Sans SC", sans-serif';
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(255,180,50,0.5)';
         ctx.fillText('\u7EBF\u7C92\u4F53\u57FA\u8D28', W / 2, H * 0.15);
@@ -220,7 +220,7 @@ const CellularResp = {
             ctx.arc(ix, iy, 6, 0, Math.PI * 2);
             ctx.fillStyle = i === activeIdx ? 'rgba(255,180,50,0.8)' : 'rgba(255,180,50,0.3)';
             ctx.fill();
-            ctx.font = '9px "Noto Sans SC", sans-serif';
+            ctx.font = '14px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillStyle = i === activeIdx ? 'rgba(255,180,50,0.9)' : 'rgba(200,200,200,0.4)';
             const tx = cx + Math.cos(a) * (cr + 20);
@@ -247,7 +247,7 @@ const CellularResp = {
             ctx.arc(px, py, 14, 0, Math.PI * 2);
             ctx.fillStyle = prodColors[i].replace('0.7', '0.3').replace('0.6', '0.3');
             ctx.fill();
-            ctx.font = 'bold 9px monospace';
+            ctx.font = 'bold 14px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillStyle = prodColors[i];
             ctx.fillText(pr, px, py + 3);
@@ -260,7 +260,7 @@ const CellularResp = {
         ctx.strokeStyle = 'rgba(200,150,50,0.3)';
         ctx.lineWidth = 1.5;
         ctx.stroke();
-        ctx.font = '10px "Noto Sans SC", sans-serif';
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillStyle = 'rgba(200,150,50,0.7)';
         ctx.fillText('\u4E59\u9170CoA', W * 0.08, H * 0.28);
@@ -280,7 +280,7 @@ const CellularResp = {
             else ctx.lineTo(x, y);
         }
         ctx.stroke();
-        ctx.font = '10px "Noto Sans SC", sans-serif';
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(100,150,255,0.5)';
         ctx.fillText('\u7EBF\u7C92\u4F53\u5185\u819C', W / 2, H * 0.22);
@@ -303,7 +303,7 @@ const CellularResp = {
             ctx.strokeStyle = i === 4 ? 'rgba(255,200,50,0.5)' : 'rgba(100,150,255,0.4)';
             ctx.lineWidth = 1.5;
             ctx.strokeRect(c.x - 18, cy - 20, 36, 40);
-            ctx.font = '9px "Noto Sans SC", sans-serif';
+            ctx.font = '14px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(255,255,255,0.7)';
             ctx.fillText(c.name, c.x, cy + 4);
@@ -326,7 +326,7 @@ const CellularResp = {
             ctx.arc(ex, H * 0.45, 4, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(100,200,255,0.8)';
             ctx.fill();
-            ctx.font = '9px "JetBrains Mono", monospace';
+            ctx.font = '14px ' + CF.mono;
             ctx.fillStyle = '#fff';
             ctx.fillText('e\u207B', ex, H * 0.45 + 2);
         }
@@ -340,7 +340,7 @@ const CellularResp = {
             ctx.arc(hx, hy, 5, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(255,100,100,' + (0.6 - hp * 0.4) + ')';
             ctx.fill();
-            ctx.font = '9px "JetBrains Mono", monospace';
+            ctx.font = '14px ' + CF.mono;
             ctx.fillStyle = 'rgba(255,255,255,' + (0.8 - hp * 0.5) + ')';
             ctx.fillText('H\u207A', hx, hy + 2);
         }
@@ -352,18 +352,18 @@ const CellularResp = {
         ctx.arc(complexes[4].x, ashy, 5, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(255,200,50,0.7)';
         ctx.fill();
-        ctx.font = '9px "JetBrains Mono", monospace';
+        ctx.font = '14px ' + CF.mono;
         ctx.fillStyle = '#fff';
         ctx.fillText('H\u207A', complexes[4].x, ashy + 2);
 
         // ATP output
-        ctx.font = 'bold 12px monospace';
+        ctx.font = 'bold 18px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(255,200,50,0.8)';
         ctx.fillText('34 ATP', complexes[4].x, H * 0.75);
 
         // O2 + H+ -> H2O
-        ctx.font = '10px monospace';
+        ctx.font = '15px ' + CF.mono;
         ctx.fillStyle = 'rgba(200,200,200,0.5)';
         ctx.fillText('O\u2082 + 4H\u207A + 4e\u207B \u2192 2H\u2082O', complexes[3].x, H * 0.75);
     },
@@ -371,7 +371,7 @@ const CellularResp = {
         const ctx = this.ctx, W = this.W, H = this.H;
         ctx.clearRect(0, 0, W, H);
         const s = this.stages[this.stage];
-        ctx.font = 'bold 14px "Noto Sans SC", sans-serif';
+        ctx.font = 'bold 21px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(58,158,143,0.9)';
         ctx.fillText('\u6709\u6C27\u547C\u5438 - ' + s.name + ' (' + s.loc + ')', W / 2, 25);

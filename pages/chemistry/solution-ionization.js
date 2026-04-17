@@ -288,7 +288,7 @@ const SolutionIon = {
             if (p.symbol.length <= 6) {
                 ctx.fillStyle = typeof p.color === 'string' && p.color.startsWith('rgba') ?
                     p.color.replace(/[\d.]+\)$/, '0.85)') : p.color;
-                ctx.font = `${fs}px var(--font-mono)`;
+                ctx.font = `${fs}px ${CF.mono}`;
                 ctx.textAlign = 'center';
                 ctx.fillText(p.symbol, px, py - p.rad - 2);
             }
@@ -314,7 +314,7 @@ const SolutionIon = {
         ctx.beginPath(); ctx.roundRect(barL, barY, barR - barL, barH, 3); ctx.fill();
 
         // Ticks
-        ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = `${fs - 1}px var(--font-mono)`; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = `${fs - 1}px ${CF.mono}`; ctx.textAlign = 'center';
         for (let i = 0; i <= 14; i++) {
             const x = barL + (i / 14) * (barR - barL);
             ctx.fillText(i, x, barY + barH + 10);
@@ -326,11 +326,11 @@ const SolutionIon = {
         ctx.moveTo(indX - 5, barY - 2); ctx.lineTo(indX + 5, barY - 2); ctx.lineTo(indX, barY + 5); ctx.fill();
 
         // pH value
-        ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = `${fs + 3}px var(--font-mono)`; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = `${fs + 3}px ${CF.mono}`; ctx.textAlign = 'center';
         ctx.fillText('pH = ' + pH.toFixed(2), (barL + barR) / 2, barY - 10);
 
         // Labels
-        ctx.font = `${fs}px var(--font-sans)`;
+        ctx.font = `${fs}px ${CF.sans}`;
         ctx.fillStyle = 'rgba(224,108,117,0.4)'; ctx.textAlign = 'left'; ctx.fillText('酸性', barL, barY + barH + 24);
         ctx.fillStyle = 'rgba(139,111,192,0.4)'; ctx.textAlign = 'right'; ctx.fillText('碱性', barR, barY + barH + 24);
         ctx.fillStyle = 'rgba(77,158,126,0.4)'; ctx.textAlign = 'center'; ctx.fillText('中性', (barL + barR) / 2, barY + barH + 24);
@@ -342,16 +342,16 @@ const SolutionIon = {
         const fs = Math.max(9, W * 0.009);
         const x0 = W * 0.62, y0 = H * 0.45;
 
-        ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = `${fs + 1}px var(--font-sans)`; ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = `${fs + 1}px ${CF.sans}`; ctx.textAlign = 'left';
         ctx.fillText(info.name, x0, y0);
-        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = `${fs}px var(--font-mono)`;
+        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = `${fs}px ${CF.mono}`;
         ctx.fillText('类型: ' + info.type, x0, y0 + 18);
         ctx.fillText('c = ' + this.concentration.toFixed(2) + ' mol/L', x0, y0 + 36);
         ctx.fillText('pH = ' + info.pH.toFixed(2), x0, y0 + 54);
         ctx.fillText('电离度: ' + (info.degree * 100).toFixed(1) + '%', x0, y0 + 72);
 
         // Equation
-        ctx.fillStyle = 'rgba(77,158,126,0.45)'; ctx.font = `${fs}px var(--font-mono)`;
+        ctx.fillStyle = 'rgba(77,158,126,0.45)'; ctx.font = `${fs}px ${CF.mono}`;
         ctx.fillText(info.eq, x0, y0 + 96);
 
         // Ion count
@@ -359,7 +359,7 @@ const SolutionIon = {
         const groups = {};
         for (const p of ionCounts) groups[p.symbol] = (groups[p.symbol] || 0) + 1;
         let cy = y0 + 120;
-        ctx.font = `${fs - 1}px var(--font-mono)`;
+        ctx.font = `${fs - 1}px ${CF.mono}`;
         for (const [sym, cnt] of Object.entries(groups)) {
             const p = ionCounts.find(pp => pp.symbol === sym);
             ctx.fillStyle = p ? p.color : 'rgba(255,255,255,0.3)';
@@ -402,7 +402,7 @@ const SolutionIon = {
         if (!this.hoverLabel || this.hoverX < 0) return;
         const { ctx, hoverX, hoverY, W } = this;
         const fs = Math.max(10, W * 0.011);
-        ctx.font = `${fs}px var(--font-sans)`;
+        ctx.font = `${fs}px ${CF.sans}`;
         const tw = ctx.measureText(this.hoverLabel).width;
         const px = Math.min(hoverX + 12, W - tw - 20);
         const py = Math.max(hoverY - 20, 16);

@@ -323,7 +323,7 @@ const SortCompare = {
 
             // Title
             ctx.fillStyle = s.done ? '#98c379' : 'rgba(255,255,255,0.6)';
-            ctx.font = '11px var(--font-sans, sans-serif)';
+            ctx.font = '11px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText(this.algoNames[algo] + ' ' + this.complexity[algo], x + w / 2, y + 12);
 

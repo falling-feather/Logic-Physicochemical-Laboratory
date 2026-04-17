@@ -358,7 +358,7 @@ const ComplexVis = {
         ctx.beginPath(); ctx.moveTo(origin.x, 0); ctx.lineTo(origin.x, H); ctx.stroke();
 
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '12px "JetBrains Mono", monospace';
+        ctx.font = '18px ' + CF.mono;
         const dec = step >= 1 ? 0 : step >= 0.1 ? 1 : 2;
         ctx.textAlign = 'center';
         for (let v = Math.ceil(-r / step) * step; v <= r; v += step) {
@@ -446,7 +446,7 @@ const ComplexVis = {
 
         const la = t / 2;
         ctx.fillStyle = '#c4793a';
-        ctx.font = '13px "JetBrains Mono", monospace';
+        ctx.font = '20px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('θ', origin.x + unitR * 0.38 * Math.cos(-la), origin.y + unitR * 0.38 * Math.sin(-la));
 
@@ -460,7 +460,7 @@ const ComplexVis = {
         ctx.beginPath(); ctx.moveTo(pt.x, pt.y); ctx.lineTo(cosP.x, cosP.y); ctx.stroke();
         ctx.setLineDash([]);
 
-        ctx.font = '11px "JetBrains Mono", monospace';
+        ctx.font = '17px ' + CF.mono;
         ctx.fillStyle = '#5b8dce'; ctx.textAlign = 'center';
         ctx.fillText('cos θ = ' + px.toFixed(2), (origin.x + cosP.x) / 2, origin.y + 18);
         ctx.fillStyle = '#8b6fc0'; ctx.textAlign = 'left';
@@ -469,7 +469,7 @@ const ComplexVis = {
         ctx.fillStyle = '#4d9e7e';
         ctx.beginPath(); ctx.arc(pt.x, pt.y, 5, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#fff';
-        ctx.font = '12px "Inter", sans-serif'; ctx.textAlign = 'left';
+        ctx.font = '18px ' + CF.sans; ctx.textAlign = 'left';
         ctx.fillText(`(${px.toFixed(2)}, ${py.toFixed(2)}i)`, pt.x + 10, pt.y - 8);
     },
 
@@ -529,7 +529,7 @@ const ComplexVis = {
             // Label
             const label = i === 0 ? '1' : i === 1 ? 'ω' : 'ω' + this._sup(i);
             ctx.fillStyle = '#fff';
-            ctx.font = '11px "JetBrains Mono", monospace';
+            ctx.font = '17px ' + CF.mono;
             ctx.textAlign = 'center';
             const lr = unitR + 18;
             ctx.fillText(label, origin.x + lr * Math.cos(-r.angle), origin.y + lr * Math.sin(-r.angle) + 4);
@@ -544,7 +544,7 @@ const ComplexVis = {
             ctx.beginPath(); ctx.arc(origin.x, origin.y, arcR, start, start - dAngle, true); ctx.stroke();
             const mid = start - dAngle / 2;
             ctx.fillStyle = '#c4793a';
-            ctx.font = '12px "JetBrains Mono", monospace';
+            ctx.font = '18px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(`${(360/n).toFixed(1)}°`, origin.x + (arcR + 14) * Math.cos(mid), origin.y + (arcR + 14) * Math.sin(mid) + 4);
         }
@@ -681,14 +681,14 @@ const ComplexVis = {
             if (pt.type === 'zero') {
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
                 ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI * 2); ctx.stroke();
-                ctx.fillStyle = '#fff'; ctx.font = '10px "JetBrains Mono"'; ctx.textAlign = 'left';
+                ctx.fillStyle = '#fff'; ctx.font = '16px ' + CF.mono; ctx.textAlign = 'left';
                 ctx.fillText(pt.ord > 1 ? `零点(${pt.ord}阶)` : '零点', p.x + 12, p.y + 4);
             } else {
                 ctx.strokeStyle = '#ff6b6b'; ctx.lineWidth = 2;
                 const s = 7;
                 ctx.beginPath(); ctx.moveTo(p.x-s, p.y-s); ctx.lineTo(p.x+s, p.y+s); ctx.stroke();
                 ctx.beginPath(); ctx.moveTo(p.x+s, p.y-s); ctx.lineTo(p.x-s, p.y+s); ctx.stroke();
-                ctx.fillStyle = '#ff6b6b'; ctx.font = '10px "JetBrains Mono"'; ctx.textAlign = 'left';
+                ctx.fillStyle = '#ff6b6b'; ctx.font = '16px ' + CF.mono; ctx.textAlign = 'left';
                 ctx.fillText(pt.ord > 1 ? `极点(${pt.ord}阶)` : '极点', p.x + 12, p.y + 4);
             }
         });
@@ -740,7 +740,7 @@ const ComplexVis = {
         ctx.strokeStyle = 'rgba(77,158,126,0.6)'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(origin.x, origin.y, arcR+12, 0, -aR, aR > 0); ctx.stroke();
         // Angle degree label
-        ctx.font = '10px "JetBrains Mono"';
+        ctx.font = '16px ' + CF.mono;
         ctx.fillStyle = 'rgba(91,141,206,0.6)'; ctx.textAlign = 'left';
         ctx.fillText(`${(a1*180/Math.PI).toFixed(0)}°`, origin.x + arcR + 2, origin.y - 2);
     },
@@ -754,7 +754,7 @@ const ComplexVis = {
         ctx.beginPath(); ctx.arc(pt.x, pt.y, 3, 0, Math.PI * 2); ctx.fill();
         ctx.shadowBlur = 0;
         ctx.fillStyle = color;
-        ctx.font = '12px "Inter", sans-serif'; ctx.textAlign = 'left';
+        ctx.font = '18px ' + CF.sans; ctx.textAlign = 'left';
         ctx.fillText(label, pt.x + 8, pt.y - 8);
     },
 

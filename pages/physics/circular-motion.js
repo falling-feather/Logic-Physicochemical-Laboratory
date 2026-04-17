@@ -284,7 +284,7 @@ const CircularMotion = {
         ctx.fill();
 
         ctx.fillStyle = color;
-        ctx.font = 'bold 12px var(--font-sans, sans-serif)';
+        ctx.font = 'bold 12px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText(label, x2 + 6, y2 - 4);
     },
@@ -313,7 +313,7 @@ const CircularMotion = {
         if (this.showAccel) items.push({ color: this.colors.accel, label: 'a \u2014 \u5411\u5fc3\u52a0\u901f\u5ea6' });
         if (this.showForce) items.push({ color: this.colors.force, label: 'F \u2014 \u5411\u5fc3\u529b' });
 
-        ctx.font = '11px var(--font-sans, sans-serif)';
+        ctx.font = '11px ' + CF.sans;
         ctx.textAlign = 'left';
         let y = 16;
         items.forEach(item => {

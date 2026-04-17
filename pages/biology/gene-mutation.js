@@ -89,7 +89,7 @@ const GeneMutation = (() => {
            hl ? modes[mode].color + '40' : `rgba(${hexRgb(c)},0.15)`,
            hl ? modes[mode].color : c);
         ctx.shadowBlur = 0;
-        ctx.font = 'bold 12px "Noto Sans SC", monospace';
+        ctx.font = 'bold 18px ' + CF.sans;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillStyle = c;
         ctx.fillText(base, bx + bw / 2, by + bh / 2);
@@ -114,8 +114,8 @@ const GeneMutation = (() => {
         ctx.globalAlpha = alpha;
         const cs = codons(mrna), a2 = aas(cs);
         ctx.strokeStyle = 'rgba(200,200,200,0.3)'; ctx.lineWidth = 0.8;
-        const fs = Math.max(9, boxes[0].w * 0.28);
-        ctx.font = `${fs}px "Noto Sans SC",sans-serif`; ctx.textAlign = 'center';
+        const fs = Math.max(14, boxes[0].w * 0.42);
+        ctx.font = `${fs}px ${CF.sans}`; ctx.textAlign = 'center';
         for (let c = 0; c < cs.length; c++) {
             const si = c * 3;
             if (si + 2 >= boxes.length) break;
@@ -130,7 +130,7 @@ const GeneMutation = (() => {
     }
 
     function drawLabel(t, x, y, c, a) {
-        ctx.globalAlpha = a; ctx.font = '11px "Noto Sans SC",sans-serif';
+        ctx.globalAlpha = a; ctx.font = '17px ' + CF.sans;
         ctx.textAlign = 'right'; ctx.fillStyle = c || '#94a3b8';
         ctx.fillText(t, x - 8, y); ctx.globalAlpha = 1;
     }
@@ -176,7 +176,7 @@ const GeneMutation = (() => {
         if (!paused && mutated) progress = Math.min(1, progress + dt * 0.8);
         ctx.clearRect(0, 0, W, H);
         const m = modes[mode];
-        ctx.font = 'bold 15px "Noto Sans SC",sans-serif';
+        ctx.font = 'bold 23px ' + CF.sans;
         ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(58,158,143,0.9)';
         ctx.fillText('基因突变 — '+m.name, W/2, 22);
 
@@ -197,20 +197,20 @@ const GeneMutation = (() => {
             }
             if ((mode===1||mode===2)&&progress>0.55) {
                 ctx.globalAlpha = Math.min(1,(progress-0.55)/0.3);
-                ctx.font = 'bold 12px "Noto Sans SC",sans-serif'; ctx.textAlign = 'center';
+                ctx.font = 'bold 18px ' + CF.sans; ctx.textAlign = 'center';
                 ctx.fillStyle = '#fbbf24';
                 ctx.fillText('⚠ 移码突变：突变位点后所有密码子改变 → 氨基酸序列大幅改变', W/2, H-18);
                 ctx.globalAlpha = 1;
             }
             if (progress > 0.25) {
                 ctx.globalAlpha = Math.min(1,(progress-0.25)/0.3);
-                ctx.font = '11px "Noto Sans SC",sans-serif'; ctx.textAlign = 'center';
+                ctx.font = '17px ' + CF.sans; ctx.textAlign = 'center';
                 ctx.fillStyle = m.color; ctx.fillText(m.desc, W/2, H-5);
                 ctx.globalAlpha = 1;
             }
         }
         if (!mutated) {
-            ctx.font = '11px "Noto Sans SC",sans-serif'; ctx.textAlign = 'center';
+            ctx.font = '17px ' + CF.sans; ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(200,200,200,0.4)';
             ctx.fillText('点击 "触发突变" 查看突变效果', W/2, H-12);
         }
@@ -228,7 +228,7 @@ const GeneMutation = (() => {
         const aaStr = aa[cdn] || '—';
         const lbl = hb.strand==='orig' ? '原始' : '突变后';
         const t = `${lbl} #${hb.idx+1} | 碱基: ${b} | mRNA密码子: ${cdn} | 氨基酸: ${aaStr}`;
-        ctx.font = '11px "Noto Sans SC",sans-serif';
+        ctx.font = '17px ' + CF.sans;
         const tw = ctx.measureText(t).width+16, th = 22;
         let tx = hb.px-tw/2, ty = hb.py-th-10;
         if (tx<4) tx=4; if (tx+tw>W-4) tx=W-4-tw; if (ty<4) ty=hb.py+14;

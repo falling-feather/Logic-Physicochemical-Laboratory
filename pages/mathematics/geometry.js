@@ -335,7 +335,7 @@ const GeoTransform = {
         ctx.beginPath(); ctx.moveTo(ox, 0); ctx.lineTo(ox, h); ctx.stroke();
         // Axis labels
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.font = '10px monospace';
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'center'; ctx.textBaseline = 'top';
         for (let g = gxMin; g <= gxMax; g++) {
             if (g === 0) continue;
@@ -395,7 +395,7 @@ const GeoTransform = {
             ctx.fillStyle = strokeColor; ctx.fill();
             if (!dashed && i < labels.length) {
                 ctx.fillStyle = 'rgba(255,255,255,0.6)';
-                ctx.font = '10px Inter, sans-serif';
+                ctx.font = '16px ' + CF.sans;
                 ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
                 ctx.fillText(labels[i] + "'", px + 5, py - 3);
             }
@@ -408,7 +408,7 @@ const GeoTransform = {
         ctx.fillStyle = 'rgba(0,0,0,0.45)';
         ctx.fillRect(x0 - 8, y0 - 4, 200, 80);
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = '10px monospace';
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'left';
         ctx.fillText('变换矩阵:', x0, y0 + 10);
         ctx.fillText(`[ ${mat.a.toFixed(2)}  ${mat.b.toFixed(2)}  ${mat.tx.toFixed(2)} ]`, x0, y0 + 24);
@@ -547,7 +547,7 @@ const GeoTransform = {
                 const mx = (P[0] + Q[0]) / 2, my = (P[1] + Q[1]) / 2;
                 const px = this.mapX(mx, w), py = this.mapY(my, h);
                 ctx.fillStyle = 'rgba(255,255,255,0.5)';
-                ctx.font = '11px monospace';
+                ctx.font = '17px ' + CF.mono;
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText(`${name}=${len.toFixed(2)}`, px, py - 10);
             });
@@ -573,7 +573,7 @@ const GeoTransform = {
                 // Angle text
                 const amid = a1 + sweep / 2;
                 ctx.fillStyle = '#e4c864';
-                ctx.font = '10px monospace';
+                ctx.font = '16px ' + CF.mono;
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText(`${deg.toFixed(1)}°`, vx + Math.cos(amid) * (r + 14), vy + Math.sin(amid) * (r + 14));
             });
@@ -588,7 +588,7 @@ const GeoTransform = {
             ctx.shadowColor = '#5b8dce'; ctx.shadowBlur = 6;
             ctx.fill(); ctx.shadowBlur = 0;
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 12px Inter, sans-serif';
+            ctx.font = 'bold 18px ' + CF.sans;
             ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
             ctx.fillText(names[i], px, py - 10);
         });
@@ -599,7 +599,7 @@ const GeoTransform = {
 
     _drawLabel(ctx, x, y, text, color) {
         ctx.fillStyle = color;
-        ctx.font = '10px Inter, sans-serif';
+        ctx.font = '16px ' + CF.sans;
         ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
         ctx.fillText(text, x + 6, y - 4);
     },
@@ -611,7 +611,7 @@ const GeoTransform = {
         ctx.fillStyle = 'rgba(0,0,0,0.45)';
         ctx.fillRect(x0 - 4, y0 - 4, 180, 42);
         ctx.fillStyle = 'rgba(255,255,255,0.6)';
-        ctx.font = '10px monospace';
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'left';
         ctx.fillText(`面积 = ${area.toFixed(3)}`, x0, y0 + 10);
         ctx.fillText(`周长 = ${perimeter.toFixed(3)}`, x0, y0 + 24);

@@ -120,7 +120,7 @@ const SubstanceTransport = {
             ctx.fill();
         }
         // labels
-        ctx.font = '10px "Noto Sans SC", sans-serif';
+        ctx.font = '15px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(200,200,200,0.4)';
         ctx.fillText('\u7EC6\u80DE\u5916 (\u9AD8\u6D53\u5EA6)', W * 0.25, 42);
@@ -145,7 +145,7 @@ const SubstanceTransport = {
         ctx.lineTo(mx + 15, H * 0.65);
         ctx.closePath();
         ctx.fill();
-        ctx.font = '9px "Noto Sans SC", sans-serif';
+        ctx.font = '14px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(100,150,255,0.6)';
         ctx.fillText('\u8F7D\u4F53\u86CB\u767D', mx, H * 0.32);
@@ -161,7 +161,7 @@ const SubstanceTransport = {
         ctx.strokeStyle = 'rgba(255,150,50,0.5)';
         ctx.lineWidth = 1.5;
         ctx.stroke();
-        ctx.font = '9px "Noto Sans SC", sans-serif';
+        ctx.font = '14px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(255,150,50,0.7)';
         ctx.fillText('\u8F7D\u4F53\u86CB\u767D', mx, H * 0.5);
@@ -171,7 +171,7 @@ const SubstanceTransport = {
         ctx.arc(mx + 25, H * 0.5 + 20, 8, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(255,200,50,' + (0.4 + ap * 0.3) + ')';
         ctx.fill();
-        ctx.font = 'bold 9px "JetBrains Mono", monospace';
+        ctx.font = 'bold 14px ' + CF.mono;
         ctx.fillStyle = '#fff';
         ctx.fillText('ATP', mx + 25, H * 0.5 + 22);
         // direction arrow (reversed - low to high)
@@ -198,7 +198,7 @@ const SubstanceTransport = {
             ctx.strokeStyle = 'rgba(200,180,120,0.4)';
             ctx.stroke();
         }
-        ctx.font = '9px "Noto Sans SC", sans-serif';
+        ctx.font = '14px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(200,100,200,0.6)';
         ctx.fillText('\u80DE\u541E', mx, ey - 25);
@@ -219,11 +219,11 @@ const SubstanceTransport = {
         const ctx = this.ctx, W = this.W, H = this.H;
         ctx.clearRect(0, 0, W, H);
         const m = this.modes[this.mode];
-        ctx.font = 'bold 14px "Noto Sans SC", sans-serif';
+        ctx.font = 'bold 21px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(58,158,143,0.9)';
         ctx.fillText('\u7269\u8D28\u8F90\u8FD0 - ' + m.name, W / 2, 25);
-        ctx.font = '11px "Noto Sans SC", sans-serif';
+        ctx.font = '17px ' + CF.sans;
         ctx.fillStyle = 'rgba(200,200,200,0.5)';
         ctx.fillText(m.desc, W / 2, H - 8);
 

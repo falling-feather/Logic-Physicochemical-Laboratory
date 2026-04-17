@@ -191,7 +191,7 @@ const Gravitation = {
         ctx.fillStyle = 'rgba(255,200,50,0.1)';
         ctx.fill();
         // label
-        ctx.font = '11px "Noto Sans SC", sans-serif';
+        ctx.font = '11px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(255,200,50,0.8)';
         ctx.fillText('M = ' + this.centralMass, this.cx, this.cy + this.centralR + 18);
@@ -215,7 +215,7 @@ const Gravitation = {
             ctx.fillStyle = s.color;
             ctx.fill();
             // name
-            ctx.font = '10px "Noto Sans SC", sans-serif';
+            ctx.font = '10px ' + CF.sans;
             ctx.fillStyle = s.color;
             ctx.fillText(s.name, s.x, s.y - s.r - 5);
             // force vector
@@ -253,11 +253,11 @@ const Gravitation = {
         });
 
         // formula
-        ctx.font = 'bold 13px "Noto Sans SC", sans-serif';
+        ctx.font = 'bold 13px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillStyle = 'rgba(139,111,192,0.9)';
         ctx.fillText('F = GMm/r\u00B2', 14, 25);
-        ctx.font = '11px "Noto Sans SC", sans-serif';
+        ctx.font = '11px ' + CF.sans;
         ctx.fillStyle = 'rgba(200,200,200,0.5)';
         ctx.fillText('\u7EA2: \u5F15\u529B  \u7EFF: \u901F\u5EA6', 14, 45);
     },
@@ -265,7 +265,7 @@ const Gravitation = {
         const ctx = this.ctx, W = this.W, H = this.H;
         const step = 35;
         const M = this.centralMass;
-        ctx.font = 'bold 13px "Noto Sans SC", sans-serif';
+        ctx.font = 'bold 13px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(139,111,192,0.9)';
         ctx.fillText('\u5F15\u529B\u573A\u5206\u5E03 (g = GM/r\u00B2)', W / 2, 25);

@@ -49,6 +49,7 @@ const ExpLog = {
         const rect = wrap.getBoundingClientRect();
         this.W = rect.width;
         this.H = Math.min(rect.width * 0.55, 500);
+        if (this.W <= 0 || this.H <= 0) return;
         this.canvas.width = this.W * dpr;
         this.canvas.height = this.H * dpr;
         this.canvas.style.width = this.W + 'px';
@@ -278,7 +279,7 @@ const ExpLog = {
         ctx.beginPath(); ctx.moveTo(origin.x, 2); ctx.lineTo(origin.x - 4, 10); ctx.lineTo(origin.x + 4, 10); ctx.closePath(); ctx.fill();
 
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        ctx.font = '11px sans-serif';
+        ctx.font = '17px ' + CF.sans;
         ctx.textAlign = 'center'; ctx.textBaseline = 'top';
         for (let i = xMin; i <= xMax; i++) {
             if (i === 0) continue;
@@ -293,7 +294,7 @@ const ExpLog = {
         ctx.fillText('O', origin.x - 4, origin.y + 4);
         // Axis labels
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = 'italic 13px sans-serif';
+        ctx.font = 'italic 20px ' + CF.sans;
         ctx.textAlign = 'left'; ctx.textBaseline = 'top';
         ctx.fillText('x', W - 14, origin.y + 8);
         ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
@@ -302,9 +303,11 @@ const ExpLog = {
 
     _plotFunc(f, color, dash, lw) {
         const { ctx, W, H, origin, scale } = this;
+        if (W <= 0) return;
         const xMin = (0 - origin.x) / scale;
         const xMax = (W - origin.x) / scale;
         const step = (xMax - xMin) / Math.max(W * 2, 800);
+        if (step <= 0) return;
 
         ctx.save();
         ctx.strokeStyle = color;
@@ -337,7 +340,7 @@ const ExpLog = {
         ctx.stroke();
         if (label) {
             ctx.fillStyle = 'rgba(255,255,255,0.8)';
-            ctx.font = 'bold 11px sans-serif';
+            ctx.font = 'bold 17px ' + CF.sans;
             ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
             ctx.fillText(label, sx + 8, sy - 4);
         }
@@ -347,7 +350,7 @@ const ExpLog = {
         const { ctx, W } = this;
         const a = this.base;
         const x0 = W - 160, y0 = 16;
-        ctx.font = '12px sans-serif';
+        ctx.font = '18px ' + CF.sans;
         let row = 0;
         if (this.showExp) {
             ctx.fillStyle = '#5b9bd5';

@@ -236,7 +236,7 @@ ${opEdu[this.operation]}
 
         // Origin label
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '10px var(--font-sans, sans-serif)';
+        ctx.font = '16px ' + CF.sans;
         ctx.textAlign = 'left';
         ctx.fillText('O', origin.x + 4, origin.y + 14);
     },
@@ -267,7 +267,7 @@ ${opEdu[this.operation]}
 
         // Label
         ctx.fillStyle = color;
-        ctx.font = 'bold 14px var(--font-sans, sans-serif)';
+        ctx.font = 'bold 22px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
         ctx.fillText(label, s.x + 12 * Math.cos(angle + 0.5), s.y + 12 * Math.sin(angle + 0.5) - 4);
@@ -337,7 +337,7 @@ ${opEdu[this.operation]}
                 const midAngle = (angleA + angleB) / 2;
                 const dp = A.x * B.x + A.y * B.y;
                 ctx.fillStyle = this.colors.result;
-                ctx.font = '11px var(--font-mono, monospace)';
+                ctx.font = '17px ' + CF.mono;
                 ctx.textAlign = 'center';
                 ctx.fillText(dp.toFixed(1), o.x + 45 * Math.cos(midAngle), o.y + 45 * Math.sin(midAngle));
                 break;
@@ -401,7 +401,7 @@ ${opEdu[this.operation]}
         ctx.fill();
 
         ctx.fillStyle = color;
-        ctx.font = 'bold 12px var(--font-sans, sans-serif)';
+        ctx.font = 'bold 18px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText(label, (x1 + x2) / 2 + 15 * Math.cos(angle + Math.PI / 2),
                             (y1 + y2) / 2 + 15 * Math.sin(angle + Math.PI / 2));
@@ -410,7 +410,7 @@ ${opEdu[this.operation]}
     drawDragHints() {
         const ctx = this.ctx;
         ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '10px var(--font-sans, sans-serif)';
+        ctx.font = '16px ' + CF.sans;
         ctx.textAlign = 'right';
         ctx.fillText('\u62d6\u62fd\u5411\u91cf\u7aef\u70b9\u8c03\u6574', this.W - 10, this.H - 8);
     }

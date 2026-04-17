@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -20,22 +20,22 @@
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
 
     <!-- CSS: Shared -->
-    <link rel="stylesheet" href="shared/css/tokens.css">
-    <link rel="stylesheet" href="shared/css/base.css">
-    <link rel="stylesheet" href="shared/css/typography.css">
-    <link rel="stylesheet" href="shared/css/navbar.css">
-    <link rel="stylesheet" href="shared/css/page-layout.css">
-    <link rel="stylesheet" href="shared/css/cards.css">
-    <link rel="stylesheet" href="shared/css/module-selector.css">
+    <link rel="stylesheet" href="shared/css/tokens.css?v=20260417d">
+    <link rel="stylesheet" href="shared/css/base.css?v=20260417d">
+    <link rel="stylesheet" href="shared/css/typography.css?v=20260417d">
+    <link rel="stylesheet" href="shared/css/navbar.css?v=20260417d">
+    <link rel="stylesheet" href="shared/css/page-layout.css?v=20260417d">
+    <link rel="stylesheet" href="shared/css/cards.css?v=20260417d">
+    <link rel="stylesheet" href="shared/css/module-selector.css?v=20260417d">
     <!-- CSS: Pages -->
-    <link rel="stylesheet" href="pages/home/home.css">
-    <link rel="stylesheet" href="pages/mathematics/mathematics.css">
-    <link rel="stylesheet" href="pages/physics/physics.css">
-    <link rel="stylesheet" href="pages/chemistry/chemistry.css">
-    <link rel="stylesheet" href="pages/algorithms/algorithms.css">
-    <link rel="stylesheet" href="pages/biology/biology.css">
+    <link rel="stylesheet" href="pages/home/home.css?v=20260417d">
+    <link rel="stylesheet" href="pages/mathematics/mathematics.css?v=20260417d">
+    <link rel="stylesheet" href="pages/physics/physics.css?v=20260417d">
+    <link rel="stylesheet" href="pages/chemistry/chemistry.css?v=20260417d">
+    <link rel="stylesheet" href="pages/algorithms/algorithms.css?v=20260417d">
+    <link rel="stylesheet" href="pages/biology/biology.css?v=20260417d">
     <!-- CSS: Responsive (must be last) -->
-    <link rel="stylesheet" href="shared/css/responsive.css">
+    <link rel="stylesheet" href="shared/css/responsive.css?v=20260417d">
 
     <!-- Loading Screen (inline — zero dependency, shows immediately) -->
     <style id="loading-screen-styles">
@@ -69,7 +69,14 @@
         <div class="loader-bar"><div class="loader-bar-fill" id="loading-bar"></div></div>
     </div>
     <script>
-        window.__englabCache = { returnVisitor: false, visitCount: 1 };
+        window.__englabCache = {
+            returnVisitor: false,
+            visitCount: 1,
+            cacheMode: 'pending',
+            transport: 'none',
+            protocol: location.protocol,
+            secureContext: !!window.isSecureContext
+        };
         try {
             var raw = JSON.parse(localStorage.getItem('englab-cache-meta') || '{}');
             raw.visitCount = (raw.visitCount || 0) + 1;
@@ -79,6 +86,11 @@
             window.__englabCache.visitCount = raw.visitCount;
             localStorage.setItem('englab-cache-meta', JSON.stringify(raw));
             if (raw.visitCount > 1) document.documentElement.classList.add('return-visit');
+            if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+                document.documentElement.classList.add('http-cache-fallback');
+                window.__englabCache.cacheMode = 'http-fallback';
+                window.__englabCache.transport = 'browser-http-cache';
+            }
         } catch (e) {}
 
         window.__loadProgress = function(p) {
@@ -2646,22 +2658,22 @@
 
     <!-- External Libraries (pinned versions) -->
     <!-- lucide: 本地优先，CDN 回退，确保图标在弱网环境下正常显示 -->
-    <script src="shared/js/lucide.min.js"></script>
+    <script src="shared/js/lucide.min.js?v=20260417d"></script>
     <script>if(typeof lucide==='undefined'){var s=document.createElement('script');s.src='https://unpkg.com/lucide@0.454.0/dist/umd/lucide.js';document.head.appendChild(s);}</script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/ScrollTrigger.min.js"></script>
 
     <!-- Application Scripts: Shared -->
-    <script src="shared/js/config.js"></script>
-    <script src="shared/js/module-selector.js?v=20260416b"></script>
-    <script src="shared/js/router.js?v=20260416b"></script>
-    <script src="shared/js/scroll-animations.js?v=20260416b"></script>
-    <script src="shared/js/cards.js"></script>
-    <script src="shared/js/common.js"></script>
+    <script src="shared/js/config.js?v=20260417d"></script>
+    <script src="shared/js/module-selector.js?v=20260417d"></script>
+    <script src="shared/js/router.js?v=20260417d"></script>
+    <script src="shared/js/scroll-animations.js?v=20260417d"></script>
+    <script src="shared/js/cards.js?v=20260417d"></script>
+    <script src="shared/js/common.js?v=20260417d"></script>
     <!-- Scripts: Home -->
-    <script src="pages/home/home.js?v=20260416b"></script>
+    <script src="pages/home/home.js?v=20260417d"></script>
     <!-- Scripts: Bootstrap (before deferred modules for fast homepage boot) -->
-    <script src="shared/js/main.js?v=20260416b"></script>
+    <script src="shared/js/main.js?v=20260417d"></script>
     <!-- Scripts: Subject modules (deferred — download in parallel, execute after core) -->
     <script defer src="pages/mathematics/mathematics.js"></script>
     <script defer src="pages/mathematics/calculus.js"></script>

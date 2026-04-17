@@ -186,7 +186,7 @@ const ConicSections = {
             ctx.arc(cx + fx * s, cy + fy * s, 4, 0, Math.PI * 2);
             ctx.fill();
             ctx.fillStyle = 'rgba(229,192,123,0.6)';
-            ctx.font = '10px var(--font-mono)';
+            ctx.font = '16px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(i === 0 ? 'F\u2081' : 'F\u2082', cx + fx * s, cy + fy * s + 14);
         });
@@ -216,7 +216,7 @@ const ConicSections = {
         const d1 = Math.hypot(px + c, py);
         const d2 = Math.hypot(px - c, py);
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '10px var(--font-mono)';
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'left';
         ctx.fillText('|PF\u2081|+|PF\u2082| = ' + d1.toFixed(2) + '+' + d2.toFixed(2) + ' = ' + (d1 + d2).toFixed(2), 10, 20);
         ctx.fillText('2a = ' + (2 * a).toFixed(2), 10, 34);
@@ -266,7 +266,7 @@ const ConicSections = {
             ctx.arc(cx + fx * s, cy, 4, 0, Math.PI * 2);
             ctx.fill();
             ctx.fillStyle = 'rgba(229,192,123,0.6)';
-            ctx.font = '10px var(--font-mono)';
+            ctx.font = '16px ' + CF.mono;
             ctx.textAlign = 'center';
             ctx.fillText(i === 0 ? 'F\u2081' : 'F\u2082', cx + fx * s, cy + 14);
         });
@@ -286,7 +286,7 @@ const ConicSections = {
         const d1 = Math.hypot(px + c, py);
         const d2 = Math.hypot(px - c, py);
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '10px var(--font-mono)';
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'left';
         ctx.fillText('||PF\u2081|-|PF\u2082|| = |' + d1.toFixed(2) + '-' + d2.toFixed(2) + '| = ' + Math.abs(d1 - d2).toFixed(2), 10, 20);
         ctx.fillText('2a = ' + (2 * a).toFixed(2), 10, 34);
@@ -318,7 +318,7 @@ const ConicSections = {
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.fillStyle = 'rgba(224,108,117,0.4)';
-        ctx.font = '10px var(--font-mono)';
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillText('\u51c6\u7ebf x=-p/2', dx, 14);
 
@@ -329,7 +329,7 @@ const ConicSections = {
         ctx.arc(cx + fx * s, cy, 4, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = 'rgba(229,192,123,0.6)';
-        ctx.font = '10px var(--font-mono)';
+        ctx.font = '16px ' + CF.mono;
         ctx.fillText('F(' + (p / 2).toFixed(1) + ',0)', cx + fx * s, cy + 14);
 
         // Tracing point
@@ -352,7 +352,7 @@ const ConicSections = {
         ctx.setLineDash([]);
 
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '10px var(--font-mono)';
+        ctx.font = '16px ' + CF.mono;
         ctx.textAlign = 'left';
         ctx.fillText('|PF| = ' + dF.toFixed(2) + '  \u51c6\u7ebf\u8ddd = ' + dD.toFixed(2), 10, 20);
     }

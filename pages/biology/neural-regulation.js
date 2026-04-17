@@ -282,7 +282,7 @@ const NeuralReg = {
             ctx.fillRect(caChX - 3, cy - 4, 6, 8);
             if (i === 0) {
                 ctx.fillStyle = 'rgba(229,192,123,0.4)';
-                ctx.font = '10px var(--font-mono)';
+                ctx.font = '15px ' + CF.mono;
                 ctx.textAlign = 'left';
                 ctx.fillText('Ca²⁺', caChX + 7, cy + 3);
             }
@@ -387,13 +387,13 @@ const NeuralReg = {
         }
 
         // Labels
-        ctx.font = `${fs}px var(--font-sans)`; ctx.textAlign = 'center';
+        ctx.font = `${fs}px ${CF.sans}`; ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(139,111,192,0.45)'; ctx.fillText('突触前膜', W * 0.15, H * 0.93);
         ctx.fillStyle = 'rgba(58,158,143,0.45)'; ctx.fillText('突触后膜', W * 0.75, H * 0.93);
         ctx.fillStyle = 'rgba(255,255,255,0.13)'; ctx.fillText('突触间隙', (cleftL + cleftR) / 2, H * 0.08);
 
         // Status line
-        ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = `${fs}px var(--font-sans)`; ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = `${fs}px ${CF.sans}`; ctx.textAlign = 'left';
         let s = '';
         if (phase < 0.15) s = '① 静息状态 (膜电位 -70mV)';
         else if (phase < 0.35) s = '② 动作电位沿轴突传导 →';
@@ -453,7 +453,7 @@ const NeuralReg = {
         ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, padT + gH); ctx.lineTo(padL + gW, padT + gH); ctx.stroke();
 
         // Y labels
-        ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.font = `${fs}px var(--font-mono)`; ctx.textAlign = 'right';
+        ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.font = `${fs}px ${CF.mono}`; ctx.textAlign = 'right';
         for (const v of [40, 0, -55, -70, -90]) {
             const y = vToY(v);
             ctx.fillText(v + 'mV', padL - 5, y + 3);
@@ -465,11 +465,11 @@ const NeuralReg = {
         const thY = vToY(-55);
         ctx.strokeStyle = 'rgba(229,192,123,0.3)'; ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(padL, thY); ctx.lineTo(padL + gW, thY); ctx.stroke(); ctx.setLineDash([]);
-        ctx.fillStyle = 'rgba(229,192,123,0.35)'; ctx.font = `${fs - 1}px var(--font-mono)`; ctx.textAlign = 'right';
+        ctx.fillStyle = 'rgba(229,192,123,0.35)'; ctx.font = `${fs - 1}px ${CF.mono}`; ctx.textAlign = 'right';
         ctx.fillText('阈值 -55mV', padL + gW, thY - 4);
 
         // Axis labels
-        ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.font = `${fs}px var(--font-sans)`; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.font = `${fs}px ${CF.sans}`; ctx.textAlign = 'center';
         ctx.fillText('时间 (ms)', padL + gW / 2, H - 5);
         ctx.save(); ctx.translate(12, padT + gH / 2); ctx.rotate(-Math.PI / 2);
         ctx.fillText('膜电位 (mV)', 0, 0); ctx.restore();
@@ -500,7 +500,7 @@ const NeuralReg = {
             ctx.shadowColor = '#e06c75'; ctx.shadowBlur = 8;
             ctx.fillStyle = '#e06c75'; ctx.beginPath(); ctx.arc(dx, dy, 4, 0, Math.PI * 2); ctx.fill();
             ctx.shadowBlur = 0;
-            ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = `${fs}px var(--font-mono)`; ctx.textAlign = 'left';
+            ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = `${fs}px ${CF.mono}`; ctx.textAlign = 'left';
             ctx.fillText(v.toFixed(0) + 'mV', dx + 8, dy - 5);
         }
 
@@ -517,9 +517,9 @@ const NeuralReg = {
             const mid = (p.r[0] + p.r[1]) / 2;
             if (mid <= drawP) {
                 const px = padL + mid * gW;
-                ctx.fillStyle = p.col; ctx.font = `${fs}px var(--font-sans)`; ctx.textAlign = 'center';
+                ctx.fillStyle = p.col; ctx.font = `${fs}px ${CF.sans}`; ctx.textAlign = 'center';
                 ctx.fillText(p.label, px, padT - 10);
-                if (p.desc) { ctx.font = `${fs - 1}px var(--font-mono)`; ctx.fillText(p.desc, px, padT - 1); }
+                if (p.desc) { ctx.font = `${fs - 1}px ${CF.mono}`; ctx.fillText(p.desc, px, padT - 1); }
             }
         }
 
@@ -544,10 +544,10 @@ const NeuralReg = {
         ctx.stroke();
         if (naO) {
             ctx.fillStyle = 'rgba(224,108,117,0.45)';
-            ctx.font = '10px var(--font-mono)'; ctx.textAlign = 'center';
+            ctx.font = '15px ' + CF.mono; ctx.textAlign = 'center';
             ctx.fillText('Na⁺↓', cx - s * 0.65, cy + 3);
         }
-        ctx.fillStyle = 'rgba(224,108,117,0.35)'; ctx.font = '10px var(--font-sans)'; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(224,108,117,0.35)'; ctx.font = '15px ' + CF.sans; ctx.textAlign = 'center';
         ctx.fillText('Na⁺通道', cx - s * 0.6, cy - s * 0.78);
 
         // K⁺ channel
@@ -559,10 +559,10 @@ const NeuralReg = {
         ctx.stroke();
         if (kO) {
             ctx.fillStyle = 'rgba(97,175,239,0.45)';
-            ctx.font = '10px var(--font-mono)'; ctx.textAlign = 'center';
+            ctx.font = '15px ' + CF.mono; ctx.textAlign = 'center';
             ctx.fillText('K⁺↑', cx + s * 0.65, cy + 3);
         }
-        ctx.fillStyle = 'rgba(97,175,239,0.35)'; ctx.font = '10px var(--font-sans)'; ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(97,175,239,0.35)'; ctx.font = '15px ' + CF.sans; ctx.textAlign = 'center';
         ctx.fillText('K⁺通道', cx + s * 0.6, cy - s * 0.78);
     },
 
@@ -589,7 +589,7 @@ const NeuralReg = {
         if (!this.hoverLabel || this.hoverX < 0) return;
         const { ctx, hoverX, hoverY, W } = this;
         const fs = Math.max(10, W * 0.011);
-        ctx.font = `${fs}px var(--font-sans)`;
+        ctx.font = `${fs}px ${CF.sans}`;
         const tw = ctx.measureText(this.hoverLabel).width;
         const px = Math.min(hoverX + 12, W - tw - 20);
         const py = Math.max(hoverY - 20, 16);

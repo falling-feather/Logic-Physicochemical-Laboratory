@@ -331,7 +331,7 @@ const Mitosis = {
         if (p > 0.3) {
             const ctx = this.ctx;
             ctx.fillStyle = 'rgba(86,182,194,0.4)';
-            ctx.font = '10px var(--font-sans, sans-serif)';
+            ctx.font = '15px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('DNA \u590d\u5236\u4e2d...', cx, cy + r * 0.75);
 
