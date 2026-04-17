@@ -44,6 +44,7 @@ const CircularMotion = {
         this.lastTime = performance.now();
         this.resize();
         this.bindEvents();
+        this.updateInfo();
         this.loop();
     },
 
@@ -286,6 +287,23 @@ const CircularMotion = {
         ctx.font = 'bold 12px var(--font-sans, sans-serif)';
         ctx.textAlign = 'left';
         ctx.fillText(label, x2 + 6, y2 - 4);
+    },
+
+    /* ── education panel ── */
+    updateInfo() {
+        const el = document.getElementById('circ-info');
+        if (!el) return;
+        const w = this.angularSpeed;
+        const r = this.radius / 100;
+        const v = (w * r).toFixed(2);
+        const T = (2 * Math.PI / w).toFixed(2);
+        el.innerHTML = `<div class="ac-hd"><span class="ac-tag">圆周</span>匀速圆周运动</div>
+<div class="ac-row"><span class="ac-key">线速度</span>v = ωr = ${v} m/s — 速度大小不变，方向沿切线时刻改变</div>
+<div class="ac-row"><span class="ac-key ac-key--purple">向心加速度</span>a<sub>c</sub> = v²/r = ω²r — 方向始终指向圆心，大小恒定</div>
+<div class="ac-row"><span class="ac-key ac-key--amber">向心力</span>F<sub>c</sub> = ma<sub>c</sub> = mω²r = mv²/r — 不是新力，是合力的效果（提供向心加速度的合外力）</div>
+<div class="ac-row"><span class="ac-key">周期与频率</span>T = 2π/ω = ${T} s — 转一圈的时间；f = 1/T；ω = 2πf</div>
+<div class="ac-row"><span class="ac-key">关键关系</span>v = ωr, a = ω²r = v²/r, F = ma — 三组公式是圆周运动的核心工具</div>
+<div class="ac-note">💡 人教版必修2：匀速圆周运动速度大小不变但方向改变，因此有加速度。调节 ω 和 r 观察各物理量的联动变化</div>`;
     },
 
     drawLegend() {

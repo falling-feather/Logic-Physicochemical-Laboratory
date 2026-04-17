@@ -479,6 +479,7 @@ const OpticsLab = {
             if (this._slitAnimId) { cancelAnimationFrame(this._slitAnimId); this._slitAnimId = null; }
         }
         this.render();
+        this.updateInfo();
     },
 
     // ═══════════════════════════════════════════
@@ -1469,6 +1470,50 @@ const OpticsLab = {
         ctx.lineTo(x - hl * Math.cos(angle - 0.5), y - hl * Math.sin(angle - 0.5));
         ctx.lineTo(x - hl * Math.cos(angle + 0.5), y - hl * Math.sin(angle + 0.5));
         ctx.closePath(); ctx.fill();
+    },
+
+    /* ── education panel ── */
+    updateInfo() {
+        const el = document.getElementById('optics-info');
+        if (!el) return;
+        const labels = { lens:'透镜成像', doubleslit:'双缝干涉', refraction:'折射与全反射', prism:'棱镜色散', grating:'衡射光栅', polarization:'偏振' };
+        const data = {
+            lens: [
+                ['透镜公式','1/f = 1/dₒ + 1/dᵢ，物距大于 2f 时成缩小实像，f < d < 2f 时成放大实像'],
+                ['实像 / 虚像','实像由实际光线会聚（倒立），虚像由光线反向延长线交于同侧（正立）'],
+                ['放大率','m = dᵢ/dₒ = 像高/物高，|m| > 1 放大，|m| < 1 缩小']
+            ],
+            doubleslit: [
+                ['干涉条件','两列相干波叠加，等光程差处明纹，半波长奇数倍处暗纹'],
+                ['条纹间距','Δy = λL/d，波长越长/缝距越小/屏距越大→条纹越宽'],
+                ['白光干涉','各色光条纹间距不同，中央明纹为白色，两侧彩色']
+            ],
+            refraction: [
+                ['Snell 定律','n₁sinθ₁ = n₂sinθ₂，光从光疏到光密介质时折射角 < 入射角'],
+                ['全反射','光从光密到光疏介质，入射角 > 临界角 θc = arcsin(n₂/n₁) 时发生'],
+                ['应用','光纤通信利用全反射，水中看物体偶变浅是折射现象']
+            ],
+            prism: [
+                ['色散原理','不同波长的光折射率不同 (Cauchy 方程)，紫光偏转最大、红光最小'],
+                ['最小偏向角','当光线对称通过棱镜时偏向角最小，可用于测量折射率'],
+                ['连续光谱','白光经棱镜分解为红橙黄绿青蓝紫连续光谱']
+            ],
+            grating: [
+                ['光栅方程','d sinθ = mλ，缝数越多峰越尖锐，分辨率越高'],
+                ['各级次谱','每个级次 m 中白光展为彩色光谱，级次越高色散越大'],
+                ['应用','光谱分析、测量波长、X 射线衡射']
+            ],
+            polarization: [
+                ['Malus 定律','I = I₀cos²θ，偏振光通过检偶器，透射强度与夹角余弦平方成正比'],
+                ['偏振片','将自然光变为线偏振光，两片正交时完全遮光'],
+                ['偏振悖论','两正交偏振片间插入 45° 中间片反而透光 (I = I₀/8)']
+            ]
+        };
+        const items = data[this.mode] || data.lens;
+        let h = `<div class="ac-hd"><span class="ac-tag">${labels[this.mode]}</span>光学知识点</div>`;
+        items.forEach(([k, v]) => h += `<div class="ac-row"><span class="ac-key">${k}</span>${v}</div>`);
+        h += `<div class="ac-note">💡 人教版选择性必修1：切换上方模式按钮探索几何光学与波动光学的不同现象</div>`;
+        el.innerHTML = h;
     }
 };
 

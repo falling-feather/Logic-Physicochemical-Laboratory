@@ -22,6 +22,7 @@ const SubstanceTransport = {
         this._resize();
         this._on(window, 'resize', () => this._resize());
         this._buildControls();
+        this._injectInfoPanel();
         this._initMolecules();
         this._loop();
     },
@@ -61,6 +62,7 @@ const SubstanceTransport = {
                 this._initMolecules();
                 wrap.querySelectorAll('.strans-btn').forEach(x => x.classList.remove('active'));
                 b.classList.add('active');
+                this._updateInfo();
             });
             wrap.appendChild(b);
         });
@@ -285,6 +287,40 @@ const SubstanceTransport = {
             ctx.fill();
         });
     },
+    _injectInfoPanel() {
+        const el = document.getElementById('strans-info');
+        if (!el) return;
+        el.innerHTML = `
+            <div class="strans-info__hd">📘 物质运输知识点</div>
+            <div class="strans-info__grid">
+                <div class="strans-info__block">
+                    <div class="strans-info__sub">当前方式</div>
+                    <div id="strans-mode-display" class="strans-info__val">自由扩散</div>
+                    <div id="strans-mode-desc" class="strans-info__desc">小分子/非极性分子顺浓度梯度通过磷脂双分子层</div>
+                </div>
+                <div class="strans-info__block">
+                    <div class="strans-info__sub">四种运输方式</div>
+                    <div class="strans-info__row"><span class="strans-info__key" style="--c:#64c896">自由扩散</span> 顺浓度，不耗能，不需载体（如O₂、CO₂、H₂O）</div>
+                    <div class="strans-info__row"><span class="strans-info__key" style="--c:#6496ff">协助扩散</span> 顺浓度，不耗能，需载体蛋白（如葡萄糖进红细胞）</div>
+                    <div class="strans-info__row"><span class="strans-info__key" style="--c:#ff9632">主动运输</span> 逆浓度，耗ATP，需载体蛋白（如Na⁺-K⁺泵）</div>
+                    <div class="strans-info__row"><span class="strans-info__key" style="--c:#c864c8">胞吞/胞吐</span> 大分子通过囊泡进出细胞</div>
+                </div>
+                <div class="strans-info__block">
+                    <div class="strans-info__sub">💡 知识要点</div>
+                    <div class="strans-info__note">自由扩散和协助扩散统称被动运输（顺浓度梯度）。主动运输消耗细胞代谢产生的ATP，可逆浓度梯度运输。胞吞胞吐需要膜的流动性。</div>
+                </div>
+            </div>
+        `;
+    },
+
+    _updateInfo() {
+        const m = this.modes[this.mode];
+        const nameEl = document.getElementById('strans-mode-display');
+        const descEl = document.getElementById('strans-mode-desc');
+        if (nameEl) nameEl.textContent = m.name;
+        if (descEl) descEl.textContent = m.desc;
+    },
+
     _loop() {
         const t = performance.now() / 1000;
         this._draw(t);

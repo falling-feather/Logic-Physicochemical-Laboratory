@@ -605,21 +605,53 @@ const NeuralReg = {
         const el = document.getElementById('neural-info');
         if (!el) return;
         if (this.mode === 'synapse') {
-            el.innerHTML =
-                '<div class="neur-hd"><span class="neur-tag">突触传递</span>化学突触的信号转导过程</div>' +
-                '<div class="neur-row"><span class="neur-key">突触小泡</span>含乙酰胆碱(ACh)等递质，Ca²⁺触发胞吐释放</div>' +
-                '<div class="neur-row"><span class="neur-key neur-key--gold">Ca²⁺ 内流</span>动作电位 → 电压门控Ca²⁺通道开放 → Ca²⁺涌入突触小体</div>' +
-                '<div class="neur-row"><span class="neur-key neur-key--teal">受体结合</span>递质与后膜特异性受体结合 → 离子通道开放 → 突触后电位</div>' +
-                '<div class="neur-row"><span class="neur-key neur-key--pink">信号终止</span>递质被酶降解(如AChE)或突触前膜回收再利用</div>' +
-                '<div class="neur-note">💡 突触传递是单向的：前膜→间隙→后膜（递质只能由前膜释放）</div>';
+            el.innerHTML = `
+                <div class="neur-info__hd">📘 突触传递 — 化学突触的信号转导过程</div>
+                <div class="neur-info__grid">
+                    <div class="neur-info__block">
+                        <div class="neur-info__sub">突触小泡</div>
+                        <div class="neur-info__val">胞吐释放递质</div>
+                        <div class="neur-info__desc">含乙酰胆碱(ACh)等递质，Ca²⁺触发胞吐释放到突触间隙</div>
+                    </div>
+                    <div class="neur-info__block">
+                        <div class="neur-info__sub">Ca²⁺ 内流</div>
+                        <div class="neur-info__val" style="color:#e5c07b">电压门控通道</div>
+                        <div class="neur-info__desc">动作电位 → 电压门控Ca²⁺通道开放 → Ca²⁺涌入突触小体</div>
+                    </div>
+                    <div class="neur-info__block">
+                        <div class="neur-info__sub">关键过程</div>
+                        <div class="neur-info__row"><span class="neur-info__key" style="--c:var(--accent-teal,#3a9e8f)">受体结合</span> 递质与后膜特异性受体结合 → 离子通道开放 → 突触后电位</div>
+                        <div class="neur-info__row"><span class="neur-info__key" style="--c:#e06c75">信号终止</span> 递质被酶降解(如AChE)或突触前膜回收再利用</div>
+                    </div>
+                    <div class="neur-info__block">
+                        <div class="neur-info__sub">💡 知识要点</div>
+                        <div class="neur-info__note">突触传递是单向的：前膜→间隙→后膜（递质只能由前膜释放）。兴奋性递质使后膜去极化，抑制性递质使后膜超极化。</div>
+                    </div>
+                </div>`;
         } else {
-            el.innerHTML =
-                '<div class="neur-hd"><span class="neur-tag neur-tag--red">动作电位</span>神经冲动的产生与传导</div>' +
-                '<div class="neur-row"><span class="neur-key neur-key--pink">去极化</span>Na⁺通道开放 → Na⁺大量内流 → 膜内变正 (-70→+40mV)</div>' +
-                '<div class="neur-row"><span class="neur-key neur-key--blue">复极化</span>Na⁺通道关闭 + K⁺通道开放 → K⁺外流 → 膜电位回降</div>' +
-                '<div class="neur-row"><span class="neur-key neur-key--purple">超极化</span>K⁺通道延迟关闭 → 膜电位暂时低于静息电位(-90mV)</div>' +
-                '<div class="neur-row"><span class="neur-key">Na⁺/K⁺ 泵</span>3Na⁺泵出 / 2K⁺泵入，消耗ATP维持浓度梯度</div>' +
-                '<div class="neur-note">💡 全或无定律：只有达到阈值(-55mV)才会产生动作电位，幅度恒定</div>';
+            el.innerHTML = `
+                <div class="neur-info__hd">📘 动作电位 — 神经冲动的产生与传导</div>
+                <div class="neur-info__grid">
+                    <div class="neur-info__block">
+                        <div class="neur-info__sub">去极化</div>
+                        <div class="neur-info__val" style="color:#e06c75">-70 → +40 mV</div>
+                        <div class="neur-info__desc">Na⁺通道开放 → Na⁺大量内流 → 膜内变正</div>
+                    </div>
+                    <div class="neur-info__block">
+                        <div class="neur-info__sub">复极化</div>
+                        <div class="neur-info__val" style="color:#61afef">+40 → -70 mV</div>
+                        <div class="neur-info__desc">Na⁺通道关闭 + K⁺通道开放 → K⁺外流 → 膜电位回降</div>
+                    </div>
+                    <div class="neur-info__block">
+                        <div class="neur-info__sub">关键过程</div>
+                        <div class="neur-info__row"><span class="neur-info__key" style="--c:#c678dd">超极化</span> K⁺通道延迟关闭 → 膜电位暂时低于静息电位(-90mV)</div>
+                        <div class="neur-info__row"><span class="neur-info__key" style="--c:var(--accent-teal,#3a9e8f)">Na⁺/K⁺ 泵</span> 3Na⁺泵出 / 2K⁺泵入，消耗ATP维持浓度梯度</div>
+                    </div>
+                    <div class="neur-info__block">
+                        <div class="neur-info__sub">💡 知识要点</div>
+                        <div class="neur-info__note">全或无定律：只有达到阈值(-55mV)才会产生动作电位，幅度恒定。神经冲动在有髓鞘神经纤维上以跳跃传导方式快速传播。</div>
+                    </div>
+                </div>`;
         }
     }
 };

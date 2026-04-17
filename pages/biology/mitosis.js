@@ -41,6 +41,7 @@ const Mitosis = {
         this.ctx = this.canvas.getContext('2d');
         this.resize();
         this.bindEvents();
+        this._injectInfoPanel();
         this.draw();
         this.updatePhaseInfo();
     },
@@ -178,6 +179,8 @@ const Mitosis = {
             dot.classList.toggle('active', i === this.phase);
             dot.classList.toggle('done', i < this.phase);
         });
+
+        this._updateInfo();
     },
 
     draw() {
@@ -511,6 +514,58 @@ const Mitosis = {
                 ctx.lineTo(left + ((i + 1) / 5) * totalW - 6, y);
                 ctx.stroke();
             }
+        }
+    },
+
+    _injectInfoPanel() {
+        const el = document.getElementById('mito-edu-info');
+        if (!el) return;
+        el.innerHTML = `
+            <div class="mito-edu-info__hd">🔬 有丝分裂知识点</div>
+            <div class="mito-edu-info__grid">
+                <div class="mito-edu-info__block">
+                    <div class="mito-edu-info__sub">当前阶段</div>
+                    <div id="mito-edu-phase" class="mito-edu-info__val">间期 (Interphase)</div>
+                    <div id="mito-edu-desc" class="mito-edu-info__desc">DNA复制，细胞生长，染色质松散</div>
+                </div>
+                <div class="mito-edu-info__block">
+                    <div class="mito-edu-info__sub">染色体变化</div>
+                    <div id="mito-edu-chr" class="mito-edu-info__val">2n → DNA复制 → 2n(含姐妹染色单体)</div>
+                </div>
+                <div class="mito-edu-info__block">
+                    <div class="mito-edu-info__sub">各时期关键事件</div>
+                    <div class="mito-edu-info__row"><span class="mito-edu-info__key" style="--c:#3a9e8f">间期</span> DNA复制、蛋白质合成，为分裂做准备</div>
+                    <div class="mito-edu-info__row"><span class="mito-edu-info__key" style="--c:#e06c75">前期</span> 染色质→染色体，纺锤体形成，核膜解体</div>
+                    <div class="mito-edu-info__row"><span class="mito-edu-info__key" style="--c:#c678dd">中期</span> 染色体排列在赤道板上，纺锤丝连接着丝粒</div>
+                    <div class="mito-edu-info__row"><span class="mito-edu-info__key" style="--c:#e5c07b">后期</span> 着丝粒分裂，姐妹染色单体分开移向两极</div>
+                    <div class="mito-edu-info__row"><span class="mito-edu-info__key" style="--c:#61afef">末期</span> 染色体解旋，核膜重新形成，纺锤丝消失</div>
+                    <div class="mito-edu-info__row"><span class="mito-edu-info__key" style="--c:#56b6c2">胞质分裂</span> 细胞质一分为二，形成两个子细胞</div>
+                </div>
+                <div class="mito-edu-info__block">
+                    <div class="mito-edu-info__sub">💡 知识要点</div>
+                    <div class="mito-edu-info__note">有丝分裂保证了亲代与子代细胞遗传信息的一致性。DNA复制一次，细胞分裂一次，子细胞染色体数=母细胞。动物细胞由中心体发出星射线形成纺锤体，植物细胞由细胞两极发出纺锤丝形成纺锤体。</div>
+                </div>
+            </div>
+        `;
+    },
+
+    _updateInfo() {
+        const info = this.phases[this.phase];
+        const phaseEl = document.getElementById('mito-edu-phase');
+        const descEl = document.getElementById('mito-edu-desc');
+        const chrEl = document.getElementById('mito-edu-chr');
+        if (phaseEl) phaseEl.textContent = info.name;
+        if (descEl) descEl.textContent = info.desc;
+        if (chrEl) {
+            const chrTexts = [
+                '2n → DNA复制 → 2n(含姐妹染色单体)',
+                '染色质螺旋化→染色体(每条含2条姐妹染色单体)',
+                '着丝粒排列在赤道板，染色体数=2n',
+                '着丝粒分裂，染色体数暂时加倍 4n → 2n',
+                '染色体解旋为染色质，恢复为 2n',
+                '两个子细胞各含 2n 条染色体'
+            ];
+            chrEl.textContent = chrTexts[this.phase] || '';
         }
     },
 

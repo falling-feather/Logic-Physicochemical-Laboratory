@@ -702,6 +702,28 @@
     background: rgba(139,111,192,.25); border-color: var(--accent-purple, #8b6fc0); color: #fff;
 }
 
+/* Circuit Analysis education panel */
+.circuit-info { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(139,111,192,.06); border:1px solid rgba(139,111,192,.12); font-size:.85rem; line-height:1.65; }
+.circuit-info .ac-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.circuit-info .ac-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(139,111,192,.18); color:rgba(139,111,192,.9); }
+.circuit-info .ac-tag--amber { background:rgba(229,192,123,.15); color:rgba(229,192,123,.9); }
+.circuit-info .ac-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.circuit-info .ac-key { flex-shrink:0; font-weight:600; color:rgba(91,141,206,.85); }
+.circuit-info .ac-key--purple { color:rgba(139,111,192,.85); }
+.circuit-info .ac-key--amber { color:rgba(229,192,123,.85); }
+.circuit-info .ac-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(139,111,192,.1); color:var(--text-tertiary); font-size:.82rem; }
+
+/* Energy Conservation education panel */
+.energy-info { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(139,111,192,.06); border:1px solid rgba(139,111,192,.12); font-size:.85rem; line-height:1.65; }
+.energy-info .ac-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.energy-info .ac-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(139,111,192,.18); color:rgba(139,111,192,.9); }
+.energy-info .ac-tag--amber { background:rgba(229,192,123,.15); color:rgba(229,192,123,.9); }
+.energy-info .ac-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.energy-info .ac-key { flex-shrink:0; font-weight:600; color:rgba(91,141,206,.85); }
+.energy-info .ac-key--purple { color:rgba(139,111,192,.85); }
+.energy-info .ac-key--amber { color:rgba(229,192,123,.85); }
+.energy-info .ac-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(139,111,192,.1); color:var(--text-tertiary); font-size:.82rem; }
+
 /* ── EM Induction ── */
 .emi-controls { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .75rem; }
 .emi-mode-btn {
@@ -712,6 +734,37 @@
 .emi-mode-btn.active, .emi-mode-btn:hover {
     background: rgba(139,111,192,.25); border-color: var(--accent-purple, #8b6fc0); color: #fff;
 }
+
+/* EM Induction education panel */
+.emi-info { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(139,111,192,.06); border:1px solid rgba(139,111,192,.12); font-size:.85rem; line-height:1.65; }
+.emi-info .ac-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.emi-info .ac-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(139,111,192,.18); color:rgba(139,111,192,.9); }
+.emi-info .ac-tag--amber { background:rgba(229,192,123,.15); color:rgba(229,192,123,.9); }
+.emi-info .ac-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.emi-info .ac-key { flex-shrink:0; font-weight:600; color:rgba(91,141,206,.85); }
+.emi-info .ac-key--purple { color:rgba(139,111,192,.85); }
+.emi-info .ac-key--amber { color:rgba(229,192,123,.85); }
+.emi-info .ac-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(139,111,192,.1); color:var(--text-tertiary); font-size:.82rem; }
+
+/* Optics education panel */
+.optics-info { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(139,111,192,.06); border:1px solid rgba(139,111,192,.12); font-size:.85rem; line-height:1.65; }
+.optics-info .ac-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.optics-info .ac-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(139,111,192,.18); color:rgba(139,111,192,.9); }
+.optics-info .ac-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.optics-info .ac-key { flex-shrink:0; font-weight:600; color:rgba(91,141,206,.85); }
+.optics-info .ac-key--red { color:rgba(224,108,117,.85); }
+.optics-info .ac-key--amber { color:rgba(229,192,123,.85); }
+.optics-info .ac-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(139,111,192,.1); color:var(--text-tertiary); font-size:.82rem; }
+
+/* Waves education panel */
+.wave-info { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(139,111,192,.06); border:1px solid rgba(139,111,192,.12); font-size:.85rem; line-height:1.65; }
+.wave-info .ac-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.wave-info .ac-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(139,111,192,.18); color:rgba(139,111,192,.9); }
+.wave-info .ac-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.wave-info .ac-key { flex-shrink:0; font-weight:600; color:rgba(91,141,206,.85); }
+.wave-info .ac-key--red { color:rgba(224,108,117,.85); }
+.wave-info .ac-key--amber { color:rgba(229,192,123,.85); }
+.wave-info .ac-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(139,111,192,.1); color:var(--text-tertiary); font-size:.82rem; }
 
 .circuit-controls .primary-btn.small,
 .emi-controls .primary-btn.small,
@@ -753,6 +806,17 @@
 .grav-param { display:flex; align-items:center; gap:4px; font-size:.82rem; color:var(--text-secondary); }
 .grav-param input[type="range"] { width:80px; accent-color:var(--accent-purple,#8b6fc0); }
 @media (max-width: 768px) { .grav-controls { flex-direction: column; align-items: flex-start; } }
+
+/* Gravitation education panel */
+.grav-info { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(139,111,192,.06); border:1px solid rgba(139,111,192,.12); font-size:.85rem; line-height:1.65; }
+.grav-info .ac-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.grav-info .ac-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(139,111,192,.18); color:rgba(139,111,192,.9); }
+.grav-info .ac-tag--amber { background:rgba(229,192,123,.15); color:rgba(229,192,123,.9); }
+.grav-info .ac-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.grav-info .ac-key { flex-shrink:0; font-weight:600; color:rgba(91,141,206,.85); }
+.grav-info .ac-key--purple { color:rgba(139,111,192,.85); }
+.grav-info .ac-key--amber { color:rgba(229,192,123,.85); }
+.grav-info .ac-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(139,111,192,.1); color:var(--text-tertiary); font-size:.82rem; }
 
 /* ══════ Physics Zoom Modal ══════ */
 .physics-zoom-btn {

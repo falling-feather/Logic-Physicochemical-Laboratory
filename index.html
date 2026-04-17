@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -41,6 +41,10 @@
     <style id="loading-screen-styles">
       #loading-screen{position:fixed;inset:0;z-index:99999;background:#0a0e1a;display:flex;flex-direction:column;justify-content:center;align-items:center;transition:opacity .6s ease,visibility .6s ease}
       #loading-screen.hidden{opacity:0;visibility:hidden;pointer-events:none}
+      html.return-visit #loading-screen{transition-duration:.26s}
+      html.return-visit .loader-wrap{width:112px;height:112px}
+      html.return-visit .loader-text{margin-top:18px;letter-spacing:2px}
+      html.return-visit .loader-bar{width:120px}
       .loader-wrap{position:relative;width:140px;height:140px;display:flex;justify-content:center;align-items:center}
       .loader-planet{width:64px;height:64px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#5b8dce,#1a3a6a 60%,#0d1b3e);box-shadow:0 0 40px rgba(91,141,206,.25),inset -6px -6px 16px rgba(0,0,0,.5);animation:lp-pulse 2s ease-in-out infinite}
       .loader-ring{position:absolute;border:2px solid transparent;border-radius:50%;border-top-color:rgba(91,141,206,.5);animation:lp-spin 1.2s linear infinite}
@@ -65,11 +69,23 @@
         <div class="loader-bar"><div class="loader-bar-fill" id="loading-bar"></div></div>
     </div>
     <script>
+        window.__englabCache = { returnVisitor: false, visitCount: 1 };
+        try {
+            var raw = JSON.parse(localStorage.getItem('englab-cache-meta') || '{}');
+            raw.visitCount = (raw.visitCount || 0) + 1;
+            raw.lastVisit = Date.now();
+            raw.hasSeenSplash = true;
+            window.__englabCache.returnVisitor = raw.visitCount > 1;
+            window.__englabCache.visitCount = raw.visitCount;
+            localStorage.setItem('englab-cache-meta', JSON.stringify(raw));
+            if (raw.visitCount > 1) document.documentElement.classList.add('return-visit');
+        } catch (e) {}
+
         window.__loadProgress = function(p) {
             var b = document.getElementById('loading-bar');
             if (b) b.style.width = Math.min(p, 100) + '%';
         };
-        window.__loadProgress(5);
+        window.__loadProgress(window.__englabCache.returnVisitor ? 22 : 5);
     </script>
     <!-- ═══════════════ Navigation ═══════════════ -->
     <nav class="navbar navbar--transparent" id="navbar">
@@ -511,6 +527,7 @@
                             <canvas id="trig-canvas" class="trig-canvas"></canvas>
                         </div>
                         <div class="trig-info" id="trig-info"></div>
+                        <div id="trig-edu-info" class="trig-edu-info"></div>
                     </div>
                 </div>
             </div>
@@ -546,6 +563,8 @@
                     <p id="prob-info-text">点击“开始实验”或“连续实验”</p>
                 </div>
                 </div>
+
+                <div id="prob-edu-info" class="prob-edu-info"></div>
             </div>
 
             <!-- ── 集合运算 ── -->
@@ -578,6 +597,7 @@
                     <p id="setops-op-desc">属于 A 或属于 B 的所有元素</p>
                     <p class="setops-result" id="setops-result">结果 = {1, 2, 3, 4, 5, 6, 7, 8, 9}（8 个元素）</p>
                 </div>
+                <div id="setops-edu" class="setops-edu"></div>
                 </div>
             </div>
 
@@ -604,6 +624,7 @@
                     <p id="vecops-op-desc">平行四边形法则 / 三角形法则</p>
                     <p class="vecops-result" id="vecops-result"></p>
                 </div>
+                <div id="vecops-edu" class="vecops-edu"></div>
                 </div>
             </div>
 
@@ -708,6 +729,36 @@
                 <div id="sequences-controls" class="seq-controls"></div>
                 <div class="canvas-container"><canvas id="sequences-canvas"></canvas></div>
                 <div id="sequences-info" class="seq-info"></div>
+                </div>
+            </div>
+
+            <!-- ── 函数性质探究 ── -->
+            <div class="content-section" data-module="function-properties">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h3><i data-lucide="scan-line"></i> 函数性质探究</h3>
+                        <p>交互探索函数的单调性、奇偶性与周期性——拖拽标记区间，直观理解函数性质</p>
+                    </div>
+                    <div id="fp-controls" class="fp-controls"></div>
+                    <div class="canvas-container">
+                        <canvas id="fp-canvas" role="img" aria-label="函数性质探究可视化画布"></canvas>
+                    </div>
+                    <div id="fp-info" class="fp-info"></div>
+                </div>
+            </div>
+
+            <!-- ── 指数与对数函数 ── -->
+            <div class="content-section" data-module="exp-log">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h3><i data-lucide="trending-up"></i> 指数与对数函数</h3>
+                        <p>调节底数 a，观察 y=aˣ 与 y=logₐx 的图像变化及互为反函数的对称关系</p>
+                    </div>
+                    <div id="el-controls" class="el-controls"></div>
+                    <div class="canvas-container">
+                        <canvas id="el-canvas" role="img" aria-label="指数与对数函数可视化画布"></canvas>
+                    </div>
+                    <div id="el-info" class="el-info"></div>
                 </div>
             </div>
 
@@ -982,6 +1033,7 @@
                             <canvas id="wave-canvas" class="wave-canvas"></canvas>
                         </div>
                     </div>
+                    <div id="wave-info" class="wave-info"></div>
                 </div>
 
                 <div class="demo-section">
@@ -1101,6 +1153,7 @@
                             <canvas id="optics-canvas" class="em-canvas"></canvas>
                         </div>
                     </div>
+                    <div id="optics-info" class="optics-info"></div>
                 </div>
 
                 <div class="demo-section">
@@ -1167,6 +1220,7 @@
                             <canvas id="kin-canvas" class="kin-canvas"></canvas>
                         </div>
                         <div class="kin-info" id="kin-info"></div>
+                        <div id="kin-edu" class="kin-edu"></div>
                     </div>
                 </div>
             </div>
@@ -1215,6 +1269,7 @@
                             <canvas id="proj-canvas" class="proj-canvas"></canvas>
                         </div>
                         <div class="proj-info" id="proj-info"></div>
+                        <div id="proj-edu" class="proj-edu"></div>
                     </div>
                 </div>
             </div>
@@ -1246,6 +1301,7 @@
                         <canvas id="circ-canvas"></canvas>
                     </div>
                     <div class="circ-stats" id="circ-stats"></div>
+                    <div id="circ-info" class="circ-info"></div>
                 </div>
             </div>
 
@@ -1264,6 +1320,7 @@
                     <div class="physics-canvas-wrap">
                         <canvas id="energy-canvas"></canvas>
                     </div>
+                    <div id="energy-info" class="energy-info"></div>
                 </div>
             </div>
 
@@ -1286,6 +1343,7 @@
                     <div class="physics-canvas-wrap">
                         <canvas id="circuit-canvas"></canvas>
                     </div>
+                    <div id="circuit-info" class="circuit-info"></div>
                 </div>
             </div>
 
@@ -1305,6 +1363,7 @@
                     <div class="physics-canvas-wrap">
                         <canvas id="eminduction-canvas"></canvas>
                     </div>
+                    <div id="emi-info" class="emi-info"></div>
                 </div>
             </div>
 
@@ -1347,6 +1406,7 @@
                         <button id="grav-reset" class="primary-btn small">重置</button>
                     </div>
                     <div class="canvas-container"><canvas id="gravitation-canvas"></canvas></div>
+                    <div id="grav-info" class="grav-info"></div>
                 </div>
             </div>
 
@@ -1403,10 +1463,9 @@
                         </div>
                         <div class="pt-detail-config"></div>
                     </div>
+                    <div id="pt-edu-info" class="pt-edu-info"></div>
                 </div>
             </div>
-
-            <!-- ── 分子结构 ── -->
             <div class="content-section" data-module="molecular-structure">
                 <div class="demo-section" id="molecule-section">
                     <div class="section-header">
@@ -1508,6 +1567,7 @@
                     <p id="cheq-conc-display">[N₂]=1.000  [H₂]=3.000  [NH₃]=0.000</p>
                     <p id="cheq-temp-display">T=450°C  P=1.0atm  Kc=0.5000</p>
                 </div>
+                <div id="cheq-edu" class="cheq-edu"></div>
                 </div>
             </div>
 
@@ -1632,6 +1692,7 @@
                     </div>
                 <div id="ionic-reaction-controls" class="ionrxn-controls"></div>
                 <div class="canvas-container"><canvas id="ionic-reaction-canvas"></canvas></div>
+                <div id="ionic-info" class="ionic-info"></div>
                 </div>
             </div>
 
@@ -2143,6 +2204,9 @@
                     <h1 class="page-hero__title">生物实验</h1>
                     <p class="page-hero__desc">探索生命的奥秘，从细胞结构到遗传规律，可视化理解生物学核心概念。</p>
                 </div>
+                <div class="page-hero__visual">
+                    <canvas id="hero-canvas-biology" class="page-hero__canvas" role="img" aria-label="生物可视化装饰动画"></canvas>
+                </div>
             </div>
 
             <!-- ═══ 细胞结构 ═══ -->
@@ -2183,6 +2247,7 @@
                     </div>
                     <canvas id="cell-canvas" class="bio-canvas" width="700" height="500"></canvas>
                     <div class="bio-info" id="cell-info">点击细胞器查看详细信息</div>
+                    <div id="cellstr-info" class="cellstr-info" aria-live="polite"></div>
                 </div>
                 </div>
             </div>
@@ -2220,6 +2285,7 @@
                     </div>
                     <canvas id="dna-canvas" class="bio-canvas" width="700" height="500"></canvas>
                     <div class="bio-info" id="dna-info">DNA 双螺旋结构 — 点击按钮开始探索</div>
+                    <div id="dnahelix-info" class="dnahelix-info" aria-live="polite"></div>
                 </div>
                 </div>
             </div>
@@ -2262,6 +2328,7 @@
                     </div>
                     <canvas id="photosynthesis-canvas" class="bio-canvas" width="700" height="500"></canvas>
                     <div class="bio-info" id="photo-info">调节光照强度，观察光合作用速率变化</div>
+                    <div id="photosynth-info" class="photosynth-info" aria-live="polite"></div>
                 </div>
                 </div>
             </div>
@@ -2335,6 +2402,7 @@
                     </div>
                     <canvas id="genetics-canvas" class="bio-canvas" width="700" height="500"></canvas>
                     <div class="bio-info" id="genetics-info">选择亲本基因型，点击杂交查看后代比例</div>
+                    <div id="gen-edu-info" class="gen-edu-info" aria-live="polite"></div>
                 </div>
                 </div>
             </div>
@@ -2377,6 +2445,7 @@
                     <h3 id="mito-phase-name">间期 (Interphase)</h3>
                     <p id="mito-phase-desc">DNA复制，细胞生长，染色质松散</p>
                 </div>
+                <div id="mito-edu-info" class="mito-edu-info" aria-live="polite"></div>
                 </div>
             </div>
 
@@ -2444,6 +2513,7 @@
                     </div>
                 <div id="meiosis-controls" class="meio-controls"></div>
                 <div class="canvas-container"><canvas id="meiosis-canvas"></canvas></div>
+                <div id="meiosis-info" class="meio-info" aria-live="polite"></div>
                 </div>
             </div>
 
@@ -2455,6 +2525,7 @@
                     </div>
                 <div id="gene-expression-controls" class="genexp-controls"></div>
                 <div class="canvas-container"><canvas id="gene-expression-canvas"></canvas></div>
+                <div id="genexp-info" class="genexp-info" aria-live="polite"></div>
                 </div>
             </div>
 
@@ -2466,6 +2537,7 @@
                     </div>
                 <div id="cell-resp-controls" class="cellresp-controls"></div>
                 <div class="canvas-container"><canvas id="cell-resp-canvas"></canvas></div>
+                <div id="cellresp-info" class="cellresp-info" aria-live="polite"></div>
                 </div>
             </div>
 
@@ -2477,6 +2549,7 @@
                     </div>
                 <div id="substance-transport-controls" class="strans-controls"></div>
                 <div class="canvas-container"><canvas id="substance-transport-canvas"></canvas></div>
+                <div id="strans-info" class="strans-info" aria-live="polite"></div>
                 </div>
             </div>
 
@@ -2572,21 +2645,23 @@
     </footer>
 
     <!-- External Libraries (pinned versions) -->
-    <script src="https://unpkg.com/lucide@0.454.0/dist/umd/lucide.js"></script>
+    <!-- lucide: 本地优先，CDN 回退，确保图标在弱网环境下正常显示 -->
+    <script src="shared/js/lucide.min.js"></script>
+    <script>if(typeof lucide==='undefined'){var s=document.createElement('script');s.src='https://unpkg.com/lucide@0.454.0/dist/umd/lucide.js';document.head.appendChild(s);}</script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/ScrollTrigger.min.js"></script>
 
     <!-- Application Scripts: Shared -->
     <script src="shared/js/config.js"></script>
-    <script src="shared/js/module-selector.js"></script>
-    <script src="shared/js/router.js"></script>
-    <script src="shared/js/scroll-animations.js"></script>
+    <script src="shared/js/module-selector.js?v=20260416b"></script>
+    <script src="shared/js/router.js?v=20260416b"></script>
+    <script src="shared/js/scroll-animations.js?v=20260416b"></script>
     <script src="shared/js/cards.js"></script>
     <script src="shared/js/common.js"></script>
     <!-- Scripts: Home -->
-    <script src="pages/home/home.js"></script>
+    <script src="pages/home/home.js?v=20260416b"></script>
     <!-- Scripts: Bootstrap (before deferred modules for fast homepage boot) -->
-    <script src="shared/js/main.js"></script>
+    <script src="shared/js/main.js?v=20260416b"></script>
     <!-- Scripts: Subject modules (deferred — download in parallel, execute after core) -->
     <script defer src="pages/mathematics/mathematics.js"></script>
     <script defer src="pages/mathematics/calculus.js"></script>
@@ -2601,6 +2676,8 @@
     <script defer src="pages/mathematics/solid-geometry.js"></script>
     <script defer src="pages/mathematics/permutation-combination.js"></script>
     <script defer src="pages/mathematics/sequences.js"></script>
+    <script defer src="pages/mathematics/function-properties.js"></script>
+    <script defer src="pages/mathematics/exp-log.js"></script>
     <script defer src="pages/physics/physics.js"></script>
     <script defer src="pages/physics/electromagnetic.js"></script>
     <script defer src="pages/physics/waves.js"></script>
@@ -2635,20 +2712,20 @@
     <script defer src="pages/algorithms/recursion-vis.js"></script>
     <script defer src="pages/algorithms/dynamic-programming.js"></script>
     <script defer src="pages/algorithms/string-matching.js"></script>
-    <script defer src="pages/biology/biology.js"></script>
-    <script defer src="pages/biology/cell-structure.js"></script>
-    <script defer src="pages/biology/dna-helix.js"></script>
-    <script defer src="pages/biology/photosynthesis.js"></script>
-    <script defer src="pages/biology/genetics.js"></script>
-    <script defer src="pages/biology/mitosis.js"></script>
-    <script defer src="pages/biology/neural-regulation.js"></script>
-    <script defer src="pages/biology/immune-system.js"></script>
-    <script defer src="pages/biology/ecosystem.js"></script>
-    <script defer src="pages/biology/biology-zoom.js"></script>
-    <script defer src="pages/biology/meiosis.js"></script>
-    <script defer src="pages/biology/gene-expression.js"></script>
-    <script defer src="pages/biology/cellular-respiration.js"></script>
-    <script defer src="pages/biology/substance-transport.js"></script>
-    <script defer src="pages/biology/gene-mutation.js"></script>
+    <script defer src="pages/biology/biology.js?v=20260416b"></script>
+    <script defer src="pages/biology/cell-structure.js?v=20260416b"></script>
+    <script defer src="pages/biology/dna-helix.js?v=20260416b"></script>
+    <script defer src="pages/biology/photosynthesis.js?v=20260416b"></script>
+    <script defer src="pages/biology/genetics.js?v=20260416b"></script>
+    <script defer src="pages/biology/mitosis.js?v=20260416b"></script>
+    <script defer src="pages/biology/neural-regulation.js?v=20260416b"></script>
+    <script defer src="pages/biology/immune-system.js?v=20260416b"></script>
+    <script defer src="pages/biology/ecosystem.js?v=20260416b"></script>
+    <script defer src="pages/biology/biology-zoom.js?v=20260416b"></script>
+    <script defer src="pages/biology/meiosis.js?v=20260416b"></script>
+    <script defer src="pages/biology/gene-expression.js?v=20260416b"></script>
+    <script defer src="pages/biology/cellular-respiration.js?v=20260416b"></script>
+    <script defer src="pages/biology/substance-transport.js?v=20260416b"></script>
+    <script defer src="pages/biology/gene-mutation.js?v=20260416b"></script>
 </body>
 </html>

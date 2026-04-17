@@ -780,25 +780,48 @@ const Calculus = {
     updateInfo() {
         const x = this.param;
         const y = this.evaluate(x);
-        let text = '';
+        const el = document.getElementById('calc-info');
+        if (!el) return;
+        let html = '';
         if (this.mode === 'derivative') {
             const slope = this.derivative(x);
             const d2 = this.secondDerivative(x);
-            text = `f(${x.toFixed(2)}) = ${isNaN(y) ? '—' : y.toFixed(4)}   |   ` +
-                   `f'(${x.toFixed(2)}) = ${isNaN(slope) ? '—' : slope.toFixed(4)}   |   ` +
-                   `f''(${x.toFixed(2)}) = ${isNaN(d2) ? '—' : d2.toFixed(4)}`;
+            const yStr = isNaN(y) ? '—' : y.toFixed(4);
+            const sStr = isNaN(slope) ? '—' : slope.toFixed(4);
+            const d2Str = isNaN(d2) ? '—' : d2.toFixed(4);
+            const concavity = isNaN(d2) ? '—' : (d2 > 0.001 ? '凹（上凸）' : d2 < -0.001 ? '凸（下凸）' : '拐点附近');
+            const monotone = isNaN(slope) ? '—' : (slope > 0.001 ? '↑ 递增' : slope < -0.001 ? '↓ 递减' : '≈ 极值点');
+            html = `<div class="calc-edu">
+<div class="math-hd"><span class="math-tag">导数</span>微分学 — 函数的局部性质分析</div>
+<div class="math-row"><span class="math-key">f(${x.toFixed(2)})</span>= ${yStr}</div>
+<div class="math-row"><span class="math-key">f'(${x.toFixed(2)})</span>= ${sStr} &nbsp;→ 切线斜率 → ${monotone}</div>
+<div class="math-row"><span class="math-key math-key--amber">f''(${x.toFixed(2)})</span>= ${d2Str} &nbsp;→ 曲率变化 → ${concavity}</div>
+<div class="math-row"><span class="math-key math-key--red">几何意义</span>f'(x₀) 是曲线在 x₀ 处切线的斜率；切线方程 y − f(x₀) = f'(x₀)(x − x₀)</div>
+<div class="math-note">💡 f'(x₀)=0 且 f''(x₀)>0 → 极小值；f''(x₀)<0 → 极大值（二阶判定法）。导数的本质是函数的瞬时变化率 lim[Δx→0] Δy/Δx</div>
+</div>`;
         } else if (this.mode === 'integral') {
             const area = this.numericalIntegral(0, x);
-            text = `f(${x.toFixed(2)}) = ${isNaN(y) ? '—' : y.toFixed(4)}   |   ∫₀^${x.toFixed(1)} f(t)dt = ${isNaN(area) ? '—' : area.toFixed(4)}`;
+            const yStr = isNaN(y) ? '—' : y.toFixed(4);
+            const aStr = isNaN(area) ? '—' : area.toFixed(4);
+            html = `<div class="calc-edu">
+<div class="math-hd"><span class="math-tag">积分</span>积分学 — 函数的累积效应</div>
+<div class="math-row"><span class="math-key">f(${x.toFixed(2)})</span>= ${yStr}</div>
+<div class="math-row"><span class="math-key">∫₀<sup>${x.toFixed(1)}</sup> f(t)dt</span>= ${aStr}（有向面积，N=${this.riemannN} 矩形逼近）</div>
+<div class="math-row"><span class="math-key math-key--amber">牛顿-莱布尼茨</span>∫ₐᵇ f(x)dx = F(b) − F(a)，其中 F'(x) = f(x)</div>
+<div class="math-row"><span class="math-key math-key--red">几何意义</span>定积分 = x 轴上方面积 − 下方面积（有向面积）</div>
+<div class="math-note">💡 增大矩形数 N → Riemann 和趋于精确积分值。微积分基本定理将求面积问题转化为求原函数问题，是微积分的核心桥梁</div>
+</div>`;
         } else if (this.mode === 'taylor') {
-            text = `T${this.taylorDeg}(x) ≈ ${this._taylorPolyStr || '...'}`;
+            const n = this.taylorDeg;
+            html = `<div class="calc-edu">
+<div class="math-hd"><span class="math-tag">Taylor</span>Taylor 展开 — 多项式逼近</div>
+<div class="math-row"><span class="math-key">T<sub>${n}</sub>(x)</span>≈ ${this._taylorPolyStr || '...'}</div>
+<div class="math-row"><span class="math-key math-key--amber">通式</span>f(x) ≈ Σₖ₌₀ⁿ f⁽ᵏ⁾(a)/k! · (x−a)ᵏ，展开中心 a</div>
+<div class="math-row"><span class="math-key math-key--red">余项</span>Rₙ(x) = f⁽ⁿ⁺¹⁾(ξ)/(n+1)! · (x−a)ⁿ⁺¹（Lagrange 余项）</div>
+<div class="math-note">💡 增大展开阶数 n → 多项式在 a 附近更精确地逼近原函数。常见展开：eˣ = Σ xⁿ/n!，sin x = x − x³/3! + x⁵/5! − ...</div>
+</div>`;
         }
-        this.setInfo(text);
-    },
-
-    setInfo(text) {
-        const el = document.getElementById('calc-info');
-        if (el) el.textContent = text;
+        el.innerHTML = html;
     },
 
     /* ══════════════ mode / preset / animate ══════════════ */

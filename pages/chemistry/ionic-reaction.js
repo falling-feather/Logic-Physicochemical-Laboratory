@@ -72,6 +72,7 @@ const IonicReaction = {
         this._on(window, 'resize', () => this._resize());
         this._buildControls();
         this._initParticles();
+        this.updateInfo();
         this._loop();
     },
     destroy() {
@@ -112,6 +113,7 @@ const IonicReaction = {
             this.animProgress = 0;
             this._initParticles();
             this._updatePhaseButtons();
+            this.updateInfo();
         });
         ctrl.appendChild(sel);
         // phase buttons
@@ -131,6 +133,7 @@ const IonicReaction = {
                 this.phase = p.id;
                 this.animProgress = 0;
                 this._updatePhaseButtons();
+                this.updateInfo();
             });
             this._phaseBtnWrap.appendChild(b);
         });
@@ -263,6 +266,24 @@ const IonicReaction = {
         const t = performance.now() / 1000;
         this._draw(t);
         this.animId = requestAnimationFrame(() => this._loop());
+    },
+
+    /* ── education panel ── */
+    updateInfo() {
+        const el = document.getElementById('ionic-info');
+        if (!el) return;
+        const r = this.reactions[this.currentIdx];
+        const phaseLabels = { 'molecular': '化学方程式', 'ionic': '全离子方程式', 'net-ionic': '净离子方程式' };
+        const spectators = r.spectator.join('、');
+        let h = `<div class="chem-hd"><span class="chem-tag">${phaseLabels[this.phase]}</span>离子反应知识点</div>
+<div class="chem-row"><span class="chem-key">离子反应定义</span>有离子参加或生成的反应，在电解质溶液中进行</div>
+<div class="chem-row"><span class="chem-key chem-key--purple">拆分规则</span>强酸、强碱、可溶性盐 → 拆为离子；弱电解质、沉淀、气体、水 → 保留分子式</div>
+<div class="chem-row"><span class="chem-key chem-key--amber">旁观离子</span>${spectators} — 反应前后形态不变，全离子→净离子时消去</div>`;
+        if (this.phase === 'net-ionic') {
+            h += `<div class="chem-row"><span class="chem-key">净离子方程式</span>${r.netIonic.join(' ')} — 反映反应本质</div>`;
+        }
+        h += `<div class="chem-note">💡 人教版必修1：离子方程式书写步骤：写→拆→删→查。本质是找到真正参与反应的离子，消去旁观离子</div>`;
+        el.innerHTML = h;
     }
 };
 

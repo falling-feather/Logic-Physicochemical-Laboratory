@@ -25,6 +25,7 @@ const Gravitation = {
         this._on(window, 'resize', () => this._resize());
         this._buildControls();
         this._initSatellites();
+        this.updateInfo();
         this._loop();
     },
     destroy() {
@@ -69,6 +70,7 @@ const Gravitation = {
                 this.mode = m.id;
                 btnWrap.querySelectorAll('.grav-mode-btn').forEach(x => x.classList.remove('active'));
                 b.classList.add('active');
+                this.updateInfo();
             });
             btnWrap.appendChild(b);
         });
@@ -321,6 +323,30 @@ const Gravitation = {
             this._drawField();
         }
         this.animId = requestAnimationFrame(() => this._loop());
+    },
+
+    /* ── education panel ── */
+    updateInfo() {
+        const el = document.getElementById('grav-info');
+        if (!el) return;
+        const M = this.centralMass;
+        let h = '';
+        if (this.mode === 'orbit') {
+            h = `<div class="ac-hd"><span class="ac-tag">轨道</span>万有引力与天体运动</div>
+<div class="ac-row"><span class="ac-key">万有引力定律</span>F = GMm/r² — 任意两质点间的引力，G = 6.674×10⁻¹¹ N·m²/kg²</div>
+<div class="ac-row"><span class="ac-key ac-key--purple">轨道速度</span>GMm/r² = mv²/r → v = √(GM/r) — 轨道越高速度越小</div>
+<div class="ac-row"><span class="ac-key ac-key--amber">开普勒第三定律</span>T²/r³ = 4π²/(GM) — 所有卫星的 T²/r³ 为同一常数</div>
+<div class="ac-row"><span class="ac-key">第一宇宙速度</span>v₁ = √(gR) ≈ 7.9 km/s — 近地圆轨道最小发射速度，也是最大环绕速度</div>
+<div class="ac-note">💡 人教版必修2：向心力由万有引力提供。近地卫星速度最大、周期最短。当前中心质量 M = ${M}，调节滑块观察轨道变化</div>`;
+        } else {
+            h = `<div class="ac-hd"><span class="ac-tag ac-tag--amber">引力场</span>引力场强度分布</div>
+<div class="ac-row"><span class="ac-key">场强定义</span>g = F/m = GM/r² — 距质心 r 处的引力场强度（单位质量受力）</div>
+<div class="ac-row"><span class="ac-key ac-key--purple">等势面</span>虚线圆 = 引力势能相等的面，球对称质量的等势面为同心球面</div>
+<div class="ac-row"><span class="ac-key ac-key--amber">场线特征</span>箭头指向质心，越靠近中心越密集 → 场强越大</div>
+<div class="ac-row"><span class="ac-key">表面重力</span>g₀ = GM/R² — 天体表面的重力加速度，地球 g₀ ≈ 9.8 m/s²</div>
+<div class="ac-note">💡 人教版必修2：引力场强度随距离平方反比递减。等势面与场线处处垂直。当前 M = ${M}</div>`;
+        }
+        el.innerHTML = h;
     }
 };
 

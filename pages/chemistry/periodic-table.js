@@ -152,6 +152,7 @@ const PeriodicTable = {
         this.buildLegend();
         this.bindSearch();
         this._injectModeButtons();
+        this.updateInfo();
 
         const closeBtn = document.getElementById('pt-detail-close');
         this._on(closeBtn, 'click', () => this.closeDetail());
@@ -187,6 +188,7 @@ const PeriodicTable = {
                 this.mode = btn.dataset.mode;
                 wrap.querySelectorAll('.pt-mode-btn').forEach(b => b.classList.toggle('active', b === btn));
                 this._applyMode();
+                this.updateInfo();
             });
         });
     },
@@ -523,6 +525,26 @@ const PeriodicTable = {
         const grid = document.getElementById('periodic-table-grid');
         if (!grid) return;
         grid.querySelectorAll('.pt-search-match').forEach(c => c.classList.remove('pt-search-match'));
+    },
+
+    /* ── education panel ── */
+    updateInfo() {
+        const el = document.getElementById('pt-edu-info');
+        if (!el) return;
+        const modeLabels = { 'standard': '标准分类', 'electronegativity': '电负性趋势', 'radius': '原子半径趋势' };
+        let h = `<div class="chem-hd"><span class="chem-tag">${modeLabels[this.mode] || '元素周期表'}</span>元素周期律知识点</div>
+<div class="chem-row"><span class="chem-key">周期律</span>元素性质随原子序数递增而周期性变化，同周期从左到右金属性减弱、非金属性增强</div>
+<div class="chem-row"><span class="chem-key chem-key--purple">族的规律</span>同主族元素最外层电子数相同，化学性质相似；从上到下金属性增强</div>`;
+        if (this.mode === 'electronegativity') {
+            h += `<div class="chem-row"><span class="chem-key chem-key--amber">电负性</span>同周期从左到右增大，同族从上到下减小。F 电负性最大(3.98)，Cs 最小(0.79)</div>`;
+        } else if (this.mode === 'radius') {
+            h += `<div class="chem-row"><span class="chem-key chem-key--amber">原子半径</span>同周期从左到右减小（核电荷增大），同族从上到下增大（电子层数增多）</div>`;
+        } else {
+            h += `<div class="chem-row"><span class="chem-key chem-key--amber">元素分类</span>金属元素(左下区)、非金属元素(右上区)、类金属(对角线)；过渡金属占据中部</div>`;
+        }
+        h += `<div class="chem-row"><span class="chem-key">电子排布</span>核外电子按能量最低原理填充：1s→2s→2p→3s→3p→4s→3d…</div>
+<div class="chem-note">💡 人教版必修1：周期表中纵行为族、横行为周期。点击任意元素查看详细信息，切换模式观察属性趋势</div>`;
+        el.innerHTML = h;
     }
 };
 

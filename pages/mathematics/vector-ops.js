@@ -184,6 +184,22 @@ const VectorOps = {
         const aInfo = 'A = (' + A.x.toFixed(1) + ', ' + A.y.toFixed(1) + ')  |A| = ' + Math.hypot(A.x, A.y).toFixed(2);
         const bInfo = 'B = (' + B.x.toFixed(1) + ', ' + B.y.toFixed(1) + ')  |B| = ' + Math.hypot(B.x, B.y).toFixed(2);
         if (resultEl) resultEl.textContent = aInfo + '    ' + bInfo + '    ' + resultText;
+
+        /* education panel */
+        const eduEl = document.getElementById('vecops-edu');
+        if (eduEl) {
+            const opEdu = {
+                add: '<div class="math-row"><span class="math-key">加法法则</span>三角形法则：首尾相接；平行四边形法则：共起点取对角线</div><div class="math-row"><span class="math-key math-key--amber">坐标运算</span>(x₁+x₂, y₁+y₂) — 对应分量相加</div>',
+                sub: '<div class="math-row"><span class="math-key">减法法则</span>A−B 的方向：从 B 的终点指向 A 的终点（共起点时）</div><div class="math-row"><span class="math-key math-key--amber">坐标运算</span>(x₁−x₂, y₁−y₂) — 对应分量相减</div>',
+                dot: '<div class="math-row"><span class="math-key">数量积</span>A·B = |A||B|cosθ — 结果是标量，不是向量</div><div class="math-row"><span class="math-key math-key--amber">坐标公式</span>A·B = x₁x₂ + y₁y₂ &nbsp; cosθ = A·B/(|A||B|)</div>',
+                projection: '<div class="math-row"><span class="math-key">投影向量</span>A 在 B 方向上的投影向量 = (A·B/|B|²)·B</div><div class="math-row"><span class="math-key math-key--amber">投影长度</span>|proj| = |A|cosθ = A·B/|B| — 可正可负</div>'
+            };
+            eduEl.innerHTML = `<div class="math-hd"><span class="math-tag">${info.symbol}</span>向量运算知识点</div>
+${opEdu[this.operation]}
+<div class="math-row"><span class="math-key math-key--red">向量共线</span>A∥B ⇔ x₁y₂ − x₂y₁ = 0（叉积为零）</div>
+<div class="math-row"><span class="math-key">向量垂直</span>A⊥B ⇔ A·B = 0 ⇔ x₁x₂ + y₁y₂ = 0</div>
+<div class="math-note">💡 人教版必修2：拖拽箭头端点改变向量，观察运算结果的几何意义。向量是"既有大小又有方向"的量</div>`;
+        }
     },
 
     draw() {

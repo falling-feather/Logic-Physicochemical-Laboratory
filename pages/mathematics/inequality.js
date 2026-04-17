@@ -318,11 +318,14 @@ const Inequality = {
             if (z > maxZ) { maxZ = z; optPt = p; }
         });
         const vtxStr = pts.map(p => '(' + p.x.toFixed(1) + ',' + p.y.toFixed(1) + ')').join('  ');
-        let text = '\u9876\u70b9: ' + vtxStr;
-        if (optPt) {
-            text += '    \u6700\u4f18\u89e3: (' + optPt.x.toFixed(1) + ',' + optPt.y.toFixed(1) + ')  z=' + maxZ.toFixed(1);
-        }
-        el.textContent = text;
+        let h = `<div class="math-hd"><span class="math-tag">线性规划</span>不等式与线性规划</div>
+<div class="math-row"><span class="math-key">可行域</span>满足所有约束不等式的点的集合（阴影区域），由多条直线围成</div>
+<div class="math-row"><span class="math-key math-key--red">目标函数</span>z = ${cx}x + ${cy}y — 在可行域内取最大值或最小值</div>
+<div class="math-row"><span class="math-key math-key--amber">最优解</span>目标函数 z 在可行域的顶点处取得最值 — 只需逐一检验顶点即可</div>
+<div class="math-row"><span class="math-key">顶点法</span>${vtxStr}${optPt ? ' → 最优 (' + optPt.x.toFixed(1) + ',' + optPt.y.toFixed(1) + ')  z<sub>max</sub>=' + maxZ.toFixed(1) : ''}</div>
+<div class="math-row"><span class="math-key">几何意义</span>平移目标函数直线 z/${cx} = x + ${(cy/cx).toFixed(1)}y，最后离开可行域的顶点即最优解</div>
+<div class="math-note">💡 人教版必修5：线性规划的核心思路 — 画出可行域、确定目标函数直线的移动方向、在顶点处取最值</div>`;
+        el.innerHTML = h;
     }
 };
 

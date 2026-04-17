@@ -288,6 +288,8 @@ const ModuleSelector = {
             'solid-geometry': () => { if (typeof initSolidGeom === 'function') initSolidGeom(); },
             'permutation-combination': () => { if (typeof initPermComb === 'function') initPermComb(); },
             'sequences': () => { if (typeof initSequences === 'function') initSequences(); },
+            'function-properties': () => { if (typeof initFuncProps === 'function') initFuncProps(); },
+            'exp-log': () => { if (typeof initExpLog === 'function') initExpLog(); },
 
             // Physics
             'mechanics': () => { if (typeof initPhysics === 'function') initPhysics(); },
@@ -329,10 +331,10 @@ const ModuleSelector = {
             'string-matching': () => { if (typeof initStringMatch === 'function') initStringMatch(); },
 
             // Biology
-            'cell-structure': () => { if (typeof initBiology === 'function') initBiology(); },
-            'dna': () => { /* dna-helix auto-inits */ },
-            'photosynthesis': () => { /* photosynthesis auto-inits */ },
-            'genetics': () => { /* genetics auto-inits */ },
+            'cell-structure': () => { if (typeof initCellStructure === 'function') initCellStructure(); },
+            'dna': () => { if (typeof initDNAHelix === 'function') initDNAHelix(); },
+            'photosynthesis': () => { if (typeof initPhotosynthesis === 'function') initPhotosynthesis(); },
+            'genetics': () => { if (typeof initGenetics === 'function') initGenetics(); },
             'mitosis': () => { if (typeof initMitosis === 'function') initMitosis(); },
             'meiosis': () => { if (typeof initMeiosis === 'function') initMeiosis(); },
             'gene-expression': () => { if (typeof initGeneExpression === 'function') initGeneExpression(); },

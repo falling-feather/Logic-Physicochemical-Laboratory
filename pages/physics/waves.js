@@ -58,6 +58,7 @@ const WaveDemo = {
         this._ro = new ResizeObserver(() => { this.resizeCanvas(); });
         this._ro.observe(this.canvas.parentElement);
         this.start();
+        this.updateInfo();
     },
 
     destroy() {
@@ -215,6 +216,7 @@ const WaveDemo = {
             if (pauseBtn) pauseBtn.textContent = '暂停';
             this.start();
         }
+        this.updateInfo();
     },
 
     // ════════════════════════════════════════
@@ -830,6 +832,35 @@ const WaveDemo = {
             `f' = f₀ · v / (v ${this.dpSourceSpeed >= 0 ? '∓' : '±'} v<sub>s</sub>)<br>` +
             `<span style="color:rgba(255,255,255,0.35)">v<sub>s</sub>/v = ${ratio.toFixed(2)}</span>` +
             (ratio > 1 ? `<br>马赫数 M = ${ratio.toFixed(2)}, 锥角 θ = ${(Math.asin(1/ratio)*180/Math.PI).toFixed(1)}°` : '');
+    },
+
+    /* ── education panel ── */
+    updateInfo() {
+        const el = document.getElementById('wave-info');
+        if (!el) return;
+        const labels = { superposition:'波的叠加', standing:'驻波分析', doppler:'多普勒效应' };
+        const data = {
+            superposition: [
+                ['叠加原理','合位移 = 各分位移的矢量和，同相加强、反相减弱'],
+                ['拍频波','两列频率接近的波叠加，拍频 f_beat = |f₁ − f₂|，产生包络线'],
+                ['能量分布','叠加波能量正比于振幅的平方，加强区 > 单波 > 减弱区']
+            ],
+            standing: [
+                ['驻波形成','两列同频反向波叠加，y = 2A sin(kx) cos(ωt)'],
+                ['波节 / 波腹','波节位移始终为零，波腹振幅最大；相邻波节距 = λ/2'],
+                ['谐波','两端固定弦：基频 f₁ = v/2L，第 n 次谐波 f_n = n·f₁']
+            ],
+            doppler: [
+                ['多普勒公式','f\' = f₀ · v/(v ∓ v_s)，声源靠近时频率升高，远离时降低'],
+                ['超音速','声源速度 > 波速时形成马赫锥，锥角 sinθ = v/v_s'],
+                ['应用','多普勒雷达测速、天文学红移/蓝移、医学超声血流检测']
+            ]
+        };
+        const items = data[this.mode] || data.superposition;
+        let h = `<div class="ac-hd"><span class="ac-tag">${labels[this.mode]}</span>波动知识点</div>`;
+        items.forEach(([k, v]) => h += `<div class="ac-row"><span class="ac-key">${k}</span>${v}</div>`);
+        h += `<div class="ac-note">💡 人教版选择性必修1：切换上方模式探索波的叠加、驻波与多普勒三大现象</div>`;
+        el.innerHTML = h;
     },
 };
 

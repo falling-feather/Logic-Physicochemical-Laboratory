@@ -644,24 +644,53 @@ const Ecosystem = {
         if (!el) return;
         if (this.mode === 'food-chain') {
             el.innerHTML = `
-                <div class="eco-info__row"><span class="eco-info__tag eco-info__tag--green">食物链与能量流</span></div>
-                <div class="eco-info__row"><span class="eco-info__detail">营养级：太阳→生产者→初级消费者→高级消费者→分解者</span></div>
-                <div class="eco-info__formulas">
-                    <code>能量传递效率 ≈ 10%~20%（林德曼十分之一定律）</code>
-                    <code>生产者固定太阳能 → 化学能沿食物链单向流动</code>
-                    <code>分解者将有机物分解为无机物，归还给生产者</code>
-                </div>
-                <p class="eco-info__note">💡 能量沿食物链流动时逐级递减，因此高级消费者数量最少，形成能量金字塔</p>`;
+                <div class="eco-info__hd">📘 食物链与能量流</div>
+                <div class="eco-info__grid">
+                    <div class="eco-info__block">
+                        <div class="eco-info__sub">营养级</div>
+                        <div class="eco-info__val">太阳 → 生产者 → 消费者 → 分解者</div>
+                        <div class="eco-info__desc">生产者固定太阳能 → 化学能沿食物链单向流动、逐级递减</div>
+                    </div>
+                    <div class="eco-info__block">
+                        <div class="eco-info__sub">能量传递</div>
+                        <div class="eco-info__val" style="color:#4ade80">效率 ≈ 10%~20%</div>
+                        <div class="eco-info__desc">林德曼十分之一定律：相邻营养级间能量传递效率约10%-20%</div>
+                    </div>
+                    <div class="eco-info__block">
+                        <div class="eco-info__sub">物质循环</div>
+                        <div class="eco-info__row"><span class="eco-info__key" style="--c:#4ade80">分解者</span> 将有机物分解为无机物，归还给无机环境</div>
+                        <div class="eco-info__row"><span class="eco-info__key" style="--c:#60a5fa">物质循环</span> 物质在生物群落与无机环境间往复循环</div>
+                    </div>
+                    <div class="eco-info__block">
+                        <div class="eco-info__sub">💡 知识要点</div>
+                        <div class="eco-info__note">能量沿食物链流动时逐级递减，因此高营养级生物数量最少，形成能量金字塔。能量流动是单向流动、逐级递减的。</div>
+                    </div>
+                </div>`;
         } else {
             const p = this.popParams;
             el.innerHTML = `
-                <div class="eco-info__row"><span class="eco-info__tag eco-info__tag--teal">Lotka-Volterra 模型</span><span class="eco-info__detail">α=${p.alpha.toFixed(3)} β=${p.beta.toFixed(4)} γ=${p.gamma.toFixed(3)} δ=${p.delta.toFixed(4)}</span></div>
-                <div class="eco-info__formulas">
-                    <code>dx/dt = αx − βxy （猎物增长 − 被捕食）</code>
-                    <code>dy/dt = δxy − γy （捕食增长 − 自然死亡）</code>
-                    <code>当前: x=${Math.round(this.popState.prey)}, y=${Math.round(this.popState.predator)}</code>
-                </div>
-                <p class="eco-info__note">💡 两个种群数量呈周期性振荡：猎物增多→捕食者增多→猎物减少→捕食者减少→循环</p>`;
+                <div class="eco-info__hd">📘 Lotka-Volterra 种群动态模型</div>
+                <div class="eco-info__grid">
+                    <div class="eco-info__block">
+                        <div class="eco-info__sub">猎物方程</div>
+                        <div class="eco-info__val">dx/dt = αx − βxy</div>
+                        <div class="eco-info__desc">α=${p.alpha.toFixed(3)} β=${p.beta.toFixed(4)} — 猎物自然增长 − 被捕食消耗</div>
+                    </div>
+                    <div class="eco-info__block">
+                        <div class="eco-info__sub">捕食者方程</div>
+                        <div class="eco-info__val">dy/dt = δxy − γy</div>
+                        <div class="eco-info__desc">δ=${p.delta.toFixed(4)} γ=${p.gamma.toFixed(3)} — 捕食增长 − 自然死亡</div>
+                    </div>
+                    <div class="eco-info__block">
+                        <div class="eco-info__sub">当前状态</div>
+                        <div class="eco-info__row"><span class="eco-info__key" style="--c:#4ade80">猎物 x</span> ${Math.round(this.popState.prey)}</div>
+                        <div class="eco-info__row"><span class="eco-info__key" style="--c:#f87171">捕食者 y</span> ${Math.round(this.popState.predator)}</div>
+                    </div>
+                    <div class="eco-info__block">
+                        <div class="eco-info__sub">💡 知识要点</div>
+                        <div class="eco-info__note">两个种群数量呈周期性振荡：猎物增多→捕食者增多→猎物减少→捕食者减少→循环。这体现了负反馈调节机制。</div>
+                    </div>
+                </div>`;
         }
     },
 

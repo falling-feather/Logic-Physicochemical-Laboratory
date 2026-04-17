@@ -217,6 +217,21 @@ const Projectile = {
             '<span>\u6700\u9ad8\u70b9 H = ' + this.maxH.toFixed(2) + ' m</span>' +
             '<span>\u6eda\u65f6 T = ' + this.tFlight.toFixed(2) + ' s</span>' +
             '</div>';
+
+        /* education panel */
+        const eduEl = document.getElementById('proj-edu');
+        if (eduEl) {
+            const rad = this.theta * Math.PI / 180;
+            const v0x = (this.v0 * Math.cos(rad)).toFixed(1);
+            const v0y = (this.v0 * Math.sin(rad)).toFixed(1);
+            eduEl.innerHTML = `<div class="ac-hd"><span class="ac-tag">θ=${this.theta}°</span>抛体运动</div>
+<div class="ac-row"><span class="ac-key">运动分解</span>水平方向匀速 v₀x = v₀cosθ = ${v0x} m/s；竖直方向自由落体 v₀y = v₀sinθ = ${v0y} m/s</div>
+<div class="ac-row"><span class="ac-key ac-key--purple">位移公式</span>x = v₀cosθ·t &emsp; y = v₀sinθ·t − ½gt² — 水平与竖直独立叠加</div>
+<div class="ac-row"><span class="ac-key ac-key--amber">射程公式</span>R = v₀²sin2θ/g — θ=45° 时射程最大；互余角（如 30°/60°）射程相同</div>
+<div class="ac-row"><span class="ac-key">最高点</span>H = v₀²sin²θ/(2g) — 竖直分速度为零时达到最高点</div>
+<div class="ac-row"><span class="ac-key">飞行时间</span>T = 2v₀sinθ/g — 上升与下降时间对称（忽略空气阻力）</div>
+<div class="ac-note">💡 人教版必修2：抛体运动的核心方法是"运动的分解与合成"。调整角度和初速度，观察抛物线轨迹的变化</div>`;
+        }
     },
 
     draw() {

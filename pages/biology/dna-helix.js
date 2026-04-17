@@ -61,6 +61,8 @@ const DNAHelix = {
         this.bindControls();
         this.bindCanvas();
         this.startLoop();
+        this._injectInfoPanel();
+        this._updateInfo();
 
         if (typeof ResizeObserver !== 'undefined') {
             const ro = new ResizeObserver(() => this.resize());
@@ -168,6 +170,7 @@ const DNAHelix = {
             mutation: '\u57fa\u56e0\u7a81\u53d8 \u2014 \u89c2\u5bdf\u78b1\u57fa\u66ff\u6362\u5bf9\u5e8f\u5217\u7684\u5f71\u54cd'
         };
         if (this.info) this.info.textContent = msgs[mode] || '';
+        this._updateInfo();
     },
 
     resetAll() {
@@ -842,6 +845,42 @@ const DNAHelix = {
         content.lines.forEach((line, i) => {
             ctx.fillText(line, 18, y0 + 34 + i * 18);
         });
+    },
+
+    _injectInfoPanel() {
+        const el = document.getElementById('dnahelix-info');
+        if (!el) return;
+        el.innerHTML = `
+            <div class="dnahelix-info__hd">\ud83e\uddec DNA\u5206\u5b50\u7ed3\u6784\u4e0e\u529f\u80fd</div>
+            <div class="dnahelix-info__grid">
+                <div class="dnahelix-info__block">
+                    <div class="dnahelix-info__sub">\u5f53\u524d\u6a21\u5f0f</div>
+                    <div class="dnahelix-info__val" id="dnahelix-mode">\u53cc\u87ba\u65cb\u7ed3\u6784</div>
+                </div>
+                <div class="dnahelix-info__block">
+                    <div class="dnahelix-info__sub">\u6a21\u5f0f\u8bf4\u660e</div>
+                    <div class="dnahelix-info__desc" id="dnahelix-mode-desc">\u4e24\u6761\u53cd\u5411\u5e73\u884c\u7684\u8131\u6c27\u6838\u82f7\u9178\u94fe\u901a\u8fc7\u78b1\u57fa\u5bf9\u76f8\u8fde</div>
+                </div>
+            </div>
+            <div class="dnahelix-info__row"><span class="dnahelix-info__key" style="--c:#3a9e8f">\u78b1\u57fa\u914d\u5bf9</span>A=T (2\u4e2a\u6c22\u952e) &nbsp; G\u2261C (3\u4e2a\u6c22\u952e)</div>
+            <div class="dnahelix-info__row"><span class="dnahelix-info__key" style="--c:#8b6fc0">\u57fa\u672c\u5355\u4f4d</span>\u8131\u6c27\u6838\u82f7\u9178 = \u78f7\u9178\u57fa\u56e2 + \u8131\u6c27\u6838\u7cd6 + \u542b\u6c2e\u78b1\u57fa</div>
+            <div class="dnahelix-info__note">\u4eba\u6559\u7248\u5fc5\u4fee2 \u2014 Watson\u548cCrick\u4e8e1953\u5e74\u63d0\u51fa\u53cc\u87ba\u65cb\u7ed3\u6784\u6a21\u578b\uff0c\u70b9\u51fb\u78b1\u57fa\u5bf9\u53ef\u67e5\u770b\u8be6\u60c5</div>
+        `;
+    },
+
+    _updateInfo() {
+        const modeEl = document.getElementById('dnahelix-mode');
+        const descEl = document.getElementById('dnahelix-mode-desc');
+        if (!modeEl) return;
+        const data = {
+            helix:         ['\u53cc\u87ba\u65cb\u7ed3\u6784', '\u4e24\u6761\u53cd\u5411\u5e73\u884c\u7684\u8131\u6c27\u6838\u82f7\u9178\u94fe\u901a\u8fc7\u78b1\u57fa\u5bf9\u76f8\u8fde'],
+            replication:   ['\u534a\u4fdd\u7559\u590d\u5236', '\u4ee5\u6bcd\u94fe\u4e3a\u6a21\u677f\uff0c\u6309\u78b1\u57fa\u4e92\u8865\u914d\u5bf9\u539f\u5219\u5408\u6210\u5b50\u94fe\uff0c\u6bcf\u6761\u5b50DNA\u4fdd\u7559\u4e00\u6761\u6bcd\u94fe'],
+            transcription: ['\u8f6c\u5f55\u8fc7\u7a0b', 'DNA\u89e3\u65cb\uff0c\u4ee5\u6a21\u677f\u94fe3\u2032\u21925\u2032\u5408\u6210mRNA\uff0c\u78b1\u57fa\u914d\u5bf9: A\u2192U, T\u2192A, G\u2192C, C\u2192G'],
+            mutation:      ['\u57fa\u56e0\u7a81\u53d8', '\u78b1\u57fa\u5bf9\u7684\u589e\u6dfb\u3001\u7f3a\u5931\u6216\u66ff\u6362\uff0c\u53ef\u5bfc\u81f4\u86cb\u767d\u8d28\u7ed3\u6784\u6539\u53d8']
+        };
+        const d = data[this.mode] || data.helix;
+        modeEl.textContent = d[0];
+        descEl.textContent = d[1];
     }
 };
 

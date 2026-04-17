@@ -31,6 +31,7 @@ const StringMatch = {
         this.computeSteps();
         this.bindEvents();
         this.draw();
+        this.updateEdu();
     },
 
     destroy() {
@@ -150,6 +151,7 @@ const StringMatch = {
                 this.playing = false;
                 this.computeSteps();
                 this.draw();
+                this.updateEdu();
             });
         });
         const playBtn = document.getElementById('strmatch-play');
@@ -169,6 +171,7 @@ const StringMatch = {
                 if (this.currentStep < this.steps.length - 1) {
                     this.currentStep++;
                     this.draw();
+                    this.updateEdu();
                 }
             });
         }
@@ -178,6 +181,7 @@ const StringMatch = {
                 this.playing = false;
                 this.currentStep = 0;
                 this.draw();
+                this.updateEdu();
             });
         }
         const speedS = document.getElementById('strmatch-speed');
@@ -191,9 +195,11 @@ const StringMatch = {
         if (this.currentStep < this.steps.length - 1) {
             this.currentStep++;
             this.draw();
+            this.updateEdu();
             setTimeout(() => this.autoPlay(), 400 / this.speed);
         } else {
             this.playing = false;
+            this.updateEdu();
         }
     },
 
@@ -337,6 +343,41 @@ const StringMatch = {
             ctx.font = '10px var(--font-mono)';
             ctx.textAlign = 'center';
             ctx.fillText(lps[i], x + cellW / 2, y + 37);
+        }
+    },
+
+    /* ── education panel ── */
+    updateEdu() {
+        let el = document.getElementById('strmatch-edu');
+        if (!el) {
+            const wrap = this.canvas?.closest('.demo-section');
+            if (!wrap) return;
+            el = document.createElement('div');
+            el.id = 'strmatch-edu';
+            el.className = 'strmatch-edu';
+            wrap.appendChild(el);
+        }
+        const step = this.steps[this.currentStep];
+        const m = this.pattern.length;
+        const n = this.text.length;
+        if (this.algo === 'kmp') {
+            const found = step && step.found;
+            el.innerHTML =
+                '<b>KMP 算法</b> — 利用前缀函数避免重复比较' +
+                '<br>• <b>LPS 数组</b>（最长公共前后缀）: [' + this.lps.join(', ') + ']' +
+                '<br>• 失配时模式串跳转到 lps[j-1] 位置，<b>主串指针不回退</b>。' +
+                '<br>• 时间 O(n+m) = O(' + n + '+' + m + ') = O(' + (n + m) + ')，空间 O(m) 存 LPS。' +
+                (found ? '<br>✅ 匹配成功! KMP 的优势在失配较多时尤为明显。' :
+                '<br>💡 对比暴力算法 O(nm)，KMP 的核心思想是"不走回头路"。');
+        } else {
+            const found = step && step.found;
+            el.innerHTML =
+                '<b>暴力匹配</b> — 逐位对齐逐字符比较' +
+                '<br>• 将模式串对齐到主串每个位置，逐字符匹配。' +
+                '<br>• 失配时模式串回到开头，主串回退到下一个起点。' +
+                '<br>• 最坏时间 O(nm) = O(' + n + '×' + m + ') = O(' + (n * m) + ')。' +
+                (found ? '<br>✅ 匹配成功! 暴力法简单但效率低，适合短文本。' :
+                '<br>💡 暴力法的问题: 失配时已比较的信息被浪费，KMP 利用 LPS 避免了这一点。');
         }
     }
 };

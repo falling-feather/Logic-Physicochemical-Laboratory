@@ -157,6 +157,19 @@ const Kinematics = {
             '<div class="ki-item"><span class="ki-label">v(t)</span> = v\u2080 + at = <strong>' + v.toFixed(2) + '</strong> m/s</div>' +
             '<div class="ki-item"><span class="ki-label">s(t)</span> = v\u2080t + \u00bdat\u00b2 = <strong>' + s.toFixed(2) + '</strong> m</div>' +
             '<div class="ki-item ki-formula">v = ' + this.v0.toFixed(1) + ' + ' + this.a.toFixed(1) + ' \u00d7 ' + this.t.toFixed(1) + ' = ' + v.toFixed(2) + '</div>';
+
+        /* education panel */
+        const eduEl = document.getElementById('kin-edu');
+        if (eduEl) {
+            const aDir = this.a > 0 ? '加速' : this.a < 0 ? '减速' : '匀速';
+            eduEl.innerHTML = `<div class="ac-hd"><span class="ac-tag">${aDir}</span>匀变速直线运动</div>
+<div class="ac-row"><span class="ac-key">速度公式</span>v = v₀ + at — 当前 v₀=${this.v0.toFixed(1)} m/s, a=${this.a.toFixed(1)} m/s²</div>
+<div class="ac-row"><span class="ac-key ac-key--purple">位移公式</span>s = v₀t + ½at² — t=${this.t.toFixed(1)}s 时 s=${s.toFixed(2)} m</div>
+<div class="ac-row"><span class="ac-key ac-key--amber">速度位移</span>v² − v₀² = 2as — 不含时间的推导公式，常用于刹车问题</div>
+<div class="ac-row"><span class="ac-key">v-t 图像</span>斜率 = 加速度 a；图线下面积 = 位移 s</div>
+<div class="ac-row"><span class="ac-key">中间时刻速度</span>v(t/2) = (v₀+v)/2 = 平均速度 — 匀变速运动的重要推论</div>
+<div class="ac-note">💡 人教版必修1：调整 v₀ 和 a 的滑块观察粒子运动和图像变化。a 与 v 同向为加速，反向为减速</div>`;
+        }
     },
 
     draw() {

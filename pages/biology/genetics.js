@@ -41,7 +41,9 @@ const Genetics = {
 
         this.resize();
         this.bindControls();
+        this._injectInfoPanel();
         this.startLoop();
+        this._updateInfo();
 
         if (typeof ResizeObserver !== 'undefined') {
             const ro = new ResizeObserver(() => this.resize());
@@ -198,6 +200,7 @@ const Genetics = {
             pedigree: '\u70b9\u51fb\u4e2a\u4f53\u67e5\u770b\u57fa\u56e0\u578b\uff0c\u5206\u6790\u9057\u4f20\u65b9\u5f0f'
         };
         if (this.info) this.info.textContent = msgs[mode] || '';
+        this._updateInfo();
     },
 
     /* ============ Animation Loop ============ */
@@ -594,6 +597,82 @@ const Genetics = {
         this._selectedPedigreeNode = null;
     },
 
+    /* ============ Education Panel ============ */
+
+    _injectInfoPanel() {
+        const el = document.getElementById('gen-edu-info');
+        if (!el) return;
+        el.innerHTML = `
+            <div class="gen-edu-info__hd">🧬 遗传学知识点</div>
+            <div class="gen-edu-info__grid">
+                <div class="gen-edu-info__block">
+                    <div class="gen-edu-info__sub">当前模式</div>
+                    <div id="gen-edu-mode" class="gen-edu-info__val">孟德尔杂交</div>
+                    <div id="gen-edu-mode-desc" class="gen-edu-info__desc">选择亲本基因型，点击杂交查看后代比例</div>
+                </div>
+                <div class="gen-edu-info__block" id="gen-edu-detail-block">
+                    <div class="gen-edu-info__sub">核心定律</div>
+                    <div id="gen-edu-detail" class="gen-edu-info__val">分离定律</div>
+                </div>
+                <div class="gen-edu-info__block" id="gen-edu-laws-block">
+                    <div class="gen-edu-info__sub">知识要点</div>
+                    <div id="gen-edu-laws"></div>
+                </div>
+                <div class="gen-edu-info__block">
+                    <div class="gen-edu-info__sub">💡 人教版必修2</div>
+                    <div class="gen-edu-info__note" id="gen-edu-note">等位基因在形成配子时彼此分离，分别进入不同配子中。显性纯合(AA)与杂合(Aa)表现型相同，需测交鉴定。</div>
+                </div>
+            </div>
+        `;
+    },
+
+    _updateInfo() {
+        const modeEl = document.getElementById('gen-edu-mode');
+        const descEl = document.getElementById('gen-edu-mode-desc');
+        const detailEl = document.getElementById('gen-edu-detail');
+        const lawsEl = document.getElementById('gen-edu-laws');
+        const noteEl = document.getElementById('gen-edu-note');
+        if (!modeEl) return;
+
+        if (this.mode === 'punnett') {
+            modeEl.textContent = '孟德尔杂交';
+            descEl.textContent = this.punnettMode === 'single' ? '单基因杂交 — 分离定律' : '双基因杂交 — 自由组合定律';
+            detailEl.textContent = this.punnettMode === 'single' ? '分离定律' : '自由组合定律';
+            if (lawsEl) {
+                lawsEl.innerHTML = this.punnettMode === 'single'
+                    ? '<div class="gen-edu-info__row"><span class="gen-edu-info__key" style="--c:#3a9e8f">分离定律</span> 等位基因在形成配子时彼此分离</div>'
+                      + '<div class="gen-edu-info__row"><span class="gen-edu-info__key" style="--c:#8b6fc0">经典比例</span> Aa × Aa → AA:Aa:aa = 1:2:1，表现型比 3:1</div>'
+                      + '<div class="gen-edu-info__row"><span class="gen-edu-info__key" style="--c:#c4793a">测交</span> 显性纯合(AA)与杂合(Aa)表现型相同，需测交鉴定</div>'
+                    : '<div class="gen-edu-info__row"><span class="gen-edu-info__key" style="--c:#3a9e8f">自由组合</span> 非同源染色体上的基因自由组合</div>'
+                      + '<div class="gen-edu-info__row"><span class="gen-edu-info__key" style="--c:#8b6fc0">经典比例</span> AaBb × AaBb → 9:3:3:1 表现型比</div>'
+                      + '<div class="gen-edu-info__row"><span class="gen-edu-info__key" style="--c:#c4793a">配子类型</span> 16种配子组合，产生 9 种基因型</div>';
+            }
+            if (noteEl) noteEl.textContent = this.punnettMode === 'single'
+                ? '等位基因在形成配子时彼此分离，分别进入不同配子中。显性纯合(AA)与杂合(Aa)表现型相同，需测交鉴定。'
+                : '两对等位基因分别位于两对同源染色体上，减数分裂时非同源染色体上的非等位基因自由组合。';
+        } else if (this.mode === 'population') {
+            modeEl.textContent = '种群遗传';
+            descEl.textContent = 'Hardy-Weinberg 遗传平衡定律';
+            detailEl.textContent = 'p² + 2pq + q² = 1';
+            if (lawsEl) {
+                lawsEl.innerHTML = '<div class="gen-edu-info__row"><span class="gen-edu-info__key" style="--c:#3a9e8f">平衡条件</span> 大种群、随机交配、无选择/突变/迁移</div>'
+                    + '<div class="gen-edu-info__row"><span class="gen-edu-info__key" style="--c:#8b6fc0">基因频率</span> p=显性等位基因频率，q=隐性等位基因频率</div>'
+                    + '<div class="gen-edu-info__row"><span class="gen-edu-info__key" style="--c:#c4793a">进化因素</span> 开启"自然选择"观察基因频率偏离平衡的过程</div>';
+            }
+            if (noteEl) noteEl.textContent = '在理想条件下基因频率和基因型频率代代不变。自然选择、突变、基因漂变和迁移是打破平衡引起进化的四大因素。';
+        } else if (this.mode === 'pedigree') {
+            modeEl.textContent = '系谱图分析';
+            descEl.textContent = '判断遗传方式与基因型';
+            detailEl.textContent = this.pedigreeData ? this.pedigreeData.title : '—';
+            if (lawsEl) {
+                lawsEl.innerHTML = '<div class="gen-edu-info__row"><span class="gen-edu-info__key" style="--c:#3a9e8f">■ 方/●圆</span> 方=男性，圆=女性；实心=患病，空心=正常</div>'
+                    + '<div class="gen-edu-info__row"><span class="gen-edu-info__key" style="--c:#8b6fc0">• 携带者</span> 中心小圆点表示表型正常但携带隐性基因</div>'
+                    + '<div class="gen-edu-info__row"><span class="gen-edu-info__key" style="--c:#c4793a">判断口诀</span> 无中生有为隐性，有中生无为显性；隐性看女，显性看男</div>';
+            }
+            if (noteEl) noteEl.textContent = '点击个体查看基因型信息，选择不同遗传方式观察系谱图特征。常隐：父母正常可生患病后代；X隐：男性患者多于女性。';
+        }
+    },
+
     /* ============ Main Draw ============ */
 
     draw() {
@@ -780,37 +859,10 @@ const Genetics = {
         }
 
         // Edu panel (bottom)
-        this._drawPunnettEdu(ctx, W, H);
     },
 
     _drawPunnettEdu(ctx, W, H) {
-        const y0 = H * 0.72;
-        ctx.fillStyle = 'rgba(58,158,143,0.06)';
-        ctx.fillRect(8, y0, W - 16, H - y0 - 8);
-        ctx.strokeStyle = 'rgba(58,158,143,0.15)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(8, y0, W - 16, H - y0 - 8);
-
-        ctx.fillStyle = 'rgba(58,158,143,0.6)';
-        ctx.font = '600 11px "Noto Sans SC", sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText('\u77e5\u8bc6\u8865\u5145', 18, y0 + 16);
-
-        ctx.fillStyle = 'rgba(255,255,255,0.45)';
-        ctx.font = '11px "Noto Sans SC", sans-serif';
-
-        const lines = this.punnettMode === 'single' ? [
-            '\u2022 \u5206\u79bb\u5b9a\u5f8b\uff1a\u7b49\u4f4d\u57fa\u56e0\u5728\u5f62\u6210\u914d\u5b50\u65f6\u5f7c\u6b64\u5206\u79bb\uff0c\u5206\u522b\u8fdb\u5165\u4e0d\u540c\u914d\u5b50\u4e2d',
-            '\u2022 Aa \u00d7 Aa \u2192 AA:Aa:aa = 1:2:1\uff0c\u8868\u73b0\u578b\u6bd4 3:1',
-            '\u2022 \u663e\u6027\u7eaf\u5408(AA)\u4e0e\u6742\u5408(Aa)\u8868\u73b0\u578b\u76f8\u540c\uff0c\u9700\u6d4b\u4ea4\u9274\u5b9a'
-        ] : [
-            '\u2022 \u81ea\u7531\u7ec4\u5408\u5b9a\u5f8b\uff1a\u975e\u540c\u6e90\u67d3\u8272\u4f53\u4e0a\u7684\u57fa\u56e0\u81ea\u7531\u7ec4\u5408',
-            '\u2022 AaBb \u00d7 AaBb \u2192 9:3:3:1 \u8868\u73b0\u578b\u6bd4',
-            '\u2022 16\u79cd\u914d\u5b50\u7ec4\u5408\uff0c\u4ea7\u751f 9 \u79cd\u57fa\u56e0\u578b'
-        ];
-        lines.forEach((line, i) => {
-            ctx.fillText(line, 18, y0 + 34 + i * 18);
-        });
+        // Education content moved to DOM _injectInfoPanel()
     },
 
     /* ── Population Draw ── */
@@ -830,8 +882,6 @@ const Genetics = {
         // Draw allele frequency history (right panel)
         this._drawPopGraph(ctx, W, H);
 
-        // Draw legend + stats at bottom
-        this._drawPopEdu(ctx, W, H);
     },
 
     _drawPopGraph(ctx, W, H) {
@@ -904,49 +954,7 @@ const Genetics = {
     },
 
     _drawPopEdu(ctx, W, H) {
-        const y0 = H * 0.72;
-        ctx.fillStyle = 'rgba(58,158,143,0.06)';
-        ctx.fillRect(8, y0, W - 16, H - y0 - 8);
-        ctx.strokeStyle = 'rgba(58,158,143,0.15)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(8, y0, W - 16, H - y0 - 8);
-
-        ctx.fillStyle = 'rgba(58,158,143,0.6)';
-        ctx.font = '600 11px "Noto Sans SC", sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText('Hardy-Weinberg \u5b9a\u5f8b', 18, y0 + 16);
-
-        ctx.fillStyle = 'rgba(255,255,255,0.45)';
-        ctx.font = '11px "Noto Sans SC", sans-serif';
-        const lines = [
-            '\u2022 p\u00b2 + 2pq + q\u00b2 = 1\uff0c\u5176\u4e2d p=\u663e\u6027\u7b49\u4f4d\u57fa\u56e0\u9891\u7387\uff0cq=\u9690\u6027\u7b49\u4f4d\u57fa\u56e0\u9891\u7387',
-            '\u2022 \u5e73\u8861\u6761\u4ef6\uff1a\u5927\u79cd\u7fa4\u3001\u968f\u673a\u4ea4\u914d\u3001\u65e0\u9009\u62e9/\u7a81\u53d8/\u8fc1\u79fb',
-            '\u2022 \u5f00\u542f\u201c\u81ea\u7136\u9009\u62e9\u201d\u89c2\u5bdf\u57fa\u56e0\u9891\u7387\u504f\u79bb\u5e73\u8861\u7684\u8fc7\u7a0b'
-        ];
-        lines.forEach((line, i) => {
-            ctx.fillText(line, 18, y0 + 34 + i * 18);
-        });
-
-        // Genotype frequency bar (bottom strip)
-        if (this.popHistory.length > 0) {
-            const last = this.popHistory[this.popHistory.length - 1];
-            const barY = y0 + 90, barH = 10, barW = W - 40;
-            const bx = 20;
-
-            ctx.fillStyle = '#3a9e8f';
-            ctx.fillRect(bx, barY, barW * last.AA, barH);
-            ctx.fillStyle = '#8b6fc0';
-            ctx.fillRect(bx + barW * last.AA, barY, barW * last.Aa, barH);
-            ctx.fillStyle = '#c4793a';
-            ctx.fillRect(bx + barW * (last.AA + last.Aa), barY, barW * last.aa, barH);
-
-            ctx.font = '9px "JetBrains Mono", monospace';
-            ctx.textAlign = 'center';
-            ctx.fillStyle = 'rgba(255,255,255,0.5)';
-            ctx.fillText('AA ' + (last.AA * 100).toFixed(1) + '%', bx + barW * last.AA / 2, barY + barH + 12);
-            ctx.fillText('Aa ' + (last.Aa * 100).toFixed(1) + '%', bx + barW * (last.AA + last.Aa / 2), barY + barH + 12);
-            ctx.fillText('aa ' + (last.aa * 100).toFixed(1) + '%', bx + barW * (last.AA + last.Aa + last.aa / 2), barY + barH + 12);
-        }
+        // Education content moved to DOM _injectInfoPanel()
     },
 
     /* ── Pedigree Draw ── */
@@ -1073,43 +1081,6 @@ const Genetics = {
             }
         }
 
-        // Legend
-        const ly = H * 0.72;
-        ctx.fillStyle = 'rgba(58,158,143,0.06)';
-        ctx.fillRect(8, ly, W - 16, H - ly - 8);
-        ctx.strokeStyle = 'rgba(58,158,143,0.15)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(8, ly, W - 16, H - ly - 8);
-
-        ctx.fillStyle = 'rgba(58,158,143,0.6)';
-        ctx.font = '600 11px "Noto Sans SC", sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText('\u7cfb\u8c31\u56fe\u56fe\u4f8b', 18, ly + 16);
-
-        // Legend items
-        const items = [
-            { draw: (x, y) => { ctx.strokeStyle = 'rgba(58,158,143,0.5)'; ctx.lineWidth = 1.5; ctx.strokeRect(x, y - 7, 14, 14); }, label: '\u6b63\u5e38\u7537\u6027' },
-            { draw: (x, y) => { ctx.beginPath(); ctx.arc(x + 7, y, 7, 0, Math.PI * 2); ctx.strokeStyle = 'rgba(58,158,143,0.5)'; ctx.lineWidth = 1.5; ctx.stroke(); }, label: '\u6b63\u5e38\u5973\u6027' },
-            { draw: (x, y) => { ctx.fillStyle = '#3a9e8f'; ctx.fillRect(x, y - 7, 14, 14); }, label: '\u60a3\u75c5\u7537\u6027' },
-            { draw: (x, y) => { ctx.beginPath(); ctx.arc(x + 7, y, 7, 0, Math.PI * 2); ctx.fillStyle = '#3a9e8f'; ctx.fill(); }, label: '\u60a3\u75c5\u5973\u6027' },
-            { draw: (x, y) => { ctx.beginPath(); ctx.arc(x + 7, y, 3, 0, Math.PI * 2); ctx.fillStyle = 'rgba(58,158,143,0.5)'; ctx.fill(); }, label: '\u643a\u5e26\u8005' }
-        ];
-
-        let lx = 18;
-        items.forEach(item => {
-            item.draw(lx, ly + 38);
-            ctx.fillStyle = 'rgba(255,255,255,0.45)';
-            ctx.font = '10px "Noto Sans SC", sans-serif';
-            ctx.textAlign = 'left';
-            ctx.fillText(item.label, lx + 18, ly + 42);
-            lx += 80;
-        });
-
-        // Edu info
-        ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        ctx.font = '10px "Noto Sans SC", sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText('\u70b9\u51fb\u4e2a\u4f53\u67e5\u770b\u57fa\u56e0\u578b\u4fe1\u606f\uff0c\u9009\u62e9\u4e0d\u540c\u9057\u4f20\u65b9\u5f0f\u89c2\u5bdf\u7cfb\u8c31\u56fe\u7279\u5f81', 18, ly + 60);
     }
 };
 

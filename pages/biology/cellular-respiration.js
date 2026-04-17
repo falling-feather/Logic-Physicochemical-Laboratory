@@ -23,6 +23,7 @@ const CellularResp = {
         this._resize();
         this._on(window, 'resize', () => this._resize());
         this._buildControls();
+        this._injectInfoPanel();
         this._initParticles();
         this._loop();
     },
@@ -63,6 +64,7 @@ const CellularResp = {
                 this._initParticles();
                 btnWrap.querySelectorAll('.cellresp-btn').forEach(x => x.classList.remove('active'));
                 b.classList.add('active');
+                this._updateInfo();
             });
             btnWrap.appendChild(b);
         });
@@ -383,6 +385,43 @@ const CellularResp = {
             if (this.progress > 1) this.progress = 0;
         }
     },
+    _injectInfoPanel() {
+        const el = document.getElementById('cellresp-info');
+        if (!el) return;
+        el.innerHTML = `
+            <div class="cellresp-info__hd">📘 细胞呼吸知识点</div>
+            <div class="cellresp-info__grid">
+                <div class="cellresp-info__block">
+                    <div class="cellresp-info__sub">当前阶段</div>
+                    <div id="cellresp-stage-display" class="cellresp-info__val">糖酵解</div>
+                    <div id="cellresp-stage-loc" class="cellresp-info__desc">场所：细胞质基质</div>
+                </div>
+                <div class="cellresp-info__block">
+                    <div class="cellresp-info__sub">三阶段总览</div>
+                    <div class="cellresp-info__row"><span class="cellresp-info__key" style="--c:#64c864">糖酵解</span> C₆H₁₂O₆ → 2丙酮酸 + 2ATP + 2NADH</div>
+                    <div class="cellresp-info__row"><span class="cellresp-info__key" style="--c:#ffb432">柠檬酸循环</span> 2丙酮酸 → 6CO₂ + 2ATP + 8NADH + 2FADH₂</div>
+                    <div class="cellresp-info__row"><span class="cellresp-info__key" style="--c:#6496ff">电子传递链</span> NADH/FADH₂ + O₂ → 34ATP + H₂O</div>
+                </div>
+                <div class="cellresp-info__block">
+                    <div class="cellresp-info__sub">能量产出</div>
+                    <div id="cellresp-atp-info" class="cellresp-info__val">总计约38个ATP / 1分子葡萄糖</div>
+                </div>
+                <div class="cellresp-info__block">
+                    <div class="cellresp-info__sub">💡 知识要点</div>
+                    <div class="cellresp-info__note">有氧呼吸总反应式：C₆H₁₂O₆ + 6O₂ + 6H₂O → 6CO₂ + 12H₂O + 能量(38ATP)。糖酵解不需要O₂，在无氧条件下可转为发酵。</div>
+                </div>
+            </div>
+        `;
+    },
+
+    _updateInfo() {
+        const s = this.stages[this.stage];
+        const nameEl = document.getElementById('cellresp-stage-display');
+        const locEl = document.getElementById('cellresp-stage-loc');
+        if (nameEl) nameEl.textContent = s.name;
+        if (locEl) locEl.textContent = '场所：' + s.loc;
+    },
+
     _loop() {
         const t = performance.now() / 1000;
         this._draw(t);

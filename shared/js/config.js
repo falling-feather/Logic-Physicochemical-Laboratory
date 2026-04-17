@@ -59,7 +59,9 @@ const CONFIG = {
             { id: 'conic-sections', title: '圆锥曲线', description: '椭圆/双曲线/抛物线焦点轨迹', icon: 'circle', variant: 'featured' },
             { id: 'solid-geometry', title: '立体几何', description: '三维多面体旋转与截面', icon: 'box', variant: 'featured' },
             { id: 'permutation-combination', title: '排列组合', description: '树状图/计数公式/杨辉三角', icon: 'layers', variant: 'featured' },
-            { id: 'sequences', title: '数列可视化', description: '等差/等比数列图形化与前n项和', icon: 'bar-chart', variant: 'featured' }
+            { id: 'sequences', title: '数列可视化', description: '等差/等比数列图形化与前n项和', icon: 'bar-chart', variant: 'featured' },
+            { id: 'function-properties', title: '函数性质探究', description: '单调性/奇偶性/周期性交互分析', icon: 'scan-line', variant: 'featured' },
+            { id: 'exp-log', title: '指数与对数', description: '底数a对图像影响与互为反函数', icon: 'trending-up', variant: 'featured' }
         ],
         physics: [
             { id: 'mechanics', title: '力学模拟', description: '重力、碰撞、弹簧', icon: 'gauge', variant: 'featured' },

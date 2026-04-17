@@ -44,6 +44,7 @@ const GeoTransform = {
             this._resObs.observe(this.canvas.parentElement);
         }
         this.draw();
+        this.updateEdu();
     },
 
     destroy() {
@@ -77,6 +78,7 @@ const GeoTransform = {
                 div.querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
                 this._updateMode();
                 this.draw();
+                this.updateEdu();
             });
         });
     },
@@ -757,6 +759,39 @@ const GeoTransform = {
         this.animId = null;
         const btn = document.getElementById('geo-animate-btn');
         if (btn) btn.textContent = '▶ 动画演示';
+    },
+
+    /* ── education panel ── */
+    updateEdu() {
+        let el = document.getElementById('geo-edu');
+        if (!el) {
+            const wrap = this.canvas?.closest('.demo-content');
+            if (!wrap) return;
+            el = document.createElement('div');
+            el.id = 'geo-edu';
+            el.className = 'geo-edu';
+            wrap.appendChild(el);
+        }
+        if (this.mode === 'transform') {
+            const det = (this.sx * Math.cos(this.angle * Math.PI / 180)) *
+                        (this.sy * Math.cos(this.angle * Math.PI / 180)) -
+                        (-this.sx * Math.sin(this.angle * Math.PI / 180) + this.shx) *
+                        (this.sy * Math.sin(this.angle * Math.PI / 180));
+            el.innerHTML =
+                '<b>仿射变换</b>：线性变换 + 平移，保持共线性与比例不变。' +
+                '<br>变换矩阵 <code>M = T · R · S · Sh</code>：平移 T、旋转 R、缩放 S、剪切 Sh 依次复合。' +
+                '<br>• <b>行列式 det(M)</b> = 面积缩放因子，det < 0 表示翻转方向（镜像）。' +
+                '<br>• <b>特征值</b>描述变换的主方向拉伸量，特征向量是不变方向。' +
+                '<br>💡 旋转矩阵 R(θ) = [[cos θ, −sin θ], [sin θ, cos θ]]，行列式恒为 1。';
+        } else {
+            el.innerHTML =
+                '<b>三角形五心</b>：外心、内心、重心、垂心、旁心是三角形核心几何要素。' +
+                '<br>• <b>外心</b>：三边垂直平分线交点，到三顶点等距（外接圆圆心）。' +
+                '<br>• <b>内心</b>：三角平分线交点，到三边等距（内切圆圆心）。' +
+                '<br>• <b>重心</b>：三中线交点，分中线为 2:1，坐标 = 三顶点坐标均值。' +
+                '<br>• <b>垂心</b>：三高线交点；<b>欧拉线</b>：外心、重心、垂心共线。' +
+                '<br>💡 拖拽顶点观察五心如何随三角形形状变化而移动。';
+        }
     }
 };
 

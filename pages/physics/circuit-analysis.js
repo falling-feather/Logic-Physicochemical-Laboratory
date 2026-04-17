@@ -31,6 +31,7 @@ const CircuitAnalysis = {
         this._applyDefaults();
         this.resize();
         this.bindEvents();
+        this.updateInfo();
         this.loop();
     },
 
@@ -83,6 +84,7 @@ const CircuitAnalysis = {
                 document.querySelectorAll('.circuit-mode-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 this.mode = btn.dataset.mode;
+                this.updateInfo();
             });
         });
 
@@ -385,6 +387,35 @@ const CircuitAnalysis = {
         lines.forEach((l, i) => {
             ctx.fillText(l, W - 15, H - 10 - (lines.length - 1 - i) * 16);
         });
+    },
+
+    /* ── education panel ── */
+    updateInfo() {
+        const el = document.getElementById('circuit-info');
+        if (!el) return;
+        const { voltage, R1, R2, mode } = this;
+        let h = '';
+        if (mode === 'series') {
+            const Req = R1 + R2;
+            const I = voltage / Req;
+            const U1 = I * R1, U2 = I * R2;
+            h = `<div class="ac-hd"><span class="ac-tag">串联</span>串联电路分析</div>
+<div class="ac-row"><span class="ac-key">欧姆定律</span>I = U/R — 电流等于电压与电阻之比（宏观，适用于金属导体）</div>
+<div class="ac-row"><span class="ac-key ac-key--purple">等效电阻</span>R<sub>eq</sub> = R₁ + R₂ = ${R1} + ${R2} = ${Req} Ω — 串联电阻越多总阻越大</div>
+<div class="ac-row"><span class="ac-key ac-key--amber">电流特点</span>串联电路各处电流相等: I = U/R<sub>eq</sub> = ${voltage}/${Req} = ${I.toFixed(2)} A</div>
+<div class="ac-row"><span class="ac-key">分压规则</span>U₁/U₂ = R₁/R₂ → U₁ = ${U1.toFixed(1)}V, U₂ = ${U2.toFixed(1)}V — 电阻大的分压多</div>
+<div class="ac-note">💡 人教版必修3：串联电路电流处处相等，总电压等于各部分电压之和 U = U₁ + U₂。功率分配与电阻成正比 P₁/P₂ = R₁/R₂</div>`;
+        } else {
+            const Req = (R1 * R2) / (R1 + R2);
+            const I1 = voltage / R1, I2 = voltage / R2, Itotal = I1 + I2;
+            h = `<div class="ac-hd"><span class="ac-tag ac-tag--amber">并联</span>并联电路分析</div>
+<div class="ac-row"><span class="ac-key">欧姆定律</span>I = U/R — 各支路独立满足欧姆定律</div>
+<div class="ac-row"><span class="ac-key ac-key--purple">等效电阻</span>1/R<sub>eq</sub> = 1/R₁ + 1/R₂ → R<sub>eq</sub> = ${Req.toFixed(1)} Ω — 并联总阻小于任一分阻</div>
+<div class="ac-row"><span class="ac-key ac-key--amber">电压特点</span>并联各支路电压相等: U₁ = U₂ = ${voltage} V</div>
+<div class="ac-row"><span class="ac-key">分流规则</span>I₁/I₂ = R₂/R₁ → I₁ = ${I1.toFixed(2)}A, I₂ = ${I2.toFixed(2)}A — 电阻小的电流大</div>
+<div class="ac-note">💡 人教版必修3：并联电路各支路电压相等，干路电流等于各支路之和 I = I₁ + I₂。功率分配与电阻成反比 P₁/P₂ = R₂/R₁</div>`;
+        }
+        el.innerHTML = h;
     }
 };
 

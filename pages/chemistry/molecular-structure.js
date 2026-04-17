@@ -198,7 +198,6 @@ const MoleculeVis = {
             name: '\u6c2f\u5316\u6c22 HCl',
             formula: 'HCl',
             desc: '\u5f3a\u9178\uff0c\u6781\u6027\u5171\u4ef7\u952e',
-            hybridization: 'sp\u00b3',
             polarity: '\u6781\u6027',
             shape: '\u7ebf\u5f62',
             atoms: [
@@ -728,9 +727,29 @@ const MoleculeVis = {
         if (bondTypes[2]) html += '\u53cc\u952e \u00d7' + bondTypes[2] + ' ';
         if (bondTypes[3]) html += '\u4e09\u952e \u00d7' + bondTypes[3];
         html += '</span></div>';
-        html += '<div class="mol-info-row"><span class="mol-info-label">\u6742\u5316</span><span>' + (mol.hybridization || '-') + '</span></div>';
+        if (mol.hybridization) html += '<div class="mol-info-row"><span class="mol-info-label">\u6742\u5316</span><span>' + mol.hybridization + '</span></div>';
         html += '<div class="mol-info-row"><span class="mol-info-label">\u6781\u6027</span><span>' + (mol.polarity || '-') + '</span></div>';
         html += '<div class="mol-info-row"><span class="mol-info-label">\u5206\u5b50\u6784\u578b</span><span>' + (mol.shape || '-') + '</span></div>';
+
+        // Educational panel
+        const hybMap = {
+            'sp3': '1个s + 3个p轨道杂化 → 4个等价sp³杂化轨道，键角≈109.5°（正四面体）',
+            'sp2': '1个s + 2个p轨道杂化 → 3个等价sp²杂化轨道，键角≈120°（平面三角形），剩余p轨道形成π键',
+            'sp': '1个s + 1个p轨道杂化 → 2个等价sp杂化轨道，键角=180°（直线形），剩余2个p轨道形成π键'
+        };
+        const hybKey = mol.hybridization ? mol.hybridization.toLowerCase().replace(/[³²]/g, m => m === '³' ? '3' : '2') : '';
+        const hybDesc = hybMap[hybKey] || (mol.hybridization ? mol.hybridization + ' 杂化' : '—');
+        const polarDesc = mol.polarity === '非极性' || mol.polarity === '非极性分子'
+            ? '分子中正负电荷中心重合，偶极矩μ=0。判据：高对称结构（如正四面体CH₄、直线形CO₂）键的极性相互抵消'
+            : '分子中正负电荷中心不重合，偶极矩μ≠0。极性越强→沸点越高、水溶性越强';
+
+        html += '<div class="mol-edu">';
+        html += '<div class="chem-hd"><span class="chem-tag">\u5206\u5b50\u7ed3\u6784</span>VSEPR 理论与杂化轨道</div>';
+        html += '<div class="chem-row"><span class="chem-key">\u6742\u5316\u89e3\u8bfb</span>' + hybDesc + '</div>';
+        html += '<div class="chem-row"><span class="chem-key chem-key--amber">\u6781\u6027\u5206\u6790</span>' + polarDesc + '</div>';
+        html += '<div class="chem-row"><span class="chem-key chem-key--purple">VSEPR</span>价层电子对互斥理论：孤对电子排斥 > 成键电子对排斥，孤对越多→键角越小</div>';
+        html += '<div class="chem-note">💡 共价键：原子间通过共用电子对形成；σ键（头碰头重叠）可自由旋转，π键（肩并肩重叠）限制旋转。双键 = 1σ+1π，三键 = 1σ+2π</div>';
+        html += '</div>';
 
         el.innerHTML = html;
     }

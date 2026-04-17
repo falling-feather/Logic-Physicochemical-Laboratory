@@ -960,6 +960,19 @@ const ChemReaction = {
         const el = document.getElementById('rxn-info');
         if (!el || !this.currentReaction) return;
         const rxn = this.currentReaction;
+        const isExo = rxn.energy < 0;
+        const typeDescs = {
+            '放热': '反应物总能量 > 生成物总能量，多余能量以热/光形式释放到环境中',
+            '吸热': '反应物总能量 < 生成物总能量，需从环境中吸收能量才能持续反应'
+        };
+        const typeNotes = {
+            'combustion': '燃烧反应是最典型的放热反应，产物CO₂和H₂O的化学键总能量远高于反应物',
+            'synthesis': '工业合成氨（Haber法）：高温高压+铁催化剂，N≡N三键键能=946kJ/mol，断键困难',
+            'neutralization': '中和热ΔH≈-57.3kJ/mol（稀溶液中强酸+强碱），本质是H⁺+OH⁻→H₂O',
+            'decomposition': '分解反应需要持续供热（煅烧石灰石~900°C），Le Chatelier原理：升温有利于吸热反应',
+            'redox': '置换反应的本质是氧化还原：活泼金属失电子被氧化，不活泼金属离子得电子被还原'
+        };
+        const rxnKey = Object.keys(this.reactions).find(k => this.reactions[k] === rxn) || '';
         el.innerHTML = `
             <div class="rxn-info-title">${rxn.name}</div>
             <div class="rxn-info-desc">${rxn.desc}</div>
@@ -968,6 +981,13 @@ const ChemReaction = {
             <div class="rxn-info-row"><span class="rxn-info-label">能量变化</span><span>ΔH = ${rxn.energy > 0 ? '+' : ''}${rxn.energy} ${rxn.unit}</span></div>
             <div class="rxn-info-row"><span class="rxn-info-label">活化能</span><span>Ea ≈ ${rxn.activationEnergy} ${rxn.unit}</span></div>
             <div class="rxn-info-row"><span class="rxn-info-label">反应历程</span><span>${rxn.mechanism}</span></div>
+            <div class="rxn-edu">
+                <div class="chem-hd"><span class="chem-tag">化学反应</span>能量变化与反应原理</div>
+                <div class="chem-row"><span class="chem-key">能量本质</span>${typeDescs[rxn.type] || rxn.type}</div>
+                <div class="chem-row"><span class="chem-key chem-key--amber">Ea 含义</span>活化能是反应物→活化络合物所需最低能量；Ea越高→反应越慢，催化剂可降低Ea</div>
+                <div class="chem-row"><span class="chem-key chem-key--purple">键能分析</span>${isExo ? 'ΔH<0：生成物键能总和 > 反应物键能总和（形成更稳定的化学键）' : 'ΔH>0：反应物键能总和 > 生成物键能总和（产物键能较低）'}</div>
+                <div class="chem-note">💡 ${typeNotes[rxnKey] || '化学反应的实质是旧键断裂、新键形成。反应热ΔH = 反应物键能总和 − 生成物键能总和'}</div>
+            </div>
         `;
     }
 };

@@ -27,6 +27,7 @@ const TrigVis = {
         this.resize();
         this.bindEvents();
         this.draw();
+        this.updateInfo();
     },
 
     destroy() {
@@ -78,6 +79,7 @@ const TrigVis = {
                 btn.classList.add('active');
                 this.mode = btn.dataset.mode;
                 this.draw();
+                this.updateInfo();
             });
         });
 
@@ -545,6 +547,26 @@ const TrigVis = {
             ctx.fillStyle = '#e5c07b';
             ctx.fillText('tan \u03b8', legendX, legendY);
         }
+    },
+
+    /* ── education panel ── */
+    updateInfo() {
+        const el = document.getElementById('trig-edu-info');
+        if (!el) return;
+        const modeLabels = { 'sin-cos': '正弦 / 余弦', 'tan': '正切', 'all': '全部函数' };
+        let h = `<div class="math-hd"><span class="math-tag">${modeLabels[this.mode]}</span>三角函数知识点</div>
+<div class="math-row"><span class="math-key">单位圆定义</span>角 θ 终边与单位圆交点 P(cos θ, sin θ)，tan θ = sin θ / cos θ</div>
+<div class="math-row"><span class="math-key math-key--red">基本恒等式</span>sin²θ + cos²θ = 1；1 + tan²θ = sec²θ</div>`;
+        if (this.mode === 'sin-cos' || this.mode === 'all') {
+            h += `<div class="math-row"><span class="math-key">正弦曲线</span>y = sin x，周期 2π，振幅 1，过原点递增</div>
+<div class="math-row"><span class="math-key">余弦曲线</span>y = cos x，周期 2π，振幅 1，cos x = sin(x + π/2)</div>`;
+        }
+        if (this.mode === 'tan' || this.mode === 'all') {
+            h += `<div class="math-row"><span class="math-key math-key--amber">正切曲线</span>y = tan x，周期 π，x = π/2 + kπ 处无定义（渐近线）</div>`;
+        }
+        h += `<div class="math-row"><span class="math-key">诱导公式</span>"奇变偶不变，符号看象限" — 如 sin(π−θ) = sin θ，cos(π+θ) = −cos θ</div>
+<div class="math-note">💡 人教版必修1：单位圆是理解三角函数定义的核心工具。拖动圆上的点观察 sin/cos/tan 随角度的变化</div>`;
+        el.innerHTML = h;
     }
 };
 

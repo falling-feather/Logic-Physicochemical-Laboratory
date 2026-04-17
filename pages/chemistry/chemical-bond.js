@@ -90,7 +90,31 @@ const ChemBond = {
     updateInfo() {
         const info = this.bondInfo[this.mode];
         const el = document.getElementById('chembond-info');
-        if (el) el.innerHTML = '<strong>' + info.name + '</strong> \u2014 ' + info.desc + '<br><code>' + info.example + '</code>';
+        if (!el) return;
+        let h = '';
+        if (this.mode === 'ionic') {
+            h = `<div class="chem-hd"><span class="chem-tag">离子键</span>化学键知识点</div>
+<div class="chem-row"><span class="chem-key">定义</span>${info.desc}，本质是阴阳离子间的静电引力</div>
+<div class="chem-row"><span class="chem-key chem-key--purple">形成条件</span>活泼金属 + 活泼非金属（电负性差 > 1.7），如 ${info.example}</div>
+<div class="chem-row"><span class="chem-key chem-key--amber">特征</span>无方向性、无饱和性 — 离子晶体中每个离子周围吸引尽可能多的异号离子</div>
+<div class="chem-row"><span class="chem-key">性质影响</span>离子键强 → 熔沸点高、硬度大；熔融/溶于水可导电（自由移动离子）</div>
+<div class="chem-note">💡 人教版必修2：判断离子键——看是否由阴阳离子构成。NH₄Cl 虽无金属但含 NH₄⁺ 与 Cl⁻ 的离子键</div>`;
+        } else if (this.mode === 'covalent') {
+            h = `<div class="chem-hd"><span class="chem-tag">共价键</span>化学键知识点</div>
+<div class="chem-row"><span class="chem-key">定义</span>${info.desc}，本质是共用电子对的静电作用</div>
+<div class="chem-row"><span class="chem-key chem-key--purple">分类</span>极性共价键（共用电子对偏移，如 H-Cl）vs 非极性共价键（电子对不偏移，如 H-H）</div>
+<div class="chem-row"><span class="chem-key chem-key--amber">特征</span>有方向性（最大重叠原理）、有饱和性（成键电子数有限）</div>
+<div class="chem-row"><span class="chem-key">键参数</span>键能↑ → 稳定性↑；键长↓ → 键越强；键角决定分子空间构型</div>
+<div class="chem-note">💡 人教版必修2：σ 键（头碰头重叠）可绕轴旋转，π 键（肩并肩重叠）不可旋转。双键 = 1σ + 1π</div>`;
+        } else {
+            h = `<div class="chem-hd"><span class="chem-tag">金属键</span>化学键知识点</div>
+<div class="chem-row"><span class="chem-key">定义</span>${info.desc}</div>
+<div class="chem-row"><span class="chem-key chem-key--purple">自由电子模型</span>金属阳离子规则排列，自由电子在整个晶体中运动（"电子海洋"）</div>
+<div class="chem-row"><span class="chem-key chem-key--amber">特征</span>无方向性、无饱和性 — 金属晶体中原子倾向密堆积</div>
+<div class="chem-row"><span class="chem-key">性质解释</span>导电导热（自由电子）、延展性（离子层滑动后仍被电子海粘合）、金属光泽（电子吸收后再辐射光）</div>
+<div class="chem-note">💡 人教版选择性必修2：金属键强度影响熔沸点——原子半径↓、价电子数↑ → 金属键越强 → 熔点越高</div>`;
+        }
+        el.innerHTML = h;
     },
 
     loop() {

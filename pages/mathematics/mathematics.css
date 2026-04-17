@@ -333,14 +333,17 @@
 
 .calc-info {
     margin-top: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    background: var(--surface-2);
     border-radius: var(--radius-sm);
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
     min-height: 24px;
 }
+.calc-edu { padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(139,111,192,.06); border:1px solid rgba(139,111,192,.12); font-size:.85rem; line-height:1.65; }
+.calc-edu .math-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.calc-edu .math-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(139,111,192,.18); color:rgba(139,111,192,.9); }
+.calc-edu .math-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.calc-edu .math-key { flex-shrink:0; font-weight:600; color:rgba(91,141,206,.85); min-width:90px; }
+.calc-edu .math-key--amber { color:rgba(229,192,123,.85); }
+.calc-edu .math-key--red { color:rgba(224,108,117,.85); }
+.calc-edu .math-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(139,111,192,.1); color:var(--text-tertiary); font-size:.82rem; }
 
 .calc-legend {
     display: flex;
@@ -482,6 +485,15 @@
     font-size: var(--text-xs);
     color: var(--text-secondary);
 }
+
+.geo-edu {
+    padding: 6px 14px;
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.45);
+    line-height: 1.6;
+}
+.geo-edu b { color: var(--accent-orange, #c4793a); font-weight: 600; }
+.geo-edu code { color: var(--accent-blue, #5b8dce); font-family: var(--font-mono, monospace); font-size: 0.72rem; }
 
 .geo-legend span {
     display: flex;
@@ -872,6 +884,26 @@
     .trig-preset-group .btn { padding: 4px 8px; font-size: 11px; }
 }
 
+/* Trigonometry education panel */
+.trig-edu-info { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(139,111,192,.06); border:1px solid rgba(139,111,192,.12); font-size:.85rem; line-height:1.65; }
+.trig-edu-info .math-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.trig-edu-info .math-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(139,111,192,.18); color:rgba(139,111,192,.9); }
+.trig-edu-info .math-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.trig-edu-info .math-key { flex-shrink:0; font-weight:600; color:rgba(91,141,206,.85); }
+.trig-edu-info .math-key--red { color:rgba(224,108,117,.85); }
+.trig-edu-info .math-key--amber { color:rgba(229,192,123,.85); }
+.trig-edu-info .math-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(139,111,192,.1); color:var(--text-tertiary); font-size:.82rem; }
+
+/* Probability education panel */
+.prob-edu-info { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(139,111,192,.06); border:1px solid rgba(139,111,192,.12); font-size:.85rem; line-height:1.65; }
+.prob-edu-info .math-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.prob-edu-info .math-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(139,111,192,.18); color:rgba(139,111,192,.9); }
+.prob-edu-info .math-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.prob-edu-info .math-key { flex-shrink:0; font-weight:600; color:rgba(91,141,206,.85); }
+.prob-edu-info .math-key--red { color:rgba(224,108,117,.85); }
+.prob-edu-info .math-key--amber { color:rgba(229,192,123,.85); }
+.prob-edu-info .math-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(139,111,192,.1); color:var(--text-tertiary); font-size:.82rem; }
+
 /* ══════ Set Operations ══════ */
 .setops-controls {
     display: flex; flex-direction: column; gap: var(--space-3);
@@ -1078,3 +1110,66 @@
 .seq-info__formulas code { font-size:.82rem; color:var(--text-primary); background:rgba(255,255,255,.04); padding:2px 8px; border-radius:4px; }
 .seq-info__note { margin:0; color:var(--text-secondary); font-size:.8rem; }
 @media (max-width: 768px) { .seq-controls { flex-direction: column; align-items: flex-start; } }
+
+/* ═══ Function Properties Explorer ═══ */
+.fp-controls { display:flex; flex-direction:column; gap:10px; margin-bottom:14px; }
+.fp-modes { display:flex; gap:6px; }
+.fp-mode-btn { padding:6px 16px; border-radius:var(--radius-sm); border:1px solid rgba(91,141,206,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.85rem; transition:all .2s; }
+.fp-mode-btn.active { background:rgba(91,141,206,.18); color:var(--text-primary); border-color:rgba(91,141,206,.5); }
+.fp-funcs { display:flex; gap:5px; flex-wrap:wrap; }
+.fp-func-btn { padding:4px 12px; border-radius:var(--radius-sm); border:1px solid rgba(139,111,192,.25); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; font-family:'Cambria Math','Latin Modern Math',serif; transition:all .2s; }
+.fp-func-btn.active { background:rgba(139,111,192,.18); color:var(--text-primary); border-color:rgba(139,111,192,.5); }
+.fp-interval { display:flex; align-items:center; gap:6px; font-size:.85rem; color:var(--text-secondary); }
+.fp-int-input { width:56px; padding:3px 6px; border-radius:4px; border:1px solid rgba(91,141,206,.3); background:rgba(0,0,0,.2); color:var(--text-primary); font-size:.82rem; text-align:center; }
+.fp-hint { font-size:.75rem; color:var(--text-tertiary); margin-left:6px; }
+.fp-info { margin-top:14px; padding:14px 18px; border-radius:var(--radius-md,10px); background:rgba(91,141,206,.05); border:1px solid rgba(91,141,206,.12); font-size:.85rem; line-height:1.7; }
+.fp-info-title { font-size:1.1rem; font-weight:700; color:var(--text-primary); font-family:'Cambria Math','Latin Modern Math',serif; margin-bottom:2px; }
+.fp-info-subtitle { font-size:.82rem; font-weight:600; color:rgba(91,141,206,.85); margin-bottom:8px; }
+.fp-edu { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(139,111,192,.06); border:1px solid rgba(139,111,192,.12); }
+.fp-edu .math-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.fp-edu .math-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(139,111,192,.18); color:rgba(139,111,192,.9); }
+.fp-edu .math-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.fp-edu .math-key { flex-shrink:0; font-weight:600; color:rgba(91,141,206,.85); min-width:90px; }
+.fp-edu .math-key--amber { flex-shrink:0; font-weight:600; color:rgba(229,192,123,.85); min-width:90px; }
+.fp-edu .math-key--red { flex-shrink:0; font-weight:600; color:rgba(224,108,117,.85); min-width:90px; }
+.fp-edu .math-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(139,111,192,.1); color:var(--text-tertiary); font-size:.82rem; }
+@media (max-width: 768px) {
+    .fp-modes, .fp-funcs { flex-wrap:wrap; }
+    .fp-interval { flex-wrap:wrap; }
+    .fp-edu .math-row { flex-direction:column; gap:2px; }
+}
+
+/* ═══ Exponential & Logarithmic Functions ═══ */
+.el-controls { display:flex; flex-direction:column; gap:10px; margin-bottom:14px; }
+.el-row { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.el-base-group { display:flex; align-items:center; gap:8px; font-size:.85rem; color:var(--text-secondary); }
+.el-base-display { font-weight:700; color:var(--text-primary); font-family:'Cambria Math','Latin Modern Math',serif; min-width:40px; display:inline-block; }
+.el-slider { width:180px; accent-color:var(--accent-blue,#5b8dce); }
+.el-presets { display:flex; gap:5px; }
+.el-preset { padding:4px 12px; border-radius:var(--radius-sm); border:1px solid rgba(139,111,192,.25); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.el-preset.active { background:rgba(139,111,192,.18); color:var(--text-primary); border-color:rgba(139,111,192,.5); }
+.el-toggles { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.el-toggle { display:flex; align-items:center; gap:5px; font-size:.82rem; color:var(--text-secondary); cursor:pointer; }
+.el-toggle input { accent-color:var(--accent-blue,#5b8dce); }
+.el-swatch { width:12px; height:3px; border-radius:2px; display:inline-block; }
+.el-swatch--exp { background:#5b9bd5; }
+.el-swatch--log { background:#e06c75; }
+.el-swatch--mirror { background:rgba(255,255,255,.25); }
+.el-swatch--asy { background:rgba(255,255,255,.15); }
+.el-anim-btn { padding:4px 14px; border-radius:var(--radius-sm); border:1px solid rgba(91,141,206,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.el-anim-btn:hover { background:rgba(91,141,206,.12); color:var(--text-primary); }
+.el-info { margin-top:14px; padding:14px 18px; border-radius:var(--radius-md,10px); background:rgba(91,141,206,.05); border:1px solid rgba(91,141,206,.12); font-size:.85rem; line-height:1.7; }
+.el-info-title { font-size:1.1rem; font-weight:700; color:var(--text-primary); font-family:'Cambria Math','Latin Modern Math',serif; margin-bottom:2px; }
+.el-info-subtitle { font-size:.82rem; font-weight:600; color:rgba(91,141,206,.85); margin-bottom:8px; }
+.el-edu { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(139,111,192,.06); border:1px solid rgba(139,111,192,.12); }
+.el-edu .math-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.el-edu .math-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(139,111,192,.18); color:rgba(139,111,192,.9); }
+.el-edu .math-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.el-edu .math-key { flex-shrink:0; font-weight:600; color:rgba(91,141,206,.85); min-width:90px; }
+.el-edu .math-key--amber { flex-shrink:0; font-weight:600; color:rgba(229,192,123,.85); min-width:90px; }
+.el-edu .math-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(139,111,192,.1); color:var(--text-tertiary); font-size:.82rem; }
+@media (max-width: 768px) {
+    .el-row { flex-direction:column; align-items:flex-start; }
+    .el-slider { width:100%; }
+    .el-edu .math-row { flex-direction:column; gap:2px; }
+}

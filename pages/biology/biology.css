@@ -657,7 +657,7 @@
 .gmut-trigger-btn:hover { background:rgba(255,180,50,.2); }
 .gmut-speed { display:flex; align-items:center; gap:4px; font-size:var(--text-sm); color:var(--text-secondary); }
 .gmut-speed input[type="range"] { width:60px; accent-color:var(--accent-teal,#3a9e8f); }
-.gmut-info { background:rgba(15,23,42,.45); border:1px solid rgba(58,158,143,.15); border-radius:var(--radius-md,10px); padding:16px 18px; margin-top:12px; }
+.gmut-info { background:rgba(15,23,42,.45); }
 .gmut-info-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; }
 .gmut-info-block { background:rgba(30,41,59,.5); border-radius:var(--radius-sm,6px); padding:10px 12px; }
 .gmut-info-block h4 { margin:0 0 6px; font-size:var(--text-sm); color:var(--text-primary,#e2e8f0); }
@@ -672,5 +672,73 @@
 .gmut-table { width:100%; border-collapse:collapse; font-size:var(--text-xs); margin-top:6px; }
 .gmut-table th { text-align:left; padding:4px 6px; border-bottom:1px solid rgba(100,116,139,.25); color:var(--text-primary,#e2e8f0); font-weight:600; }
 .gmut-table td { padding:4px 6px; border-bottom:1px solid rgba(100,116,139,.1); color:var(--text-secondary,#94a3b8); }
-@media (max-width: 768px) { .gmut-controls { flex-direction:column; align-items:flex-start; } .gmut-info-grid { grid-template-columns:1fr; } }
+@media (max-width: 768px) { .gmut-controls { flex-direction:column; align-items:flex-start; } .gmut-info-grid, .gmut-info__grid { grid-template-columns:1fr; } }
+
+/* ── Education info panels for biology modules ── */
+.meio-info, .genexp-info, .cellresp-info, .strans-info, .mito-edu-info, .gen-edu-info, .photosynth-info, .cellstr-info, .dnahelix-info, .gmut-info {
+    margin-top: 1rem;
+    padding: 1rem 1.25rem;
+    background: rgba(58,158,143,0.04);
+    border: 1px solid rgba(58,158,143,0.12);
+    border-radius: var(--radius-lg, 12px);
+    font-size: 0.85rem;
+    line-height: 1.6;
+}
+.meio-info__hd, .genexp-info__hd, .cellresp-info__hd, .strans-info__hd, .mito-edu-info__hd, .gen-edu-info__hd, .photosynth-info__hd, .cellstr-info__hd, .dnahelix-info__hd, .neur-info__hd, .imm-info__hd, .eco-info__hd, .gmut-info__hd {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 0.75rem;
+    color: rgba(255,255,255,0.85);
+}
+.meio-info__grid, .genexp-info__grid, .cellresp-info__grid, .strans-info__grid, .mito-edu-info__grid, .gen-edu-info__grid, .photosynth-info__grid, .cellstr-info__grid, .dnahelix-info__grid, .neur-info__grid, .imm-info__grid, .eco-info__grid, .gmut-info__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+@media (max-width: 600px) {
+    .meio-info__grid, .genexp-info__grid, .cellresp-info__grid, .strans-info__grid, .mito-edu-info__grid, .gen-edu-info__grid, .photosynth-info__grid, .cellstr-info__grid, .dnahelix-info__grid, .neur-info__grid, .imm-info__grid, .eco-info__grid, .gmut-info__grid {
+        grid-template-columns: 1fr;
+    }
+}
+.meio-info__block, .genexp-info__block, .cellresp-info__block, .strans-info__block, .mito-edu-info__block, .gen-edu-info__block, .photosynth-info__block, .cellstr-info__block, .dnahelix-info__block, .neur-info__block, .imm-info__block, .eco-info__block, .gmut-info__block {
+    padding: 0.5rem 0;
+}
+.meio-info__sub, .genexp-info__sub, .cellresp-info__sub, .strans-info__sub, .mito-edu-info__sub, .gen-edu-info__sub, .photosynth-info__sub, .cellstr-info__sub, .dnahelix-info__sub, .neur-info__sub, .imm-info__sub, .eco-info__sub, .gmut-info__sub {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 0.25rem;
+}
+.meio-info__val, .genexp-info__val, .cellresp-info__val, .strans-info__val, .mito-edu-info__val, .gen-edu-info__val, .photosynth-info__val, .cellstr-info__val, .dnahelix-info__val, .neur-info__val, .imm-info__val, .eco-info__val, .gmut-info__val {
+    font-weight: 600;
+    color: rgba(58,158,143,0.9);
+    font-size: 0.9rem;
+}
+.meio-info__desc, .genexp-info__desc, .cellresp-info__desc, .strans-info__desc, .mito-edu-info__desc, .gen-edu-info__desc, .photosynth-info__desc, .cellstr-info__desc, .dnahelix-info__desc, .neur-info__desc, .imm-info__desc, .eco-info__desc, .gmut-info__desc {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.5);
+    margin-top: 0.15rem;
+}
+.meio-info__row, .genexp-info__row, .cellresp-info__row, .strans-info__row, .mito-edu-info__row, .gen-edu-info__row, .photosynth-info__row, .cellstr-info__row, .dnahelix-info__row, .neur-info__row, .imm-info__row, .eco-info__row, .gmut-info__row {
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 0.25rem;
+    font-size: 0.82rem;
+}
+.meio-info__key, .genexp-info__key, .cellresp-info__key, .strans-info__key, .mito-edu-info__key, .gen-edu-info__key, .photosynth-info__key, .cellstr-info__key, .dnahelix-info__key, .neur-info__key, .imm-info__key, .eco-info__key, .gmut-info__key {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--c, #3a9e8f);
+    background: color-mix(in srgb, var(--c, #3a9e8f) 12%, transparent);
+    margin-right: 0.35rem;
+}
+.meio-info__note, .genexp-info__note, .cellresp-info__note, .strans-info__note, .mito-edu-info__note, .gen-edu-info__note, .photosynth-info__note, .cellstr-info__note, .dnahelix-info__note, .neur-info__note, .imm-info__note, .eco-info__note, .gmut-info__note {
+    color: rgba(255,255,255,0.45);
+    font-size: 0.78rem;
+    line-height: 1.5;
+    margin-top: 0.2rem;
+}
 

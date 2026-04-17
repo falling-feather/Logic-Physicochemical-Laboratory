@@ -94,13 +94,28 @@ const ConicSections = {
         if (this.curve === 'ellipse') {
             const c = Math.sqrt(Math.abs(this.a * this.a - this.b * this.b));
             const e = (c / this.a).toFixed(3);
-            html = '<strong>\u692d\u5706</strong> x\u00b2/' + this.a + '\u00b2 + y\u00b2/' + this.b + '\u00b2 = 1 &nbsp; e=' + e + ' &nbsp; c=' + c.toFixed(2);
+            html = `<div class="math-hd"><span class="math-tag">椭圆</span>圆锥曲线知识点</div>
+<div class="math-row"><span class="math-key">标准方程</span>x²/${this.a}² + y²/${this.b}² = 1 &nbsp; a=${this.a}, b=${this.b}, c=${c.toFixed(2)}</div>
+<div class="math-row"><span class="math-key math-key--red">离心率</span>e = c/a = ${e} — 0 < e < 1，e 越小越接近圆</div>
+<div class="math-row"><span class="math-key math-key--amber">焦点与准线</span>焦点 (±${c.toFixed(2)}, 0)；准线 x = ±a²/c — 焦点到准线距离 = a/e − c</div>
+<div class="math-row"><span class="math-key">焦点距离</span>|PF₁| + |PF₂| = 2a — 椭圆的第一定义（到两焦点距离之和为常数）</div>
+<div class="math-note">💡 人教版选择性必修1：椭圆的 a²=b²+c² 区别于双曲线。拖动滑块改变 a、b 观察形状和离心率的变化</div>`;
         } else if (this.curve === 'hyperbola') {
             const c = Math.sqrt(this.a * this.a + this.b * this.b);
             const e = (c / this.a).toFixed(3);
-            html = '<strong>\u53cc\u66f2\u7ebf</strong> x\u00b2/' + this.a + '\u00b2 - y\u00b2/' + this.b + '\u00b2 = 1 &nbsp; e=' + e + ' &nbsp; c=' + c.toFixed(2);
+            html = `<div class="math-hd"><span class="math-tag">双曲线</span>圆锥曲线知识点</div>
+<div class="math-row"><span class="math-key">标准方程</span>x²/${this.a}² − y²/${this.b}² = 1 &nbsp; a=${this.a}, b=${this.b}, c=${c.toFixed(2)}</div>
+<div class="math-row"><span class="math-key math-key--red">离心率</span>e = c/a = ${e} — e > 1，e 越大开口越大</div>
+<div class="math-row"><span class="math-key math-key--amber">渐近线</span>y = ±(b/a)x = ±${(this.b/this.a).toFixed(2)}x — 双曲线无限趋近但不相交</div>
+<div class="math-row"><span class="math-key">焦点距离</span>||PF₁| − |PF₂|| = 2a — 双曲线的第一定义（到两焦点距离之差的绝对值为常数）</div>
+<div class="math-note">💡 人教版选择性必修1：双曲线 c²=a²+b²。渐近线方程 y=±(b/a)x 是解题的关键辅助线</div>`;
         } else {
-            html = '<strong>\u629b\u7269\u7ebf</strong> y\u00b2 = ' + (2 * this.p).toFixed(1) + 'x &nbsp; \u7126\u8ddd p=' + this.p;
+            html = `<div class="math-hd"><span class="math-tag">抛物线</span>圆锥曲线知识点</div>
+<div class="math-row"><span class="math-key">标准方程</span>y² = ${(2*this.p).toFixed(1)}x &nbsp; p=${this.p}（焦点到准线距离）</div>
+<div class="math-row"><span class="math-key math-key--red">焦点与准线</span>焦点 (${(this.p/2).toFixed(1)}, 0)；准线 x = −${(this.p/2).toFixed(1)}</div>
+<div class="math-row"><span class="math-key math-key--amber">焦点距离</span>|PF| = x + p/2 — 抛物线上任意点到焦点的距离等于到准线的距离</div>
+<div class="math-row"><span class="math-key">离心率</span>e = 1 — 抛物线只有一个焦点，开口大小由 p 决定</div>
+<div class="math-note">💡 人教版选择性必修1：抛物线是 e=1 的圆锥曲线，光学反射镜和卫星天线都利用其焦点聚焦性质</div>`;
         }
         el.innerHTML = html;
     },

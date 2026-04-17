@@ -46,6 +46,7 @@ const RecursionVis = {
         this.bindEvents();
         this.buildFibTree();
         this.draw();
+        this.updateEdu();
     },
 
     destroy() {
@@ -88,6 +89,7 @@ const RecursionVis = {
                 if (this.mode === 'fibonacci') this.buildFibTree();
                 else this.buildHanoi();
                 this.draw();
+                this.updateEdu();
                 // Toggle param visibility
                 const fibP = document.getElementById('recur-fib-param');
                 const hanP = document.getElementById('recur-hanoi-param');
@@ -389,6 +391,41 @@ const RecursionVis = {
         else this.drawHanoi();
 
         this.updateStepInfo();
+    },
+
+    /* ── education panel ── */
+    updateEdu() {
+        let el = document.getElementById('recur-edu');
+        if (!el) {
+            const info = document.getElementById('recur-info');
+            if (!info || !info.parentElement) return;
+            el = document.createElement('div');
+            el.id = 'recur-edu';
+            el.className = 'recur-edu';
+            info.parentElement.appendChild(el);
+        }
+        if (this.mode === 'fibonacci') {
+            const n = this.fibN;
+            const calls = this.fibSteps.length;
+            const done = this.fibStepIndex >= calls;
+            el.innerHTML =
+                '<b>Fibonacci 递归树</b>: F(n) = F(n-1) + F(n-2)，F(0)=0, F(1)=1' +
+                '<br>• <b>朴素递归</b>时间 O(2ⁿ)：n=' + n + ' 时产生 ' + calls + ' 次调用，' +
+                '存在大量<b>重叠子问题</b>（如 F(' + Math.max(0, n - 2) + ') 被重复计算多次）。' +
+                '<br>• <b>记忆化</b>（备忘录）：缓存已算结果，降至 O(n) 时间 + O(n) 空间。' +
+                '<br>• <b>递推（DP）</b>：自底向上 f[i]=f[i-1]+f[i-2]，O(n) 时间 + O(1) 空间。' +
+                (done ? '<br>✅ 递归完成! 观察树中重复节点（相同颜色）的数量。' :
+                '<br>💡 点击"播放"观察递归调用展开过程，注意重复子问题的出现。');
+        } else {
+            const n = this.hanoiN;
+            const minMoves = Math.pow(2, n) - 1;
+            el.innerHTML =
+                '<b>汉诺塔</b>: 将 ' + n + ' 个圆盘从 A 柱移到 C 柱，大盘不能放在小盘上。' +
+                '<br>• <b>递归策略</b>: 先将上面 n-1 个移到 B，将最大盘移到 C，再将 n-1 个从 B 移到 C。' +
+                '<br>• <b>递推关系</b>: T(n) = 2T(n-1) + 1，解为 T(n) = 2ⁿ − 1 = ' + minMoves + ' 步。' +
+                '<br>• 这是<b>最优解</b>——不存在少于 ' + minMoves + ' 步的方案。' +
+                '<br>💡 汉诺塔是理解递归"分治"思想的经典模型：将大问题拆解为相同结构的子问题。';
+        }
     }
 };
 

@@ -123,8 +123,27 @@ const ChemEquilibrium = {
             case 'rmNH3': this.concNH3 = Math.max(0, this.concNH3 - 0.3); break;
             case 'heat': this.temperature += 50; break;
             case 'cool': this.temperature = Math.max(200, this.temperature - 50); break;
-            case 'pressUp': this.pressure = Math.min(5, this.pressure + 0.5); break;
-            case 'pressDown': this.pressure = Math.max(0.2, this.pressure - 0.3); break;
+            case 'pressUp': {
+                // 加压 = 等温缩小体积 → 所有气体浓度瞬间按比例增大
+                // 压力增到原来的 factor 倍，浓度也增到 factor 倍
+                const oldP = this.pressure;
+                this.pressure = Math.min(5, this.pressure + 0.5);
+                const factor = this.pressure / oldP;
+                this.concN2 *= factor;
+                this.concH2 *= factor;
+                this.concNH3 *= factor;
+                break;
+            }
+            case 'pressDown': {
+                // 减压 = 等温增大体积 → 所有气体浓度瞬间按比例减小
+                const oldP = this.pressure;
+                this.pressure = Math.max(0.2, this.pressure - 0.3);
+                const factor = this.pressure / oldP;
+                this.concN2 *= factor;
+                this.concH2 *= factor;
+                this.concNH3 *= factor;
+                break;
+            }
         }
         if (!this.animating) { this.startAnim(); }
         this.updateInfo();
@@ -144,12 +163,10 @@ const ChemEquilibrium = {
         // Simplified kinetics toward equilibrium
         // N2 + 3H2 <=> 2NH3
         // Q = [NH3]^2 / ([N2] * [H2]^3)
+        // 加压/减压已经直接改变了浓度，所以这里直接用实际浓度计算
         const Kc = this.getKc();
-        const effH2 = this.concH2 * this.pressure; // pressure effect
-        const effN2 = this.concN2 * this.pressure;
-        const effNH3 = this.concNH3; // NH3 is 2 moles, fewer moles = favored by high P
 
-        const Q = (effNH3 * effNH3 + 0.001) / ((effN2 + 0.001) * Math.pow(effH2 + 0.001, 3));
+        const Q = (this.concNH3 * this.concNH3 + 0.001) / ((this.concN2 + 0.001) * Math.pow(this.concH2 + 0.001, 3));
 
         // Rate proportional to deviation from equilibrium
         const rate = 0.015 * (1 + Math.abs(Math.log(Kc / (Q + 0.0001))));
@@ -231,6 +248,20 @@ const ChemEquilibrium = {
         }
         const tempEl = document.getElementById('cheq-temp-display');
         if (tempEl) tempEl.textContent = 'T=' + this.temperature + '\u00b0C  P=' + this.pressure.toFixed(1) + 'atm  Kc=' + this.getKc().toFixed(4);
+
+        /* education panel */
+        const eduEl = document.getElementById('cheq-edu');
+        if (eduEl) {
+            const Kc = this.getKc().toFixed(4);
+            const dir = this.equilibrium ? '平衡态' : (this.concNH3 < 0.5 ? '正向移动中' : '逆向移动中');
+            eduEl.innerHTML = `<div class="chem-hd"><span class="chem-tag">${dir}</span>化学平衡知识点</div>
+<div class="chem-row"><span class="chem-key">平衡状态</span>正反应速率 = 逆反应速率，各组分浓度不再改变（动态平衡）</div>
+<div class="chem-row"><span class="chem-key chem-key--purple">平衡常数</span>K<sub>c</sub> = [NH₃]²/([N₂][H₂]³) = ${Kc} — 温度不变时 K 值恒定</div>
+<div class="chem-row"><span class="chem-key chem-key--amber">勒夏特列原理</span>改变条件 → 平衡向减弱该改变的方向移动（"削弱但不消除"）</div>
+<div class="chem-row"><span class="chem-key">浓度影响</span>增大反应物浓度 → 正移；减小生成物浓度 → 正移；反之逆移</div>
+<div class="chem-row"><span class="chem-key">温度与压强</span>升温 → 向吸热方向移动；增压 → 向气体体积减小方向移动（此反应正向）</div>
+<div class="chem-note">💡 人教版选择性必修1：N₂ + 3H₂ ⇌ 2NH₃ 为放热反应(ΔH<0)，正向体积减小。点击按钮扰动平衡观察响应</div>`;
+        }
     },
 
     draw() {

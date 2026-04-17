@@ -450,6 +450,18 @@
 .search-edu b { color: var(--accent-orange); font-weight: 600; }
 .search-edu em { color: var(--accent-blue); font-style: normal; }
 
+.sortcmp-edu,
+.recur-edu,
+.dp-edu,
+.strmatch-edu {
+    padding: 6px 14px;
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.45);
+    line-height: 1.6;
+}
+.sortcmp-edu b, .recur-edu b, .dp-edu b, .strmatch-edu b { color: var(--accent-orange); font-weight: 600; }
+.sortcmp-edu code, .recur-edu code, .dp-edu code, .strmatch-edu code { color: var(--accent-blue); font-family: var(--font-mono); font-size: 0.72rem; }
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
     .bs-cell { min-width: 32px; padding: var(--space-1); }

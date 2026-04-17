@@ -27,6 +27,7 @@ const Meiosis = {
         this._resize();
         this._on(window, 'resize', () => this._resize());
         this._buildControls();
+        this._injectInfoPanel();
         this.phase = 0;
         this.progress = 0;
         this._loop();
@@ -325,6 +326,7 @@ const Meiosis = {
         ctx.font = '12px "Noto Sans SC", sans-serif';
         ctx.fillStyle = 'rgba(200,200,200,0.6)';
         ctx.fillText(info.desc, W / 2, 45);
+        this._updateInfo();
 
         // phase progress indicator
         ctx.font = '10px monospace';
@@ -360,6 +362,48 @@ const Meiosis = {
             }
         }
     },
+    _injectInfoPanel() {
+        const el = document.getElementById('meiosis-info');
+        if (!el) return;
+        el.innerHTML = `
+            <div class="meio-info__hd">📘 减数分裂知识点</div>
+            <div class="meio-info__grid">
+                <div class="meio-info__block">
+                    <div class="meio-info__sub">当前阶段</div>
+                    <div id="meio-phase-name" class="meio-info__val">前期 I</div>
+                    <div id="meio-phase-desc" class="meio-info__desc">同源染色体联会、交叉互换</div>
+                </div>
+                <div class="meio-info__block">
+                    <div class="meio-info__sub">染色体变化</div>
+                    <div id="meio-chr-info" class="meio-info__val">2n → n</div>
+                </div>
+                <div class="meio-info__block">
+                    <div class="meio-info__sub">关键概念</div>
+                    <div class="meio-info__row"><span class="meio-info__key" style="--c:var(--color-teal,#3a9e8f)">减数分裂 I</span> 同源染色体分离，染色体数减半</div>
+                    <div class="meio-info__row"><span class="meio-info__key" style="--c:var(--color-purple,#8b6fc0)">减数分裂 II</span> 着丝粒断裂，姐妹染色单体分开</div>
+                    <div class="meio-info__row"><span class="meio-info__key" style="--c:#e5c07b">交叉互换</span> 增加遗传多样性</div>
+                </div>
+                <div class="meio-info__block">
+                    <div class="meio-info__sub">💡 知识要点</div>
+                    <div class="meio-info__note">减数分裂产生4个单倍体配子(n)，DNA复制一次，细胞分裂两次。交叉互换发生在前期I，是基因重组的重要来源。</div>
+                </div>
+            </div>
+        `;
+    },
+
+    _updateInfo() {
+        const phaseNames = ['前期 I','中期 I','后期 I','末期 I','前期 II','中期 II','后期 II','末期 II'];
+        const nameEl = document.getElementById('meio-phase-name');
+        const descEl = document.getElementById('meio-phase-desc');
+        const chrEl = document.getElementById('meio-chr-info');
+        if (nameEl) nameEl.textContent = phaseNames[this.phase] || '';
+        if (descEl) descEl.textContent = this.phases[this.phase]?.desc || '';
+        if (chrEl) {
+            const chrInfo = this.phase <= 3 ? '2n(同源染色体) → n' : 'n(姐妹染色单体分离)';
+            chrEl.textContent = chrInfo;
+        }
+    },
+
     _loop() {
         const t = performance.now() / 1000;
         this._draw(t);

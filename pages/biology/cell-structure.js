@@ -29,6 +29,8 @@ const CellStructure = {
         this.bindControls();
         this.bindCanvas();
         this.startLoop();
+        this._injectInfoPanel();
+        this._updateInfo();
 
         if (typeof ResizeObserver !== 'undefined') {
             new ResizeObserver(() => this.resize()).observe(this.canvas.parentElement);
@@ -58,6 +60,7 @@ const CellStructure = {
             this.isPlant = !this.isPlant;
             this.hoveredOrganelle = null;
             this.zoomOut();
+            this._updateInfo();
         });
         const labelBtn = document.getElementById('bio-cell-label-toggle');
         if (labelBtn) labelBtn.addEventListener('click', () => { this.showLabels = !this.showLabels; });
@@ -902,9 +905,52 @@ const CellStructure = {
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
         const desc = org.desc.length > 40 ? org.desc.slice(0, 40) + '…' : org.desc;
         ctx.fillText(desc, cx, cy + 22);
+    },
+    _injectInfoPanel() {
+        const el = document.getElementById('cellstr-info');
+        if (!el) return;
+        el.innerHTML = `
+            <div class="cellstr-info__hd">\ud83d\udd2c \u7ec6\u80de\u7ed3\u6784\u77e5\u8bc6\u70b9</div>
+            <div class="cellstr-info__grid">
+                <div class="cellstr-info__block">
+                    <div class="cellstr-info__sub">\u5f53\u524d\u7c7b\u578b</div>
+                    <div class="cellstr-info__val" id="cellstr-type">\u52a8\u7269\u7ec6\u80de</div>
+                    <div class="cellstr-info__desc" id="cellstr-type-desc">\u6709\u4e2d\u5fc3\u4f53\uff0c\u65e0\u7ec6\u80de\u58c1\u3001\u53f6\u7eff\u4f53\u548c\u5927\u6db2\u6ce1</div>
+                </div>
+                <div class="cellstr-info__block">
+                    <div class="cellstr-info__sub">\u7279\u6709\u7ed3\u6784</div>
+                    <div class="cellstr-info__val" id="cellstr-unique">\u4e2d\u5fc3\u4f53</div>
+                    <div class="cellstr-info__desc" id="cellstr-unique-desc">\u4e0e\u7ec6\u80de\u5206\u88c2\u6709\u5173\uff0c\u53d1\u51fa\u7eba\u9524\u4e1d</div>
+                </div>
+            </div>
+            <div class="cellstr-info__row">\u5171\u6709\u7ed3\u6784 \u2014 \u7ec6\u80de\u819c\u3001\u7ebf\u7c92\u4f53\u3001\u6838\u7cd6\u4f53\u3001\u5185\u8d28\u7f51\u3001\u9ad8\u5c14\u57fa\u4f53\u3001\u6eb6\u9176\u4f53\u3001\u7ec6\u80de\u6838</div>
+            <div class="cellstr-info__note">\u4eba\u6559\u7248\u5fc5\u4fee1 \u2014 \u7ec6\u80de\u662f\u751f\u547d\u6d3b\u52a8\u7684\u57fa\u672c\u7ed3\u6784\u548c\u529f\u80fd\u5355\u4f4d\uff0c\u70b9\u51fb\u7ec6\u80de\u5668\u53ef\u653e\u5927\u67e5\u770b\u8be6\u60c5</div>
+        `;
+    },
+
+    _updateInfo() {
+        const typeEl = document.getElementById('cellstr-type');
+        const descEl = document.getElementById('cellstr-type-desc');
+        const uniqEl = document.getElementById('cellstr-unique');
+        const uniqDescEl = document.getElementById('cellstr-unique-desc');
+        if (!typeEl) return;
+        if (this.isPlant) {
+            typeEl.textContent = '\u690d\u7269\u7ec6\u80de';
+            descEl.textContent = '\u6709\u7ec6\u80de\u58c1\u3001\u53f6\u7eff\u4f53\u548c\u5927\u6db2\u6ce1\uff0c\u65e0\u4e2d\u5fc3\u4f53';
+            uniqEl.textContent = '\u7ec6\u80de\u58c1\u3001\u53f6\u7eff\u4f53\u3001\u5927\u6db2\u6ce1';
+            uniqDescEl.textContent = '\u7ec6\u80de\u58c1\u63d0\u4f9b\u652f\u6301\uff0c\u53f6\u7eff\u4f53\u8fdb\u884c\u5149\u5408\u4f5c\u7528\uff0c\u5927\u6db2\u6ce1\u7ef4\u6301\u6e17\u900f\u538b';
+        } else {
+            typeEl.textContent = '\u52a8\u7269\u7ec6\u80de';
+            descEl.textContent = '\u6709\u4e2d\u5fc3\u4f53\uff0c\u65e0\u7ec6\u80de\u58c1\u3001\u53f6\u7eff\u4f53\u548c\u5927\u6db2\u6ce1';
+            uniqEl.textContent = '\u4e2d\u5fc3\u4f53';
+            uniqDescEl.textContent = '\u4e0e\u7ec6\u80de\u5206\u88c2\u6709\u5173\uff0c\u53d1\u51fa\u7eba\u9524\u4e1d';
+        }
     }
 };
 
 function initCellStructure() {
     CellStructure.init();
 }
+
+window.CellStructure = CellStructure;
+window.initCellStructure = initCellStructure;

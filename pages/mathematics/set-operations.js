@@ -153,6 +153,23 @@ const SetOps = {
             const sorted = [...this.result].sort((a, b) => a - b);
             resultEl.textContent = '\u7ed3\u679c = {' + sorted.join(', ') + '}' + ' \uff08' + sorted.length + ' \u4e2a\u5143\u7d20\uff09';
         }
+        /* education panel */
+        const eduEl = document.getElementById('setops-edu');
+        if (eduEl) {
+            const opEdu = {
+                union: '<div class="math-row"><span class="math-key">并集 A∪B</span>属于 A <strong>或</strong>属于 B 的全部元素（"或"关系）</div><div class="math-row"><span class="math-key math-key--amber">性质</span>A⊆A∪B, B⊆A∪B；A∪∅=A；A∪U=U</div>',
+                intersection: '<div class="math-row"><span class="math-key">交集 A∩B</span><strong>同时</strong>属于 A 和 B 的元素（"且"关系）</div><div class="math-row"><span class="math-key math-key--amber">性质</span>A∩B⊆A, A∩B⊆B；A∩∅=∅；A∩A=A</div>',
+                differenceAB: '<div class="math-row"><span class="math-key">差集 A−B</span>属于 A 但<strong>不</strong>属于 B 的元素</div><div class="math-row"><span class="math-key math-key--amber">性质</span>A−B = A∩B\u1d9c；(A−B)∪(A∩B) = A</div>',
+                differenceBA: '<div class="math-row"><span class="math-key">差集 B−A</span>属于 B 但<strong>不</strong>属于 A 的元素</div><div class="math-row"><span class="math-key math-key--amber">性质</span>B−A = B∩A\u1d9c；通常 A−B ≠ B−A</div>',
+                complement: '<div class="math-row"><span class="math-key">补集 A\u1d9c</span>全集 U 中不属于 A 的元素，即 U−A</div><div class="math-row"><span class="math-key math-key--amber">德摩根律</span>(A∪B)\u1d9c = A\u1d9c∩B\u1d9c；(A∩B)\u1d9c = A\u1d9c∪B\u1d9c</div>',
+                symmetric: '<div class="math-row"><span class="math-key">对称差 A△B</span>属于 A 或 B 但不同时属于两者：(A−B)∪(B−A)</div><div class="math-row"><span class="math-key math-key--amber">等价</span>A△B = (A∪B) − (A∩B)</div>'
+            };
+            eduEl.innerHTML = `<div class="math-hd"><span class="math-tag">${info.symbol}</span>集合运算知识点</div>
+${opEdu[this.operation]}
+<div class="math-row"><span class="math-key math-key--red">Venn 图</span>阴影区域表示运算结果 — 画 Venn 图是解集合题的核心方法</div>
+<div class="math-row"><span class="math-key">元素特性</span>确定性（能判断是否属于集合）、互异性（元素不重复）、无序性</div>
+<div class="math-note">💡 人教版必修1：集合是高中数学的基础语言。修改输入框中的元素，观察 Venn 图与运算结果的对应关系</div>`;
+        }
     },
 
     getCircles() {

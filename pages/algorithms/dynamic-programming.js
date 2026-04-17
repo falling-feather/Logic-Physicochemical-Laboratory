@@ -39,6 +39,7 @@ const DPVis = {
         this.buildDP();
         this.bindEvents();
         this.draw();
+        this.updateEdu();
     },
 
     destroy() {
@@ -137,6 +138,7 @@ const DPVis = {
                 if (playBtn) playBtn.textContent = '\u25b6 \u64ad\u653e';
                 this.advanceStep();
                 this.draw();
+                this.updateEdu();
             });
         }
 
@@ -147,6 +149,7 @@ const DPVis = {
                 if (playBtn) playBtn.textContent = '\u25b6 \u64ad\u653e';
                 this.buildDP();
                 this.draw();
+                this.updateEdu();
             });
         }
 
@@ -177,6 +180,7 @@ const DPVis = {
                 this.playing = false;
                 const playBtn = document.getElementById('dp-play');
                 if (playBtn) playBtn.textContent = '\u25b6 \u64ad\u653e';
+                this.updateEdu();
             }
         }
 
@@ -293,6 +297,51 @@ const DPVis = {
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
         ctx.font = '10px var(--font-mono)';
         ctx.fillText('\u5bb9\u91cf W=' + this.capacity, x, y + 18 + items.length * 22 + 10);
+    },
+
+    /* ── education panel ── */
+    updateEdu() {
+        let el = document.getElementById('dp-edu');
+        if (!el) {
+            const wrap = this.canvas?.closest('.demo-section');
+            if (!wrap) return;
+            el = document.createElement('div');
+            el.id = 'dp-edu';
+            el.className = 'dp-edu';
+            wrap.appendChild(el);
+        }
+        const done = this.step >= this.maxStep;
+        const n = this.items.length;
+        const W = this.capacity;
+        if (done) {
+            const optVal = this.dp[n][W];
+            const chosen = this.selectedItems.map(i => this.items[i].name).join(', ');
+            el.innerHTML =
+                '<b>✅ DP 填表完成!</b> 最优价值 = ' + optVal + '，选择物品: [' + chosen + ']' +
+                '<br>• 总共填写 ' + n + '×' + (W + 1) + ' = ' + (n * (W + 1)) + ' 个单元格，时间 O(nW)。' +
+                '<br>• <b>回溯路径</b>: 从 dp[n][W] 向上追踪，若 dp[i][j] ≠ dp[i-1][j] 则物品 i 被选中。' +
+                '<br>💡 0/1 背包是 NPC 问题，但 DP 在 W 不大时是高效的<b>伪多项式</b>算法。';
+        } else if (this.step > 0) {
+            const s = this.steps[this.step - 1];
+            const item = this.items[s.i - 1];
+            el.innerHTML =
+                '<b>0/1 背包 · 动态规划</b> — 正在填充 dp[' + s.i + '][' + s.j + ']' +
+                '<br>• 当前物品 ' + item.name + ': 重量=' + item.w + ', 价值=' + item.v +
+                '，容量 j=' + s.j +
+                '<br>• <b>状态转移</b>: dp[i][j] = max(dp[i-1][j], dp[i-1][j-wᵢ] + vᵢ)' +
+                '<br>• ' + (s.took ?
+                    '选择装入 → dp[' + (s.i - 1) + '][' + (s.j - item.w) + '] + ' + item.v + ' = ' + s.val :
+                    '不装入（重量超限或不划算）→ dp[' + (s.i - 1) + '][' + s.j + '] = ' + s.val) +
+                '<br>💡 每个物品只有"选"或"不选"两种决策，穷举需 2ⁿ = ' + Math.pow(2, n) + ' 种，DP 将其优化到 O(nW) = ' + (n * (W + 1)) + '。';
+        } else {
+            el.innerHTML =
+                '<b>0/1 背包问题 · 动态规划</b>' +
+                '<br>• ' + n + ' 件物品，背包容量 W=' + W + '。每件物品只能选一次（0/1 决策）。' +
+                '<br>• <b>状态定义</b>: dp[i][j] = 前 i 件物品、容量 j 时的最大价值。' +
+                '<br>• <b>转移方程</b>: dp[i][j] = max(dp[i-1][j], dp[i-1][j-wᵢ] + vᵢ)' +
+                '<br>• <b>最优子结构</b>: 全局最优包含子问题最优；<b>重叠子问题</b>: 多次用到相同 dp[i][j]。' +
+                '<br>💡 点击"播放"或"单步"观察 DP 表格逐格填充过程。';
+        }
     }
 };
 

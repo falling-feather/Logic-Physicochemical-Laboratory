@@ -1,4 +1,5 @@
 // ===== 首页逻辑 =====
+const _isReturningVisitor = !!(window.__englabCache && window.__englabCache.returnVisitor);
 
 // ===== 粒子网络系统 =====
 const ParticleNetwork = {
@@ -52,7 +53,9 @@ const ParticleNetwork = {
 
     spawn() {
         const area = this.W * this.H;
-        const count = Math.min(Math.floor(area / 18000), 80);
+        // 低端设备减少粒子数量（减半），避免 O(n²) 连线拖慢帧率
+        const maxParticles = (typeof _isLowEnd !== 'undefined' && _isLowEnd) ? 40 : 80;
+        const count = Math.min(Math.floor(area / 18000), maxParticles);
         this.particles = [];
         for (let i = 0; i < count; i++) {
             this.particles.push({
@@ -147,10 +150,11 @@ const TaglineTyper = {
     phrases: [
         '探索科学的星辰大海',
         'Visualize. Interact. Understand.',
-        '数学 · 物理 · 化学 · 算法',
+        '数学 · 物理 · 化学 · 算法 · 生物',
         'f(x) = curiosity × imagination',
         'E = mc² | F = ma | PV = nRT',
-        '从抽象到直觉，从公式到画面'
+        '从抽象到直觉，从公式到画面',
+        'Made by Fallingfeather'
     ],
     idx: 0,
     el: null,
@@ -161,6 +165,7 @@ const TaglineTyper = {
     init() {
         this.el = document.getElementById('tagline-text');
         if (!this.el) return;
+        if (this.timeout) clearTimeout(this.timeout);
         this.el.textContent = '';
         this.charIdx = 0;
         this.deleting = false;
@@ -193,6 +198,7 @@ const TaglineTyper = {
 
 // ===== HUD 数据流 =====
 const HUDData = {
+    _interval: null,
     init() {
         const left = document.getElementById('hud-data-left');
         const right = document.getElementById('hud-data-right');
@@ -205,7 +211,8 @@ const HUDData = {
         right.innerHTML = dataR.map(d => `<span>${d}</span>`).join('<br>');
 
         // Periodically flash random data items
-        setInterval(() => {
+        if (this._interval) clearInterval(this._interval);
+        this._interval = setInterval(() => {
             const targets = [left, right];
             const target = targets[Math.floor(Math.random() * 2)];
             const spans = target.querySelectorAll('span');
@@ -249,6 +256,7 @@ const SatelliteSystem = {
     },
 
     perspective: 1200,
+    _lastFrameTime: 0,
 
     init: function() {
         this.satellites = document.querySelectorAll('.satellite');
@@ -258,12 +266,19 @@ const SatelliteSystem = {
 
         this.startTime = Date.now();
         this.isRunning = true;
+        this._lastFrameTime = 0;
         this.loop();
     },
 
     loop: function() {
-        requestAnimationFrame(this.loop.bind(this));
         if (!this.isRunning) return;
+        requestAnimationFrame(this.loop.bind(this));
+
+        // 低端设备帧率限制：约 30fps（~33ms 间隔）
+        const perfNow = performance.now();
+        const minInterval = (typeof _isLowEnd !== 'undefined' && _isLowEnd) ? 33 : 0;
+        if (minInterval > 0 && perfNow - this._lastFrameTime < minInterval) return;
+        this._lastFrameTime = perfNow;
 
         const now = Date.now();
         const toRad = Math.PI / 180;
@@ -425,15 +440,18 @@ function emitClickParticles(element) {
 
 // ===== 多层星空背景 =====
 function createStars() {
+    const lowEnd = typeof _isLowEnd !== 'undefined' && _isLowEnd;
+    const returning = typeof _isReturningVisitor !== 'undefined' && _isReturningVisitor;
     const layers = [
-        { id: 'star-layer-1', count: 130, classes: ['small'],                      },
-        { id: 'star-layer-2', count: 80,  classes: ['small', 'medium'],             },
-        { id: 'star-layer-3', count: 35,  classes: ['medium', 'large', 'bright'],   }
+        { id: 'star-layer-1', count: lowEnd ? 40 : (returning ? 70 : 90), classes: ['small'] },
+        { id: 'star-layer-2', count: lowEnd ? 18 : (returning ? 36 : 50), classes: ['small', 'medium'] },
+        { id: 'star-layer-3', count: lowEnd ? 8 : (returning ? 14 : 20), classes: ['medium', 'large', 'bright'] }
     ];
 
     layers.forEach(layer => {
         const el = document.getElementById(layer.id);
         if (!el) return;
+        el.innerHTML = '';
 
         for (let i = 0; i < layer.count; i++) {
             const s = document.createElement('div');
@@ -450,6 +468,9 @@ function createStars() {
 
 // ===== 视差背景跟踪 =====
 function initParallax() {
+    if (window.__homeParallaxBound) return;
+    window.__homeParallaxBound = true;
+
     const depths = [0.015, 0.04, 0.09]; // 三层视差深度
     const layerEls = [
         document.getElementById('star-layer-1'),
@@ -477,6 +498,9 @@ function initParallax() {
 
 // ===== 眼睛跟随 + 眨眼 =====
 function initEyeTracking() {
+    if (window.__homeEyeTrackingBound) return;
+    window.__homeEyeTrackingBound = true;
+
     const main = document.getElementById('main-star');
     const pl = document.getElementById('pupil-left');
     const pr = document.getElementById('pupil-right');
@@ -527,6 +551,9 @@ function initEyeTracking() {
 
 // ===== 流星系统 =====
 function initShootingStars() {
+    if (window.__homeShootingStarsBound) return;
+    window.__homeShootingStarsBound = true;
+
     const container = document.getElementById('shooting-stars');
     if (!container) return;
 
@@ -559,26 +586,38 @@ function initShootingStars() {
 }
 
 // ===== 首页初始化（分阶段，避免首次加载卡顿）=====
-function initHome() {
-    // ── Phase 1 (同步): 关键布局 — 卫星定位 + 主星球已在 DOM 可见 ──
-    SatelliteSystem.init();
+// 低端设备检测：硬件线程数 ≤ 4 或内存 ≤ 4GB 时启用简化模式
+const _isLowEnd = (navigator.hardwareConcurrency || 8) <= 4 ||
+                  (navigator.deviceMemory && navigator.deviceMemory <= 4);
 
+function initHome() {
+    // ── Phase 1 (同步): 先确保首页可见可交互 ──
+    SatelliteSystem.init();
+    TaglineTyper.init();
     if (window.__loadProgress) window.__loadProgress(85);
 
-    // ── Phase 2 (下一帧): 背景视觉 ──
+    // 其余动效延后：先让页面出来，再逐步补视觉细节
     requestAnimationFrame(function () {
-        ParticleNetwork.init();
-        createStars();
-        initParallax();
-
         if (window.__loadProgress) window.__loadProgress(95);
 
-        // ── Phase 3 (再下一帧): 细节动效 ──
-        requestAnimationFrame(function () {
+        const scheduleEnhancements = window.requestIdleCallback
+            ? (cb) => window.requestIdleCallback(cb, { timeout: _isReturningVisitor ? 450 : 300 })
+            : (cb) => setTimeout(cb, _isReturningVisitor ? 180 : 120);
+
+        scheduleEnhancements(function () {
+            createStars();
+            initParallax();
+            if (!_isLowEnd && !_isReturningVisitor) {
+                ParticleNetwork.init();
+                initShootingStars();
+            } else if (!_isLowEnd) {
+                setTimeout(function () {
+                    ParticleNetwork.init();
+                    initShootingStars();
+                }, 350);
+            }
             HUDData.init();
             initEyeTracking();
-            initShootingStars();
-            TaglineTyper.init();
         });
     });
 }

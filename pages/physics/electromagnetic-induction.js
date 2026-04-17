@@ -32,6 +32,7 @@ const EMInduction = {
         this.playing = true;
         this.resize();
         this.bindEvents();
+        this.updateInfo();
         this.loop();
     },
 
@@ -324,6 +325,19 @@ const EMInduction = {
         ctx.textAlign = 'center';
         ctx.fillText('\u03a6', x, y - 4);
         ctx.fillText((flux * 100).toFixed(0) + '%', x, y + barH + 12);
+    },
+
+    /* ── education panel ── */
+    updateInfo() {
+        const el = document.getElementById('emi-info');
+        if (!el) return;
+        el.innerHTML = `<div class="ac-hd"><span class="ac-tag">电磁感应</span>法拉第电磁感应定律</div>
+<div class="ac-row"><span class="ac-key">法拉第定律</span>ε = -dΦ/dt — 感应电动势等于磁通量变化率的负值</div>
+<div class="ac-row"><span class="ac-key ac-key--purple">磁通量</span>Φ = BS·cosθ — 磁感应强度 × 面积 × cosθ（Wb）</div>
+<div class="ac-row"><span class="ac-key ac-key--amber">楞次定律</span>感应电流的磁场总是阻碍引起它的磁通量的变化（"来拒去留"）</div>
+<div class="ac-row"><span class="ac-key">导体切割</span>ε = BLv — 导体以速度 v 垂直切割磁力线时的感应电动势</div>
+<div class="ac-row"><span class="ac-key ac-key--purple">右手定则</span>四指指向电流方向，大拇指指向导体运动方向（判断感应电流方向）</div>
+<div class="ac-note">💡 人教版选择性必修2：磁铁越快穿过线圈 → 磁通量变化率越大 → 感应电动势越大。${this.mode === 'manual' ? '拖拽磁铁感受快慢对 ε 的影响' : '自动模式展示匀速往复'}</div>`;
     }
 };
 

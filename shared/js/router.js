@@ -3,6 +3,7 @@ const Router = {
     overlay: null,
     currentPage: 'home',
     isTransitioning: false,
+    _initialEnterFired: false,
     // Store origin point for radial wipe (set by selectModule or default center)
     transitionOrigin: { x: 50, y: 50 },
 
@@ -18,6 +19,14 @@ const Router = {
                 e.preventDefault();
                 const page = item.dataset.page;
                 if (page) {
+                    // If already on this page, reset to gallery view (back to experiment list)
+                    if (page === this.currentPage && document.querySelector('.page.active')) {
+                        if (page !== 'home' && typeof ModuleSelector !== 'undefined' && ModuleSelector.activeModule[page]) {
+                            ModuleSelector.closeModule(page);
+                        }
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        return;
+                    }
                     // Use nav item center as transition origin
                     const rect = item.getBoundingClientRect();
                     this.transitionOrigin = {
@@ -29,8 +38,25 @@ const Router = {
             });
         });
 
-        // Initial state
-        this.handleHash();
+        // Initial state — determine page from hash
+        const initialPage = window.location.hash.slice(1) || 'home';
+        this.currentPage = initialPage;
+
+        // Ensure the correct page has 'active' class (HTML defaults to home)
+        if (initialPage !== 'home') {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            const initEl = document.getElementById(`page-${initialPage}`);
+            if (initEl) initEl.classList.add('active');
+        }
+        this.updateNav(initialPage);
+
+        // CRITICAL FIX: Always fire onPageEnter for the initial page.
+        // Previously, handleHash() returned early when page-home already had .active
+        // in HTML, so initHome() was never called on first load — causing the
+        // satellite animation to never start until a re-navigation.
+        this._initialEnterFired = true;
+        this.onPageEnter(initialPage);
+
         window.addEventListener('hashchange', () => this.handleHash());
 
         // Handle popstate (back/forward)
@@ -141,6 +167,20 @@ const Router = {
             targetEl.classList.add('active');
             window.scrollTo({ top: 0 });
             gsap.set(targetEl, { opacity: 0, y: 20 });
+            // Pre-hide hero children so they never flash visible during the page fade-in.
+            // animatePageContent will animate them in individually afterwards.
+            if (page !== 'home') {
+                const heroKids = targetEl.querySelectorAll(
+                    '.page-hero__eyebrow, .page-hero__title, .page-hero__desc, .page-hero__actions, .page-hero__visual'
+                );
+                if (heroKids.length) gsap.set(heroKids, { y: 15, opacity: 0 });
+            }
+            // Start hero canvas rendering immediately in the background.
+            // The canvas is invisible (opacity 0) but already drawing, so when
+            // it fades in with the hero animation there is no blank-canvas flash.
+            if (page !== 'home' && typeof initHeroVisual === 'function') {
+                initHeroVisual(page);
+            }
         }, '-=0.1');
 
         // Phase 4: Fade out overlay while fading in target
@@ -179,16 +219,15 @@ const Router = {
         if (hero) {
             const heroChildren = hero.querySelectorAll('.page-hero__eyebrow, .page-hero__title, .page-hero__desc, .page-hero__actions, .page-hero__visual');
             if (heroChildren.length) {
-                gsap.fromTo(heroChildren,
-                    { y: 15, opacity: 0 },
-                    {
-                        y: 0, opacity: 1,
-                        duration: 0.3,
-                        ease: 'power3.out',
-                        stagger: 0.05,
-                        onComplete: () => this.onPageEnter(page)
-                    }
-                );
+                // Hero children are already pre-hidden (y:15, opacity:0) in Phase 3.
+                // Use gsap.to() to avoid re-setting the start state which would cause a flash.
+                gsap.to(heroChildren, {
+                    y: 0, opacity: 1,
+                    duration: 0.35,
+                    ease: 'power3.out',
+                    stagger: 0.06,
+                    onComplete: () => this.onPageEnter(page)
+                });
                 return;
             }
         }
@@ -250,7 +289,10 @@ const Router = {
         }
 
         // Initialize hero canvas if present
-        if (typeof initHeroVisual === 'function') {
+
+        // Initialize hero canvas (also serves as fallback for non-animated path).
+        // canvas.dataset.initialized prevents double-init on the animated path.
+        if (page !== 'home' && typeof initHeroVisual === 'function') {
             initHeroVisual(page);
         }
     },
@@ -280,6 +322,8 @@ const Router = {
                     () => { if (typeof SolidGeom !== 'undefined' && SolidGeom.destroy) SolidGeom.destroy(); },
                     () => { if (typeof PermComb !== 'undefined' && PermComb.destroy) PermComb.destroy(); },
                     () => { if (typeof Sequences !== 'undefined' && Sequences.destroy) Sequences.destroy(); },
+                    () => { if (typeof FuncProps !== 'undefined' && FuncProps.destroy) FuncProps.destroy(); },
+                    () => { if (typeof ExpLog !== 'undefined' && ExpLog.destroy) ExpLog.destroy(); },
                 ],
                 physics: [
                     () => { if (typeof destroyPhysics === 'function') destroyPhysics(); },

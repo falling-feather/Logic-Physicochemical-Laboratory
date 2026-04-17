@@ -45,6 +45,8 @@ const Photosynthesis = {
         this.slider = document.getElementById('bio-light-intensity');
         this.resize();
         this.bindControls();
+        this._injectInfoPanel();
+        this._updateInfo();
         this.startLoop();
         this._generateCurveData();
 
@@ -173,6 +175,7 @@ const Photosynthesis = {
             comparison: '\u5149\u5408\u4f5c\u7528 vs \u7ec6\u80de\u547c\u5438 \u2014 \u89c2\u5bdf\u6c14\u4f53\u4ea4\u6362\u5e73\u8861\u70b9'
         };
         if (this.info) this.info.textContent = msgs[mode] || '';
+        this._updateInfo();
     },
 
     _generateCurveData() {
@@ -321,9 +324,6 @@ const Photosynthesis = {
             case 'curve':       this._drawCurve(ctx, W, H); break;
             case 'comparison':  this._drawComparison(ctx, W, H); break;
         }
-
-        // Edu panel
-        this._drawEdu(ctx, W, H);
     },
 
     /* ── Simulation Draw ── */
@@ -865,53 +865,81 @@ const Photosynthesis = {
         });
     },
 
-    /* ── Edu Panel ── */
+    /* ── DOM Education Panel ── */
+
+    _injectInfoPanel() {
+        const box = document.getElementById('photosynth-info');
+        if (!box) return;
+        const P = 'photosynth-info';
+        box.innerHTML = `
+            <div class="${P}__hd" id="psy-panel-title">光合作用过程</div>
+            <div class="${P}__grid" id="psy-panel-grid"></div>
+            <div id="psy-panel-extra"></div>`;
+    },
+
+    _updateInfo() {
+        const grid = document.getElementById('psy-panel-grid');
+        const title = document.getElementById('psy-panel-title');
+        const extra = document.getElementById('psy-panel-extra');
+        if (!grid) return;
+        const P = 'photosynth-info';
+        const k = (c, t) => `<span class="${P}__key" style="--c:${c}">${t}</span>`;
+
+        if (this.mode === 'simulation') {
+            title.textContent = '光合作用过程';
+            grid.innerHTML = `
+                <div class="${P}__block">
+                    <div class="${P}__sub">光反应（类囊体薄膜）</div>
+                    <div class="${P}__row">${k('#3a9e8f','水的光解')} H₂O → [H] + O₂</div>
+                    <div class="${P}__row">${k('#6fa8dc','ATP合成')} ADP + Pi → ATP（光合磷酸化）</div>
+                    <div class="${P}__desc">需要光能驱动，产生 [H](NADPH) 和 ATP 供暗反应使用</div>
+                </div>
+                <div class="${P}__block">
+                    <div class="${P}__sub">暗反应（叶绿体基质）</div>
+                    <div class="${P}__row">${k('#8b6fc0','CO₂固定')} CO₂ + C₅ → 2C₃</div>
+                    <div class="${P}__row">${k('#c4793a','C₃还原')} C₃ + [H] + ATP → G3P → 葡萄糖</div>
+                    <div class="${P}__desc">Calvin 循环，不直接需要光，但依赖光反应产物</div>
+                </div>`;
+            extra.innerHTML = `<div class="${P}__note">💡 总反应：6CO₂ + 12H₂O →(光能/叶绿体) C₆H₁₂O₆ + 6O₂ + 6H₂O</div>`;
+        } else if (this.mode === 'curve') {
+            title.textContent = '光合速率影响因素';
+            grid.innerHTML = `
+                <div class="${P}__block">
+                    <div class="${P}__sub">关键概念</div>
+                    <div class="${P}__row">${k('#3a9e8f','光补偿点')} 光合速率 = 呼吸速率，净 O₂ 释放为 0</div>
+                    <div class="${P}__row">${k('#c4793a','光饱和点')} 再增强光照，光合速率不再提高</div>
+                    <div class="${P}__desc">超过饱和点后限制因素转变为 CO₂ 浓度或温度</div>
+                </div>
+                <div class="${P}__block">
+                    <div class="${P}__sub">温度效应</div>
+                    <div class="${P}__row">${k('#8b6fc0','最适温度')} 暗反应酶活性最高（约25-30°C）</div>
+                    <div class="${P}__row">${k('#6fa8dc','高温抑制')} 酶变性导致光合速率骤降</div>
+                    <div class="${P}__desc">温度同时影响呼吸作用，改变补偿点位置</div>
+                </div>`;
+            extra.innerHTML = `<div class="${P}__note">📈 拖动温度/CO₂ 滑块观察曲线形态变化，理解限制因素的切换</div>`;
+        } else {
+            title.textContent = '光合作用与呼吸作用';
+            grid.innerHTML = `
+                <div class="${P}__block">
+                    <div class="${P}__sub">光合作用</div>
+                    <div class="${P}__row">${k('#3a9e8f','场所')} 叶绿体（类囊体 + 基质）</div>
+                    <div class="${P}__row">${k('#6fa8dc','本质')} 合成有机物，储存能量</div>
+                    <div class="${P}__desc">将光能转变为有机物中的化学能</div>
+                </div>
+                <div class="${P}__block">
+                    <div class="${P}__sub">呼吸作用</div>
+                    <div class="${P}__row">${k('#c4793a','场所')} 细胞质基质 + 线粒体</div>
+                    <div class="${P}__row">${k('#8b6fc0','本质')} 分解有机物，释放能量</div>
+                    <div class="${P}__desc">将有机物中的化学能转变为 ATP 活跃化学能</div>
+                </div>`;
+            extra.innerHTML = `<div class="${P}__note">🔄 两者互为原料与产物，形成物质循环与能量流动，共同维持生命活动</div>`;
+        }
+    },
+
+    /* ── Edu Panel (Canvas – legacy, now DOM) ── */
 
     _drawEdu(ctx, W, H) {
-        const y0 = H * 0.78;
-        if (this.mode === 'comparison') y0 === H * 0.92; // comparison uses more space
-
-        ctx.fillStyle = 'rgba(58,158,143,0.06)';
-        ctx.fillRect(8, y0, W - 16, H - y0 - 8);
-        ctx.strokeStyle = 'rgba(58,158,143,0.15)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(8, y0, W - 16, H - y0 - 8);
-
-        const eduContent = {
-            simulation: {
-                title: '\u5149\u5408\u4f5c\u7528\u8fc7\u7a0b',
-                lines: [
-                    '\u2022 \u5149\u53cd\u5e94(\u7c7b\u56ca\u4f53\u8584\u819c): H\u2082O \u2192 [H] + O\u2082 + ATP\uff0c\u9700\u8981\u5149\u80fd\u9a71\u52a8',
-                    '\u2022 \u6697\u53cd\u5e94(Calvin\u5faa\u73af): CO\u2082 + [H] + ATP \u2192 C\u2083H\u2086O\u2083(G3P) \u2192 \u8461\u8404\u7cd6'
-                ]
-            },
-            curve: {
-                title: '\u5149\u5408\u901f\u7387\u5f71\u54cd\u56e0\u7d20',
-                lines: [
-                    '\u2022 \u5149\u8865\u507f\u70b9: \u5149\u5408\u901f\u7387 = \u547c\u5438\u901f\u7387\uff0c\u51c0O\u2082\u91ca\u653e\u4e3a0',
-                    '\u2022 \u5149\u9971\u548c\u70b9: \u518d\u589e\u5f3a\u5149\u7167\uff0c\u5149\u5408\u901f\u7387\u4e0d\u518d\u63d0\u9ad8(\u9650\u5236\u56e0\u7d20\u8f6c\u53d8\u4e3aCO\u2082/\u6e29\u5ea6)'
-                ]
-            },
-            comparison: {
-                title: '\u5149\u5408\u4f5c\u7528\u4e0e\u547c\u5438\u4f5c\u7528',
-                lines: [
-                    '\u2022 \u4e24\u8005\u4e92\u4e3a\u539f\u6599\u548c\u4ea7\u7269\uff0c\u5f62\u6210\u7269\u8d28\u5faa\u73af\u4e0e\u80fd\u91cf\u6d41\u52a8',
-                    '\u2022 \u5149\u5408\u4f5c\u7528\u50a8\u80fd\uff0c\u547c\u5438\u4f5c\u7528\u91ca\u80fd\uff0c\u5171\u540c\u7ef4\u6301\u751f\u547d\u6d3b\u52a8'
-                ]
-            }
-        };
-
-        const content = eduContent[this.mode] || eduContent.simulation;
-        ctx.fillStyle = 'rgba(58,158,143,0.6)';
-        ctx.font = '600 11px "Noto Sans SC", sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText(content.title, 18, y0 + 16);
-
-        ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '11px "Noto Sans SC", sans-serif';
-        content.lines.forEach((line, i) => {
-            ctx.fillText(line, 18, y0 + 34 + i * 18);
-        });
+        // Education content moved to DOM _injectInfoPanel()
     }
 };
 

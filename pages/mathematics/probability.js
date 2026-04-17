@@ -25,6 +25,7 @@ const Probability = {
         this.bindEvents();
         this.reset();
         this.draw();
+        this.updateInfo();
     },
 
     destroy() {
@@ -66,6 +67,7 @@ const Probability = {
                 this.mode = btn.dataset.mode;
                 this.reset();
                 this.draw();
+                this.updateInfo();
             });
         });
 
@@ -367,6 +369,21 @@ const Probability = {
             ctx.textAlign = 'center';
             ctx.fillText('\u6700\u5927\u504f\u5dee', x + w / 2, y + h + 14);
         }
+    },
+
+    /* \u2500\u2500 education panel \u2500\u2500 */
+    updateInfo() {
+        const el = document.getElementById('prob-edu-info');
+        if (!el) return;
+        const modeLabel = this.mode === 'coin' ? '\u629b\u786c\u5e01' : '\u63b7\u9ab0\u5b50';
+        const p = this.mode === 'coin' ? '1/2' : '1/6';
+        let h = `<div class="math-hd"><span class="math-tag">${modeLabel}</span>\u6982\u7387\u7edf\u8ba1\u77e5\u8bc6\u70b9</div>
+<div class="math-row"><span class="math-key">\u53e4\u5178\u6982\u578b</span>\u6709\u9650\u7b49\u53ef\u80fd\u4e8b\u4ef6\uff0cP(A) = m/n\u3002${this.mode === 'coin' ? '\u786c\u5e01\u6b63\u53cd\u5404 1/2' : '\u9ab0\u5b50\u6bcf\u9762 1/6'}</div>
+<div class="math-row"><span class="math-key math-key--red">\u5927\u6570\u5b9a\u5f8b</span>\u5f53\u8bd5\u9a8c\u6b21\u6570 n \u2192 \u221e \u65f6\uff0c\u9891\u7387 \u2192 \u7406\u8bba\u6982\u7387 ${p}\u3002\u89c2\u5bdf\u67f1\u72b6\u56fe\u6536\u655b\u8fc7\u7a0b</div>
+<div class="math-row"><span class="math-key math-key--amber">\u9891\u7387 vs \u6982\u7387</span>\u9891\u7387\u662f\u5b9e\u9a8c\u7ed3\u679c\uff0c\u6982\u7387\u662f\u7406\u8bba\u503c\uff1b\u524d\u8005\u968f\u6837\u672c\u589e\u5927\u8d8b\u8fd1\u540e\u8005</div>
+<div class="math-row"><span class="math-key">\u51e0\u4f55\u6982\u578b</span>\u8bd5\u9a8c\u7ed3\u679c\u843d\u5728\u67d0\u533a\u57df\u5185\u7684\u6982\u7387 = \u8be5\u533a\u57df\u9762\u79ef / \u603b\u9762\u79ef\uff08\u7b49\u53ef\u80fd\u6027\uff09</div>
+<div class="math-note">\ud83d\udca1 \u4eba\u6559\u7248\u5fc5\u4fee1\uff1a\u70b9\u51fb\u201c\u8fde\u7eed\u5b9e\u9a8c\u201d\u89c2\u5bdf\u9891\u7387\u5982\u4f55\u968f\u8bd5\u9a8c\u6b21\u6570\u589e\u52a0\u800c\u6536\u655b\u5230\u7406\u8bba\u6982\u7387</div>`;
+        el.innerHTML = h;
     }
 };
 

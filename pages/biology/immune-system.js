@@ -144,20 +144,53 @@ const ImmuneSystem = {
         const el = document.getElementById('immune-info');
         if (!el) return;
         if (this.mode === 'innate') {
-            el.innerHTML =
-                '<div class="imm-hd"><span class="imm-tag">非特异性免疫</span>第一/二道防线</div>' +
-                '<div class="imm-row"><span class="imm-key">巨噬细胞</span>伪足包裹→吞噬体 + 溶酶体→消化分解（吞噬作用）</div>' +
-                '<div class="imm-row"><span class="imm-key">中性粒细胞</span>血液中最多的白细胞，快速趋化至感染部位</div>' +
-                '<div class="imm-row"><span class="imm-key imm-key--orange">炎症信号</span>受损细胞释放组胺等趋化因子，吸引更多免疫细胞</div>' +
-                '<div class="imm-note">💡 非特异性免疫不具有记忆性，对各种病原体均有效</div>';
+            el.innerHTML = `
+                <div class="imm-info__hd">📘 非特异性免疫 — 第一/二道防线</div>
+                <div class="imm-info__grid">
+                    <div class="imm-info__block">
+                        <div class="imm-info__sub">巨噬细胞</div>
+                        <div class="imm-info__val">吞噬作用</div>
+                        <div class="imm-info__desc">伪足包裹 → 吞噬体 + 溶酶体 → 消化分解病原体</div>
+                    </div>
+                    <div class="imm-info__block">
+                        <div class="imm-info__sub">中性粒细胞</div>
+                        <div class="imm-info__val">快速趋化</div>
+                        <div class="imm-info__desc">血液中最多的白细胞，快速迁移至感染部位</div>
+                    </div>
+                    <div class="imm-info__block">
+                        <div class="imm-info__sub">关键过程</div>
+                        <div class="imm-info__row"><span class="imm-info__key" style="--c:#e5c07b">炎症信号</span> 受损细胞释放组胺等趋化因子，吸引更多免疫细胞</div>
+                        <div class="imm-info__row"><span class="imm-info__key" style="--c:var(--accent-teal,#3a9e8f)">物理屏障</span> 皮肤/黏膜构成第一道防线，阻止病原体入侵</div>
+                    </div>
+                    <div class="imm-info__block">
+                        <div class="imm-info__sub">💡 知识要点</div>
+                        <div class="imm-info__note">非特异性免疫不具有记忆性，对各种病原体均有效。包括第一道防线（皮肤/黏膜）和第二道防线（体液中杀菌物质及吞噬细胞）。</div>
+                    </div>
+                </div>`;
         } else {
-            el.innerHTML =
-                '<div class="imm-hd"><span class="imm-tag imm-tag--purple">特异性免疫</span>第三道防线</div>' +
-                '<div class="imm-row"><span class="imm-key imm-key--purple">B 细胞</span>识别抗原→增殖分化→浆细胞产生抗体（体液免疫）</div>' +
-                '<div class="imm-row"><span class="imm-key imm-key--green">T 辅助 (Th)</span>识别抗原呈递→分泌淋巴因子→激活 B/T 细胞</div>' +
-                '<div class="imm-row"><span class="imm-key imm-key--green">T 杀伤 (Tc)</span>接触靶细胞→释放穿孔素→诱导细胞凋亡（细胞免疫）</div>' +
-                '<div class="imm-row"><span class="imm-key imm-key--amber">抗体 (Ig)</span>Y 形免疫球蛋白，与抗原特异性结合→标记→补体激活</div>' +
-                '<div class="imm-note">💡 特异性免疫产生免疫记忆，二次应答更快更强（免疫接种原理）</div>';
+            el.innerHTML = `
+                <div class="imm-info__hd">📘 特异性免疫 — 第三道防线</div>
+                <div class="imm-info__grid">
+                    <div class="imm-info__block">
+                        <div class="imm-info__sub">体液免疫</div>
+                        <div class="imm-info__val" style="color:#b48eed">B 细胞 → 浆细胞</div>
+                        <div class="imm-info__desc">B细胞识别抗原 → 增殖分化为浆细胞 → 产生抗体</div>
+                    </div>
+                    <div class="imm-info__block">
+                        <div class="imm-info__sub">细胞免疫</div>
+                        <div class="imm-info__val" style="color:#4d9e7e">T 细胞 → 效应T细胞</div>
+                        <div class="imm-info__desc">效应T细胞接触靶细胞 → 释放穿孔素 → 诱导细胞凋亡</div>
+                    </div>
+                    <div class="imm-info__block">
+                        <div class="imm-info__sub">关键分子</div>
+                        <div class="imm-info__row"><span class="imm-info__key" style="--c:#4d9e7e">T 辅助 (Th)</span> 识别抗原呈递 → 分泌淋巴因子 → 激活 B/T 细胞</div>
+                        <div class="imm-info__row"><span class="imm-info__key" style="--c:#e5c07b">抗体 (Ig)</span> Y 形免疫球蛋白，与抗原特异性结合 → 标记 → 补体激活</div>
+                    </div>
+                    <div class="imm-info__block">
+                        <div class="imm-info__sub">💡 知识要点</div>
+                        <div class="imm-info__note">特异性免疫产生免疫记忆，二次应答更快更强（免疫接种原理）。体液免疫主要针对细胞外病原体，细胞免疫主要针对胞内寄生物。</div>
+                    </div>
+                </div>`;
         }
     },
 

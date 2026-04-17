@@ -255,26 +255,30 @@ const GeneMutation = (() => {
         if (!infoEl) return;
         const m = modes[mode];
         const oMR = toRNA(origBases), oC = codons(oMR), oA = aas(oC);
-        let h = '<div class="gmut-info-grid">';
-        h += `<div class="gmut-info-block"><h4>${m.name}</h4><p>${m.desc}</p>
-            <p class="gmut-sub">${mode===0?'点突变（碱基替换）不改变阅读框，仅影响单个密码子':
+        let h = '<div class="gmut-info__hd">📘 基因突变可视化</div>';
+        h += '<div class="gmut-info__grid">';
+        h += `<div class="gmut-info__block">
+            <div class="gmut-info__sub">${m.name}</div>
+            <div class="gmut-info__val" style="color:${m.color}">${m.desc}</div>
+            <div class="gmut-info__desc">${mode===0?'点突变（碱基替换）不改变阅读框，仅影响单个密码子':
             mode===1?'插入碱基后突变位点后读码框全部右移（移码突变）':
-            '缺失碱基后突变位点后读码框全部左移（移码突变）'}</p></div>`;
-        h += `<div class="gmut-info-block"><h4>原始氨基酸序列</h4>
+            '缺失碱基后突变位点后读码框全部左移（移码突变）'}</div></div>`;
+        h += `<div class="gmut-info__block"><div class="gmut-info__sub">原始氨基酸序列</div>
             <p class="gmut-aa-seq">${oA.map(a=>`<span class="${a==='Stop'?'gmut-stop':a==='Met'?'gmut-start':''}">${a}</span>`).join(' → ')}</p></div>`;
         if (mutated) {
             const mMR = toRNA(mutBases), mC = codons(mMR), mA = aas(mC);
-            h += `<div class="gmut-info-block"><h4>突变后氨基酸序列</h4>
+            h += `<div class="gmut-info__block"><div class="gmut-info__sub">突变后氨基酸序列</div>
                 <p class="gmut-aa-seq">${mA.map((a,i)=>{
                 const ch=i>=oA.length||a!==oA[i];
                 return `<span class="${a==='Stop'?'gmut-stop':a==='Met'?'gmut-start':''} ${ch?'gmut-changed':''}">${a}</span>`;
             }).join(' → ')}</p></div>`;
             const chg = mA.filter((a,i)=>i>=oA.length||a!==oA[i]).length;
-            h += `<div class="gmut-info-block gmut-summary"><h4>突变总结</h4>
-                <p>共 ${mA.length} 个密码子，其中 <strong>${chg}</strong> 个氨基酸发生改变</p>
-                <p>${mode===0?'错义突变（missense）— 改变单个氨基酸':'移码突变 — 蛋白质序列大幅改变，通常导致功能丧失'}</p></div>`;
+            h += `<div class="gmut-info__block gmut-summary">
+                <div class="gmut-info__sub">突变总结</div>
+                <div class="gmut-info__val">共 ${mA.length} 个密码子，<strong>${chg}</strong> 个氨基酸改变</div>
+                <div class="gmut-info__desc">${mode===0?'错义突变（missense）— 改变单个氨基酸':'移码突变 — 蛋白质序列大幅改变，通常导致功能丧失'}</div></div>`;
         }
-        h += `<div class="gmut-info-block"><h4>基因突变的类型</h4>
+        h += `<div class="gmut-info__block"><div class="gmut-info__sub">基因突变的类型</div>
             <table class="gmut-table"><tr><th>类型</th><th>机制</th><th>影响</th></tr>
             <tr><td>碱基替换</td><td>一个碱基被另一个替换</td><td>点突变，可能改变 1 个氨基酸</td></tr>
             <tr><td>碱基插入</td><td>额外碱基插入 DNA 序列</td><td>移码突变，后续所有氨基酸受影响</td></tr>
@@ -353,3 +357,4 @@ const GeneMutation = (() => {
 
 function initGeneMutation() { GeneMutation.init(); }
 window.GeneMutation = GeneMutation;
+window.initGeneMutation = initGeneMutation;

@@ -43,6 +43,7 @@ const EnergyConservation = {
         this.ballSpeed = 0;
         this.resize();
         this.bindEvents();
+        this.updateInfo();
         this.loop();
     },
 
@@ -271,6 +272,21 @@ const EnergyConservation = {
         ctx.font = '10px var(--font-mono)';
         ctx.textAlign = 'left';
         ctx.fillText('v = ' + v.toFixed(2) + ' m/s', area.x, area.y + area.h + 16);
+    },
+
+    /* ── education panel ── */
+    updateInfo() {
+        const el = document.getElementById('energy-info');
+        if (!el) return;
+        const fricDesc = this.friction > 0
+            ? `摩擦系数 μ = ${this.friction.toFixed(2)}，机械能逐渐减少转化为内能`
+            : '无摩擦，机械能守恒 E<sub>k</sub> + E<sub>p</sub> = 常数';
+        el.innerHTML = `<div class="ac-hd"><span class="ac-tag">能量</span>机械能守恒定律</div>
+<div class="ac-row"><span class="ac-key">动能</span>E<sub>k</sub> = ½mv² — 物体由于运动而具有的能量</div>
+<div class="ac-row"><span class="ac-key ac-key--purple">重力势能</span>E<sub>p</sub> = mgh — 物体由于被举高而具有的能量（以轨道最低点为零势面）</div>
+<div class="ac-row"><span class="ac-key ac-key--amber">动能定理</span>W<sub>合</sub> = ΔE<sub>k</sub> — 合力做的功等于动能的变化量</div>
+<div class="ac-row"><span class="ac-key">守恒条件</span>只有重力（或弹力）做功时，机械能守恒: E<sub>k1</sub> + E<sub>p1</sub> = E<sub>k2</sub> + E<sub>p2</sub></div>
+<div class="ac-note">💡 人教版必修2：${fricDesc}。观察 PE/KE 柱形图的此消彼长理解能量转化</div>`;
     }
 };
 

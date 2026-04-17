@@ -26,6 +26,7 @@ const GeneExpression = {
         this._resize();
         this._on(window, 'resize', () => this._resize());
         this._buildControls();
+        this._injectInfoPanel();
         this._loop();
     },
     destroy() {
@@ -68,6 +69,7 @@ const GeneExpression = {
                 this.progress = 0;
                 btnWrap.querySelectorAll('.genexp-mode-btn').forEach(x => x.classList.remove('active'));
                 b.classList.add('active');
+                this._updateInfo();
             });
             btnWrap.appendChild(b);
         });
@@ -370,6 +372,41 @@ const GeneExpression = {
             if (this.progress > 1.1) this.progress = 0;
         }
     },
+    _injectInfoPanel() {
+        const el = document.getElementById('genexp-info');
+        if (!el) return;
+        el.innerHTML = `
+            <div class="genexp-info__hd">📘 基因表达知识点</div>
+            <div class="genexp-info__grid">
+                <div class="genexp-info__block">
+                    <div class="genexp-info__sub">当前过程</div>
+                    <div id="genexp-mode-display" class="genexp-info__val">转录 (DNA→mRNA)</div>
+                </div>
+                <div class="genexp-info__block">
+                    <div class="genexp-info__sub">中心法则</div>
+                    <div class="genexp-info__row"><span class="genexp-info__key" style="--c:var(--color-teal,#3a9e8f)">转录</span> DNA → mRNA（RNA聚合酶，细胞核）</div>
+                    <div class="genexp-info__row"><span class="genexp-info__key" style="--c:var(--color-purple,#8b6fc0)">翻译</span> mRNA → 蛋白质（核糖体，细胞质）</div>
+                </div>
+                <div class="genexp-info__block">
+                    <div class="genexp-info__sub">碱基配对规则</div>
+                    <div class="genexp-info__row"><span class="genexp-info__key" style="--c:#e06c75">转录</span> A-U, T-A, C-G, G-C</div>
+                    <div class="genexp-info__row"><span class="genexp-info__key" style="--c:#e5c07b">翻译</span> 密码子与反密码子互补配对</div>
+                </div>
+                <div class="genexp-info__block">
+                    <div class="genexp-info__sub">💡 知识要点</div>
+                    <div class="genexp-info__note">mRNA上每3个相邻碱基构成一个密码子，编码一个氨基酸。AUG为起始密码子(Met)，UAA/UAG/UGA为终止密码子。</div>
+                </div>
+            </div>
+        `;
+    },
+
+    _updateInfo() {
+        const el = document.getElementById('genexp-mode-display');
+        if (el) {
+            el.textContent = this.mode === 'transcription' ? '转录 (DNA→mRNA)' : '翻译 (mRNA→蛋白质)';
+        }
+    },
+
     _loop() {
         const t = performance.now() / 1000;
         this._draw(t);

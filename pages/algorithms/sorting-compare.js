@@ -42,6 +42,7 @@ const SortCompare = {
         this.bindEvents();
         this.generate();
         this.draw();
+        this.updateEdu();
     },
 
     destroy() {
@@ -270,7 +271,7 @@ const SortCompare = {
                 }
                 this.draw();
                 this.updateStats();
-                if (!anyActive) { this.stopAnim(); return; }
+                if (!anyActive) { this.stopAnim(); this.updateEdu(); return; }
             }
             this.animId = requestAnimationFrame(step);
         };
@@ -351,6 +352,44 @@ const SortCompare = {
             ctx.strokeStyle = 'rgba(255,255,255,0.06)';
             ctx.lineWidth = 0.5;
             ctx.strokeRect(x - 2, y, w + 4, cellH - padding * 2);
+        }
+    },
+
+    /* ── education panel ── */
+    updateEdu() {
+        let el = document.getElementById('sortcmp-edu');
+        if (!el) {
+            const stats = document.getElementById('sortcmp-stats');
+            if (!stats || !stats.parentElement) return;
+            el = document.createElement('div');
+            el.id = 'sortcmp-edu';
+            el.className = 'sortcmp-edu';
+            stats.parentElement.parentElement.appendChild(el);
+        }
+        const allDone = this.algorithms.every(a => this.states[a]?.done);
+        if (allDone && this.states.bubble) {
+            const stats = this.algorithms.map(a => ({
+                name: this.algoNames[a],
+                cmp: this.states[a].comparisons,
+                swp: this.states[a].swaps
+            }));
+            const best = stats.reduce((a, b) => a.cmp < b.cmp ? a : b);
+            el.innerHTML =
+                '<b>排序完成!</b> 最少比较: ' + best.name + ' (' + best.cmp + ' 次)' +
+                '<br>• <b>冒泡排序</b> O(n²): 稳定，反复交换相邻逆序对，最好 O(n) (已序)。' +
+                '<br>• <b>选择排序</b> O(n²): 不稳定，每轮选最小值放到前端，比较次数固定 n(n-1)/2。' +
+                '<br>• <b>插入排序</b> O(n²): 稳定，将元素插入已排序部分，对近乎有序数据效率极高。' +
+                '<br>• <b>快速排序</b> O(n log n): 不稳定，分治 + 枢轴划分，最坏 O(n²) 但实际最快。' +
+                '<br>• <b>归并排序</b> O(n log n): 稳定，分治 + 合并，需 O(n) 额外空间。' +
+                '<br>💡 n=' + this.arraySize + ' 时，O(n²) ≈ ' + (this.arraySize * this.arraySize) +
+                ' 次，O(n log n) ≈ ' + Math.round(this.arraySize * Math.log2(this.arraySize)) + ' 次。';
+        } else {
+            el.innerHTML =
+                '<b>五种经典排序算法对比</b>' +
+                '<br>• <b>冒泡 / 选择 / 插入</b>: 简单排序，时间 O(n²)，适合小数据或教学。' +
+                '<br>• <b>快排 / 归并</b>: 高效排序，时间 O(n log n)，是实际工程首选。' +
+                '<br>• <b>稳定性</b>: 相等元素的相对顺序是否保持（冒泡/插入/归并 稳定，选择/快排 不稳定）。' +
+                '<br>💡 点击"开始排序"观察不同算法的比较次数与交换次数差异。';
         }
     }
 };
