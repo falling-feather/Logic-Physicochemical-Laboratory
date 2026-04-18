@@ -355,6 +355,7 @@ const ModuleSelector = {
             'alternating-current': () => { if (typeof initACCircuit === 'function') initACCircuit(); },
             'gravitation': () => { if (typeof initGravitation === 'function') initGravitation(); },
             'force-composition': () => { if (typeof initForceComposition === 'function') initForceComposition(); },
+            'momentum-conservation': () => { if (typeof initMomentumConservation === 'function') initMomentumConservation(); },
 
             // Chemistry
             'periodic-table': () => { if (typeof initPeriodicTable === 'function') initPeriodicTable(); },
