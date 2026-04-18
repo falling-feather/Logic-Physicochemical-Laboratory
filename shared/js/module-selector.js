@@ -232,6 +232,9 @@ const ModuleSelector = {
         // Hide favorites button
         if (window.ExperimentFavorites) ExperimentFavorites.hide();
 
+        // Hide rating card
+        if (window.ExperimentRating) ExperimentRating.hide();
+
         // Hide all module sections
         pageEl.querySelectorAll('[data-module].module-active').forEach(s => {
             s.classList.remove('module-active');
@@ -418,6 +421,10 @@ const ModuleSelector = {
                 // Show favorites button
                 if (window.ExperimentFavorites) {
                     ExperimentFavorites.show(moduleId);
+                }
+                // Show rating card after delay
+                if (window.ExperimentRating) {
+                    ExperimentRating.show(moduleId);
                 }
             }, 50);
         }

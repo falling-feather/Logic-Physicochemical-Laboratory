@@ -21,6 +21,9 @@ function initApp() {
     // 1d3. Initialize favorites system
     if (typeof ExperimentFavorites !== 'undefined') ExperimentFavorites.init();
 
+    // 1d4. Initialize rating system
+    if (typeof ExperimentRating !== 'undefined') ExperimentRating.init();
+
     // 1e. Initialize learning progress system (X-01)
     if (typeof LearningProgress !== 'undefined') LearningProgress.init();
 
