@@ -78,6 +78,7 @@ const LearningProgress = {
             this._renderBadges(page);
             this._renderProgressBar(page);
         });
+        this._renderHomeProgress();
     },
 
     /** Add ✓ badges on visited gallery cards */
@@ -139,5 +140,49 @@ const LearningProgress = {
                 break;
             }
         }
+    },
+
+    /** Render overall progress on the home page */
+    _renderHomeProgress() {
+        // ── Overall progress widget below tagline ──
+        const tagline = document.getElementById('home-tagline');
+        if (tagline) {
+            const { visited, total, percent } = this.getOverallProgress();
+            let widget = document.getElementById('home-progress-widget');
+            if (!widget) {
+                widget = document.createElement('div');
+                widget.id = 'home-progress-widget';
+                widget.className = 'home-progress-widget';
+                widget.innerHTML = `
+                    <div class="home-progress-widget__bar">
+                        <div class="home-progress-widget__fill"></div>
+                    </div>
+                    <span class="home-progress-widget__text"></span>
+                `;
+                tagline.parentElement.appendChild(widget);
+            }
+            widget.querySelector('.home-progress-widget__fill').style.width = percent + '%';
+            widget.querySelector('.home-progress-widget__text').textContent =
+                visited === 0 ? `共 ${total} 个实验等你探索` : `已探索 ${visited}/${total} 个实验`;
+        }
+
+        // ── Per-satellite progress chips ──
+        const subjects = ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology'];
+        subjects.forEach((page, i) => {
+            const sat = document.querySelector(`.satellite-${i + 1}[data-target="${page}"]`);
+            if (!sat) return;
+            const container = sat.querySelector('.satellite-label-container');
+            if (!container) return;
+
+            const { visited, total } = this.getSubjectProgress(page);
+            let chip = container.querySelector('.satellite-progress');
+            if (!chip) {
+                chip = document.createElement('span');
+                chip.className = 'satellite-progress';
+                container.appendChild(chip);
+            }
+            chip.textContent = `${visited}/${total}`;
+            chip.classList.toggle('satellite-progress--active', visited > 0);
+        });
     }
 };

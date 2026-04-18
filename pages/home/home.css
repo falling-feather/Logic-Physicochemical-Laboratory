@@ -645,3 +645,65 @@
     from { opacity: 1; transform: scale(1); }
     to   { opacity: 0; transform: scale(0); }
 }
+
+/* ── Home Progress Widget ── */
+.home-progress-widget {
+    position: absolute;
+    bottom: 5%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 20px;
+    background: linear-gradient(135deg, rgba(21,24,34,0.85), rgba(30,35,50,0.75));
+    border: 1px solid rgba(91,141,206,0.2);
+    border-radius: var(--radius-lg);
+    backdrop-filter: blur(12px);
+    opacity: 0;
+    animation: taglineFadeUp 1.6s ease-out 2s forwards;
+}
+
+.home-progress-widget__bar {
+    width: 100px;
+    height: 4px;
+    background: rgba(91,141,206,0.15);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.home-progress-widget__fill {
+    height: 100%;
+    background: linear-gradient(90deg, rgba(91,141,206,0.8), rgba(120,170,230,0.9));
+    border-radius: 2px;
+    transition: width 0.6s ease;
+    box-shadow: 0 0 6px rgba(91,141,206,0.4);
+}
+
+.home-progress-widget__text {
+    font-size: var(--text-xs);
+    color: rgba(91,141,206,0.6);
+    font-family: var(--font-mono);
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+}
+
+/* ── Satellite Progress Chips ── */
+.satellite-progress {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.35);
+    font-family: var(--font-mono);
+    letter-spacing: 0.1em;
+    transition: color 0.3s;
+}
+
+.satellite-progress--active {
+    color: rgba(91,141,206,0.7);
+}
+
+.satellite:hover .satellite-progress {
+    color: rgba(91,141,206,0.9);
+}

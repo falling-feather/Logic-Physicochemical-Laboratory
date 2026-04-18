@@ -1,10 +1,10 @@
-const CACHE_NAME = 'englab-static-v20260418h';
+const CACHE_NAME = 'englab-static-v20260418i';
 const APP_SHELL = [
   './',
   './index.html',
   './shared/js/lucide.min.js?v=20260417c',
   './shared/js/config.js?v=20260417c',
-  './shared/js/learning-progress.js?v=20260418c',
+  './shared/js/learning-progress.js?v=20260418d',
   './shared/js/theme-switch.js?v=20260418c',
   './shared/js/touch-gestures.js?v=20260418a',
   './shared/js/experiment-export.js?v=20260418f',
