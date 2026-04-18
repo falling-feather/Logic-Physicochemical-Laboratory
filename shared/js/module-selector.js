@@ -354,6 +354,7 @@ const ModuleSelector = {
             'em-induction': () => { if (typeof initEMInduction === 'function') initEMInduction(); },
             'alternating-current': () => { if (typeof initACCircuit === 'function') initACCircuit(); },
             'gravitation': () => { if (typeof initGravitation === 'function') initGravitation(); },
+            'force-composition': () => { if (typeof initForceComposition === 'function') initForceComposition(); },
 
             // Chemistry
             'periodic-table': () => { if (typeof initPeriodicTable === 'function') initPeriodicTable(); },

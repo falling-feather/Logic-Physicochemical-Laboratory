@@ -85,7 +85,8 @@ const CONFIG = {
             { id: 'alternating-current', title: '交变电流', description: 'AC波形、RMS与变压器', icon: 'radio', variant: 'featured' },
             { id: 'fluid-dynamics', title: '流体力学', description: '势流叠加、圆柱绕流与伯努利方程', icon: 'wind', variant: 'featured' },
             { id: 'optics', title: '光学', description: '透镜成像/双缝干涉/折射/色散/偏振', icon: 'eye', variant: 'featured' },
-            { id: 'gravitation', title: '万有引力', description: '卫星轨道模拟与引力场', icon: 'orbit', variant: 'featured' }
+            { id: 'gravitation', title: '万有引力', description: '卫星轨道模拟与引力场', icon: 'orbit', variant: 'featured' },
+            { id: 'force-composition', title: '力的合成与分解', description: '平行四边形定则与正交分解', icon: 'move-diagonal-2', variant: 'featured' }
         ],
         chemistry: [
             { id: 'periodic-table', title: '元素周期表', description: '交互式元素周期表', icon: 'table', variant: 'featured' },

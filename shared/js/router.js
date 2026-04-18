@@ -347,6 +347,7 @@ const Router = {
                     () => { if (typeof EMInduction !== 'undefined' && EMInduction.destroy) EMInduction.destroy(); },
                     () => { if (typeof ACCircuit !== 'undefined' && ACCircuit.destroy) ACCircuit.destroy(); },
                     () => { if (typeof Gravitation !== 'undefined' && Gravitation.destroy) Gravitation.destroy(); },
+                    () => { if (typeof ForceComposition !== 'undefined' && ForceComposition.destroy) ForceComposition.destroy(); },
                 ],
                 chemistry: [
                     () => { if (typeof PeriodicTable !== 'undefined' && PeriodicTable.destroy) PeriodicTable.destroy(); },

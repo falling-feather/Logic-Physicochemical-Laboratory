@@ -898,3 +898,91 @@
 .physics-zoom-modal__host canvas {
     display: block;
 }
+
+/* ═══ 力的合成与分解 ═══ */
+.fc-controls {
+    margin-bottom: 12px;
+}
+.fc-mode-btns {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+.fc-mode-btn {
+    padding: 6px 16px;
+    border: 1px solid var(--border, rgba(255,255,255,0.15));
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary, #aaa);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all .2s;
+}
+.fc-mode-btn.active,
+.fc-mode-btn:hover {
+    background: var(--accent, #5b8dce);
+    color: #fff;
+    border-color: var(--accent, #5b8dce);
+}
+.fc-params {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.fc-hint {
+    color: var(--text-tertiary, #888);
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+.fc-row {
+    font-size: 14px;
+    color: var(--text-primary, #eee);
+}
+.fc-label b {
+    font-variant-numeric: tabular-nums;
+}
+.fc-slider-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 6px;
+}
+.fc-slider-row label {
+    font-size: 13px;
+    color: var(--text-secondary, #bbb);
+}
+.fc-slider-row input[type="range"] {
+    width: 100%;
+    max-width: 280px;
+}
+.fc-edu {
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--surface-1, rgba(255,255,255,0.03));
+    border-radius: 10px;
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text-secondary, #ccc);
+}
+.fc-edu h4 {
+    margin: 0 0 8px;
+    color: var(--text-primary, #fff);
+    font-size: 16px;
+}
+.fc-edu ul {
+    padding-left: 20px;
+    margin: 8px 0;
+}
+.fc-edu li {
+    margin-bottom: 4px;
+}
+.fc-tip {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: rgba(91,141,206,0.1);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--accent, #5b8dce);
+}
