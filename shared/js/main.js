@@ -18,6 +18,9 @@ function initApp() {
     // 1e. Initialize learning progress system (X-01)
     if (typeof LearningProgress !== 'undefined') LearningProgress.init();
 
+    // 1f. Initialize theme switch (X-03)
+    if (typeof ThemeSwitch !== 'undefined') ThemeSwitch.init();
+
     // 2. Homepage init moved to Router.onPageEnter('home') for lazy loading
 
     // 3. All experiment module inits moved to Router.onPageEnter() for lazy loading

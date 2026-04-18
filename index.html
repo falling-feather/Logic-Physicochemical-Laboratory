@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="工科实验室 - 交互式可视化科学学习平台，涵盖数学、物理、化学、算法与生物">
     <meta name="theme-color" content="#08090e">
+    <!-- X-03: Apply saved theme before first paint to prevent flash -->
+    <script>
+        (function(){var t=localStorage.getItem('englab-theme');if(!t){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t);if(t==='light')document.querySelector('meta[name=theme-color]').content='#f5f6fa'})();
+    </script>
     <title>工科实验室 - 可视化学习平台</title>
     <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48" type="image/x-icon">
     <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
@@ -23,10 +27,10 @@
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
 
     <!-- CSS: Shared -->
-    <link rel="stylesheet" href="shared/css/tokens.css?v=20260417d">
+    <link rel="stylesheet" href="shared/css/tokens.css?v=20260418c">
     <link rel="stylesheet" href="shared/css/base.css?v=20260417f">
     <link rel="stylesheet" href="shared/css/typography.css?v=20260417d">
-    <link rel="stylesheet" href="shared/css/navbar.css?v=20260417d">
+    <link rel="stylesheet" href="shared/css/navbar.css?v=20260418c">
     <link rel="stylesheet" href="shared/css/page-layout.css?v=20260417d">
     <link rel="stylesheet" href="shared/css/cards.css?v=20260417d">
     <link rel="stylesheet" href="shared/css/module-selector.css?v=20260418c">
@@ -2666,6 +2670,7 @@
     <!-- Application Scripts: Shared -->
     <script src="shared/js/config.js?v=20260417d"></script>
     <script src="shared/js/learning-progress.js?v=20260418c"></script>
+    <script src="shared/js/theme-switch.js?v=20260418c"></script>
     <script src="shared/js/touch-gestures.js?v=20260418a"></script>
     <script src="shared/js/module-selector.js?v=20260418c"></script>
     <script src="shared/js/experiment-guide.js?v=20260417d"></script>

@@ -4,7 +4,7 @@
     top: 0; left: 0; right: 0;
     z-index: 1000;
     padding: 0;
-    background: rgba(8,9,14,0.75);
+    background: var(--navbar-bg);
     border-bottom: 1px solid var(--border-subtle);
     backdrop-filter: blur(16px) saturate(1.2);
     -webkit-backdrop-filter: blur(16px) saturate(1.2);
@@ -12,7 +12,7 @@
 }
 
 .navbar:not(.navbar--transparent) {
-    box-shadow: 0 1px 12px rgba(0,0,0,0.3);
+    box-shadow: var(--shadow-sm);
 }
 
 /* Transparent on homepage */
@@ -114,6 +114,34 @@
 }
 
 .nav-item i {
+    width: 16px;
+    height: 16px;
+}
+
+/* ── X-03: Theme toggle ── */
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-default);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color var(--duration-fast), border-color var(--duration-fast), background var(--duration-fast);
+    flex-shrink: 0;
+    margin-left: var(--space-3);
+}
+
+.theme-toggle:hover {
+    color: var(--text-primary);
+    border-color: var(--border-hover);
+    background: var(--surface-2);
+}
+
+.theme-toggle i {
     width: 16px;
     height: 16px;
 }
