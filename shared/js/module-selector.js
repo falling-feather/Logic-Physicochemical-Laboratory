@@ -7,6 +7,7 @@ const ModuleSelector = {
     _initialized: {},   // { 'module-id': true } — tracks which modules have been initialized
     _sidebars: {},      // { pageName: sidebar DOM element }
     _sidebarOpen: {},   // { pageName: bool }
+    _swipeBackCtrls: {}, // { pageName: SwipeBack controller }
 
     init() {
         const pages = ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology'];
@@ -192,6 +193,13 @@ const ModuleSelector = {
 
         // Trigger resize for canvas elements
         setTimeout(() => window.dispatchEvent(new Event('resize')), 150);
+
+        // Enable swipe-back from left edge (touch devices)
+        if (typeof TouchGestures !== 'undefined' && !this._swipeBackCtrls[page]) {
+            this._swipeBackCtrls[page] = TouchGestures.enableSwipeBack(
+                pageEl, () => this.closeModule(page)
+            );
+        }
     },
 
     closeModule(page) {
@@ -227,6 +235,12 @@ const ModuleSelector = {
         }
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        // Destroy swipe-back gesture for this page
+        if (this._swipeBackCtrls[page]) {
+            this._swipeBackCtrls[page].destroy();
+            this._swipeBackCtrls[page] = null;
+        }
     },
 
     toggleSidebar(page) {

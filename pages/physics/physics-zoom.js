@@ -10,6 +10,7 @@ const PhysicsZoom = {
     originalInlineStyle: null,
     originalRect: null,
     _resizeHandlerBound: null,
+    _pinchCtrl: null,
 
     init() {
         this._ensureModal();
@@ -98,6 +99,12 @@ const PhysicsZoom = {
 
         this.modal.classList.add('open');
         this._syncScale();
+
+        // Enable pinch-zoom gesture on touch devices
+        if (typeof TouchGestures !== 'undefined' && !this._pinchCtrl) {
+            this._pinchCtrl = TouchGestures.enablePinchZoom(this.host, this.movedCanvas, { maxScale: 4 });
+        }
+        if (this._pinchCtrl) this._pinchCtrl.reset();
     },
 
     _syncScale() {
@@ -108,11 +115,19 @@ const PhysicsZoom = {
         const sx = hostRect.width / this.originalRect.width;
         const sy = hostRect.height / this.originalRect.height;
         const scale = Math.min(sx, sy);
-        this.movedCanvas.style.transform = `scale(${scale})`;
+
+        // If pinch-zoom is active, delegate transform to its controller
+        if (this._pinchCtrl) {
+            this._pinchCtrl.setBaseScale(scale);
+        } else {
+            this.movedCanvas.style.transform = `scale(${scale})`;
+        }
     },
 
     close() {
         if (!this.movedCanvas || !this.originalParent || !this.movedPlaceholder) return;
+        // Destroy pinch-zoom controller
+        if (this._pinchCtrl) { this._pinchCtrl.destroy(); this._pinchCtrl = null; }
         // 先还原原始 inline 样式，确保缩小后尺寸完全回到放大前
         if (this.originalInlineStyle) {
             this.movedCanvas.setAttribute('style', this.originalInlineStyle);

@@ -901,7 +901,7 @@ cmake --build build --config Release
 
 - [ ] 深化实验教育面板内容（补充人教版教材原文引用）
 - [ ] 实验步骤引导系统（首次进入实验时显示操作提示）
-- [ ] 触控手势优化（移动端 pinch-zoom、swipe 返回）
+- [x] 触控手势优化（移动端 pinch-zoom、swipe 返回）
 - [ ] 键盘导航完善（Tab 切换实验控件、Esc 返回画廊）
 
 ### 15.3 中期计划 (v4.5)
