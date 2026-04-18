@@ -363,6 +363,7 @@ const Router = {
                     () => { if (typeof SolutionIon !== 'undefined' && SolutionIon.destroy) SolutionIon.destroy(); },
                     () => { if (typeof IonicReaction !== 'undefined' && IonicReaction.destroy) IonicReaction.destroy(); },
                     () => { if (typeof Redox !== 'undefined' && Redox.destroy) Redox.destroy(); },
+                    () => { if (typeof AtomicStructure !== 'undefined' && AtomicStructure.destroy) AtomicStructure.destroy(); },
                 ],
                 algorithms: [
                     () => { if (typeof SearchComparison !== 'undefined' && SearchComparison.destroy) SearchComparison.destroy(); },

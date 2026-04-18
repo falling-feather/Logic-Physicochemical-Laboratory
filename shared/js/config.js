@@ -102,6 +102,7 @@ const CONFIG = {
             { id: 'solution-ionization', title: '溶液与电离', description: 'pH指示与强弱电解质', icon: 'droplet', variant: 'featured' },
             { id: 'ionic-reaction', title: '离子反应', description: '离子方程式拆分与旁观离子', icon: 'split', variant: 'featured' },
             { id: 'redox', title: '氧化还原', description: '电子转移可视化与双线桥法', icon: 'arrow-right-left', variant: 'featured' },
+            { id: 'atomic-structure', title: '原子结构与电子排布', description: '电子云轨道·排布规则·玻尔模型', icon: 'atom', variant: 'featured' },
             { id: 'experiments', title: '虚拟实验', description: '安全环境化学实验', icon: 'beaker', variant: 'upcoming' }
         ],
         algorithms: [

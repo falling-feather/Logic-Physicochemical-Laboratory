@@ -797,6 +797,53 @@
     background: rgba(77,158,126,.25); border-color: var(--chemistry);
     color: #fff;
 }
+
+/* ── Atomic Structure 原子结构与电子排布 ── */
+.as-controls { margin-bottom: .75rem; }
+.as-mode-btns { display: flex; gap: .5rem; flex-wrap: wrap; border: none; padding: 0; margin: 0 0 .75rem; }
+.as-mode-btn {
+    padding: .4rem 1rem; border-radius: 6px; border: 1.5px solid rgba(77,158,126,.35);
+    background: transparent; color: rgba(255,255,255,.7); cursor: pointer; font-size: .82rem;
+    transition: all .2s;
+}
+.as-mode-btn.active, .as-mode-btn:hover {
+    background: rgba(77,158,126,.25); border-color: var(--chemistry, #4d9e7e); color: #fff;
+}
+.as-params { margin-bottom: .75rem; }
+.as-orbital-btns { display: flex; gap: .4rem; flex-wrap: wrap; }
+.as-orb-btn {
+    padding: .3rem .8rem; border-radius: 5px; border: 1px solid rgba(77,158,126,.3);
+    background: transparent; color: rgba(255,255,255,.6); cursor: pointer; font-size: .8rem;
+    font-family: var(--font-mono, monospace); transition: all .2s;
+}
+.as-orb-btn.active, .as-orb-btn:hover {
+    background: rgba(77,158,126,.2); border-color: var(--chemistry, #4d9e7e); color: #fff;
+}
+.as-slider-row { margin-bottom: .5rem; }
+.as-label { font-size: .85rem; color: rgba(255,255,255,.7); margin-bottom: .25rem; }
+.as-label strong { color: #4d9e7e; }
+.as-slider { width: 100%; max-width: 280px; accent-color: #4d9e7e; }
+.as-info {
+    margin-top: .5rem; font-size: .82rem; color: rgba(255,255,255,.55); line-height: 1.7;
+    font-family: var(--font-mono, monospace);
+}
+.as-mode-tag {
+    display: inline-block; padding: .15rem .6rem; border-radius: 4px; font-size: .75rem;
+    background: rgba(77,158,126,.15); color: #4d9e7e; margin-bottom: .3rem;
+}
+.as-data-row { margin: .15rem 0; }
+.as-data-row strong { color: #4d9e7e; }
+.as-tip { color: rgba(255,200,50,.7); font-size: .78rem; margin-top: .25rem; }
+.as-edu { font-size: .88rem; line-height: 1.8; color: rgba(255,255,255,.65); margin-top: 1rem; }
+.as-edu h4 { color: var(--chemistry, #4d9e7e); margin-bottom: .5rem; }
+.as-edu strong { color: #4d9e7e; }
+.as-edu ul { padding-left: 1.2rem; margin: .3rem 0; }
+.as-edu li { margin: .2rem 0; }
+.as-formula { font-family: var(--font-mono, monospace); color: rgba(255,255,255,.5); font-size: .82rem; }
+@media (max-width: 768px) {
+    .as-mode-btns { flex-direction: column; }
+    .as-orbital-btns { gap: .3rem; }
+}
 .organic-info {
     margin-top: .75rem; font-size: .82rem; color: rgba(255,255,255,.6); line-height: 1.8;
 }

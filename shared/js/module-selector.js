@@ -370,6 +370,7 @@ const ModuleSelector = {
             'solution-ionization': () => { if (typeof initSolutionIon === 'function') initSolutionIon(); },
             'ionic-reaction': () => { if (typeof initIonicReaction === 'function') initIonicReaction(); },
             'redox': () => { if (typeof initRedox === 'function') initRedox(); },
+            'atomic-structure': () => { if (typeof initAtomicStructure === 'function') initAtomicStructure(); },
 
             // Algorithms
             'sorting': () => { /* algorithms.js self-inits */ },
