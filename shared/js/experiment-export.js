@@ -140,6 +140,10 @@ const ExperimentExport = {
             '<button class="experiment-export-menu__item" data-action="csv">' +
                 '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' +
                 ' 数据 (CSV)' +
+            '</button>' +
+            '<button class="experiment-export-menu__item" data-action="share">' +
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>' +
+                ' 复制链接' +
             '</button>';
 
         var self = this;
@@ -149,6 +153,7 @@ const ExperimentExport = {
             var action = item.dataset.action;
             if (action === 'screenshot') self._screenshot();
             else if (action === 'csv') self._exportCSV();
+            else if (action === 'share') self._copyShareLink();
         });
 
         // Close menu when clicking elsewhere
@@ -188,6 +193,55 @@ const ExperimentExport = {
             var hasCSV = this._currentModule && !!this._csvProviders[this._currentModule];
             csvItem.style.display = hasCSV ? 'flex' : 'none';
         }
+    },
+
+    // ── Share Link ──
+
+    _copyShareLink() {
+        this._closeMenu();
+        var url = window.location.href;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(
+                function() { ExperimentExport._showToast('链接已复制到剪贴板'); },
+                function() { ExperimentExport._fallbackCopy(url); }
+            );
+        } else {
+            this._fallbackCopy(url);
+        }
+    },
+
+    _fallbackCopy(text) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+            document.execCommand('copy');
+            this._showToast('链接已复制到剪贴板');
+        } catch (e) {
+            this._showToast('复制失败，请手动复制地址栏链接');
+        }
+        document.body.removeChild(ta);
+    },
+
+    _showToast(msg) {
+        var existing = document.querySelector('.export-toast');
+        if (existing) existing.remove();
+
+        var toast = document.createElement('div');
+        toast.className = 'export-toast';
+        toast.textContent = msg;
+        document.body.appendChild(toast);
+
+        // Force reflow then show
+        toast.offsetHeight;
+        toast.classList.add('export-toast--visible');
+
+        setTimeout(function() {
+            toast.classList.remove('export-toast--visible');
+            setTimeout(function() { if (toast.parentNode) toast.remove(); }, 300);
+        }, 2000);
     },
 
     // ── Helpers ──

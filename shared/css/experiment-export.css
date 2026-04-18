@@ -76,6 +76,30 @@
     opacity: 0.7;
 }
 
+/* ── Toast notification ── */
+.export-toast {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%) translateY(12px);
+    z-index: 10001;
+    padding: 10px 22px;
+    background: var(--surface-3, #1c1f2e);
+    border: 1px solid var(--border-default, rgba(255,255,255,0.1));
+    border-radius: 8px;
+    color: var(--text-primary, #e2e8f0);
+    font-size: 0.85rem;
+    font-family: var(--font-sans, system-ui, sans-serif);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.export-toast--visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
     .experiment-export-btn {
