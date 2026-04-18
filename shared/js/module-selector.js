@@ -356,6 +356,7 @@ const ModuleSelector = {
             'gravitation': () => { if (typeof initGravitation === 'function') initGravitation(); },
             'force-composition': () => { if (typeof initForceComposition === 'function') initForceComposition(); },
             'momentum-conservation': () => { if (typeof initMomentumConservation === 'function') initMomentumConservation(); },
+            'charged-particle': () => { if (typeof initChargedParticle === 'function') initChargedParticle(); },
 
             // Chemistry
             'periodic-table': () => { if (typeof initPeriodicTable === 'function') initPeriodicTable(); },

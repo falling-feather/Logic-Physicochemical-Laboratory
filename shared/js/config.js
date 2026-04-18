@@ -87,7 +87,8 @@ const CONFIG = {
             { id: 'optics', title: '光学', description: '透镜成像/双缝干涉/折射/色散/偏振', icon: 'eye', variant: 'featured' },
             { id: 'gravitation', title: '万有引力', description: '卫星轨道模拟与引力场', icon: 'orbit', variant: 'featured' },
             { id: 'force-composition', title: '力的合成与分解', description: '平行四边形定则与正交分解', icon: 'move-diagonal-2', variant: 'featured' },
-            { id: 'momentum-conservation', title: '动量守恒', description: '一维碰撞与动量-动能柱状图', icon: 'arrow-right-left', variant: 'featured' }
+            { id: 'momentum-conservation', title: '动量守恒', description: '一维碰撞与动量-动能柱状图', icon: 'arrow-right-left', variant: 'featured' },
+            { id: 'charged-particle', title: '带电粒子运动', description: '洛伦兹力偏转·质谱仪·速度选择器', icon: 'atom', variant: 'featured' }
         ],
         chemistry: [
             { id: 'periodic-table', title: '元素周期表', description: '交互式元素周期表', icon: 'table', variant: 'featured' },

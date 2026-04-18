@@ -1060,3 +1060,72 @@
     background: rgba(91,141,206,0.1); border-radius: 6px;
     font-size: 13px; color: var(--accent, #5b8dce);
 }
+
+/* ===== 带电粒子运动 ===== */
+.cp-controls { margin-bottom: 12px; }
+.cp-mode-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.cp-mode-btn {
+    padding: 6px 16px;
+    border: 1px solid var(--border, rgba(255,255,255,0.15));
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary, #aaa);
+    cursor: pointer; font-size: 13px;
+    transition: all .2s;
+}
+.cp-mode-btn.active, .cp-mode-btn:hover {
+    background: var(--accent, #5b8dce); color: #fff;
+    border-color: var(--accent, #5b8dce);
+}
+.cp-params { display: flex; flex-direction: column; gap: 4px; }
+.cp-slider-row { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+.cp-label { font-size: 13px; color: var(--text-secondary, #bbb); }
+.cp-slider { width: 100%; max-width: 280px; }
+.cp-actions { display: flex; gap: 10px; margin: 12px 0; }
+.cp-btn {
+    padding: 8px 20px; border: none; border-radius: 8px;
+    cursor: pointer; font-size: 13px; font-weight: 600;
+    transition: all .2s;
+}
+.cp-play { background: var(--accent, #5b8dce); color: #fff; }
+.cp-play:hover { filter: brightness(1.15); }
+.cp-reset {
+    background: rgba(255,255,255,0.08); color: var(--text-secondary, #bbb);
+    border: 1px solid var(--border, rgba(255,255,255,0.15));
+}
+.cp-reset:hover { background: rgba(255,255,255,0.15); }
+.cp-info {
+    padding: 12px 16px;
+    background: var(--surface-1, rgba(255,255,255,0.03));
+    border-radius: 10px;
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    font-size: 13px; line-height: 1.8;
+    color: var(--text-secondary, #ccc);
+}
+.cp-mode-tag {
+    display: inline-block; padding: 2px 10px;
+    background: var(--accent, #5b8dce); color: #fff;
+    border-radius: 12px; font-size: 11px; font-weight: 600; margin-bottom: 6px;
+}
+.cp-data-row strong { font-variant-numeric: tabular-nums; }
+.cp-edu {
+    margin-top: 16px; padding: 16px;
+    background: var(--surface-1, rgba(255,255,255,0.03));
+    border-radius: 10px;
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    font-size: 14px; line-height: 1.8;
+    color: var(--text-secondary, #ccc);
+}
+.cp-edu h4 { margin: 0 0 8px; color: var(--text-primary, #fff); font-size: 16px; }
+.cp-edu ul { padding-left: 20px; margin: 8px 0; }
+.cp-edu li { margin-bottom: 4px; }
+.cp-formula {
+    text-align: center; font-size: 15px; font-weight: 600;
+    color: #2ED573; margin: 8px 0;
+    padding: 8px; background: rgba(46,213,115,0.08); border-radius: 6px;
+}
+.cp-tip {
+    margin-top: 10px; padding: 8px 12px;
+    background: rgba(91,141,206,0.1); border-radius: 6px;
+    font-size: 13px; color: var(--accent, #5b8dce);
+}
