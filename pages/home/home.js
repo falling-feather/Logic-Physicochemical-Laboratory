@@ -25,14 +25,78 @@ const ParticleNetwork = {
     _gridRows: 0,
     _cellSize: 0,
 
+    // ── OffscreenCanvas Worker ──
+    _worker: null,
+    _useWorker: false,
+    _dpr: 1,
+
     init() {
         this.canvas = document.getElementById('particle-network');
         if (!this.canvas) return;
-        this.ctx = this.canvas.getContext('2d');
-
         this._maxParticles = (typeof _isLowEnd !== 'undefined' && _isLowEnd) ? 40 : 80;
         this._cellSize = this.maxDist;
 
+        // 优先使用 OffscreenCanvas + Web Worker（释放主线程）
+        if (typeof this.canvas.transferControlToOffscreen === 'function' && typeof Worker !== 'undefined') {
+            try {
+                this._initWorker();
+                return;
+            } catch (e) {
+                console.warn('[ParticleNetwork] OffscreenCanvas 回退:', e);
+            }
+        }
+        this._initDirect();
+    },
+
+    /** OffscreenCanvas + Web Worker 渲染路径 */
+    _initWorker() {
+        const lowEnd = typeof _isLowEnd !== 'undefined' && _isLowEnd;
+        this._dpr = lowEnd ? Math.min(window.devicePixelRatio || 1, 1.5) : (window.devicePixelRatio || 1);
+        const offscreen = this.canvas.transferControlToOffscreen();
+        this._worker = new Worker('shared/workers/particle-worker.js');
+        this._useWorker = true;
+
+        const w = window.innerWidth, h = window.innerHeight;
+        this.canvas.style.width = w + 'px';
+        this.canvas.style.height = h + 'px';
+        this.W = w; this.H = h;
+
+        this._worker.postMessage({
+            type: 'init', canvas: offscreen,
+            width: w, height: h, dpr: this._dpr,
+            maxParticles: this._maxParticles
+        }, [offscreen]);
+
+        this.running = true;
+
+        // 转发鼠标位置
+        document.addEventListener('mousemove', e => {
+            this.mouse.x = e.clientX;
+            this.mouse.y = e.clientY;
+            if (this._worker) this._worker.postMessage({ type: 'mouse', x: e.clientX, y: e.clientY });
+        });
+
+        // 转发尺寸变化
+        if (typeof ResizeObserver !== 'undefined') {
+            this._resizeObs = new ResizeObserver(() => {
+                const nw = window.innerWidth, nh = window.innerHeight;
+                this.canvas.style.width = nw + 'px';
+                this.canvas.style.height = nh + 'px';
+                this.W = nw; this.H = nh;
+                if (this._worker) this._worker.postMessage({ type: 'resize', width: nw, height: nh, dpr: this._dpr });
+            });
+            this._resizeObs.observe(this.canvas.parentElement);
+        }
+
+        // 转发可见性状态
+        document.addEventListener('visibilitychange', () => {
+            if (this._worker) this._worker.postMessage({ type: 'visibility', hidden: document.hidden });
+        });
+    },
+
+    /** 主线程直接渲染路径（OffscreenCanvas 不可用时的回退） */
+    _initDirect() {
+        this.ctx = this.canvas.getContext('2d');
         this.resize();
 
         if (typeof ResizeObserver !== 'undefined') {
@@ -64,6 +128,11 @@ const ParticleNetwork = {
 
     destroy() {
         this.running = false;
+        if (this._worker) {
+            this._worker.postMessage({ type: 'destroy' });
+            this._worker.terminate();
+            this._worker = null;
+        }
         if (this._resizeObs) { this._resizeObs.disconnect(); this._resizeObs = null; }
     },
 
