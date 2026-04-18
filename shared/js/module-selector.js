@@ -198,6 +198,9 @@ const ModuleSelector = {
         const pageEl = document.getElementById(`page-${page}`);
         if (!pageEl) return;
 
+        // Hide experiment guide help button
+        if (window.ExperimentGuide) ExperimentGuide.hideHelpButton();
+
         // Hide all module sections
         pageEl.querySelectorAll('[data-module].module-active').forEach(s => {
             s.classList.remove('module-active');
@@ -358,6 +361,11 @@ const ModuleSelector = {
                 }
                 if (page === 'biology' && window.BiologyZoom && typeof window.BiologyZoom.init === 'function') {
                     window.BiologyZoom.init();
+                }
+                // Show experiment guide on first visit
+                if (window.ExperimentGuide) {
+                    ExperimentGuide.showIfFirstTime(page, moduleId);
+                    ExperimentGuide.showHelpButton(page, moduleId);
                 }
             }, 50);
         }

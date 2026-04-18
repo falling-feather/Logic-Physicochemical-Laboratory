@@ -9,6 +9,9 @@ function initApp() {
     // 1b. Initialize module selector (gallery-based navigation per subject page)
     if (typeof ModuleSelector !== 'undefined') ModuleSelector.init();
 
+    // 1c. Initialize experiment guide system
+    if (typeof ExperimentGuide !== 'undefined') ExperimentGuide.init();
+
     // 2. Homepage init moved to Router.onPageEnter('home') for lazy loading
 
     // 3. All experiment module inits moved to Router.onPageEnter() for lazy loading
