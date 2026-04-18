@@ -140,6 +140,9 @@ const ModuleSelector = {
         pageEl.classList.add('module-gallery-active');
 
         if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        // Show favorite indicators on gallery cards
+        if (window.ExperimentFavorites) ExperimentFavorites.updateGalleryCards();
     },
 
     openModule(page, moduleId) {
@@ -226,6 +229,9 @@ const ModuleSelector = {
         // Hide quiz FAB (X-02)
         if (window.ExperimentQuiz) ExperimentQuiz.hide();
 
+        // Hide favorites button
+        if (window.ExperimentFavorites) ExperimentFavorites.hide();
+
         // Hide all module sections
         pageEl.querySelectorAll('[data-module].module-active').forEach(s => {
             s.classList.remove('module-active');
@@ -234,6 +240,9 @@ const ModuleSelector = {
         // Show gallery
         const gallery = document.getElementById(`gallery-${page}`);
         if (gallery) gallery.style.display = '';
+
+        // Update favorite indicators on gallery cards
+        if (window.ExperimentFavorites) ExperimentFavorites.updateGalleryCards();
 
         // Restore gallery-active state
         pageEl.classList.add('module-gallery-active');
@@ -405,6 +414,10 @@ const ModuleSelector = {
                 // Show quiz FAB (X-02)
                 if (window.ExperimentQuiz) {
                     ExperimentQuiz.show(moduleId);
+                }
+                // Show favorites button
+                if (window.ExperimentFavorites) {
+                    ExperimentFavorites.show(moduleId);
                 }
             }, 50);
         }
