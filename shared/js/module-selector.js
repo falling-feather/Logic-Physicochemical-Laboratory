@@ -209,6 +209,9 @@ const ModuleSelector = {
         // Hide experiment guide help button
         if (window.ExperimentGuide) ExperimentGuide.hideHelpButton();
 
+        // Hide export button (E-03)
+        if (window.ExperimentExport) ExperimentExport.hide();
+
         // Hide all module sections
         pageEl.querySelectorAll('[data-module].module-active').forEach(s => {
             s.classList.remove('module-active');
@@ -380,6 +383,10 @@ const ModuleSelector = {
                 if (window.ExperimentGuide) {
                     ExperimentGuide.showIfFirstTime(page, moduleId);
                     ExperimentGuide.showHelpButton(page, moduleId);
+                }
+                // Show export button (E-03)
+                if (window.ExperimentExport) {
+                    ExperimentExport.show(page, moduleId);
                 }
             }, 50);
         }

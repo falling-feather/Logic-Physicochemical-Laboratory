@@ -12,6 +12,9 @@ function initApp() {
     // 1c. Initialize experiment guide system
     if (typeof ExperimentGuide !== 'undefined') ExperimentGuide.init();
 
+    // 1d. Initialize experiment export system (E-03)
+    if (typeof ExperimentExport !== 'undefined') ExperimentExport.init();
+
     // 2. Homepage init moved to Router.onPageEnter('home') for lazy loading
 
     // 3. All experiment module inits moved to Router.onPageEnter() for lazy loading
