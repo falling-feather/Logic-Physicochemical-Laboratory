@@ -223,6 +223,9 @@ const ModuleSelector = {
         // Hide export button (E-03)
         if (window.ExperimentExport) ExperimentExport.hide();
 
+        // Hide quiz FAB (X-02)
+        if (window.ExperimentQuiz) ExperimentQuiz.hide();
+
         // Hide all module sections
         pageEl.querySelectorAll('[data-module].module-active').forEach(s => {
             s.classList.remove('module-active');
@@ -398,6 +401,10 @@ const ModuleSelector = {
                 // Show export button (E-03)
                 if (window.ExperimentExport) {
                     ExperimentExport.show(page, moduleId);
+                }
+                // Show quiz FAB (X-02)
+                if (window.ExperimentQuiz) {
+                    ExperimentQuiz.show(moduleId);
                 }
             }, 50);
         }

@@ -15,6 +15,9 @@ function initApp() {
     // 1d. Initialize experiment export system (E-03)
     if (typeof ExperimentExport !== 'undefined') ExperimentExport.init();
 
+    // 1d2. Initialize quiz system (X-02)
+    if (typeof ExperimentQuiz !== 'undefined') ExperimentQuiz.init();
+
     // 1e. Initialize learning progress system (X-01)
     if (typeof LearningProgress !== 'undefined') LearningProgress.init();
 
