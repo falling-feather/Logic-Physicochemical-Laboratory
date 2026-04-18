@@ -10,11 +10,29 @@ const ParticleNetwork = {
     W: 0, H: 0,
     running: false,
     _resizeObs: null,
+    _hidden: false,
+
+    // ── FPS 自适应 ──
+    _fpsFrames: 0,
+    _fpsTime: 0,
+    _fps: 60,
+    _targetCount: 0,   // 期望粒子数
+    _maxParticles: 80,
+
+    // ── 空间网格 ──
+    _grid: null,
+    _gridCols: 0,
+    _gridRows: 0,
+    _cellSize: 0,
 
     init() {
         this.canvas = document.getElementById('particle-network');
         if (!this.canvas) return;
         this.ctx = this.canvas.getContext('2d');
+
+        this._maxParticles = (typeof _isLowEnd !== 'undefined' && _isLowEnd) ? 40 : 80;
+        this._cellSize = this.maxDist;
+
         this.resize();
 
         if (typeof ResizeObserver !== 'undefined') {
@@ -28,8 +46,19 @@ const ParticleNetwork = {
             this.mouse.x = e.clientX;
             this.mouse.y = e.clientY;
         });
+
+        // Page Visibility — 标签页隐藏时暂停
+        document.addEventListener('visibilitychange', () => {
+            this._hidden = document.hidden;
+            if (!this._hidden && this.running) {
+                this._fpsTime = performance.now();
+                this._fpsFrames = 0;
+            }
+        });
+
         this.spawn();
         this.running = true;
+        this._fpsTime = performance.now();
         this.loop();
     },
 
@@ -39,7 +68,8 @@ const ParticleNetwork = {
     },
 
     resize() {
-        const dpr = window.devicePixelRatio || 1;
+        const lowEnd = typeof _isLowEnd !== 'undefined' && _isLowEnd;
+        const dpr = lowEnd ? Math.min(window.devicePixelRatio || 1, 1.5) : (window.devicePixelRatio || 1);
         const w = window.innerWidth;
         const h = window.innerHeight;
         this.canvas.width = w * dpr;
@@ -49,15 +79,15 @@ const ParticleNetwork = {
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.W = w;
         this.H = h;
+        this._gridCols = Math.ceil(w / this._cellSize) + 1;
+        this._gridRows = Math.ceil(h / this._cellSize) + 1;
     },
 
     spawn() {
         const area = this.W * this.H;
-        // 低端设备减少粒子数量（减半），避免 O(n²) 连线拖慢帧率
-        const maxParticles = (typeof _isLowEnd !== 'undefined' && _isLowEnd) ? 40 : 80;
-        const count = Math.min(Math.floor(area / 18000), maxParticles);
+        this._targetCount = Math.min(Math.floor(area / 18000), this._maxParticles);
         this.particles = [];
-        for (let i = 0; i < count; i++) {
+        for (let i = 0; i < this._targetCount; i++) {
             this.particles.push({
                 x: Math.random() * this.W,
                 y: Math.random() * this.H,
@@ -68,9 +98,62 @@ const ParticleNetwork = {
         }
     },
 
+    /** 基于实际帧率自适应调整粒子数量 */
+    _adaptParticleCount() {
+        this._fpsFrames++;
+        const now = performance.now();
+        const elapsed = now - this._fpsTime;
+        if (elapsed < 1000) return; // 每秒检查一次
+
+        this._fps = Math.round(this._fpsFrames * 1000 / elapsed);
+        this._fpsFrames = 0;
+        this._fpsTime = now;
+
+        const particles = this.particles;
+        if (this._fps < 25 && particles.length > 20) {
+            // 帧率过低 → 减少 20% 粒子
+            const remove = Math.max(2, Math.floor(particles.length * 0.2));
+            particles.splice(particles.length - remove, remove);
+            this._targetCount = particles.length;
+        } else if (this._fps > 50 && particles.length < this._targetCount) {
+            // 帧率充裕且低于目标 → 补充粒子
+            const add = Math.min(4, this._targetCount - particles.length);
+            for (let i = 0; i < add; i++) {
+                particles.push({
+                    x: Math.random() * this.W,
+                    y: Math.random() * this.H,
+                    vx: (Math.random() - 0.5) * 0.4,
+                    vy: (Math.random() - 0.5) * 0.4,
+                    r: 1 + Math.random() * 1.5
+                });
+            }
+        }
+    },
+
+    /** 构建空间网格，将粒子分配到 cellSize×cellSize 的格子中 */
+    _buildGrid() {
+        const cols = this._gridCols, rows = this._gridRows;
+        const cs = this._cellSize;
+        const grid = new Array(cols * rows);
+        for (let k = 0; k < grid.length; k++) grid[k] = [];
+        const particles = this.particles;
+        for (let i = 0; i < particles.length; i++) {
+            const c = Math.min(cols - 1, (particles[i].x / cs) | 0);
+            const r = Math.min(rows - 1, (particles[i].y / cs) | 0);
+            grid[r * cols + c].push(i);
+        }
+        this._grid = grid;
+    },
+
     loop() {
         if (!this.running) return;
         requestAnimationFrame(() => this.loop());
+
+        // 标签页隐藏时跳过渲染
+        if (this._hidden) return;
+
+        this._adaptParticleCount();
+
         const { ctx, particles, mouse, maxDist, W, H } = this;
         const maxDist2 = maxDist * maxDist;
         const mouseDist = maxDist * 1.5;
@@ -99,28 +182,51 @@ const ParticleNetwork = {
         }
         ctx.fill();
 
-        // Draw connections — batch by opacity bins for fewer state changes
+        // ── 基于空间网格的连线（替代 O(n²) 暴力搜索）──
+        this._buildGrid();
+        const grid = this._grid;
+        const cols = this._gridCols, rows = this._gridRows;
+        const cs = this._cellSize;
+
         ctx.lineWidth = 0.5;
         const bins = [[], [], [], []]; // 4 opacity bins
+
         for (let i = 0; i < particles.length; i++) {
-            for (let j = i + 1; j < particles.length; j++) {
-                const dx = particles[i].x - particles[j].x;
-                const dy = particles[i].y - particles[j].y;
-                const d2 = dx * dx + dy * dy;
-                if (d2 < maxDist2) {
-                    const ratio = 1 - Math.sqrt(d2) / maxDist;
-                    const bin = Math.min(3, (ratio * 4) | 0);
-                    bins[bin].push(i, j);
+            const pi = particles[i];
+            const gc = Math.min(cols - 1, (pi.x / cs) | 0);
+            const gr = Math.min(rows - 1, (pi.y / cs) | 0);
+
+            // 检查自身及相邻 3x3 格子
+            for (let dr = -1; dr <= 1; dr++) {
+                const nr = gr + dr;
+                if (nr < 0 || nr >= rows) continue;
+                for (let dc = -1; dc <= 1; dc++) {
+                    const nc = gc + dc;
+                    if (nc < 0 || nc >= cols) continue;
+                    const cell = grid[nr * cols + nc];
+                    for (let k = 0; k < cell.length; k++) {
+                        const j = cell[k];
+                        if (j <= i) continue; // 避免重复
+                        const pj = particles[j];
+                        const dx = pi.x - pj.x;
+                        const dy = pi.y - pj.y;
+                        const d2 = dx * dx + dy * dy;
+                        if (d2 < maxDist2) {
+                            const ratio = 1 - Math.sqrt(d2) / maxDist;
+                            const bin = Math.min(3, (ratio * 4) | 0);
+                            bins[bin].push(i, j);
+                        }
+                    }
                 }
             }
             // Mouse connections
-            const mdx = mouse.x - particles[i].x;
-            const mdy = mouse.y - particles[i].y;
+            const mdx = mouse.x - pi.x;
+            const mdy = mouse.y - pi.y;
             const md2 = mdx * mdx + mdy * mdy;
             if (md2 < mouseDist2) {
                 const ratio = 1 - Math.sqrt(md2) / mouseDist;
                 const bin = Math.min(3, (ratio * 4) | 0);
-                bins[bin].push(i, -1); // -1 = mouse endpoint
+                bins[bin].push(i, -1);
             }
         }
 

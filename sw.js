@@ -1,4 +1,4 @@
-const CACHE_NAME = 'englab-static-v20260418i';
+const CACHE_NAME = 'englab-static-v20260418j';
 const APP_SHELL = [
   './',
   './index.html',
@@ -18,7 +18,7 @@ const APP_SHELL = [
   './shared/js/cards.js?v=20260417c',
   './shared/js/common.js?v=20260417c',
   './shared/js/main.js?v=20260417c',
-  './pages/home/home.js?v=20260417c',
+  './pages/home/home.js?v=20260418e',
   './shared/css/tokens.css?v=20260417c',
   './shared/css/base.css?v=20260417c',
   './shared/css/typography.css?v=20260417c',
