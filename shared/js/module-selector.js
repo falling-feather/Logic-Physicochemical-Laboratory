@@ -29,6 +29,9 @@ const ModuleSelector = {
         backdrop.id = 'module-sidebar-backdrop';
         backdrop.addEventListener('click', () => this._closeSidebarForCurrentPage());
         document.body.appendChild(backdrop);
+
+        // ── E-04: Global keyboard navigation ──
+        this._initKeyboardNav();
     },
 
     createSidebar(page, pageEl) {
@@ -193,6 +196,9 @@ const ModuleSelector = {
 
         // Trigger resize for canvas elements
         setTimeout(() => window.dispatchEvent(new Event('resize')), 150);
+
+        // E-04: Focus first interactive control for keyboard users
+        this._focusExperiment(page, moduleId);
 
         // Enable swipe-back from left edge (touch devices)
         if (typeof TouchGestures !== 'undefined' && !this._swipeBackCtrls[page]) {
@@ -426,4 +432,85 @@ const ModuleSelector = {
 
     // Show back button (kept for backward compat, now no-op since sidebar handles it)
     showBackButton() {},
+
+    // ── E-04: Keyboard Navigation ──
+
+    _initKeyboardNav() {
+        document.addEventListener('keydown', (e) => {
+            // Skip if user is typing in an input/textarea/select
+            const tag = (e.target.tagName || '').toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+            const page = typeof Router !== 'undefined' ? Router.currentPage : null;
+            if (!page) return;
+
+            if (e.key === 'Escape') {
+                // Priority chain: zoom modal → guide overlay → export menu → sidebar → experiment
+                const zoomModal = document.querySelector('.physics-zoom-modal.open, .biology-zoom-modal.open');
+                if (zoomModal) return; // Let zoom modal handle its own Esc
+
+                const guideOverlay = document.getElementById('experiment-guide-overlay');
+                if (guideOverlay && guideOverlay.classList.contains('active')) return; // Guide handles Esc
+
+                // Close export menu if open
+                if (window.ExperimentExport && ExperimentExport._menuOpen) {
+                    ExperimentExport._closeMenu();
+                    e.preventDefault();
+                    return;
+                }
+
+                // Close sidebar if open
+                if (this._sidebarOpen[page]) {
+                    this._closeSidebar(page);
+                    e.preventDefault();
+                    return;
+                }
+
+                // Close experiment → back to gallery
+                if (this.activeModule[page]) {
+                    this.closeModule(page);
+                    e.preventDefault();
+                    return;
+                }
+            }
+
+            // Arrow keys in sidebar
+            if (this._sidebarOpen[page] && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                this._sidebarArrowNav(page, e.key === 'ArrowDown' ? 1 : -1);
+                e.preventDefault();
+            }
+        });
+    },
+
+    _sidebarArrowNav(page, direction) {
+        const sidebar = this._sidebars[page];
+        if (!sidebar) return;
+        const items = Array.from(sidebar.querySelectorAll('.module-sidebar__item[data-module-target]'));
+        if (items.length === 0) return;
+
+        const focused = document.activeElement;
+        let idx = items.indexOf(focused);
+        if (idx < 0) {
+            // Find currently active item
+            idx = items.findIndex(i => i.classList.contains('active'));
+        }
+        idx = Math.max(0, Math.min(items.length - 1, idx + direction));
+        items[idx].focus();
+    },
+
+    // Focus the first interactive control inside the experiment when it opens
+    _focusExperiment(page, moduleId) {
+        const pageEl = document.getElementById(`page-${page}`);
+        if (!pageEl) return;
+        const section = pageEl.querySelector(`[data-module="${moduleId}"].module-active`);
+        if (!section) return;
+
+        // Find first focusable element (button, input, select, [tabindex])
+        const focusable = section.querySelector(
+            'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable) {
+            setTimeout(() => focusable.focus(), 200);
+        }
+    }
 };
