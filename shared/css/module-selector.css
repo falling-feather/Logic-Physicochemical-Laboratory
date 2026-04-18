@@ -268,6 +268,53 @@
 .page-algorithms .module-card__icon { background: rgba(196,121,58,0.1); }
 .page-biology .module-card__icon { background: rgba(58,158,143,0.1); }
 
+/* ── X-01: Visited badge ── */
+.module-card--visited::after {
+    content: '✓';
+    position: absolute;
+    bottom: var(--space-3);
+    right: var(--space-3);
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--card-accent, var(--accent-blue));
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0.85;
+    pointer-events: none;
+}
+
+/* ── X-01: Progress bar in hero ── */
+.progress-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+}
+
+.progress-bar__track {
+    flex: 1;
+    max-width: 200px;
+    height: 6px;
+    background: var(--surface-2);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-bar__fill {
+    height: 100%;
+    background: var(--card-accent, var(--accent-blue));
+    border-radius: 3px;
+    transition: width 0.4s var(--ease-spring);
+}
+
+.progress-bar__text {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    white-space: nowrap;
+}
+
 /* Sidebar accent per subject */
 .page-mathematics .module-sidebar__item { --card-accent: var(--accent-blue); }
 .page-physics .module-sidebar__item { --card-accent: var(--accent-purple); }

@@ -185,6 +185,11 @@ const ModuleSelector = {
 
         this.activeModule[page] = moduleId;
 
+        // X-01: Track learning progress
+        if (typeof LearningProgress !== 'undefined') {
+            LearningProgress.markVisited(moduleId);
+        }
+
         // Lazy-initialize this specific module
         this._initModule(page, moduleId);
 

@@ -15,6 +15,9 @@ function initApp() {
     // 1d. Initialize experiment export system (E-03)
     if (typeof ExperimentExport !== 'undefined') ExperimentExport.init();
 
+    // 1e. Initialize learning progress system (X-01)
+    if (typeof LearningProgress !== 'undefined') LearningProgress.init();
+
     // 2. Homepage init moved to Router.onPageEnter('home') for lazy loading
 
     // 3. All experiment module inits moved to Router.onPageEnter() for lazy loading
