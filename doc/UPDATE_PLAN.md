@@ -184,7 +184,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.12** | **任务 3 物理运动学三件套：kinematics + projectile + circular-motion 各加 5 步定制引导 + 5 题测验（匀变速 v²−v₀²=2as、斜抛 45° 最远、圆周 v=ωr/F=mv²/r），物理 6/17** | ✅**已完成** |
 | **v4.1.13** | **任务 3 物理电磁学三件套：optics + electromagnetic-induction + alternating-current 各加 5 步定制引导 + 5 题测验（透镜公式 1/u+1/v=1/f、法拉第 ε=-dΦ/dt、变压器匝数比），物理 9/17** | ✅**已完成** |
 | **v4.1.14** | **任务 3 物理力学三件套：force-composition + momentum-conservation + gravitation 各加 5 步定制引导 + 5 题测验（平行四边形定则、3 种碰撞型式、万有引力 F=GMm/r²），物理 12/17** | ✅**已完成** |
-| **v4.1.15** | **任务 3 物理高阶三件套：electromagnetic + charged-particle + relativity 各加 5 步定制引导 + 5 题测验（库仑 E=kQ/r²、洛伦兹力 r=mv/(qB)、相对论 γ=1/√(1−β²)），物理 15/17** | ✅**已完成（当前版本）** |
+| **v4.1.15** | **任务 3 物理高阶三件套：electromagnetic + charged-particle + relativity 各加 5 步定制引导 + 5 题测验（库仑 E=kQ/r²、洛伦兹力 r=mv/(qB)、相对论 γ=1/√(1−β²)），物理 15/17** | ✅**已完成** |
+| **v4.1.16** | **任务 3 物理收尾 + 算法起步：energy-conservation + fluid-dynamics + sorting-compare 各加 5 步定制引导 + 5 题测验（机械能守恒、伯努利、排序复杂度），物理 17/17 ✅ 、算法 1/8 起步** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -790,6 +791,36 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - v4.1.12 — 物理推进：kinematics + projectile + circular-motion 各 5 步（运动学三件套）
 - v4.1.12 — 转向算法领域（sorting-compare / dynamic-programming / string-matching）
 - v4.1.12 — 转向生物领域（immune-system / ecosystem / neural-regulation）
+- 任务 5 — 镜空科技风星球
+- 任务 6 — 移动端深度优化
+---
+
+## 二十九、2026-04-22 v4.1.16 物理收尾 + 算法起步（机械能守恒+流体+排序对比）
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增 3 条：
+  - `energy-conservation`（5 步：过山车轨道+小球 / energy-friction 摩擦滑块控机械能是否守恒 / energy-play+reset / 能量条形图动势能+势能+总能 / mgh+½mv²=const、摩擦后 Wf=ΔE机械）
+  - `fluid-dynamics`（5 步：3 个 .fluid-mode-btn 势流叠加/圆柱绕流/伯努利管 / fluid-uniform-u+cyl-gamma+bern-constrict + 4 个 .fluid-preset-btn / pause+reset+bern-toggle / 流线+等势线+示踪粒子 / A₁v₁=A₂v₂、p+½ρv²+ρgh=const、Magnus L=ρUΓ）
+  - `sorting-compare`（5 步：5 个画布并排同步演示冒泡/选择/插入/快排/归并 / sortcmp-size+speed / sortcmp-start+gen / 每画布高亮当前比较+已排序+未排序+计数 / O(n²)与 O(n log n) 对比、插入排序在基本有序上快）
+- `shared/js/quiz-data.js`：
+  - `energy-conservation`从 3 题扩充为 5 题（新增自由落体 v=10 m/s、过山车摩擦 600J 补充 v≈17 m/s）
+  - `fluid-dynamics` 新建 5 题（伯努利“流速大处压强小”、连续性、机翅升力、A₁v₁=A₂v₂ 计算 5 m/s、流线不相交）
+  - `sorting-compare` 新建 5 题（快排最坏 O(n²)、冒泡比较 n²/2、归并稳定但需 O(n) 空间、插入最好 O(n) 适基本有序、比较排序下界 Ω(n log n)）
+- `sw.js` CACHE_NAME `englab-static-v20260422o` → `v20260422p`
+- `index.html` cache bust：experiment-guide.js & quiz-data.js 同步升级 `?v=20260422p`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches 后硬重载，6 项数据全部正确（3 标题 + 3 × 5 步 + 3 × 5 题）
+
+### 当前覆盖度
+- 引导定制化：49 / 63（化学 11/11 ✅ + 数学 15/15 ✅ + 物理 17/17 ✅ + 生物 6 + 算法 1/8 起步）
+- 测验题库：58 / 63
+- **里程碑：3 学科全满（化学 + 数学 + 物理）、5 学科全启动！**
+
+### 后续候选
+- v4.1.17 — 算法推进：search-algorithms + dynamic-programming + string-matching 各 5 步（算法 4/8）
+- v4.1.17 — 生物推进：immune-system + ecosystem + neural-regulation 各 5 步（生物 9/13）
+- v4.1.17 — 算法+生物混合：search-algorithms + immune-system + ecosystem 各 5 步
 - 任务 5 — 镜空科技风星球
 - 任务 6 — 移动端深度优化
 ---

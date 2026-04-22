@@ -514,6 +514,36 @@ const ExperimentGuide = {
                 { icon: 'eye', text: '时间膨胀：动钟变慢 Δt=γΔτ；长度收缩：L=L₀/γ；时空图：世界线 + 光锥 + Lorentz 变换坐标系；多普勒：红/蓝移频率比' },
                 { icon: 'book-open', text: 'γ=1/√(1−v²/c²)；时间膨胀 Δt=γΔτ；长度收缩 L=L₀/γ；质能 E=mc²、E²=(pc)²+(mc²)²；速度叠加 w=(u+v)/(1+uv/c²)（人教版选必三第5章）' }
             ]
+        },
+        'energy-conservation': {
+            title: '机械能守恒操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '机械能守恒过山车演示：小球沿轨道做曲线运动，势能 Eₚ=mgh 与动能 Eₖ=½mv² 不断转化' },
+                { icon: 'sliders-horizontal', text: 'energy-friction 滑块调摩擦系数：0 时为无摩擦理想情况（机械能严格守恒）；> 0 时摩擦做负功，总机械能逐渐减少' },
+                { icon: 'play', text: 'energy-play 开始/暂停小球运动；energy-reset 复位小球到起始最高点（重新积累势能）' },
+                { icon: 'eye', text: '画布同步绘制：过山车轨道 + 小球 + 实时能量条形图（红=Eₖ 动能、蓝=Eₚ 势能、绿=总能 E）；energy-info 显示数值' },
+                { icon: 'book-open', text: '机械能守恒条件：只有重力做功（无摩擦/无外力做功）；½mv²+mgh=const；摩擦时 Wf=ΔE机械（消耗的机械能转化为内能）（人教版必修二第8章）' }
+            ]
+        },
+        'fluid-dynamics': {
+            title: '流体力学操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '3 个 .fluid-mode-btn 切换：势流叠加（自定义点源/汇/涡）/ 圆柱绕流（Magnus 升力效应）/ 伯努利管（变截面流速压强变化）' },
+                { icon: 'sliders-horizontal', text: '不同模式滑块：fluid-uniform-u 来流速度；fluid-cyl-gamma 圆柱环量 Γ；fluid-bern-constrict 管道收缩比；4 个 .fluid-preset-btn 一键载入 Rankine/偶极子/双源/涡对' },
+                { icon: 'play', text: 'fluid-pause 暂停/继续流场动画；fluid-reset 复位粒子；fluid-bern-toggle 切换是否显示压强场色彩' },
+                { icon: 'eye', text: '画布绘制：流线 + 等势线 + 示踪粒子；圆柱绕流模式可观察 Γ ≠ 0 时上下流速不对称、产生升力 L=ρUΓ' },
+                { icon: 'book-open', text: '连续性方程 A₁v₁=A₂v₂（不可压）；伯努利方程 p+½ρv²+ρgh=const（流速大处压强小）；Magnus 升力 L=ρUΓ（球类弧线球原理）（人教版选必三第3章）' }
+            ]
+        },
+        'sorting-compare': {
+            title: '排序对比操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '5 种排序算法 5 个画布并排同步演示：冒泡 Bubble / 选择 Selection / 插入 Insertion / 快排 Quick / 归并 Merge' },
+                { icon: 'sliders-horizontal', text: 'sortcmp-size 调数组规模 N（默认 30）；sortcmp-speed 调动画速度（步/秒）；可直观对比 O(n²) 与 O(n log n) 的差距' },
+                { icon: 'play', text: 'sortcmp-start 同时开始所有算法、随时暂停继续；sortcmp-gen 重新生成随机数据再次对比' },
+                { icon: 'eye', text: '每个画布显示该算法的当前比较元素（红色高亮）、已排序部分（绿色）、未排序部分（蓝色），底部实时显示比较次数与交换次数' },
+                { icon: 'book-open', text: '冒泡/选择/插入：O(n²)；快排平均 O(n log n) 最坏 O(n²)；归并 O(n log n) 稳定但需 O(n) 额外空间；插入排序在小规模或基本有序数据上很快（高中信息技术算法基础）' }
+            ]
         }
     },
 
