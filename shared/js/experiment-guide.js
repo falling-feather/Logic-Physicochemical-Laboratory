@@ -544,6 +544,36 @@ const ExperimentGuide = {
                 { icon: 'eye', text: '每个画布显示该算法的当前比较元素（红色高亮）、已排序部分（绿色）、未排序部分（蓝色），底部实时显示比较次数与交换次数' },
                 { icon: 'book-open', text: '冒泡/选择/插入：O(n²)；快排平均 O(n log n) 最坏 O(n²)；归并 O(n log n) 稳定但需 O(n) 额外空间；插入排序在小规模或基本有序数据上很快（高中信息技术算法基础）' }
             ]
+        },
+        'search-algorithms': {
+            title: '搜索算法操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '页面有 3 个独立模块：① 数组搜索（4 个 .sc-mode-btn 线性 O(n)/二分 O(log n)/插值 O(log log n)/跳跃 O(√n)）；② 二叉搜索树（.tree-presets 选预设）；③ 哈希表搜索 hash-canvas' },
+                { icon: 'sliders-horizontal', text: 'bs-target 输入查找目标（默认 1~100 整数）；bs-speed / tree-speed / hash-speed 分别调三个模块的动画速度' },
+                { icon: 'play', text: '点 .sc-mode-btn 切换算法立即开始动画；树模块点节点观察查找路径；哈希模块演示插入冲突与开放寻址/链地址法' },
+                { icon: 'eye', text: '数组：当前指针 + low/high/mid 高亮；树：从根递归向左/右子树高亮路径；哈希：哈希函数 h(k)=k%m 计算位置 + 冲突时探测' },
+                { icon: 'book-open', text: '线性 O(n)（无序也行）；二分 O(log n)（必须有序）；插值适用于均匀分布；跳跃 O(√n) 介于两者；BST 平均 O(log n) 最坏 O(n)；哈希平均 O(1)（高中信息技术）' }
+            ]
+        },
+        'dynamic-programming': {
+            title: '动态规划操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '经典 0/1 背包问题动画演示：物品列表 + 容量 W → 二维 DP 表格 dp[i][j] = 前 i 个物品装入容量 j 的最大价值' },
+                { icon: 'sliders-horizontal', text: 'dp-speed 调动画速度（0.5~5 步/秒），便于慢速观察每一格的状态转移' },
+                { icon: 'play', text: 'dp-play 自动逐格填表；dp-step 手动单步填一格观察状态转移；dp-reset 复位整张 DP 表' },
+                { icon: 'eye', text: '画布展示 DP 表格滚动填充过程：当前正在计算的 dp[i][j] 高亮 + 状态转移箭头来源（dp[i-1][j] 不取 / dp[i-1][j-w]+v 取）+ 最终回溯选中的物品' },
+                { icon: 'book-open', text: '0/1 背包状态转移：dp[i][j]=max(dp[i-1][j], dp[i-1][j-w[i]]+v[i])（若 j≥w[i]）；时间 O(nW)、空间 O(nW)（可压一维 O(W)）（高中信息技术算法进阶）' }
+            ]
+        },
+        'string-matching': {
+            title: '字符串匹配操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '2 个 .strmatch-algo-btn 切换：KMP（利用 next 数组跳过已比较前缀）/ 暴力匹配 Brute Force（每次失败回退一格）' },
+                { icon: 'sliders-horizontal', text: '可在输入框修改主串 text 与模式串 pattern；strmatch-speed 调动画速度' },
+                { icon: 'play', text: 'strmatch-play 自动播放、strmatch-step 单步执行、strmatch-reset 复位指针；KMP 模式额外显示 next/fail 数组的构建过程' },
+                { icon: 'eye', text: '画布：主串字符 + 模式串字符 + 当前对齐位置 + 匹配/失配高亮（绿/红）；strmatch-info 显示比较次数与匹配成功位置' },
+                { icon: 'book-open', text: '暴力 O(nm)；KMP O(n+m) — 通过 next 数组（最长前后缀）跳过已知不匹配位置；适用于大文本搜索（编辑器查找、DNA 序列、网络包检测）（高中信息技术）' }
+            ]
         }
     },
 

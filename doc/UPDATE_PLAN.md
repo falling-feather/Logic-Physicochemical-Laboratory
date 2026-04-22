@@ -185,7 +185,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.13** | **任务 3 物理电磁学三件套：optics + electromagnetic-induction + alternating-current 各加 5 步定制引导 + 5 题测验（透镜公式 1/u+1/v=1/f、法拉第 ε=-dΦ/dt、变压器匝数比），物理 9/17** | ✅**已完成** |
 | **v4.1.14** | **任务 3 物理力学三件套：force-composition + momentum-conservation + gravitation 各加 5 步定制引导 + 5 题测验（平行四边形定则、3 种碰撞型式、万有引力 F=GMm/r²），物理 12/17** | ✅**已完成** |
 | **v4.1.15** | **任务 3 物理高阶三件套：electromagnetic + charged-particle + relativity 各加 5 步定制引导 + 5 题测验（库仑 E=kQ/r²、洛伦兹力 r=mv/(qB)、相对论 γ=1/√(1−β²)），物理 15/17** | ✅**已完成** |
-| **v4.1.16** | **任务 3 物理收尾 + 算法起步：energy-conservation + fluid-dynamics + sorting-compare 各加 5 步定制引导 + 5 题测验（机械能守恒、伯努利、排序复杂度），物理 17/17 ✅ 、算法 1/8 起步** | ✅**已完成（当前版本）** |
+| **v4.1.16** | **任务 3 物理收尾 + 算法起步：energy-conservation + fluid-dynamics + sorting-compare 各加 5 步定制引导 + 5 题测验（机械能守恒、伯努利、排序复杂度），物理 17/17 ✅ 、算法 1/8 起步** | ✅已完成 |
+| **v4.1.17** | **任务 3 算法三件套：search-algorithms + dynamic-programming + string-matching 各加 5 步定制引导 + 5 题测验（二分查找、背包 DP、KMP），算法 4/8 、引导 52/63 、测验 61/63** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -816,6 +817,42 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - 引导定制化：49 / 63（化学 11/11 ✅ + 数学 15/15 ✅ + 物理 17/17 ✅ + 生物 6 + 算法 1/8 起步）
 - 测验题库：58 / 63
 - **里程碑：3 学科全满（化学 + 数学 + 物理）、5 学科全启动！**
+
+### 后续候选
+- v4.1.17 — 算法推进：search-algorithms + dynamic-programming + string-matching 各 5 步（算法 4/8）
+- v4.1.17 — 生物推进：immune-system + ecosystem + neural-regulation 各 5 步（生物 9/13）
+- 任务 5 — 镜空科技风星球
+- 任务 6 — 移动端深度优化
+---
+
+## 三十、2026-04-22 v4.1.17 算法三件套（搜索+动态规划+字符串匹配）
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增 3 条：
+  - `search-algorithms`（5 步：3 个独立模块 数组搜索 4 个 .sc-mode-btn（线性/二分/插值/跳跃）+ 二叉搜索树 .tree-presets + 哈希表 hash-canvas / bs-target+bs-speed/tree-speed/hash-speed / 切换算法即开始 / 当前指针 low/high/mid 高亮+树查找路径+哈希冲突探测 / 线性 O(n)、二分 O(log n) 必须有序、跳跃 O(√n)、BST 平均 O(log n)、哈希 O(1)）
+  - `dynamic-programming`（5 步：0/1 背包 dp[i][j] 表格填充 / dp-speed 0.5~5 步/秒 / dp-play+step+reset / 当前格高亮+状态转移箭头+回溯选物品 / dp[i][j]=max(dp[i-1][j], dp[i-1][j-w]+v)、O(nW) 时间空间、可压一维 O(W)）
+  - `string-matching`（5 步：2 个 .strmatch-algo-btn KMP/暴力 / text+pattern 输入框+strmatch-speed / play+step+reset 单步执行 / 主串+模式串对齐+匹配/失配高亮+next 数组构建 / 暴力 O(nm)、KMP O(n+m) 通过 next 数组跳过已比较前缀）
+- `shared/js/quiz-data.js`：
+  - `search-algorithms` 新建 5 题（二分前提有序、log₂(1024)=10 次、哈希平均 O(1)、BST 平衡度、4 算法复杂度对比）
+  - `dynamic-programming` 把旧 3 题扩充为 5 题（DP 两特征、0/1 背包转移方程、O(nW)、Fibonacci 递归 O(2ⁿ) vs DP O(n)、LCS 适用 DP）
+  - `string-matching` 新建 5 题（KMP 核心改进、暴力 O(nm)、ABCABD next=[0,0,0,1,2,0]、KMP O(n+m)、3 大应用场景）
+  - 修复 `dynamic-programming` key 重复（旧 3 题位于 343 行覆盖了我新加的 5 题）→ 删除新加块，把旧块原地升级为 5 题
+- `sw.js` CACHE_NAME `englab-static-v20260422p` → `v20260422r`（中间 q 因 dp_q=3 修复）
+- `index.html` cache bust：experiment-guide.js & quiz-data.js 同步升级 `?v=20260422r`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches 后硬重载，6 项数据全部正确（3 标题 + 3 × 5 步 + 3 × 5 题），dp_q 从 3 修复为 5
+
+### 当前覆盖度
+- 引导定制化：52 / 63（化学 11/11 ✅ + 数学 15/15 ✅ + 物理 17/17 ✅ + 生物 6 + 算法 4/8）
+- 测验题库：61 / 63
+- **算法领域 4/8 ≡ 半数完成，仅余 graph-algo + data-structures + recursion-vis + 1**
+
+### 后续候选
+- v4.1.18 — 算法收尾：data-structures + recursion-vis + graph-algo 各 5 步（算法 7/8）
+- v4.1.18 — 转向生物：immune-system + ecosystem + neural-regulation 各 5 步
+- 任务 5 — 镜空科技风星球
+- 任务 6 — 移动端深度优化
 
 ### 后续候选
 - v4.1.17 — 算法推进：search-algorithms + dynamic-programming + string-matching 各 5 步（算法 4/8）
