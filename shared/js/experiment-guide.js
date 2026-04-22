@@ -424,6 +424,36 @@ const ExperimentGuide = {
                 { icon: 'eye', text: '画布固定圆周轨道 + 小球；速度始终沿切线方向，向心加速度始终指向圆心，二者垂直恒定不变（匀速圆周）' },
                 { icon: 'book-open', text: '关键公式：v=ωr，a=ω²r=v²/r，F=ma=mω²r=mv²/r；周期 T=2π/ω；ω 与 r 独立可调（人教版必修二第6章）' }
             ]
+        },
+        'optics': {
+            title: '光学操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '6 个 .optics-mode-btn 切换模式：透镜成像 lens / 双缝干涉 doubleslit / 折射与全反射 refraction / 棱镜色散 prism / 衍射光栅 grating / 偏振 polarization' },
+                { icon: 'sliders-horizontal', text: '透镜模式：optics-focal 调焦距 f、optics-objdist 调物距 u；折射模式：optics-n1/n2 调两介质折射率；双缝模式：optics-slitsep 缝距、optics-wavelength 波长' },
+                { icon: 'play', text: 'optics-pause/reset 控制动画；双缝模式额外有 optics-slit-toggle 单独控制干涉条纹动画播放/暂停' },
+                { icon: 'eye', text: '画布按当前模式渲染：透镜画三条特殊光线 + 像；双缝画明暗条纹；折射画入射/折射/反射光线 + 临界角；棱镜分光 7 色' },
+                { icon: 'book-open', text: '透镜公式 1/u + 1/v = 1/f；折射定律 n₁sinθ₁ = n₂sinθ₂；干涉条纹间距 Δy = λL/d；全反射临界角 sinC = n₂/n₁（人教版选必一第4章）' }
+            ]
+        },
+        'electromagnetic-induction': {
+            title: '电磁感应操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '2 个 .emi-mode-btn 切换：手动 manual（鼠标/触屏拖拽磁铁）/ 自动 auto（磁铁匀速往复穿过线圈）' },
+                { icon: 'hand', text: '手动模式：拖拽磁铁穿过线圈，速度越快感应电动势 ε 越大；emi-info 实时显示磁通量 Φ 与电动势 ε' },
+                { icon: 'play', text: '#emi-pause 暂停/继续，#emi-reset 复位时间与磁铁位置（自动切回 manual）' },
+                { icon: 'eye', text: '画布渲染线圈 + 磁铁 + 电流方向箭头 + 安培计读数；磁铁靠近线圈→Φ 增大、远离→Φ 减小，感应电流方向相反（楞次"来拒去留"）' },
+                { icon: 'book-open', text: '法拉第 ε = −dΦ/dt；磁通量 Φ = BS·cosθ；导体切割 ε = BLv；楞次定律：感应电流的磁场总阻碍引起它的磁通量变化（人教版选必二第2章）' }
+            ]
+        },
+        'alternating-current': {
+            title: '交变电流操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '3 个 .ac-mode-btn 切换：波形（u-t 正弦曲线）/ 相量图（旋转矢量）/ 变压器（原副线圈匝数比）' },
+                { icon: 'sliders-horizontal', text: 'ac-freq 调频率 f（中国 50 Hz、美国 60 Hz）、ac-phase 调初相位 φ；变压器模式：ac-n1 / ac-n2 分别调原/副线圈匝数 N₁/N₂' },
+                { icon: 'play', text: 'ac-speed 调动画速度；ac-pause 暂停/继续；ac-reset 复位时间与所有参数（频率回 50、相位回 30°）' },
+                { icon: 'eye', text: '波形模式：u = U₀sin(2πft+φ) 滚动绘制；相量模式：旋转矢量 + 投影；变压器模式：原副线圈电压条形图实时联动 N₂/N₁' },
+                { icon: 'book-open', text: '正弦交流 u=U₀sin(ωt)；有效值 U=U₀/√2（≈0.707U₀）；变压器电压比 U₁/U₂=N₁/N₂、电流比反比 I₁/I₂=N₂/N₁；功率守恒 U₁I₁=U₂I₂（人教版选必二第3章）' }
+            ]
         }
     },
 

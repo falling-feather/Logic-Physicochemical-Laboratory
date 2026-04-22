@@ -181,7 +181,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.9** | **任务 3 数学推进：function-properties + set-operations + permutation-combination 各加 5 步定制引导 + 测验题全部新增各 5 题（嵌入奇偶函数判定、德摩根律、二项式定理等）** | ✅**已完成** |
 | **v4.1.10** | **任务 3 数学冲刺完结：exp-log + geometry + complex-numbers 各加 5 步定制引导 + 测验题全部新增各 5 题（提及指对互为反函数、仿射变换不可交换、欧拉公式 e^(iπ)+1=0 等）** | ✅**已完成** |
 | **v4.1.11** | **任务 3 数学完结 + 起步物理：solid-geometry + circuit-analysis + waves 各加 5 步定制引导 + 5 题测验（冸台体欧拉 V-E+F=2、串联/并联分压分流、波速 v=fλ与多普勒），数学 15/15 ✅** | ✅**已完成** |
-| **v4.1.12** | **任务 3 物理运动学三件套：kinematics + projectile + circular-motion 各加 5 步定制引导 + 5 题测验（匀变速 v²−v₀²=2as、斜抛 45° 最远、圆周 v=ωr/F=mv²/r），物理 6/17** | ✅**已完成（当前版本）** |
+| **v4.1.12** | **任务 3 物理运动学三件套：kinematics + projectile + circular-motion 各加 5 步定制引导 + 5 题测验（匀变速 v²−v₀²=2as、斜抛 45° 最远、圆周 v=ωr/F=mv²/r），物理 6/17** | ✅**已完成** |
+| **v4.1.13** | **任务 3 物理电磁学三件套：optics + electromagnetic-induction + alternating-current 各加 5 步定制引导 + 5 题测验（透镜公式 1/u+1/v=1/f、法拉第 ε=-dΦ/dt、变压器匝数比），物理 9/17** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -789,7 +790,37 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - v4.1.12 — 转向生物领域（immune-system / ecosystem / neural-regulation）
 - 任务 5 — 镜空科技风星球
 - 任务 6 — 移动端深度优化
+---
 
+## 二十六、2026-04-22 v4.1.13 物理电磁学三件套（光学+电磁感应+交流）
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增 3 条：
+  - `optics`（5 步：6 个 .optics-mode-btn 透镜/双缝/折射/棱镜/光栅/偏振 / 透镜 focal+objdist、双缝 slitsep+wavelength、折射 n1+n2 / pause+reset+slit-toggle / 6 种渲染顶点与条纹 / 透镜+折射+干涉+全反射 4 公式）
+  - `electromagnetic-induction`（5 步：2 个 .emi-mode-btn manual/auto / 拖拽磁铁+emi-info / pause+reset / 线圈+磁铁+电流箭头与楞次"来拒去留" / 法拉第、磁通量、切割 BLv、楞次定律）
+  - `alternating-current`（5 步：3 个 .ac-mode-btn 波形/相量/变压器 / ac-freq+phase、变压器 ac-n1/n2 / ac-speed+pause+reset / 三种模式渲染 / U₀与U、变压器电压/电流反比公式）
+- `shared/js/quiz-data.js` 3 个题池全部新建各 5 题：
+  - `optics`（透镜 u=f 无限远、水介质 30°近⋅sin22°、双缝宽度与 λ 与 d 关系、临界角 sinC=1/n、棱镜紫光偏折最大）
+  - `electromagnetic-induction`（法拉第 ε=-dΦ/dt、楞次来拒、BLv=4V、磁通量 0.2Wb、感应电流根本原因是磁通量变化）
+  - `alternating-current`（中国 50Hz、峰值 311V→有效 220V、有效值热效应定义、变压器降压 220→44V、电流比与匝数比反比）
+- `sw.js` CACHE_NAME `englab-static-v20260422l` → `v20260422m`
+- `index.html` cache bust：experiment-guide.js & quiz-data.js 同步升级 `?v=20260422m`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches 后硬重载，6 项数据全部正确（3 标题 + 3 × 5 步 + 3 × 5 题）
+
+### 当前覆盖度
+- 引导定制化：40 / 63（化学 11/11 ✅ + 数学 15/15 ✅ + 物理 9/17 + 生物 6 + 算法 0）
+- 测验题库：49 / 63
+- **物理过半！运动学三件套 + 电磁学三件套 + 波动 + 电路 + 立体）**
+
+### 后续候选
+- v4.1.14 — 物理力学三件套：force-composition + momentum-conservation + gravitation 各 5 步
+- v4.1.14 — 物理高阶三件套：electromagnetic + charged-particle + relativity 各 5 步
+- v4.1.14 — 转向算法领域（sorting-compare / dynamic-programming / string-matching）
+- v4.1.14 — 转向生物领域（immune-system / ecosystem / neural-regulation）
+- 任务 5 — 镜空科技风星球
+- 任务 6 — 移动端深度优化
 ---
 
 ## 二十五、2026-04-22 v4.1.12 物理运动学三件套
