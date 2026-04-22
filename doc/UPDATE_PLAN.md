@@ -168,7 +168,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.0.7** | **Batch 1 修复：`momentum-conservation.js` Canvas 字号 8/9/10/11px → 12px + CF.sans（10 处）** | ✅**已完成** |
 | **v4.0.8** | **Batch 2 修复：3 个物理文件 24 处硬编码字体 → `CF.sans` / `var(--font-mono)`** | ✅**已完成** |
 | **v4.0.9** | **顺手补充：`force-composition.js` 残留 2 处 11px 字号 → 12px** | ✅**已完成** |
-| **v4.0.10** | **Batch 3 物理化学批复核：4 个 `_injectEduPanel` 被鉴定为幂等误报（表项关闭）** | ✅**已完成（当前版本）** |
+| **v4.0.10** | **Batch 3 物理化学批复核：4 个 `_injectEduPanel` 被鉴定为幂等误报（表项关闭）** | ✅**已完成** |
+| **v4.1.0** | **Batch 3 生物批复核：9 个 `_injectInfoPanel` 同样为幂等误报，§二B 整张表 13 项全部关闭** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -391,3 +392,65 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 
 - 审计报告基于正则扫描，对"幂等"的判断不应停留在"`if (!el) return;` 仅一道护栏不足"，而应具体看后续是 `appendChild` 还是 `innerHTML = `
 - 后续 Batch 3 生物批应在动手前先逐个 `read_file` 核实模式，避免编造修复
+
+
+---
+
+## 十三、2026-04-22 v4.1.0 Batch 3 生物批复核（本轮）
+
+### 任务
+
+按 UI_AUDIT_v4.0.5 §二B 表格，对 9 个生物 `_injectInfoPanel` 实施"幂等防护"补丁。
+
+### 复核方法
+
+并行 read_file 9 个文件的 `_injectInfoPanel` 实现 18~30 行片段。
+
+### 复核结论 — 9 项全部为误报
+
+| 文件 | 行号 | 实现核心语句 | 判定 |
+|------|------|-------------|------|
+| `pages/biology/cell-structure.js` | L913 | `el.innerHTML = '...'` | ✅ 天然幂等 |
+| `pages/biology/dna-helix.js` | L855 | `el.innerHTML = '...'` | ✅ 天然幂等 |
+| `pages/biology/cellular-respiration.js` | L399 | `el.innerHTML = '...'` | ✅ 天然幂等 |
+| `pages/biology/gene-expression.js` | L384 | `el.innerHTML = '...'` | ✅ 天然幂等 |
+| `pages/biology/meiosis.js` | L373 | `el.innerHTML = '...'` | ✅ 天然幂等 |
+| `pages/biology/mitosis.js` | L521 | `el.innerHTML = '...'` | ✅ 天然幂等 |
+| `pages/biology/genetics.js` | L644 | `el.innerHTML = '...'` | ✅ 天然幂等 |
+| `pages/biology/photosynthesis.js` | L873 | `box.innerHTML = '...'` | ✅ 天然幂等 |
+| `pages/biology/substance-transport.js` | L302 | `el.innerHTML = '...'` | ✅ 天然幂等 |
+
+### 总体结论
+
+- v4.0.10 + v4.1.0 累计核实 **13 项**，**全部为审计误报**
+- UI_AUDIT_v4.0.5 §二B 整张表清单关闭
+- 项目实际不存在 `_inject*` 累积式 DOM 泄漏问题（`appendChild` 模式仅出现在 `optics.js` / `fluid-dynamics.js` 且已正确去重）
+
+### 审计方法论修订
+
+> 后续若再启动 UI 审视，扫描 `_inject*` 幂等问题需用以下两段式正则：
+>
+> ```regex
+> _inject\w+Panel\s*\(\)\s*\{[\s\S]{0,500}(appendChild|insertAdjacentHTML)
+> ```
+>
+> 仅命中**追加式 DOM 操作**才属真问题；纯 `innerHTML = ` 赋值不计入。
+
+### UI_AUDIT_v4.0.5 整体收官
+
+| 维度 | 真问题 | 已修复 | 误报 |
+|------|--------|--------|------|
+| Canvas 字号过小 | 12 | 12 (v4.0.7 + v4.0.9) | 0 |
+| 硬编码字体 | 24 | 24 (v4.0.8) | 0 |
+| _inject 幂等缺失 | 0 | 0 | **13** |
+| Canvas 高度复制 | 0 | — | 0 |
+
+至此 v4.0.5 基线审视报告**全部关闭**，实际修复 36 处真问题，关闭 13 项误报。
+
+### 后续展望（v4.1.x+）
+
+按用户意愿处理：
+- 任务 3：引导/测验定制化
+- 任务 5：镂空科技风星球（独立分支 feature/holographic-planets）
+- 任务 6：移动端适配审视
+- 任务 8：Phase 2 新增实验

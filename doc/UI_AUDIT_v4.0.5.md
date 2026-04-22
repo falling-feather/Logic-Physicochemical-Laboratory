@@ -44,7 +44,7 @@
 | `pages/physics/charged-particle.js` | 200 | `_injectEduPanel` | `wrap.innerHTML = '...'` | ✅ 幂等误报 |
 | `pages/physics/force-composition.js` | 690 | `_injectEduPanel` | `edu.innerHTML = content[mode]` | ✅ 幂等误报（模式切换需覆盖是必要行为） |
 | `pages/physics/momentum-conservation.js` | 594 | `_injectEduPanel` | `edu.innerHTML = '...'` | ✅ 幂等误报 |
-| `pages/biology/*.js` × 9 | 多 | `_injectInfoPanel` | 待 v4.1.0 逐个核实 | ⚠️ 待复核 |
+| `pages/biology/*.js` × 9 | 多 | `_injectInfoPanel` | 全部为 `el.innerHTML = '...'` | ✅ 幂等误报（v4.1.0 复核完成） |
 
 > **判定准则**：面板实现中出现 `appendChild` / `insertAdjacentHTML` 且未以 `getElementById` 检查唯一性才是真问题。**纯 `innerHTML = ...` 赋值不是问题**。
 
