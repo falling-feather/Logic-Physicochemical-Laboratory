@@ -634,6 +634,36 @@ const ExperimentGuide = {
                 { icon: 'eye', text: '食物链模式：3 层金字塔 + 能量传递箭头（递减约 10~20%）；种群模式：捕食者与猎物数量随时间振荡的相位曲线（猎物先增→捕食者增→猎物降→捕食者降）' },
                 { icon: 'book-open', text: '人教版必修 3 第 5 章：能量沿食物链单向流动+逐级递减（10~20% 传递效率，不可循环）；物质循环（碳/氮/水）；种群密度调节通过出生率-死亡率-迁入迁出，K 值=环境容纳量（Logistic 增长）' }
             ]
+        },
+        'neural-regulation': {
+            title: '神经调节操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '.neural-mode-btn[data-mode] 切换两种视图：突触传递（前膜释放神经递质 → 后膜受体结合）/ 动作电位（-70mV 静息电位 → +40mV 去极化 → 复极化曲线）' },
+                { icon: 'zap', text: '#neural-fire 触发一次神经冲动（动作电位模式下产生一个"火花"沿轴突传导）；#neural-pause 暂停/继续；#neural-speed 滑块（同步显示在 #neural-speed-val）调节传导速度' },
+                { icon: 'eye', text: '突触传递模式：可见突触小泡胞吐释放 ACh、Ca²⁺ 内流触发胞吐、递质扩散到后膜与受体结合开离子通道；动作电位模式：膜电位曲线随时间扫描显示去极化/复极化/超极化三相' },
+                { icon: 'info', text: '#neural-info 面板分块显示突触小泡、Ca²⁺ 内流、受体结合、信号终止等关键过程，并标注 Na⁺/K⁺ 通道在去极化与复极化中的作用' },
+                { icon: 'book-open', text: '人教版选必 1 第 2 章：静息电位由 K⁺ 外流形成（内负外正 -70mV）；动作电位由 Na⁺ 内流引起（峰值 +40mV）；突触传递单向（前膜→间隙→后膜），递质必须被酶降解（如 AChE）或回收终止信号' }
+            ]
+        },
+        'cellular-respiration': {
+            title: '细胞呼吸操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '#cell-resp-controls 内的 .cellresp-btn 切换三阶段：糖酵解（细胞质基质，1 葡萄糖 → 2 丙酮酸 + 2ATP + 2NADH，无需 O₂）/ 柠檬酸循环（线粒体基质，2 丙酮酸 → 6CO₂ + 2ATP + 8NADH + 2FADH₂）/ 电子传递链（线粒体内膜，NADH/FADH₂ + O₂ → 34ATP + H₂O）' },
+                { icon: 'eye', text: '#cell-resp-canvas 上动态绘制对应细胞器场所（细胞质基质 / 线粒体基质 / 内膜嵴），底物分子流动 → 能量载体（NADH/ATP）生成的全过程' },
+                { icon: 'info', text: '#cellresp-stage-display 显示当前阶段名称，#cellresp-stage-loc 显示反应场所，#cellresp-atp-info 累计能量产出（最终约 38 ATP/葡萄糖）' },
+                { icon: 'gauge', text: '同步对比：糖酵解 = 2 ATP（厌氧也行）、柠檬酸 = 2 ATP、电子传递链 = 34 ATP（氧化磷酸化贡献最大，依赖 O₂ 作终末电子受体）' },
+                { icon: 'book-open', text: '人教版必修 1 第 5 章：有氧呼吸总反应 C₆H₁₂O₆ + 6O₂ + 6H₂O → 6CO₂ + 12H₂O + 能量(38 ATP)；无氧呼吸（发酵）只有糖酵解阶段，产物为乳酸（动物/乳酸菌）或乙醇+CO₂（酵母菌），仅释放 2 ATP' }
+            ]
+        },
+        'substance-transport': {
+            title: '物质运输操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '#substance-transport-controls 内的 .strans-btn 切换四种跨膜运输方式：自由扩散（O₂/CO₂/H₂O 顺浓度，无载体无 ATP）/ 协助扩散（葡萄糖入红细胞，需载体不耗能）/ 主动运输（Na⁺-K⁺ 泵逆浓度，需载体+ATP）/ 胞吞胞吐（大分子囊泡进出）' },
+                { icon: 'eye', text: '#substance-transport-canvas 动态展示磷脂双分子层、嵌入的载体蛋白构象变化、ATP 水解释能（主动运输模式下可见 ATP→ADP+Pi）、囊泡形成与融合' },
+                { icon: 'info', text: '#strans-mode-display 实时显示当前方式名称，#strans-mode-desc 显示其特征（顺/逆浓度、是否需载体、是否耗能）' },
+                { icon: 'gauge', text: '一表对比：自由扩散+协助扩散 = 被动运输（顺浓度，不耗能，差别在是否需载体）；主动运输+胞吞胞吐 = 需要细胞代谢能量（ATP）' },
+                { icon: 'book-open', text: '人教版必修 1 第 4 章：细胞膜的流动镶嵌模型（磷脂双分子层 + 蛋白质 + 多糖），运输方式由分子大小、极性、浓度梯度共同决定；胞吞胞吐体现膜的流动性，是大分子（如蛋白质、多糖）进出细胞的唯一方式' }
+            ]
         }
     },
 

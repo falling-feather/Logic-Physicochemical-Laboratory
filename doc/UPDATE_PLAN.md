@@ -188,7 +188,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.16** | **任务 3 物理收尾 + 算法起步：energy-conservation + fluid-dynamics + sorting-compare 各加 5 步定制引导 + 5 题测验（机械能守恒、伯努利、排序复杂度），物理 17/17 ✅ 、算法 1/8 起步** | ✅已完成 |
 | **v4.1.17** | **任务 3 算法三件套：search-algorithms + dynamic-programming + string-matching 各加 5 步定制引导 + 5 题测验（二分查找、背包 DP、KMP），算法 4/8 、引导 52/63 、测验 61/63** | ✅已完成 |
 | **v4.1.18** | **任务 3 算法收尾三件套：data-structures + recursion-vis + graph-algo 各加 5 步定制引导 + 5 题测验（栈队列 BST、递归三要素、Dijkstra），算法 7/8 、引导 55/63 、测验 63/63 ✅ 满分** | ✅已完成 |
-| **v4.1.19** | **任务 3 算法岁月 ✅ + 生物启动：sorting + immune-system + ecosystem 各加 5 步定制引导 + 5 题测验（桶排序、人体免疫 3 道防线、能量流动 10％），算法 8/8 ✅ 、生物 8/13 、引导 58/63** | ✅**已完成（当前版本）** |
+| **v4.1.19** | **任务 3 算法岁月 ✅ + 生物启动：sorting + immune-system + ecosystem 各加 5 步定制引导 + 5 题测验（桶排序、人体免疫 3 道防线、能量流动 10％），算法 8/8 ✅ 、生物 8/13 、引导 58/63** | ✅已完成 |
+| **v4.1.20** | **任务 3 生物 A 套：neural-regulation + cellular-respiration + substance-transport 各加 5 步定制引导 + 5 题测验（突触/动作电位/Na⁺/K⁺、有氧呼吸三阶段38ATP、跨膜运输四方式），生物 11/13 、引导 61/63** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -911,6 +912,33 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 ### 后续候选
 - v4.1.20 — 生物三件套：neural-regulation + cellular-respiration + substance-transport 各 5 步（生物 11/13）
 - v4.1.20 — 生物三件套B：meiosis + gene-expression + gene-mutation 各 5 步（生物 11/13）
+- 任务 5 — 镜空科技风星球
+- 任务 6 — 移动端深度优化
+---
+
+## 三十三、2026-04-22 v4.1.20 生物 A 套（神经调节 + 细胞呼吸 + 物质运输）
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增 3 条：
+  - `neural-regulation`（5 步：.neural-mode-btn[data-mode] 突触传递/动作电位 / #neural-fire 触发冲动 + #neural-pause + #neural-speed / Na⁺ 内流去极化、K⁺ 外流复极化 / ACh·Ca²⁺·AChE 递质代谢 / 人教选必 1 第 2 章）
+  - `cellular-respiration`（5 步：#cell-resp-controls 内 .cellresp-btn 三阶段切换（糖酰解 / 柠檬酸循环 / 电子传递链） / 38 ATP 能量产出累计 / 肧量性肨运输链依赖 O₂ / 產酅菌发酵产乙醇 / 人教必修 1 第 5 章）
+  - `substance-transport`（5 步：#substance-transport-controls 内 .strans-btn 四方式（自由扩散/协助扩散/主动运输/胞吞胞吐） / Na⁺-K⁺ 泵逆浓耗 ATP / GLUT1 载体 / 胞吞胞吐依赖膜流动性 / 淸水中红细胞渗透溶血 / 人教必修 1 第 4 章）
+- `shared/js/quiz-data.js` 新增 3 个池：
+  - `neural-regulation` 5 题（静息电位·动作电位·突触单向·递质清除·反射弧 5 部分）
+  - `cellular-respiration` 5 题（总反应式·三阶段产能·糖酰解场所·O₂ 作用·酵母发酵）
+  - `substance-transport` 5 题（红细胞董萄糖 GLUT1·主动 vs 协助·自由扩散特征·胞吞胞吐·渗透溶血）
+- `sw.js` CACHE_NAME `englab-static-v20260422t` → `v20260422u`
+- `index.html` cache bust 同步升级 `?v=20260422u`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches 后硬重载，9 项数据全部正确（3 标题 + 3 × 5 步 + 3 × 5 题）
+
+### 当前覆盖度
+- 引导定制化：61 / 63（化学 11/11 ✅ + 数学 15/15 ✅ + 物理 17/17 ✅ + 算法 8/8 ✅ + 生物 11/13）
+- **跨越門檻：生物 11/13、仅余 meiosis + gene-expression + gene-mutation 即可 生物 14/13 全接1 【全接2 100% 进在咫尺】**
+
+### 后续候选
+- v4.1.21 — 生物收尾三件套：meiosis + gene-expression + gene-mutation（生物 14/13 ✅ 全接2 100%）
 - 任务 5 — 镜空科技风星球
 - 任务 6 — 移动端深度优化
 
