@@ -1,4 +1,4 @@
-const CACHE_NAME = 'englab-static-v20260422z';
+const CACHE_NAME = 'englab-static-v20260422zc';
 const APP_SHELL = [
   './',
   './index.html',
@@ -13,7 +13,7 @@ const APP_SHELL = [
   './shared/js/experiment-favorites.js?v=20260418f',
   './shared/js/experiment-rating.js?v=20260418g',
   './shared/js/module-selector.js?v=20260418q',
-  './shared/js/router.js?v=20260418q',
+  './shared/js/router.js?v=20260418q2',
   './shared/js/scroll-animations.js?v=20260417c',
   './shared/js/cards.js?v=20260417c',
   './shared/js/common.js?v=20260417c',
@@ -31,7 +31,7 @@ const APP_SHELL = [
   './shared/css/experiment-favorites.css?v=20260418f',
   './shared/css/experiment-rating.css?v=20260422z',
   './shared/css/responsive.css?v=20260417c',
-  './pages/home/home.css?v=20260422d'
+  './pages/home/home.css?v=20260422e',
 ];
 
 self.addEventListener('install', (event) => {
