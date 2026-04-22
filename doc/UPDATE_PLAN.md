@@ -169,7 +169,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.0.8** | **Batch 2 修复：3 个物理文件 24 处硬编码字体 → `CF.sans` / `var(--font-mono)`** | ✅**已完成** |
 | **v4.0.9** | **顺手补充：`force-composition.js` 残留 2 处 11px 字号 → 12px** | ✅**已完成** |
 | **v4.0.10** | **Batch 3 物理化学批复核：4 个 `_injectEduPanel` 被鉴定为幂等误报（表项关闭）** | ✅**已完成** |
-| **v4.1.0** | **Batch 3 生物批复核：9 个 `_injectInfoPanel` 同样为幂等误报，§二B 整张表 13 项全部关闭** | ✅**已完成（当前版本）** |
+| **v4.1.0** | **Batch 3 生物批复核：9 个 `_injectInfoPanel` 同样为幂等误报，§二B 整张表 13 项全部关闭** | ✅**已完成** |
+| **v4.1.1** | **任务 6 移动端适配审视：viewport / 断点体系 / 触控事件配套检查，产出 MOBILE_AUDIT_v4.1.1.md** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -454,3 +455,34 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - 任务 5：镂空科技风星球（独立分支 feature/holographic-planets）
 - 任务 6：移动端适配审视
 - 任务 8：Phase 2 新增实验
+
+
+---
+
+## 十四、2026-04-22 v4.1.1 移动端适配审视（本轮）
+
+### 审视方法
+
+代码层扫描三大维度：
+
+1. **viewport meta**：`grep "viewport" index.html` → ✅ 已配
+2. **响应式断点分布**：扫描 `@media[^{]+max-width` 全工程
+3. **Canvas 触控事件配套**：扫描 `addEventListener('(touchstart|touchmove|touchend|mousedown|mousemove)'`
+
+### 主要发现
+
+详见 [doc/MOBILE_AUDIT_v4.1.1.md](MOBILE_AUDIT_v4.1.1.md)。摘要：
+
+- ✅ **断点体系完整**：1024 / 768 / 640 / 480 四档，全局 + 学科 + 工具三层覆盖
+- ✅ **触控设备适配齐全**：`(hover: none) and (pointer: coarse)` 媒体查询已实现卡片 :active、44px 触摸目标
+- ✅ **Canvas 拖拽实验 100% 触控配套**：5 个真拖拽实验（electromagnetic / fluid-dynamics / physics 父类 / waves / mathematics）全部 mouse* + touch* 配齐
+- ⚠️ **微小**：`cell-structure.js` 移动端无 hover 高亮（先 tap 才放大），W3C 标准触控行为，可接受
+- ⚠️ **真机测试覆盖度 0**：仅 CSS + 代码层确认，未在 iPhone/Android 真机验证
+
+### 结论
+
+**无系统性缺陷，无需修复 Batch**。后续若启动深度优化，按报告 §六 优先级安排。
+
+### Playwright VS Code 集成限制
+
+本轮尝试用 Playwright `setViewportSize({width:390, height:844})` 模拟 iPhone 14，发现 VS Code 集成模式下 viewport 不真实变化（`window.innerWidth` 仍为 1055）。**结论**：未来移动端验证需借助 Chrome DevTools mobile emulation 或真机测试，Playwright 集成模式不可靠。
