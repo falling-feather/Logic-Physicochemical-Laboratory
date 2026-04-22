@@ -34,7 +34,21 @@
 | `pages/physics/force-composition.js` | 630 | `'11px "Noto Sans SC"'` | 12px + `CF.sans` |
 | `pages/chemistry/atomic-structure.js` | 326, 418 | `'11px ' + CF.sans` ×2 | 12px |
 
-### B. `_inject*` 面板缺乏幂等防护（重复打开会累积 DOM）
+### B. `_inject*` 面板幂等防护复查结果（v4.0.10 复核后修正）
+
+> **v4.0.10 复核结论**：本表 13 项需逐个核实实际面板实现模式。以 [`pages/physics/optics.js`](../pages/physics/optics.js#L161) 为代表的 `appendChild` 动态追加模式才需“`document.getElementById('xxx') return;`”去重防护；而 **使用 `el.innerHTML = '...'` 覆盖固定容器的实现是天然幂等的**（重复调用仅重绘相同 HTML，不会累积节点、不会泄漏监听器）。
+
+| 文件 | 行号 | 方法 | 实际实现 | 核实结果 |
+|------|------|------|----------|----------|
+| `pages/physics/atomic-structure.js` | 617 | `_injectEduPanel` | `el.innerHTML = '...'` | ✅ 幂等误报 |
+| `pages/physics/charged-particle.js` | 200 | `_injectEduPanel` | `wrap.innerHTML = '...'` | ✅ 幂等误报 |
+| `pages/physics/force-composition.js` | 690 | `_injectEduPanel` | `edu.innerHTML = content[mode]` | ✅ 幂等误报（模式切换需覆盖是必要行为） |
+| `pages/physics/momentum-conservation.js` | 594 | `_injectEduPanel` | `edu.innerHTML = '...'` | ✅ 幂等误报 |
+| `pages/biology/*.js` × 9 | 多 | `_injectInfoPanel` | 待 v4.1.0 逐个核实 | ⚠️ 待复核 |
+
+> **判定准则**：面板实现中出现 `appendChild` / `insertAdjacentHTML` 且未以 `getElementById` 检查唯一性才是真问题。**纯 `innerHTML = ...` 赋值不是问题**。
+
+#### 原表（保留以备查阅，4 项物理化学条目已于 v4.0.10 关闭为误报）
 
 | 文件 | 行号 | 方法 | 当前守卫 | 建议补丁 |
 |------|------|------|----------|----------|
