@@ -180,7 +180,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.8** | **任务 3 数学续推：sequences + inequality + conic-sections 各加 5 步定制引导 + 测验题扩/新增到 5 题（提及等差等比通项、线性规划顶点原理、离心率统一定义）** | ✅**已完成** |
 | **v4.1.9** | **任务 3 数学推进：function-properties + set-operations + permutation-combination 各加 5 步定制引导 + 测验题全部新增各 5 题（嵌入奇偶函数判定、德摩根律、二项式定理等）** | ✅**已完成** |
 | **v4.1.10** | **任务 3 数学冲刺完结：exp-log + geometry + complex-numbers 各加 5 步定制引导 + 测验题全部新增各 5 题（提及指对互为反函数、仿射变换不可交换、欧拉公式 e^(iπ)+1=0 等）** | ✅**已完成** |
-| **v4.1.11** | **任务 3 数学完结 + 起步物理：solid-geometry + circuit-analysis + waves 各加 5 步定制引导 + 5 题测验（冸台体欧拉 V-E+F=2、串联/并联分压分流、波速 v=fλ与多普勒），数学 15/15 ✅** | ✅**已完成（当前版本）** |
+| **v4.1.11** | **任务 3 数学完结 + 起步物理：solid-geometry + circuit-analysis + waves 各加 5 步定制引导 + 5 题测验（冸台体欧拉 V-E+F=2、串联/并联分压分流、波速 v=fλ与多普勒），数学 15/15 ✅** | ✅**已完成** |
+| **v4.1.12** | **任务 3 物理运动学三件套：kinematics + projectile + circular-motion 各加 5 步定制引导 + 5 题测验（匀变速 v²−v₀²=2as、斜抛 45° 最远、圆周 v=ωr/F=mv²/r），物理 6/17** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -786,6 +787,38 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - v4.1.12 — 物理推进：kinematics + projectile + circular-motion 各 5 步（运动学三件套）
 - v4.1.12 — 转向算法领域（sorting-compare / dynamic-programming / string-matching）
 - v4.1.12 — 转向生物领域（immune-system / ecosystem / neural-regulation）
+- 任务 5 — 镜空科技风星球
+- 任务 6 — 移动端深度优化
+
+---
+
+## 二十五、2026-04-22 v4.1.12 物理运动学三件套
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增 3 条：
+  - `kinematics`（5 步：v₀/a/t 三滑块 / play+reset 联动 t / 轨迹 + v-t 图像双路 / kin-info 实时 v(t)与s(t) / 匀变速三公式与刹车）
+  - `projectile`（5 步：v₀/θ/g 三滑块 + 多星球 g 选择 / play+reset+t 手动定格 / 速度分量与射程包络 / proj-edu 水平+竖直独立 / 斜抛 45° 最远与平抛计算）
+  - `circular-motion`（5 步：r/ω/m 三滑块 + circ-stats 联动 / circ-play+reset / 三复选框分别显示 v　1a　1F / 速度沿切线与向心加速度指向圆心 / v=ωr、a=ω²r、F=mv²/r 与向心力不是新力）
+- `shared/js/quiz-data.js` 3 个题池全部 5 题：
+  - `kinematics` 从 3 扩到 5（加入刹车 s=v₀²/(2|a|)=50m、s=v₀t+½at²=32m）
+  - `projectile` 从 3 扩到 5（加入斜抛 45° 最远、平抛落地 x=40m）
+  - `circular-motion` 新建 5 题（匀速圆周速度方向变、向心加速度指圆心、v=ωr=6、F=mv²/r=8N、向心力是效果名不是新力）
+- `sw.js` CACHE_NAME `englab-static-v20260422k` → `v20260422l`
+- `index.html` cache bust：experiment-guide.js & quiz-data.js 同步升级 `?v=20260422l`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches 后硬重载，6 项数据全部正确（3 标题 + 3 × 5 步 + 3 × 5 题）
+
+### 当前覆盖度
+- 引导定制化：37 / 63（化学 11/11 ✅ + 数学 15/15 ✅ + 物理 6/17 + 生物 6 + 算法 0）
+- 测验题库：46 / 63
+- **运动学主线全部贯通：匀变速→抛体→圆周，涵盖人教版必修 1 + 必修 2 运动学核心**
+
+### 后续候选
+- v4.1.13 — 物理电磁三件套：optics + electromagnetic-induction + alternating-current 各 5 步
+- v4.1.13 — 物理力学三件套：force-composition + momentum-conservation + gravitation 各 5 步
+- v4.1.13 — 转向算法领域（sorting-compare / dynamic-programming / string-matching）
+- v4.1.13 — 转向生物领域（immune-system / ecosystem / neural-regulation）
 - 任务 5 — 镜空科技风星球
 - 任务 6 — 移动端深度优化
 ---

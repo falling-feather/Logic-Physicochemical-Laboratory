@@ -394,6 +394,36 @@ const ExperimentGuide = {
                 { icon: 'eye', text: '画布同步绘制三条波形（红=波1、蓝=波2、紫=合成）；驻波模式额外显示波节/波腹与 wave-sw-n 谐波次数' },
                 { icon: 'book-open', text: '波速 v=fλ；同相加强 A=A₁+A₂、反相抵消 A=|A₁−A₂|；驻波频率 fₙ=nv/(2L)；多普勒 f′=f·(v±v₀)/(v∓vₛ)（人教版选必一第3章）' }
             ]
+        },
+        'kinematics': {
+            title: '匀变速直线运动操作指南',
+            steps: [
+                { icon: 'sliders-horizontal', text: '#kin-v0 滑块设初速度 v₀，#kin-a 设加速度（正/负代表加速/减速），#kin-t 设时间；右侧 -val 实时显示数值' },
+                { icon: 'play', text: '#kin-play-btn 自动播放小球运动并联动 t 滑块；#kin-reset-btn 复位 t=0 重新开始' },
+                { icon: 'eye', text: '画布顶端是运动轨迹（小球+残影），下方是 v-t 图像；图线斜率即 a，图线下面积即位移 s' },
+                { icon: 'bar-chart-2', text: 'kin-info 实时计算 v(t)=v₀+at、s(t)=v₀t+½at²；kin-edu 给出加/减速判定与不含 t 的推导式 v²−v₀²=2as' },
+                { icon: 'book-open', text: '设 a<0 演示刹车：v 减小到 0 即停止；常用刹车距离公式 s=v₀²/(2|a|)（人教版必修一第2章）' }
+            ]
+        },
+        'projectile': {
+            title: '抛体运动操作指南',
+            steps: [
+                { icon: 'sliders-horizontal', text: 'proj-v0 调初速度大小，proj-angle 调发射角 θ（0~90°），proj-g 调重力加速度（地球9.8/月球1.6/木星等）' },
+                { icon: 'play', text: '#proj-play-btn 自动播放抛物线轨迹；#proj-reset-btn 复位；拖动 #proj-t 滑块手动定格任意时刻' },
+                { icon: 'mouse-pointer-click', text: '#proj-vectors 复选框显示瞬时速度向量分量 (vₓ, vᵧ)；#proj-envelope 显示不同 θ 的射程包络曲线' },
+                { icon: 'eye', text: '画布同步显示轨迹+顶点高度+落点；proj-info 给出 x/y/v 实时数值，proj-edu 解释水平匀速 + 竖直自由落体的独立叠加' },
+                { icon: 'book-open', text: '射程 R=v₀²sin(2θ)/g，θ=45° 时最远；最大高度 H=v₀²sin²θ/(2g)；飞行时间 T=2v₀sinθ/g（人教版必修二第5章）' }
+            ]
+        },
+        'circular-motion': {
+            title: '圆周运动操作指南',
+            steps: [
+                { icon: 'sliders-horizontal', text: '#circ-radius 调半径 r，#circ-omega 调角速度 ω，#circ-mass 调质量 m；circ-stats 实时联动显示 v/a/F/T' },
+                { icon: 'play', text: '#circ-play 暂停/继续小球绕圆心匀速圆周运动；#circ-reset 复位到起点角度 0' },
+                { icon: 'mouse-pointer-click', text: '3 个复选框 #circ-show-v / circ-show-a / circ-show-f：分别显示速度向量（蓝色切线）、向心加速度（绿色径向）、向心力（红色径向）' },
+                { icon: 'eye', text: '画布固定圆周轨道 + 小球；速度始终沿切线方向，向心加速度始终指向圆心，二者垂直恒定不变（匀速圆周）' },
+                { icon: 'book-open', text: '关键公式：v=ωr，a=ω²r=v²/r，F=ma=mω²r=mv²/r；周期 T=2π/ω；ω 与 r 独立可调（人教版必修二第6章）' }
+            ]
         }
     },
 
