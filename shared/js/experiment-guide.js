@@ -604,6 +604,36 @@ const ExperimentGuide = {
                 { icon: 'eye', text: '画布：节点+加权边；运行时高亮当前节点（红）+ 已确认节点（绿）+ MST/路径边（蓝粗）+ 候选边（橙虚线）+ 起点（金色）；ga-info 显示当前距离表/优先队列状态' },
                 { icon: 'book-open', text: 'BFS 用队列 O(V+E) 解最短跳数；DFS 用栈/递归 O(V+E) 解连通性；Dijkstra 用优先队列 O((V+E)log V) 解非负权最短路；Prim 类似 Dijkstra 解最小生成树（高中信息技术算法进阶）' }
             ]
+        },
+        'sorting': {
+            title: '排序算法操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '本演示聚焦"桶排序 Bucket Sort"算法 — 一种典型的非比较排序，把元素按值分到若干桶中再合并，时间 O(n+k)' },
+                { icon: 'sliders-horizontal', text: 'sort-speed 滑块（100~1000 ms）调动画间隔，便于慢速观察每个元素入桶过程' },
+                { icon: 'play', text: '"生成随机数组"按钮重新生成数据；"开始排序"按钮启动桶排序动画；"重置"按钮清空桶' },
+                { icon: 'eye', text: '画布从上到下显示三层：原始数组（柱状图）→ 多个桶（每桶聚集相近值的元素）→ 排序结果（按桶顺序输出，自然有序）；sort-info 实时更新当前操作' },
+                { icon: 'book-open', text: '桶排序是非比较排序，突破比较排序 Ω(n log n) 下界；时间 O(n+k)（n=元素数, k=桶数），适合数据均匀分布；不适合范围太大的整数（桶过多浪费空间）。计数排序、基数排序也属此类（高中信息技术）' }
+            ]
+        },
+        'immune-system': {
+            title: '免疫系统操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '2 个 .immune-mode-btn 切换：非特异性免疫（皮肤+黏膜+吞噬细胞，先天就有）/ 特异性免疫（B 细胞产抗体+T 细胞攻击，需后天激活）' },
+                { icon: 'sliders-horizontal', text: 'immune-speed 调动画速度（含 immune-speed-val 实时数值显示）' },
+                { icon: 'play', text: 'immune-pause 暂停/继续观察；immune-reset 复位整个动画，重新开始病原体入侵流程' },
+                { icon: 'eye', text: '画布：病原体（红色三角，入侵）+ 吞噬细胞（蓝色，巡逻吞噬）+ B 细胞（绿色，产抗体）+ T 细胞（黄色，攻击感染细胞）+ 抗体粒子（小白点中和病原）；immune-info 显示当前免疫阶段与活细胞数量' },
+                { icon: 'book-open', text: '人教版必修 3 第 2 章：3 道防线（皮肤黏膜→体液中杀菌→特异性免疫）；体液免疫（B 细胞→效应 B→分泌抗体）+ 细胞免疫（T 细胞→效应 T→裂解感染细胞）；记忆细胞使二次免疫快速强烈（疫苗原理）' }
+            ]
+        },
+        'ecosystem': {
+            title: '生态系统操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '2 个 .eco-mode-btn 切换（JS 动态注入）：食物链与能量流（草→兔→狐三级营养级 + 能量金字塔）/ 种群动态模型（捕食者-猎物 Lotka-Volterra 振荡曲线）' },
+                { icon: 'sliders-horizontal', text: 'eco 控件区动态生成的速度滑块；可在不同模式间切换观察不同生态过程' },
+                { icon: 'play', text: '暂停/继续按钮控制动画；切换模式时自动重置；ecosystem-info 实时显示当前种群数量与能量传递效率' },
+                { icon: 'eye', text: '食物链模式：3 层金字塔 + 能量传递箭头（递减约 10~20%）；种群模式：捕食者与猎物数量随时间振荡的相位曲线（猎物先增→捕食者增→猎物降→捕食者降）' },
+                { icon: 'book-open', text: '人教版必修 3 第 5 章：能量沿食物链单向流动+逐级递减（10~20% 传递效率，不可循环）；物质循环（碳/氮/水）；种群密度调节通过出生率-死亡率-迁入迁出，K 值=环境容纳量（Logistic 增长）' }
+            ]
         }
     },
 
