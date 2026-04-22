@@ -171,7 +171,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.0.10** | **Batch 3 物理化学批复核：4 个 `_injectEduPanel` 被鉴定为幂等误报（表项关闭）** | ✅**已完成** |
 | **v4.1.0** | **Batch 3 生物批复核：9 个 `_injectInfoPanel` 同样为幂等误报，§二B 整张表 13 项全部关闭** | ✅**已完成** |
 | **v4.1.1** | **任务 6 移动端适配审视：viewport / 断点体系 / 触控事件配套检查，产出 MOBILE_AUDIT_v4.1.1.md** | ✅**已完成** |
-| **v4.1.2** | **任务 3 引导/测验定制化：dna + cellular-respiration 各加 5 步定制引导，dna 测验 3→5 题，新增 cellular-respiration 5 题** | ✅**已完成（当前版本）** |
+| **v4.1.2** | **任务 3 引导/测验定制化：dna + cellular-respiration 各加 5 步定制引导，dna 测验 3→5 题，新增 cellular-respiration 5 题** | ✅**已完成** |
+| **v4.1.3** | **任务 3 续：photosynthesis + mitosis + electromagnetism 各加 5 步定制引导，三者测验全部扩到 5 题** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -516,3 +517,39 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - 任务 5 — 镜空科技风星球（独立分支 feature/holographic-planets）。
 - 任务 6 — 移动端深度优化（基于 v4.1.1 报告 P-01 ~ P-04 真机测试与修复）。
 - 任务 8 — Phase 2 新增实验（从本文档第二节待开发列表中挑选）。
+
+
+---
+
+## 十六、2026-04-22 v4.1.3 任务 3 引导/测验定制化（续）
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增三个条目：
+  - `photosynthesis`（5 步：三模式切换 / 反应模拟 / 光照-温度-CO₂ 滑块 / 光合曲线 / 呼吸对比补偿点）
+  - `mitosis`（5 步：阶段切换 / 播放暂停 / 速度滑块 / 中期赤道板 / 末期 2 子细胞）
+  - `electromagnetism`（5 步：5 显示模式 / 4 预设配置 / 拖拽电荷 / 测量探针 / 粒子轨迹与磁场）
+- `shared/js/quiz-data.js`：
+  - `photosynthesis` 由 3 题扩到 5 题（增加光补偿点 + 温度-酶活性）
+  - `mitosis` 由 3 题扩到 5 题（增加间期 DNA 复制 + 后期染色体加倍）
+  - 新增 `electromagnetism` 5 题（电场线方向 / 电场线不相交 / 等势面与电场线垂直 / 安培定则 / 洛伦兹力做匀速圆周运动）
+- `sw.js` CACHE_NAME `englab-static-v20260422b` → `v20260422c`
+- `index.html` cache bust：`experiment-guide.js?v=20260422b` → `?v=20260422c`，`quiz-data.js?v=20260422b` → `?v=20260422c`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches，硬重载后查询：
+  - `_experimentGuides['photosynthesis'].title` = "光合作用操作指南"，5 步
+  - `_experimentGuides['mitosis'].title` = "有丝分裂操作指南"，5 步
+  - `_experimentGuides['electromagnetism'].title` = "电磁场操作指南"，5 步
+  - `QUIZ_DATA['photosynthesis'].length` = 5
+  - `QUIZ_DATA['mitosis'].length` = 5
+  - `QUIZ_DATA['electromagnetism'].length` = 5
+
+### 当前覆盖度
+- 引导定制化：9 / 63（periodic-table、kinematics、calculus、genetics、dna、cellular-respiration、photosynthesis、mitosis、electromagnetism）
+- 测验题库：22 / 63 实验拥有专属题池（电磁场为新增条目）
+
+### 后续候选
+- v4.1.4 — 继续定制更多实验引导（建议化学领域：reaction-rate / chemical-equilibrium / electrochemistry）
+- 任务 5 — 镜空科技风星球（独立分支 feature/holographic-planets）
+- 任务 6 — 移动端深度优化（基于 v4.1.1 报告 P-01 ~ P-04 真机测试与修复）
+- 任务 8 — Phase 2 新增实验（从本文档第二节待开发列表中挑选）

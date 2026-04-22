@@ -114,6 +114,36 @@ const ExperimentGuide = {
                 { icon: 'bar-chart-2', text: '右侧面板实时显示当前阶段场所、底物、产物、ATP 产量' },
                 { icon: 'book-open', text: '面板汇总三阶段总览：1 葡萄糖 ≈ 38 ATP（人教版必修1）' }
             ]
+        },
+        'photosynthesis': {
+            title: '光合作用操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '顶部按钮切换三种模式：反应模拟 / 光合曲线 / 呼吸对比' },
+                { icon: 'play', text: '反应模拟点击「开始模拟」观察 CO₂ + H₂O 在类囊体/基质中转化为 O₂ + ATP + 葡萄糖' },
+                { icon: 'sliders-horizontal', text: '调节光照强度 / 温度 / CO₂ 浓度三滑块，观察对反应速率的影响' },
+                { icon: 'bar-chart-2', text: '光合曲线模式呈现 Michaelis-Menten 速率-光强曲线及温度修正' },
+                { icon: 'book-open', text: '呼吸对比模式找出补偿点 / 饱和点（人教版必修1 第五章）' }
+            ]
+        },
+        'mitosis': {
+            title: '有丝分裂操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '点击阶段按钮切换间期 → 前期 → 中期 → 后期 → 末期' },
+                { icon: 'play', text: '播放/暂停按钮控制动画自动循环演示染色体动态' },
+                { icon: 'sliders-horizontal', text: '速度滑块调节动画快慢，方便观察纺锤丝牵引细节' },
+                { icon: 'bar-chart-2', text: '中期染色体排列在赤道板，是观察染色体形态最佳时期' },
+                { icon: 'book-open', text: '末期形成 2 个遗传信息与母细胞完全相同的子细胞（人教版必修1）' }
+            ]
+        },
+        'electromagnetism': {
+            title: '电磁场操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '顶部按钮切换 5 种显示模式：电力线 / 等势线 / 电势图 / 粒子轨迹 / 磁场' },
+                { icon: 'sparkles', text: '右侧「预设配置」一键加载偶极子 / 四极子 / 平行板电容器 / 三角形' },
+                { icon: 'move', text: '拖拽电荷或导线可改变位置，添加/删除按钮自由组合' },
+                { icon: 'crosshair', text: '勾选测量探针后在画布上点击查看任意点的电场强度与电势' },
+                { icon: 'book-open', text: '粒子轨迹模式演示电荷在场中的运动；磁场模式展示通电导线周围磁感线' }
+            ]
         }
     },
 
