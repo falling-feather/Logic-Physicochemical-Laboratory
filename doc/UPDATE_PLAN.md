@@ -197,6 +197,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.2.0** | **任务 5 镜空科技风首页 main 合并：α1 主星 + α2 5 卫星 + α3 全屏背景三件套合并到 main 并 push（feature/holographic-planets 保留）** | ✅**已上线** |
 | **v4.2.1** | **任务 6 移动端深度优化：P-02 cell-structure long-press（350ms）替代 hover 预览、P-03 DEVELOPER_GUIDE §12.5 移动端开发规范、P-04 弹窗小屏 safe-area-inset 与 guide-card 滚动修复（quiz/guide/rating 三组件）** | ✅**已完成** |
 | **v4.2.0-α4** | **任务 5 续：新增 `#planets` 独立路由 — 沉浸式 3D 镂空星系导航大屏（Vanilla Canvas 2D yaw/pitch 透视 + 5 学科行星轨道环绕 + 拖拽旋转 + 4s 自动慢转 + hover 信息卡 + 点击跳学科 + 4 角 HUD + 中央青色核心 + 220 颗背景星）** | ✅**已完成（feature/holographic-planets）** |
+| **v4.2.2-audit** | **任务 7 启动：生物 13 实验文字排版只读审视（172 处 ctx.font + 41 处 fs 全统计、Top10 待修问题汇总、4 阶段修复工作量估算）→ `doc/BIOLOGY_TYPO_AUDIT.md`** | ✅**已完成（main）** |
+| **v4.2.2-phase1** | **任务 7 Phase 1：cellular-respiration / ecosystem / immune-system 三件套 P0 修复（fs 公式 `Math.max(13, W*0.012)` → `Math.max(14, Math.min(22, W*0.018))` 提升 W=900 字号 13→16.27px、immune-system HUD 透明度 0.25/0.4/0.5 → 0.7/0.85/0.95 满足 WCAG AA）** | ✅**已完成（main）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
