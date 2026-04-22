@@ -190,7 +190,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.18** | **任务 3 算法收尾三件套：data-structures + recursion-vis + graph-algo 各加 5 步定制引导 + 5 题测验（栈队列 BST、递归三要素、Dijkstra），算法 7/8 、引导 55/63 、测验 63/63 ✅ 满分** | ✅已完成 |
 | **v4.1.19** | **任务 3 算法岁月 ✅ + 生物启动：sorting + immune-system + ecosystem 各加 5 步定制引导 + 5 题测验（桶排序、人体免疫 3 道防线、能量流动 10％），算法 8/8 ✅ 、生物 8/13 、引导 58/63** | ✅已完成 |
 | **v4.1.20** | **任务 3 生物 A 套：neural-regulation + cellular-respiration + substance-transport 各加 5 步定制引导 + 5 题测验（突触/动作电位/Na⁺/K⁺、有氧呼吸三阶段38ATP、跨膜运输四方式），生物 11/13 、引导 61/63** | ✅已完成 |
-| **v4.1.21** | **🏆 全项收尾满分 🏆：meiosis + gene-expression + gene-mutation 各加 5 步定制引导 + 5 题测验（减分裂 8 期/中心法则/3 类可遗传变异），**生物 13/13 ✅ 、全 5 学科 100%、引导 64/63 ✅✅✅接2 满分冲顶**！** | ✅**已完成（当前版本）** |
+| **v4.1.21** | **🏆 全项收尾满分 🏆：meiosis + gene-expression + gene-mutation 各加 5 步定制引导 + 5 题测验（减分裂 8 期/中心法则/3 类可遗传变异），**生物 13/13 ✅ 、全 5 学科 100%、引导 64/63 ✅✅✅接2 满分冲顶**！** | ✅**已完成** |
+| **v4.2.0-α1** | **任务 5 镜空/镂空科技风星球（独立分支 `feature/holographic-planets`）：首页 `#main-star` 重塑为深空青绿 Tron 风全息 HUD —— 经纬球面网格 + 准星十字 + 双层扫描环 + 青绿外圈/眼睛/标题/Tagline** | ✅**已完成（当前分支）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -967,10 +968,53 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - 5 学科 100%、人教版高中课标覆盖高质量达标
 
 ### 后续候选
-- 任务 5 — 镜空科技风星球（独立分支）
+- 任务 5 — 镜空科技风星球（独立分支） ✅ v4.2.0-α1 已落地（首页主星球 HUD 改造）
 - 任务 6 — 移动端深度优化（v4.1.1 报告 P-01~P-04）
 - v4.2.0 — 某项重点实验深度重构（如 calculus / electromagnetism）
 - 本地 push 到远程仓库
+
+---
+
+## 三十五、2026-04-22 v4.2.0-α1 任务 5 镜空科技风主星球（feature/holographic-planets）
+
+### 改动
+- 独立分支 `feature/holographic-planets`（不污染 main 上的 v4.1.21 全 100% 里程碑）
+- `pages/home/home.css` 重塑 `.main-star` 视觉系（HTML/JS 零侵入，保留眼睛交互、shake、orbits）：
+  - **`.star-atmosphere`** → 双层青绿光晕 + `conic-gradient` 30° 扫描亮带 + 6s `hudScan` 旋转
+  - **`.star-body`** → 深空透明底（`rgba(0,30,30,0.85)`）+ 1.5px 青绿外圈（`rgba(0,255,213,0.45)`）+ 多层青绿辉光 box-shadow + 内插光效
+  - **`.star-body::before / ::after`** → 内圈虚线准星圈（18s 反向慢转）+ 中心实线圆环（30s 慢转）
+  - **`.planet-surface`** → 经线（90° 38px 一条）+ 纬线（0° 22px 一条）+ 赤道带高亮，`mask: radial-gradient` 在边缘衰减模拟球面投影
+  - **`.planet-highlight`** → 横竖准星十字（`linear-gradient` 中段亮带）+ 顶部弱高光，`mask` 限制在球内
+  - **`.star-title`** → `#d4fff3` 青白文字 + 三层青绿发光文字阴影 + `glitch2` 蓝色 → 青绿
+  - **`.eye / .pupil / .pupil-shine`** → 青白虹膜 + 深青绿瞳孔 + 青绿高光，`box-shadow: 0 0 10px rgba(0,255,213,0.85)`
+  - **`.home-tagline p / .tagline-cursor`** → 蓝色文字 → 青绿（`rgba(0,255,213,0.72)` + 青绿光晕）
+- `sw.js` CACHE_NAME `englab-static-v20260422v` → `v20260422w`
+- `index.html` & `sw.js` `home.css?v=20260422a` → `?v=20260422b`
+
+### 视觉特征（Tron / Cyberpunk 冷调全息 HUD 风）
+- 主星球不再是实心蓝色 → 透明镂空青绿球面感（经纬网格 + 准星圈 + 扫描带）
+- 眼睛、标题、Tagline 全部青绿主调，与 HUD 风一致
+- 5 个学科卫星球保持原有色彩（数学蓝 / 物理紫 / 生物绿 / 化学绿 / 算法橙），与 HUD 主星形成"冷科技中心 + 暖学科卫星"对比
+
+### 浏览器验证（Playwright pageId 8477b81b）
+- 清除 SW + caches 后硬重载，截图确认：
+  - 主星球可见经纬球面网格 + 4 个准星十字象限 + 青绿外圈辉光
+  - 顺时针扫描亮带（atmosphere conic）+ 反向虚线圈（::before）双层旋转
+  - "工科实验室"标题青绿发光、双眼睛青绿瞳孔正常显示
+  - "Visualize. Interact. Understand." Tagline 青绿色 + 青绿光标
+- 0 控制台错误，眼睛跟随鼠标交互正常，shake/glitch 动画正常
+
+### 范围说明
+- 用户选择「①只改首页 #main-star 主星球（最聚焦）」 → 5 个学科卫星球与全局背景未触动
+- 后续可选：α2 卫星球同步 HUD 化、α3 全息背景重构、α4 全新 #planets 路由
+
+### 后续候选（feature 分支内）
+- α2 — 5 个学科卫星球（.satellite）改造为青绿小型 HUD 球（与主星统一风格）
+- α3 — 整页背景：粒子网络 → 全息镂空地球/星系
+- α4 — 新增独立 #planets 路由：沉浸式 3D 镂空星系导航大屏
+- 合并到 main 并 push（需用户明示）
+
+---
 
 ### 后续候选
 - v4.1.17 — 算法推进：search-algorithms + dynamic-programming + string-matching 各 5 步（算法 4/8）
