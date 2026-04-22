@@ -173,7 +173,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.1** | **任务 6 移动端适配审视：viewport / 断点体系 / 触控事件配套检查，产出 MOBILE_AUDIT_v4.1.1.md** | ✅**已完成** |
 | **v4.1.2** | **任务 3 引导/测验定制化：dna + cellular-respiration 各加 5 步定制引导，dna 测验 3→5 题，新增 cellular-respiration 5 题** | ✅**已完成** |
 | **v4.1.3** | **任务 3 续：photosynthesis + mitosis + electromagnetism 各加 5 步定制引导，三者测验全部扩到 5 题** | ✅**已完成** |
-| **v4.1.4** | **任务 3 续：reaction-rate + chemical-equilibrium + electrochemistry 各加 5 步定制引导，三者测验全部扩到 5 题** | ✅**已完成（当前版本）** |
+| **v4.1.4** | **任务 3 续：reaction-rate + chemical-equilibrium + electrochemistry 各加 5 步定制引导，三者测验全部扩到 5 题** | ✅**已完成** |
+| **v4.1.5** | **任务 3 续：chemical-bond + ionic-reaction + organic-chemistry 各加 5 步定制引导，三者测验全部新增/扩到 5 题** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -590,4 +591,41 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - v4.1.5 — 转向物理领域（circuit-analysis / waves / optics）
 - 任务 5 — 镜空科技风星球（独立分支 feature/holographic-planets）
 - 任务 6 — 移动端深度优化（基于 v4.1.1 报告真机测试）
+
+---
+
+## 十八、2026-04-22 v4.1.5 任务 3 引导/测验定制化（化学批次续）
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增三个化学条目：
+  - `chemical-bond`（5 步：三种键切换 / 离子键静电引力 / 共价键共用电子对 / 金属键电子海 / 右侧详解面板）
+  - `ionic-reaction`（5 步：下拉选反应 / 三阶段方程式切换 / 旁观离子可视化 / 净离子本质 / 复分解三条件）
+  - `organic-chemistry`（5 步：5 种分子切换 / 拖拽旋转 3D / 暂停自转 / 官能团高亮 / 典型反应）
+- `shared/js/quiz-data.js`：
+  - 新增 `chemical-bond` 5 题（NaCl 离子键判断 / 共价键本质 / 金属导电 / 离子键无方向性 / NaOH 含两种键）
+  - 新增 `ionic-reaction` 5 题（强酸强碱中和净离子 / 复分解三条件 / 旁观离子定义 / 点燃反应不属于离子反应 / CaCO₃ 保留分子式）
+  - 新增 `organic-chemistry` 5 题（甲烷正四面体 / 乙醇与Na断 O—H 键 / 丙烯使溴水褪色 / 苯环 6 键等长 / 乙酸羧基）
+- `sw.js` CACHE_NAME `englab-static-v20260422d` → `v20260422e`
+- `index.html` cache bust：`experiment-guide.js?v=20260422d` → `?v=20260422e`，`quiz-data.js?v=20260422d` → `?v=20260422e`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches，硬重载后查询 6 项数据全部正确：
+  - `_experimentGuides['chemical-bond'].title` = "化学键操作指南"，5 步
+  - `_experimentGuides['ionic-reaction'].title` = "离子反应操作指南"，5 步
+  - `_experimentGuides['organic-chemistry'].title` = "有机化学操作指南"，5 步
+  - `QUIZ_DATA['chemical-bond'].length` = 5
+  - `QUIZ_DATA['ionic-reaction'].length` = 5
+  - `QUIZ_DATA['organic-chemistry'].length` = 5
+
+### 当前覆盖度
+- 引导定制化：15 / 63（新增 chemical-bond、ionic-reaction、organic-chemistry）
+- 测验题库：27 / 63 实验拥有专属题池（3 个全部为新增条目）
+- 化学领域引导定制完成度：8 / 11（periodic-table、chemical-equilibrium、electrochemistry、reaction-rate、chemical-bond、ionic-reaction、organic-chemistry、另包含初期版本中隐含的项目）
+
+### 后续候选
+- v4.1.6 — 收尾化学最后几项（atomic-structure / molecular-structure / chemical-reactions / solution-ionization）
+- v4.1.6 — 转向数学领域（trigonometry / probability / vector-ops）
+- v4.1.6 — 转向物理领域（circuit-analysis / waves / optics）
+- 任务 5 — 镜空科技风星球
+- 任务 6 — 移动端深度优化
 

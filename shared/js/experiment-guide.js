@@ -174,6 +174,36 @@ const ExperimentGuide = {
                 { icon: 'zap', text: '电解池：阳极氧化（2Cl⁻−2e⁻→Cl₂↑），阴极还原（Cu²⁺+2e⁻→Cu）' },
                 { icon: 'book-open', text: '判断电极口诀「正得负失」（原电池）/「阴还阳氧」（电解池）— 人教版选必一第4章' }
             ]
+        },
+        'chemical-bond': {
+            title: '化学键操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '顶部按钮切换三种化学键：离子键 / 共价键 / 金属键' },
+                { icon: 'circle', text: '离子键：阴阳离子静电引力（NaCl），无方向性、无饱和性' },
+                { icon: 'link', text: '共价键：原子共用电子对（H₂O），有方向性、有饱和性' },
+                { icon: 'sparkles', text: '金属键：金属阳离子 + 自由电子海，解释金属导电、延展性' },
+                { icon: 'book-open', text: '右侧「化学键知识点」详解每种键的形成条件、特征与性质（人教版必修2）' }
+            ]
+        },
+        'ionic-reaction': {
+            title: '离子反应操作指南',
+            steps: [
+                { icon: 'list', text: '顶部下拉选择反应：NaOH+HCl / Na₂CO₃+HCl / BaCl₂+Na₂SO₄' },
+                { icon: 'mouse-pointer-click', text: '三阶段按钮切换：化学方程式 → 全离子方程式 → 净离子方程式' },
+                { icon: 'eye', text: '画布左右展示反应物/生成物粒子，标灰的是「旁观离子」（不参与净反应）' },
+                { icon: 'arrow-right', text: '净离子方程式去掉旁观离子，揭示反应本质（如 OH⁻ + H⁺ → H₂O）' },
+                { icon: 'book-open', text: '复分解反应发生条件：生成水、气体、沉淀（人教版必修1第2章）' }
+            ]
+        },
+        'organic-chemistry': {
+            title: '有机化学操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '左侧分子按钮切换 5 种典型有机物：甲烷 / 乙醇 / 乙酸 / 苯 / 丙烯' },
+                { icon: 'move', text: '在 3D 视图上拖拽鼠标可任意角度旋转分子，观察空间构型' },
+                { icon: 'pause', text: '暂停按钮停止自动旋转，便于专注观察特定角度' },
+                { icon: 'tag', text: '右侧面板高亮官能团（—OH 羟基 / —COOH 羧基 / C=C 双键 / 苯环）' },
+                { icon: 'book-open', text: '展示典型反应：取代、加成、消去、酯化等（人教版选必三第3章）' }
+            ]
         }
     },
 
