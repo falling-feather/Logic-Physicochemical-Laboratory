@@ -1847,7 +1847,7 @@ const RelativityDemo = {
                 <h3>时间膨胀 Time Dilation</h3>
                 <p>当物体以接近光速运动时，运动参考系中的时间会变慢。静止观察者测量到的时间间隔 Δt'
                    与运动物体固有时间 Δt 的关系：</p>
-                <p style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:1.1em;color:#e8dcc8;">
+                <p style="text-align:center;font-family:var(--font-mono);font-size:1.1em;color:#e8dcc8;">
                     Δt' = γ · Δt = ${g.toFixed(4)} · Δt
                 </p>
                 <p>当前速度 <strong>v = ${b.toFixed(2)}c</strong>，洛伦兹因子 <strong>γ = ${g.toFixed(4)}</strong>。
@@ -1856,7 +1856,7 @@ const RelativityDemo = {
             info.innerHTML = `
                 <h3>长度收缩 Length Contraction</h3>
                 <p>运动方向上的长度在静止观察者看来会缩短。长度收缩公式：</p>
-                <p style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:1.1em;color:#e8dcc8;">
+                <p style="text-align:center;font-family:var(--font-mono);font-size:1.1em;color:#e8dcc8;">
                     L = L₀ / γ = L₀ · √(1 - v²/c²) = ${(1/g).toFixed(4)} · L₀
                 </p>
                 <p>当前速度 <strong>v = ${b.toFixed(2)}c</strong>，飞船长度收缩为原来的
@@ -1865,7 +1865,7 @@ const RelativityDemo = {
             info.innerHTML = `
                 <h3>质能等价 Mass-Energy Equivalence</h3>
                 <p>爱因斯坦质能关系 E = mc² 是狭义相对论最著名的推论。运动物体的总能量：</p>
-                <p style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:1.1em;color:#e8dcc8;">
+                <p style="text-align:center;font-family:var(--font-mono);font-size:1.1em;color:#e8dcc8;">
                     E = γmc² = ${g.toFixed(4)}mc²
                 </p>
                 <p>其中静止能量 E₀ = mc²，动能 Eₖ = (γ-1)mc² = <strong>${(g-1).toFixed(4)}mc²</strong>。
@@ -1880,12 +1880,12 @@ const RelativityDemo = {
                    观察运动坐标轴如何向光锥"夹拢"——这就是同时性的相对性。</p>
                 <p>🖱️ <strong>交互</strong>：<em>点击</em>添加事件（最多 6 个）→ <em>拖拽</em>移动 → <em>双击</em>删除。
                    每个事件显示 S 系坐标、因果类型和 S' 系变换坐标。</p>
-                <p>不变间隔：<strong style="font-family:'JetBrains Mono',monospace;">s² = (ct)² - x²</strong>，在所有参考系中相同。</p>`;
+                <p>不变间隔：<strong style="font-family:var(--font-mono);">s² = (ct)² - x²</strong>，在所有参考系中相同。</p>`;
         } else if (this.mode === 'lorentz') {
             info.innerHTML = `
                 <h3>Lorentz 变换 Lorentz Transformation</h3>
                 <p>Lorentz 变换是沟通不同惯性参考系的核心数学工具：</p>
-                <p style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:1.1em;color:#e8dcc8;">
+                <p style="text-align:center;font-family:var(--font-mono);font-size:1.1em;color:#e8dcc8;">
                     x' = γ(x - βct)&emsp;&emsp;ct' = γ(ct - βx)
                 </p>
                 <p>左侧为 S 系（静止），右侧为 S' 系（以 v = ${b.toFixed(2)}c 运动）。
@@ -1900,7 +1900,7 @@ const RelativityDemo = {
             info.innerHTML = `
                 <h3>速度叠加 Velocity Addition</h3>
                 <p>经典力学中，速度直接相加：u' = u + v。但在狭义相对论中，速度叠加公式为：</p>
-                <p style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:1.1em;color:#e8dcc8;">
+                <p style="text-align:center;font-family:var(--font-mono);font-size:1.1em;color:#e8dcc8;">
                     u' = (u + v) / (1 + uv/c²)
                 </p>
                 <p>这保证了合成速度永远不会超过光速 c。</p>
@@ -1929,10 +1929,10 @@ const RelativityDemo = {
             info.innerHTML = `
                 <h3>相对论多普勒效应 Relativistic Doppler Effect</h3>
                 <p>当光源相对于观察者运动时，观测到的频率会发生变化。与经典多普勒不同，相对论多普勒还包含时间膨胀的贡献。</p>
-                <p style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:1.1em;color:#e8dcc8;">
+                <p style="text-align:center;font-family:var(--font-mono);font-size:1.1em;color:#e8dcc8;">
                     f_接近 = f₀ · √((1+β)/(1-β)) = ${approach.toFixed(3)}f₀
                 </p>
-                <p style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:1.1em;color:#e8dcc8;">
+                <p style="text-align:center;font-family:var(--font-mono);font-size:1.1em;color:#e8dcc8;">
                     f_远离 = f₀ · √((1-β)/(1+β)) = ${recede.toFixed(3)}f₀
                 </p>
                 <p><strong style="color:#3498db">蓝移</strong>（接近）：频率增大、波长缩短 →

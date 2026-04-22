@@ -445,7 +445,7 @@ const ChargedParticle = {
         });
 
         // 公式
-        c.font = 'bold 14px "Noto Sans SC", sans-serif';
+        c.font = 'bold 14px ' + CF.sans;
         c.fillStyle = this._COL.accent;
         c.textAlign = 'left';
         const r = this.m * this.v0 / (this.q * this.B);
@@ -470,7 +470,7 @@ const ChargedParticle = {
         c.moveTo(slitX, slitY - 8);
         c.lineTo(slitX, slitY + 8);
         c.stroke();
-        c.font = '12px "Noto Sans SC", sans-serif';
+        c.font = '12px ' + CF.sans;
         c.fillStyle = this._COL.dim;
         c.textAlign = 'center';
         c.fillText('入射缝', slitX, slitY + 24);
@@ -486,7 +486,7 @@ const ChargedParticle = {
         c.lineTo(this.W * 0.95, slitY);
         c.stroke();
         c.setLineDash([]);
-        c.font = '12px "Noto Sans SC", sans-serif';
+        c.font = '12px ' + CF.sans;
         c.fillStyle = this._COL.detector;
         c.textAlign = 'right';
         c.fillText('检测板', this.W * 0.95, slitY + 24);
@@ -496,7 +496,7 @@ const ChargedParticle = {
         c.save();
         c.fillStyle = 'rgba(255,159,67,0.08)';
         c.fillRect(slitX - 30, slitY + 30, 60, this.H - slitY - 30);
-        c.font = '11px "Noto Sans SC", sans-serif';
+        c.font = '11px ' + CF.sans;
         c.fillStyle = this._COL.dim;
         c.textAlign = 'center';
         c.fillText(`加速电压 V = ${this.accV} V`, slitX, this.H - 8);
@@ -517,7 +517,7 @@ const ChargedParticle = {
                 c.strokeStyle = p.color;
                 c.lineWidth = 2;
                 c.stroke();
-                c.font = 'bold 12px "Noto Sans SC", sans-serif';
+                c.font = 'bold 12px ' + CF.sans;
                 c.fillStyle = p.color;
                 c.textAlign = 'center';
                 c.fillText(p.label, last.x, last.y + 26);
@@ -526,7 +526,7 @@ const ChargedParticle = {
         });
 
         // 公式
-        c.font = 'bold 14px "Noto Sans SC", sans-serif';
+        c.font = 'bold 14px ' + CF.sans;
         c.fillStyle = this._COL.accent;
         c.textAlign = 'right';
         c.fillText('r = (1/B)·√(2mV/q)', this.W - 12, 24);
@@ -563,14 +563,14 @@ const ChargedParticle = {
         for (let ax = plateL + 30; ax < plateR; ax += arrowGap) {
             this._drawArrow(ax, plateTop + 15, ax, plateBot - 15, this._COL.eArrow, '', 1.5);
         }
-        c.font = '12px "Noto Sans SC", sans-serif';
+        c.font = '12px ' + CF.sans;
         c.fillStyle = this._COL.eArrow;
         c.textAlign = 'left';
         c.fillText('E ↓', plateR + 8, this.H * 0.5);
         c.restore();
 
         // 入口和出口标记
-        c.font = '12px "Noto Sans SC", sans-serif';
+        c.font = '12px ' + CF.sans;
         c.fillStyle = this._COL.dim;
         c.textAlign = 'right';
         c.fillText('入口 →', plateL - 8, this.H * 0.5 + 4);
@@ -584,7 +584,7 @@ const ChargedParticle = {
             // 标注
             if (p.trail.length > 0) {
                 const last = p.trail[p.trail.length - 1];
-                c.font = '11px "Noto Sans SC", sans-serif';
+                c.font = '11px ' + CF.sans;
                 c.fillStyle = p.color;
                 c.textAlign = 'left';
                 const offsetY = (i - 2) * 14;
@@ -593,7 +593,7 @@ const ChargedParticle = {
         });
 
         // 公式
-        c.font = 'bold 14px "Noto Sans SC", sans-serif';
+        c.font = 'bold 14px ' + CF.sans;
         c.fillStyle = this._COL.accent;
         c.textAlign = 'left';
         const vSel = this.E / this.B;
@@ -663,7 +663,7 @@ const ChargedParticle = {
         c.stroke();
         // 标签
         if (label) {
-            c.font = 'bold 11px "Noto Sans SC", sans-serif';
+            c.font = 'bold 11px ' + CF.sans;
             c.fillStyle = '#fff';
             c.textAlign = 'center';
             c.textBaseline = 'bottom';

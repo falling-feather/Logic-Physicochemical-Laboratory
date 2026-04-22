@@ -165,7 +165,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.0.4** | **UPDATE_PLAN 拆分 → 新增 `have_done.md` 历史归档** | ✅**已完成** |
 | **v4.0.5** | **首页移除 home-progress-widget（保留卫星 chips + 学科 hero 进度条）** | ✅**已完成** |
 | **v4.0.6** | **UI 排版审视 — 输出 [`UI_AUDIT_v4.0.5.md`](UI_AUDIT_v4.0.5.md) Bug 清单（29 项）** | ✅**已完成** |
-| **v4.0.7** | **Batch 1 修复：`momentum-conservation.js` Canvas 字号 8/9/10/11px → 12px + CF.sans（10 处）** | ✅**已完成（当前版本）** |
+| **v4.0.7** | **Batch 1 修复：`momentum-conservation.js` Canvas 字号 8/9/10/11px → 12px + CF.sans（10 处）** | ✅**已完成** |
+| **v4.0.8** | **Batch 2 修复：3 个物理文件 24 处硬编码字体 → `CF.sans` / `var(--font-mono)`** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -256,7 +257,7 @@ Skip-nav  →    直接跳转主内容区
 
 ---
 
-## 九、2026-04-22 v4.0.7 Canvas 字号修复 Batch 1（本轮）
+## 九、2026-04-22 v4.0.7 Canvas 字号修复 Batch 1
 
 ### 修改文件
 
@@ -281,4 +282,33 @@ Skip-nav  →    直接跳转主内容区
 ### 后续
 
 - v4.0.8 计划：Batch 2 — 24 处硬编码字体批量替换（charged-particle / force-composition / relativity）
+- v4.1.0 计划：Batch 3 — 13 个 `_inject*` 幂等防护补全
+
+
+---
+
+## 十、2026-04-22 v4.0.8 硬编码字体替换 Batch 2（本轮）
+
+### 修改文件与替换数
+
+| 文件 | 替换数 | 原模式 | 新模式 |
+|------|--------|--------|--------|
+| `pages/physics/charged-particle.js` | 11 | `'<weight> <size>px "Noto Sans SC", sans-serif'` | `'<weight> <size>px ' + CF.sans` |
+| `pages/physics/force-composition.js` | 5 | 同上 | 同上 |
+| `pages/physics/relativity.js` | 8 | `font-family:'JetBrains Mono',monospace;` (inline style) | `font-family:var(--font-mono);` |
+| **合计** | **24** | — | — |
+
+### 验证
+
+- Playwright 浏览器验证 `charged-particle` 页面：`q⁺` 标签、`r = mv/(qB) = 6.00`、`T = 2πm/(qB) = 9.42（与 v 无关）` 等文字全部清晰渲染，CF.sans 字体生效
+- 残留扫描：3 个文件中 `Noto Sans SC` / `JetBrains Mono` 出现次数均为 0
+- `--font-mono` CSS 变量已在 `shared/css/tokens.css` L59 定义（`'JetBrains Mono', 'Fira Code', 'Consolas', monospace`），inline style 改写后保持原有外观
+
+### 已修复 vs 待办
+
+- ✅ FONT-03 (v4.0.2 遗漏) 全部清零
+- ⚠️ `force-composition.js` 仍残留 2 处 11px 字号（属 Batch 1 字号范畴，非本轮目标，纳入 v4.0.9 候选）
+
+### 后续
+
 - v4.1.0 计划：Batch 3 — 13 个 `_inject*` 幂等防护补全

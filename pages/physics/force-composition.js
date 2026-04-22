@@ -335,7 +335,7 @@ const ForceComposition = {
         ctx.beginPath(); ctx.moveTo(ox, 0); ctx.lineTo(ox, H); ctx.stroke();
         // Labels
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = '13px "Noto Sans SC", sans-serif';
+        ctx.font = '13px ' + CF.sans;
         ctx.textAlign = 'left';
         if (labelX) ctx.fillText(labelX, W - 20, oy - 6);
         ctx.textAlign = 'center';
@@ -490,7 +490,7 @@ const ForceComposition = {
         ctx.fillRect(-boxSize / 2, -boxSize, boxSize, boxSize);
         ctx.strokeRect(-boxSize / 2, -boxSize, boxSize, boxSize);
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 11px "Noto Sans SC"';
+        ctx.font = 'bold 11px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('m', 0, -boxSize / 2);
@@ -550,7 +550,7 @@ const ForceComposition = {
         ctx.strokeStyle = 'rgba(255,255,255,0.5)';
         ctx.fillStyle = 'rgba(255,255,255,0.6)';
         ctx.lineWidth = 1;
-        ctx.font = '12px "Noto Sans SC"';
+        ctx.font = '12px ' + CF.sans;
         const arcR = 45;
         ctx.beginPath();
         ctx.arc(bx + baseLen, by, arcR, Math.PI, Math.PI + rad, true);
@@ -590,7 +590,7 @@ const ForceComposition = {
         const ctx = this.ctx;
         ctx.save();
         ctx.fillStyle = color;
-        ctx.font = 'bold 14px "Noto Sans SC", sans-serif';
+        ctx.font = 'bold 14px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(text, x, y);
@@ -627,7 +627,7 @@ const ForceComposition = {
         const ty = cy - Math.sin(midAngle) * (radius + 14);
         ctx.globalAlpha = 0.7;
         ctx.fillStyle = color;
-        ctx.font = '11px "Noto Sans SC"';
+        ctx.font = '11px ' + CF.sans;
         ctx.textAlign = 'center';
         const deg = Math.abs(endAngle - startAngle) * 180 / Math.PI;
         ctx.fillText(deg.toFixed(0) + '°', tx, ty);
