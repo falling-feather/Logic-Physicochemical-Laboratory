@@ -59,19 +59,19 @@
 .hud-data--left { top: 90px; left: 28px; }
 .hud-data--right { top: 90px; right: 28px; }
 
-/* ── Hex Grid Overlay ── */
+/* ── Hex Grid Overlay — 青绿 HUD 调 ── */
 .hex-grid-overlay {
     position: absolute; top: 0; left: 0;
     width: 100%; height: 100%;
     pointer-events: none; z-index: 0;
-    opacity: 0.03;
+    opacity: 0.045;
     background-image:
-        linear-gradient(30deg, rgba(91,141,206,0.5) 12%, transparent 12.5%, transparent 87%, rgba(91,141,206,0.5) 87.5%, rgba(91,141,206,0.5)),
-        linear-gradient(150deg, rgba(91,141,206,0.5) 12%, transparent 12.5%, transparent 87%, rgba(91,141,206,0.5) 87.5%, rgba(91,141,206,0.5)),
-        linear-gradient(30deg, rgba(91,141,206,0.5) 12%, transparent 12.5%, transparent 87%, rgba(91,141,206,0.5) 87.5%, rgba(91,141,206,0.5)),
-        linear-gradient(150deg, rgba(91,141,206,0.5) 12%, transparent 12.5%, transparent 87%, rgba(91,141,206,0.5) 87.5%, rgba(91,141,206,0.5)),
-        linear-gradient(60deg, rgba(91,141,206,0.35) 25%, transparent 25.5%, transparent 75%, rgba(91,141,206,0.35) 75%, rgba(91,141,206,0.35)),
-        linear-gradient(60deg, rgba(91,141,206,0.35) 25%, transparent 25.5%, transparent 75%, rgba(91,141,206,0.35) 75%, rgba(91,141,206,0.35));
+        linear-gradient(30deg, rgba(0,255,213,0.5) 12%, transparent 12.5%, transparent 87%, rgba(0,255,213,0.5) 87.5%, rgba(0,255,213,0.5)),
+        linear-gradient(150deg, rgba(0,255,213,0.5) 12%, transparent 12.5%, transparent 87%, rgba(0,255,213,0.5) 87.5%, rgba(0,255,213,0.5)),
+        linear-gradient(30deg, rgba(0,255,213,0.5) 12%, transparent 12.5%, transparent 87%, rgba(0,255,213,0.5) 87.5%, rgba(0,255,213,0.5)),
+        linear-gradient(150deg, rgba(0,255,213,0.5) 12%, transparent 12.5%, transparent 87%, rgba(0,255,213,0.5) 87.5%, rgba(0,255,213,0.5)),
+        linear-gradient(60deg, rgba(0,255,213,0.35) 25%, transparent 25.5%, transparent 75%, rgba(0,255,213,0.35) 75%, rgba(0,255,213,0.35)),
+        linear-gradient(60deg, rgba(0,255,213,0.35) 25%, transparent 25.5%, transparent 75%, rgba(0,255,213,0.35) 75%, rgba(0,255,213,0.35));
     background-size: 80px 140px;
     background-position: 0 0, 0 0, 40px 70px, 40px 70px, 0 0, 40px 70px;
 }
@@ -129,21 +129,21 @@
 .nebula-1 {
     width: 500px; height: 500px;
     top: -8%; right: -3%;
-    background: radial-gradient(ellipse, rgba(100,70,180,0.1), transparent 70%);
+    background: radial-gradient(ellipse, rgba(0,255,213,0.10), transparent 70%);
     animation: nebulaDrift 30s ease-in-out infinite;
 }
 
 .nebula-2 {
     width: 400px; height: 350px;
     bottom: 5%; left: -6%;
-    background: radial-gradient(ellipse, rgba(50,130,100,0.06), transparent 70%);
+    background: radial-gradient(ellipse, rgba(0,180,166,0.08), transparent 70%);
     animation: nebulaDrift 25s ease-in-out infinite reverse;
 }
 
 .nebula-3 {
     width: 300px; height: 280px;
     top: 35%; left: 62%;
-    background: radial-gradient(ellipse, rgba(180,100,50,0.05), transparent 70%);
+    background: radial-gradient(ellipse, rgba(45,255,170,0.06), transparent 70%);
     animation: nebulaDrift 35s ease-in-out infinite 5s;
 }
 
@@ -191,6 +191,31 @@
     width: 100%; height: 100vh;
     display: flex; align-items: center; justify-content: center;
     perspective: 1200px;
+}
+
+/* HUD 全屏扫描线 — α3 镂空科技风背景增强 */
+.home-container::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 1;
+    background: linear-gradient(180deg,
+        transparent 0%,
+        transparent 47%,
+        rgba(0,255,213,0.045) 49%,
+        rgba(0,255,213,0.10) 50%,
+        rgba(0,255,213,0.045) 51%,
+        transparent 53%,
+        transparent 100%);
+    animation: hudVerticalScan 9s linear infinite;
+    will-change: transform;
+}
+
+@keyframes hudVerticalScan {
+    from { transform: translateY(-100%); }
+    to   { transform: translateY(100%); }
 }
 
 /* ── Central star ── */
