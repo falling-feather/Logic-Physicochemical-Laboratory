@@ -227,7 +227,7 @@
     50% { transform: scale(1.1); opacity: 1; }
 }
 
-/* Star body */
+/* Star body — steady soft glow (开灯呼吸效果已移除 v4.0.3) */
 .star-body {
     background: radial-gradient(circle at 35% 30%, #6da3d8 0%, #5b8dce 15%, #3a6da8 35%, #2a5590 55%, #1e3d6e 80%, #15254a 100%);
     border-radius: 50%;
@@ -235,22 +235,12 @@
     display: flex; align-items: center; justify-content: center;
     position: relative;
     overflow: hidden;
-    animation: starPulse 4s ease-in-out infinite;
     box-shadow:
-        0 0 30px rgba(91,141,206,0.5),
-        0 0 60px rgba(91,141,206,0.2),
-        0 0 100px rgba(91,141,206,0.06),
-        inset -20px -20px 45px rgba(0,0,0,0.5),
-        inset 8px 8px 22px rgba(255,255,255,0.03);
-}
-
-@keyframes starPulse {
-    0%, 100% {
-        box-shadow: 0 0 30px rgba(91,141,206,0.5), 0 0 60px rgba(91,141,206,0.2), 0 0 100px rgba(91,141,206,0.06), inset -20px -20px 45px rgba(0,0,0,0.5), inset 8px 8px 22px rgba(255,255,255,0.03);
-    }
-    50% {
-        box-shadow: 0 0 40px rgba(91,141,206,0.7), 0 0 80px rgba(91,141,206,0.3), 0 0 130px rgba(91,141,206,0.1), inset -28px -28px 60px rgba(0,0,0,0.5), inset 8px 8px 30px rgba(255,255,255,0.04);
-    }
+        0 0 34px rgba(91,141,206,0.55),
+        0 0 70px rgba(91,141,206,0.22),
+        0 0 110px rgba(91,141,206,0.07),
+        inset -22px -22px 50px rgba(0,0,0,0.5),
+        inset 8px 8px 24px rgba(255,255,255,0.035);
 }
 
 /* Planet surface texture */
