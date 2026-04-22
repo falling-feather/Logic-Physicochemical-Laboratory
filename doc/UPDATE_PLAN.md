@@ -175,7 +175,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.3** | **任务 3 续：photosynthesis + mitosis + electromagnetism 各加 5 步定制引导，三者测验全部扩到 5 题** | ✅**已完成** |
 | **v4.1.4** | **任务 3 续：reaction-rate + chemical-equilibrium + electrochemistry 各加 5 步定制引导，三者测验全部扩到 5 题** | ✅**已完成** |
 | **v4.1.5** | **任务 3 续：chemical-bond + ionic-reaction + organic-chemistry 各加 5 步定制引导，三者测验全部新增/扩到 5 题** | ✅**已完成** |
-| **v4.1.6** | **任务 3 收尾：atomic-structure + molecular-structure + chemical-reactions + solution-ionization 各加 5 步定制引导 + 测验题全部新增 5 题，化学领域 11/11 全部覆盖** | ✅**已完成（当前版本）** |
+| **v4.1.6** | **任务 3 收尾化学：atomic-structure + molecular-structure + chemical-reactions + solution-ionization 各加 5 步定制引导 + 测验题全部新增 5 题，化学领域 11/11 全部覆盖** | ✅**已完成** |
+| **v4.1.7** | **任务 3 转数学：trigonometry + probability + vector-ops 各加 5 步定制引导与测验题其他扯到 5 题/新增 5 题（嵌入诱导公式、大数定律、向量垂直判定等高考考点）** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -629,7 +630,36 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - v4.1.6 — 转向物理领域（circuit-analysis / waves / optics）
 - 任务 5 — 镜空科技风星球
 - 任务 6 — 移动端深度优化
+---
 
+## 二十、2026-04-22 v4.1.7 任务 3 转向数学领域（三角/概率/向量）
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增 3 个数学条目：
+  - `trigonometry`（5 步：3 种模式 sin-cos/tan/all / trig-angle 滑块扫动 / 自动播放+速度 / 6 个特殊角预设按钮 / 单位圆与诱导公式）
+  - `probability`（5 步：硬币/骰子两种模式 / 播放与重置 / +1 与 +1000 试验 / 速度与频率柱状图 / 大数定律）
+  - `vector-ops`（5 步：4 种运算 add/sub/dot/projection / 拖拽端点 / 坐标与模与夫角 / 几何意义 / 垂直与共线判定）
+- `shared/js/quiz-data.js`：
+  - `trigonometry` 4 题 → 5 题（新增诱导公式 sin(π+θ)）
+  - `probability` 3 题 → 5 题（新增互斥事件、频率估计）
+  - `vector-ops` 新建 5 题题池（模、数量积、垂直判定、三角形法则、投影向量公式）
+- `sw.js` CACHE_NAME `englab-static-v20260422f` → `v20260422g`
+- `index.html` cache bust：`experiment-guide.js?v=20260422f` → `?v=20260422g`，`quiz-data.js?v=20260422f` → `?v=20260422g`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches，硬重载后查询 6 项数据全部正确：3 个引导标题/步骤数 + 3 个测验题池长度 = 5
+
+### 当前覆盖度
+- 引导定制化：22 / 63（化学 11/11 + 数学 7/15 + 物理 1 + 生物 6 + 算法 0）
+- 测验题库：32 / 63（vector-ops 为新建）
+
+### 后续候选
+- v4.1.8 — 数学续推（sequences / inequality / conic-sections 等）
+- v4.1.8 — 转向物理领域（circuit-analysis / waves / optics）
+- v4.1.8 — 转向算法领域（sorting-compare / dynamic-programming / string-matching）
+- v4.1.8 — 转向生物领域（immune-system / ecosystem / neural-regulation）
+- 任务 5 — 镜空科技风星球
+- 任务 6 — 移动端深度优化
 ---
 
 ## 十九、2026-04-22 v4.1.6 任务 3 化学领域收尾（全覆盖里程碑）

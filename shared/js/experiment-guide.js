@@ -244,6 +244,36 @@ const ExperimentGuide = {
                 { icon: 'play', text: '速度 / 暂停按钮控制粒子动画；鼠标悬停显示离子标签' },
                 { icon: 'book-open', text: '弱酸 Ka、弱碱 Kb 反映电离程度；NaHCO₃ 因 HCO₃⁻ 水解溶液呈碱性（人教版选必一第3章）' }
             ]
+        },
+        'trigonometry': {
+            title: '三角函数操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '顶部 3 个模式按钮：sin/cos 双线对照、tan 单线、全部叠加（含 sec/csc 等延伸）' },
+                { icon: 'sliders-horizontal', text: '拖动 trig-angle 滑块（0°~360°）观察单位圆上的动点与右侧波形同步生成' },
+                { icon: 'play', text: '点击「自动播放」按钮启用角度自动扫动，trig-speed 滑块控制每秒扫过角度' },
+                { icon: 'corner-up-right', text: '快捷预设：30°/45°/60°/90°/180°/270° 一键定位特殊角，配合「特殊角」按钮显示精确值（如 sin30°=1/2）' },
+                { icon: 'book-open', text: '掌握诱导公式与单位圆几何意义，理解 sinθ=y、cosθ=x、tanθ=y/x（人教版必修一第5章）' }
+            ]
+        },
+        'probability': {
+            title: '概率统计操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '模式切换：🪙抛硬币（伯努利分布）/ 🎲掷骰子（古典概型 6 面均匀）' },
+                { icon: 'play', text: 'prob-play-btn 启动连续随机试验，prob-reset-btn 清空重新开始' },
+                { icon: 'plus-circle', text: '+1 按钮单次试验便于观察个例；+1000 按钮快速积累大样本对比理论概率' },
+                { icon: 'sliders-horizontal', text: 'prob-speed 滑块调节动画速率，画布柱状图实时显示频率分布' },
+                { icon: 'book-open', text: '理解大数定律：试验次数 n→∞ 时，频率 f → 理论概率 P；硬币 P=0.5、骰子各点 P=1/6（人教版必修二第10章）' }
+            ]
+        },
+        'vector-ops': {
+            title: '向量运算操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '4 种运算按钮：A+B 平行四边形/三角形法则、A−B 反向相加、A·B 数量积、proj_B A 投影向量' },
+                { icon: 'move', text: '直接在画布上拖拽 A、B 向量端点改变方向与模长，结果向量与公式实时更新' },
+                { icon: 'bar-chart-2', text: 'vecops-result 区显示坐标分量、模 |V|、夹角 cosθ 等数值' },
+                { icon: 'eye', text: '加减法看几何路径（首尾相连），数量积 A·B=|A||B|cosθ（标量），投影 = (A·B)/|B|' },
+                { icon: 'book-open', text: '向量是高考解析几何与立体几何工具：垂直⇔A·B=0，共线⇔A=λB（人教版必修二第6章）' }
+            ]
         }
     },
 
