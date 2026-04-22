@@ -186,7 +186,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.14** | **任务 3 物理力学三件套：force-composition + momentum-conservation + gravitation 各加 5 步定制引导 + 5 题测验（平行四边形定则、3 种碰撞型式、万有引力 F=GMm/r²），物理 12/17** | ✅**已完成** |
 | **v4.1.15** | **任务 3 物理高阶三件套：electromagnetic + charged-particle + relativity 各加 5 步定制引导 + 5 题测验（库仑 E=kQ/r²、洛伦兹力 r=mv/(qB)、相对论 γ=1/√(1−β²)），物理 15/17** | ✅**已完成** |
 | **v4.1.16** | **任务 3 物理收尾 + 算法起步：energy-conservation + fluid-dynamics + sorting-compare 各加 5 步定制引导 + 5 题测验（机械能守恒、伯努利、排序复杂度），物理 17/17 ✅ 、算法 1/8 起步** | ✅已完成 |
-| **v4.1.17** | **任务 3 算法三件套：search-algorithms + dynamic-programming + string-matching 各加 5 步定制引导 + 5 题测验（二分查找、背包 DP、KMP），算法 4/8 、引导 52/63 、测验 61/63** | ✅**已完成（当前版本）** |
+| **v4.1.17** | **任务 3 算法三件套：search-algorithms + dynamic-programming + string-matching 各加 5 步定制引导 + 5 题测验（二分查找、背包 DP、KMP），算法 4/8 、引导 52/63 、测验 61/63** | ✅已完成 |
+| **v4.1.18** | **任务 3 算法收尾三件套：data-structures + recursion-vis + graph-algo 各加 5 步定制引导 + 5 题测验（栈队列 BST、递归三要素、Dijkstra），算法 7/8 、引导 55/63 、测验 63/63 ✅ 满分** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -851,6 +852,35 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 ### 后续候选
 - v4.1.18 — 算法收尾：data-structures + recursion-vis + graph-algo 各 5 步（算法 7/8）
 - v4.1.18 — 转向生物：immune-system + ecosystem + neural-regulation 各 5 步
+- 任务 5 — 镜空科技风星球
+- 任务 6 — 移动端深度优化
+---
+
+## 三十一、2026-04-22 v4.1.18 算法收尾三件套（数据结构+递归+图算法）
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增 3 条：
+  - `data-structures`（5 步：5 个 .ds-mode-btn 栈/队列/BST/链表/堆 后两者 JS 动态注入 / ds-speed + BST 数值输入框 / Stack push+pop / Queue enqueue+dequeue / BST insert+search+三种遍历 / 栈竖直堆叠 LIFO + 队列水平 FIFO + BST 二叉树形 / 栈应用函数调用撤销+队列应用 BFS 调度+BST O(log n) 中序得有序）
+  - `recursion-vis`（5 步：2 个 .recur-mode-btn Fibonacci 树/汉诺塔 / recur-fib-n+recur-hanoi-n+recur-speed / play+step+reset 单步看每个递归调用 / 调用树展开+已计算返回值+汉诺塔盘子移动 / 递归三要素：基线+递归+缩小，Fibonacci O(2ⁿ)→DP O(n)，汉诺塔 2ⁿ−1）
+  - `graph-algo`（5 步：4 个算法 Dijkstra/Prim/BFS/DFS（后两个 JS 注入）+ 3 个 ga-presets 加权/简单/稠密 / ga-speed 200~1200ms+ga-directed-toggle+点节点换起点 / ga-pause+step+reset / 当前节点红+已确认绿+MST/路径边蓝+候选边橙+起点金 / BFS O(V+E)、Dijkstra O((V+E)log V) 优先队列、邻接矩阵 vs 邻接表）
+- `shared/js/quiz-data.js`：
+  - 旧 `'graph'` 池（3 题）重命名为 `'graph-algo'` 并扩充为 5 题（Dijkstra 不能负权、BFS 用队列、Dijkstra/Prim/Kruskal/Boruvka MST 算法、Dijkstra 优先队列 O((V+E)log V)、邻接矩阵 vs 邻接表）
+  - 新增 `data-structures` 5 题（栈 LIFO、队列 FIFO、BST 中序得有序、BST 平均 O(log n)、堆完全二叉树+堆序）
+  - 新增 `recursion-vis` 5 题（递归三要素必含基线、Fibonacci 朴素 O(2ⁿ)、汉诺塔 2ⁿ−1、树天然递归、尾递归 JS 不优化）
+- `sw.js` CACHE_NAME `englab-static-v20260422r` → `v20260422s`
+- `index.html` cache bust：experiment-guide.js & quiz-data.js 同步升级 `?v=20260422s`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches 后硬重载，6 项数据全部正确（3 标题 + 3 × 5 步 + 3 × 5 题）
+
+### 当前覆盖度
+- 引导定制化：55 / 63（化学 11/11 ✅ + 数学 15/15 ✅ + 物理 17/17 ✅ + 算法 7/8 + 生物 6/13）
+- 测验题库：63 / 63 ✅ **全覆盖里程碑！**（'graph' 旧 key 重命名为 'graph-algo' 同时新增 ds/rv，全 63 模块均有题库）
+- **里程碑：测验 100%！算法 7/8 仅余排序算法 1 项**
+
+### 后续候选
+- v4.1.19 — 算法满分：sort-algorithms（最后 1 项算法）+ 转生物：immune-system + ecosystem 各 5 步
+- v4.1.19 — 生物三件套：immune-system + ecosystem + neural-regulation 各 5 步
 - 任务 5 — 镜空科技风星球
 - 任务 6 — 移动端深度优化
 

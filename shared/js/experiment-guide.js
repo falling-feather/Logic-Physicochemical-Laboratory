@@ -574,6 +574,36 @@ const ExperimentGuide = {
                 { icon: 'eye', text: '画布：主串字符 + 模式串字符 + 当前对齐位置 + 匹配/失配高亮（绿/红）；strmatch-info 显示比较次数与匹配成功位置' },
                 { icon: 'book-open', text: '暴力 O(nm)；KMP O(n+m) — 通过 next 数组（最长前后缀）跳过已知不匹配位置；适用于大文本搜索（编辑器查找、DNA 序列、网络包检测）（高中信息技术）' }
             ]
+        },
+        'data-structures': {
+            title: '数据结构操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '5 个 .ds-mode-btn 切换：栈 Stack / 队列 Queue / 二叉搜索树 BST / 链表 LinkedList / 堆 Heap（后两者由 JS 动态注入）' },
+                { icon: 'sliders-horizontal', text: 'ds-speed 调动画速度；BST 面板可输入数值（1~99）插入/搜索/加载预设/清空' },
+                { icon: 'play', text: 'Stack：ds-push 压栈 / ds-pop 弹栈；Queue：ds-enqueue 入队 / ds-dequeue 出队；BST：ds-bst-insert + ds-bst-search + 三种遍历（前序 / 中序 / 后序）按钮' },
+                { icon: 'eye', text: '画布显示当前结构：栈竖直堆叠（top 标记）、队列水平排列（front/rear 标记）、BST 二叉树形结构（节点+左右子树连线），操作时高亮当前节点' },
+                { icon: 'book-open', text: '栈 LIFO 后进先出（函数调用、撤销）；队列 FIFO 先进先出（任务调度、BFS）；BST 平均查找/插入/删除 O(log n) 最坏 O(n)；中序遍历 BST 得有序序列（高中信息技术）' }
+            ]
+        },
+        'recursion-vis': {
+            title: '递归可视化操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '2 个 .recur-mode-btn 切换：Fibonacci 树（递归调用树展开）/ 汉诺塔（3 柱搬盘动画）' },
+                { icon: 'sliders-horizontal', text: 'recur-fib-n 调 Fibonacci 的 n 值（推荐 ≤8 否则节点爆炸）；recur-hanoi-n 调汉诺塔盘子数（3~7）；recur-speed 调动画速度' },
+                { icon: 'play', text: 'recur-play 自动播放、recur-step 单步执行（观察每个递归调用）、recur-reset 复位整棵调用树' },
+                { icon: 'eye', text: 'Fibonacci 模式：当前展开的递归调用节点高亮 + 已计算返回值（绿色）+ 子树连线展示 fib(n)=fib(n-1)+fib(n-2)；汉诺塔：3 根柱子盘子移动 + 当前移动的盘子高亮 + 步数计数' },
+                { icon: 'book-open', text: '递归三要素：基线条件 + 递归调用 + 子问题缩小；Fibonacci 朴素递归 O(2ⁿ)（重叠子问题需用 DP/记忆化优化）；汉诺塔最少步数 2ⁿ−1（高中信息技术算法基础）' }
+            ]
+        },
+        'graph-algo': {
+            title: '图算法操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '4 种算法按钮：Dijkstra 最短路径 / Prim 最小生成树（HTML 中已有）+ BFS 广度优先 / DFS 深度优先（JS 动态注入 ga-bfs/ga-dfs）；3 个 ga-presets 预设：加权图 / 简单图 / 稠密图' },
+                { icon: 'sliders-horizontal', text: 'ga-speed 200~1200 ms 调步速；ga-directed-toggle 切换有向/无向图；点击节点更换起点' },
+                { icon: 'play', text: '点算法按钮立即开始动画；ga-pause 暂停继续；ga-step 单步执行（详细观察每步入队/松弛操作）；ga-reset 复位重置图结构' },
+                { icon: 'eye', text: '画布：节点+加权边；运行时高亮当前节点（红）+ 已确认节点（绿）+ MST/路径边（蓝粗）+ 候选边（橙虚线）+ 起点（金色）；ga-info 显示当前距离表/优先队列状态' },
+                { icon: 'book-open', text: 'BFS 用队列 O(V+E) 解最短跳数；DFS 用栈/递归 O(V+E) 解连通性；Dijkstra 用优先队列 O((V+E)log V) 解非负权最短路；Prim 类似 Dijkstra 解最小生成树（高中信息技术算法进阶）' }
+            ]
         }
     },
 
