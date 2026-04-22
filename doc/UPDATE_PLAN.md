@@ -170,7 +170,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.0.9** | **顺手补充：`force-composition.js` 残留 2 处 11px 字号 → 12px** | ✅**已完成** |
 | **v4.0.10** | **Batch 3 物理化学批复核：4 个 `_injectEduPanel` 被鉴定为幂等误报（表项关闭）** | ✅**已完成** |
 | **v4.1.0** | **Batch 3 生物批复核：9 个 `_injectInfoPanel` 同样为幂等误报，§二B 整张表 13 项全部关闭** | ✅**已完成** |
-| **v4.1.1** | **任务 6 移动端适配审视：viewport / 断点体系 / 触控事件配套检查，产出 MOBILE_AUDIT_v4.1.1.md** | ✅**已完成（当前版本）** |
+| **v4.1.1** | **任务 6 移动端适配审视：viewport / 断点体系 / 触控事件配套检查，产出 MOBILE_AUDIT_v4.1.1.md** | ✅**已完成** |
+| **v4.1.2** | **任务 3 引导/测验定制化：dna + cellular-respiration 各加 5 步定制引导，dna 测验 3→5 题，新增 cellular-respiration 5 题** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -486,3 +487,32 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 ### Playwright VS Code 集成限制
 
 本轮尝试用 Playwright `setViewportSize({width:390, height:844})` 模拟 iPhone 14，发现 VS Code 集成模式下 viewport 不真实变化（`window.innerWidth` 仍为 1055）。**结论**：未来移动端验证需借助 Chrome DevTools mobile emulation 或真机测试，Playwright 集成模式不可靠。
+
+
+---
+
+## 十五、2026-04-22 v4.1.2 任务 3 引导/测验定制化（本轮）
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增 'dna'（5 步：四模式切换 / 双螺旋拖拽 / 复制转录动画 / 碱基对氢键 / Watson-Crick 模型）与 'cellular-respiration'（5 步：三阶段切换 / 自动播放 / 速度调节 / 实时面板 / 38 ATP 总览）。
+- `shared/js/quiz-data.js`：'dna' 由 3 题扩到 5 题（增加 GC 氢键数 + Watson-Crick 1953 年）；新增 'cellular-respiration' 5 题（糖酵解场所 / 柠檬酸循环 / 氧化磷酸化 / 38 ATP / 乳酸 vs 酒精）。
+- `sw.js` CACHE_NAME `englab-static-v20260422a` → `v20260422b`。
+- `index.html` cache bust：`experiment-guide.js?v=20260422d` → `?v=20260422b`，`quiz-data.js?v=20260418e` → `?v=20260422b`。
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches，硬重载后：
+  - `window.ExperimentGuide._experimentGuides['dna'].title` = "DNA 结构操作指南"，5 步全部呈现。
+  - `window.ExperimentGuide._experimentGuides['cellular-respiration'].title` = "细胞呼吸操作指南"，5 步全部呈现。
+  - `window.QUIZ_DATA['dna'].length` = 5；`window.QUIZ_DATA['cellular-respiration'].length` = 5。
+  - DNA 实验首次打开自动弹出自定义引导，小测验按钮正常显示。
+  - cellular-respiration 自定义引导经 `ExperimentGuide._show('biology', 'cellular-respiration')` 强制触发后正常呈现。
+
+### 当前覆盖度
+- 引导定制化：6 / 63（periodic-table、kinematics、calculus、genetics、dna、cellular-respiration）。
+- 测验题库：21 / 63 实验拥有专属题池。
+
+### 后续候选
+- v4.1.3 — 继续定制更多实验引导（建议 photosynthesis 光合作用 / mitosis 有丝分裂 / electromagnetic 电磁场）。
+- 任务 5 — 镜空科技风星球（独立分支 feature/holographic-planets）。
+- 任务 6 — 移动端深度优化（基于 v4.1.1 报告 P-01 ~ P-04 真机测试与修复）。
+- 任务 8 — Phase 2 新增实验（从本文档第二节待开发列表中挑选）。

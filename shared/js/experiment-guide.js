@@ -94,6 +94,26 @@ const ExperimentGuide = {
                 { icon: 'bar-chart-2', text: '观察后代表现型比例统计图' },
                 { icon: 'book-open', text: '知识面板包含分离定律和自由组合定律' }
             ]
+        },
+        'dna': {
+            title: 'DNA 结构操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '顶部按钮切换四种模式：双螺旋 / 复制 / 转录 / 突变' },
+                { icon: 'rotate-3d', text: '双螺旋模式可拖拽旋转查看立体结构（A-T、G-C 配对）' },
+                { icon: 'play', text: '复制/转录模式自动播放过程动画，可暂停或调速' },
+                { icon: 'mouse-pointer-click', text: '点击碱基对查看详细配对信息（2 个 / 3 个氢键）' },
+                { icon: 'book-open', text: '知识面板含 Watson-Crick 模型与人教版必修2 核心要点' }
+            ]
+        },
+        'cellular-respiration': {
+            title: '细胞呼吸操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '顶部三按钮切换三个阶段：糖酵解 → 柠檬酸循环 → 电子传递链' },
+                { icon: 'play', text: '默认自动播放粒子流动，演示底物→产物转化过程' },
+                { icon: 'sliders-horizontal', text: '可调节速度滑块加快/减慢动画进度' },
+                { icon: 'bar-chart-2', text: '右侧面板实时显示当前阶段场所、底物、产物、ATP 产量' },
+                { icon: 'book-open', text: '面板汇总三阶段总览：1 葡萄糖 ≈ 38 ATP（人教版必修1）' }
+            ]
         }
     },
 
