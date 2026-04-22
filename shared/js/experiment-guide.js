@@ -334,6 +334,36 @@ const ExperimentGuide = {
                 { icon: 'grid', text: '杨辉三角模式：每个数等于上方两数之和，第 n 行就是 (a+b)ⁿ 的展开系数 C(n,0)…C(n,n)' },
                 { icon: 'book-open', text: '关键区分：排列考虑顺序（如班长副班长）、组合不考虑顺序（如选 r 人代表）；二项式定理是高考重点（人教版选必三第6章）' }
             ]
+        },
+        'exp-log': {
+            title: '指数与对数函数操作指南',
+            steps: [
+                { icon: 'sliders-horizontal', text: '#el-base 滑块（0.1~5）调整底数 a，#el-base-val 实时显示当前数值；4 个 .el-preset 一键切到 ½ / 2 / e / 10 等关键底数' },
+                { icon: 'mouse-pointer-click', text: '3 个 .el-toggle 复选框分别开关 y=aˣ（指数）、y=logₐx（对数）、y=x（镜像参考线）' },
+                { icon: 'eye', text: '画布同步绘制两条曲线，关于 y=x 严格对称即印证「指数与对数互为反函数」' },
+                { icon: 'bar-chart-2', text: '滑动 a 越过 1：a>1 指数递增、对数递增；0<a<1 指数递减、对数递减；a=1 退化为常数函数（不构成函数）' },
+                { icon: 'book-open', text: '关键性质：aˣ⋅aʸ=aˣ⁺ʸ；logₐ(MN)=logₐM+logₐN；换底公式 logₐb=lnb/lna（人教版必修一第4章）' }
+            ]
+        },
+        'geometry': {
+            title: '几何变换操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '顶部 2 个 .geo-mode-btn 切换：「仿射变换」演示平移/缩放/旋转/错切，「三角形几何」演示外心/内心/重心/垂心' },
+                { icon: 'sliders-horizontal', text: '仿射模式：调整 geo-tx/ty 平移、geo-sx/sy 缩放、geo-rot 旋转角、geo-shear 错切，画布同步显示原始与变换后图形' },
+                { icon: 'play', text: '#geo-animate-btn 自动播放变换过程，可观察连续变化下的轨迹（旋转 + 缩放 = 螺线）' },
+                { icon: 'eye', text: '三角形模式：拖拽顶点调整三角形，画布动态绘制四心，geo-edu 同步显示坐标与几何意义' },
+                { icon: 'book-open', text: '仿射变换矩阵 [[a,b],[c,d]]+(tx,ty) 可表达 2D 所有线性变换；四心是初等几何核心定理（人教版必修二第6章）' }
+            ]
+        },
+        'complex-numbers': {
+            title: '复数运算操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '4 个 .cx-mode-btn 切换模式：四则运算 ops / 单位根 roots / 函数变换 domain / 欧拉公式 euler' },
+                { icon: 'edit-3', text: 'ops 模式：cx-z1-re/im、cx-z2-re/im 输入复数实/虚部；.cx-op-btn 选择 +、−、×、÷，画布显示复平面向量与平行四边形法则' },
+                { icon: 'sliders-horizontal', text: 'roots：cx-root-n 滑块（n=2~12）设次数，画布动画演示 n 次单位根均匀分布在单位圆并构成正多边形；cx-roots-anim 一键播放' },
+                { icon: 'play', text: 'euler 模式：cx-theta 滑块或 cx-euler-anim 演示 e^(iθ)=cosθ+isinθ；θ=π 时即著名公式 e^(iπ)+1=0' },
+                { icon: 'book-open', text: '复数 z=a+bi 几何即向量；模 |z|=√(a²+b²)、辐角 arg(z)=arctan(b/a)；棣莫弗 (cosθ+isinθ)ⁿ=cos(nθ)+isin(nθ)（人教版必修二第7章）' }
+            ]
         }
     },
 

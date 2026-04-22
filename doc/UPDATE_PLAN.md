@@ -178,7 +178,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.6** | **任务 3 收尾化学：atomic-structure + molecular-structure + chemical-reactions + solution-ionization 各加 5 步定制引导 + 测验题全部新增 5 题，化学领域 11/11 全部覆盖** | ✅**已完成** |
 | **v4.1.7** | **任务 3 转数学：trigonometry + probability + vector-ops 各加 5 步定制引导与测验题其他扯到 5 题/新增 5 题（嵌入诱导公式、大数定律、向量垂直判定等高考考点）** | ✅**已完成** |
 | **v4.1.8** | **任务 3 数学续推：sequences + inequality + conic-sections 各加 5 步定制引导 + 测验题扩/新增到 5 题（提及等差等比通项、线性规划顶点原理、离心率统一定义）** | ✅**已完成** |
-| **v4.1.9** | **任务 3 数学推进：function-properties + set-operations + permutation-combination 各加 5 步定制引导 + 测验题全部新增各 5 题（嵌入奇偶函数判定、德摩根律、二项式定理等）** | ✅**已完成（当前版本）** |
+| **v4.1.9** | **任务 3 数学推进：function-properties + set-operations + permutation-combination 各加 5 步定制引导 + 测验题全部新增各 5 题（嵌入奇偶函数判定、德摩根律、二项式定理等）** | ✅**已完成** |
+| **v4.1.10** | **任务 3 数学冲刺完结：exp-log + geometry + complex-numbers 各加 5 步定制引导 + 测验题全部新增各 5 题（提及指对互为反函数、仿射变换不可交换、欧拉公式 e^(iπ)+1=0 等）** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -720,6 +721,38 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - v4.1.10 — 转向物理领域（circuit-analysis / waves / optics）
 - v4.1.10 — 转向算法领域（sorting-compare / dynamic-programming / string-matching）
 - v4.1.10 — 转向生物领域（immune-system / ecosystem / neural-regulation）
+- 任务 5 — 镜空科技风星球
+- 任务 6 — 移动端深度优化
+
+---
+
+## 二十三、2026-04-22 v4.1.10 任务 3 数学领域冲刺完结（指对/几何/复数）
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增 3 个数学条目：
+  - `exp-log`（5 步：#el-base 滑块 + 4 个 .el-preset 预设底数 / 3 个 .el-toggle 开关函数 / y=x 镜像验证反函数 / a 跨越 1 的单调性 / 指对运算律）
+  - `geometry`（5 步：2 个 .geo-mode-btn 仿射/三角形 / geo-tx/ty/sx/sy/rot/shear 滑块 / #geo-animate-btn 动画 / 拖拽顶点 + 四心 / 变换不可交换）
+  - `complex-numbers`（5 步：4 个 .cx-mode-btn ops/roots/domain/euler / cx-z1-re/im + .cx-op-btn 四则 / cx-root-n 单位根 / cx-theta + 欧拉动画 / 模辐角与棣莫弗）
+- `shared/js/quiz-data.js` 新建 3 个题池，各 5 题：
+  - `exp-log`（y=x 对称 / log₂ 8 / a>1 单调递增 / 换底公式 / a^x·a^y 运算律）
+  - `geometry`（旋转相似变换 / 外心 = 垂平分线 / 重心 2:1 / 行列式 = 面积缩放 / 变换不可交换）
+  - `complex-numbers`（|3+4i|=5 / 共轭相乘 / e^(iπ)=−1 / 1+i 辐角 π/4 / 4 次单位根 = 正方形）
+- `sw.js` CACHE_NAME `englab-static-v20260422i` → `v20260422j`
+- `index.html` cache bust：`experiment-guide.js?v=20260422i` → `?v=20260422j`，`quiz-data.js?v=20260422i` → `?v=20260422j`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches 后硬重载，6 项数据全部正确（3 个引导标题/5 步 + 3 个题池长度 5）
+
+### 当前覆盖度
+- 引导定制化：31 / 63（化学 11/11 ✅ + 数学 14＋/15 + 物理 1 + 生物 6 + 算法 0）
+- 测验题库：40 / 63
+- **数学领域接近完结，剩余 solid-geometry（该项是否已有引导待检查）**
+
+### 后续候选
+- v4.1.11 — 数学最后一项 solid-geometry + 转物理中学核心三项（circuit-analysis / waves / optics）
+- v4.1.11 — 转向物理领域（造访 circuit-analysis / waves / optics / kinematics）
+- v4.1.11 — 转向算法领域（sorting-compare / dynamic-programming / string-matching）
+- v4.1.11 — 转向生物领域（immune-system / ecosystem / neural-regulation）
 - 任务 5 — 镜空科技风星球
 - 任务 6 — 移动端深度优化
 ---
