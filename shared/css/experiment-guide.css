@@ -27,6 +27,9 @@
     padding: 2rem 2.5rem;
     max-width: 480px;
     width: 90vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     box-shadow: 0 24px 80px rgba(0,0,0,0.5);
     transform: translateY(20px) scale(0.96);
     transition: transform 0.3s ease;
@@ -135,7 +138,7 @@
 
 .experiment-guide-help-btn {
     position: fixed;
-    bottom: 80px;
+    bottom: calc(80px + env(safe-area-inset-bottom, 0px));
     right: 24px;
     z-index: 9000;
     width: 36px;
@@ -174,10 +177,24 @@
     }
 
     .experiment-guide-help-btn {
-        bottom: 70px;
+        bottom: calc(70px + env(safe-area-inset-bottom, 0px));
         right: 16px;
         width: 32px;
         height: 32px;
         font-size: 0.875rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .guide-card {
+        padding: 1.25rem 1rem;
+        width: 96vw;
+        max-height: 88vh;
+    }
+    .guide-card__title {
+        font-size: 1.05rem;
+    }
+    .guide-step__text {
+        font-size: 0.82rem;
     }
 }

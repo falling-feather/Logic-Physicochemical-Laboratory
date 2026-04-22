@@ -194,6 +194,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.2.0-α1** | **任务 5 镜空/镂空科技风星球（独立分支 `feature/holographic-planets`）：首页 `#main-star` 重塑为深空青绿 Tron 风全息 HUD —— 经纬球面网格 + 准星十字 + 双层扫描环 + 青绿外圈/眼睛/标题/Tagline** | ✅**已完成（当前分支）** |
 | **v4.2.0-α2** | **任务 5 续：5 个学科卫星球 `.satellite-1~5` 同步 HUD 化 —— 透明深空底 + 青绿外圈 + 内部经纬网格/准星十字（继承主星样式）+ 学科色辅助辉光保留识别度（数学蓝/物理紫/化学绿/算法橙/生物teal）** | ✅**已完成（当前分支）** |
 | **v4.2.0-α3** | **任务 5 续：首页背景全息化 —— 粒子网络 worker 颜色 蓝→青绿、3 层 nebula 紫/绿/橙 → 三色青绿、hex-grid overlay 蓝→青绿（透明度 3%→4.5%）、新增 `.home-container::after` 全屏 HUD 垂直扫描线（9s 循环）** | ✅**已完成（当前分支）** |
+| **v4.2.0** | **任务 5 镜空科技风首页 main 合并：α1 主星 + α2 5 卫星 + α3 全屏背景三件套合并到 main 并 push（feature/holographic-planets 保留）** | ✅**已上线** |
+| **v4.2.1** | **任务 6 移动端深度优化：P-02 cell-structure long-press（350ms）替代 hover 预览、P-03 DEVELOPER_GUIDE §12.5 移动端开发规范、P-04 弹窗小屏 safe-area-inset 与 guide-card 滚动修复（quiz/guide/rating 三组件）** | ✅**已完成** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -1071,7 +1073,49 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 
 ### 后续候选（feature 分支内）
 - α4 — 新增独立 #planets 路由：沉浸式 3D 镂空星系导航大屏（工作量较大，可分多个 patch）
-- 合并 feature/holographic-planets → main 并 push（α1+α2+α3 三件套上线）
+- 合并 feature/holographic-planets → main 并 push（α1+α2+α3 三件套上线） ✅ 已完成
+
+---
+
+## 三十八、2026-04-22 v4.2.1 任务 6 移动端深度优化
+
+### 改动
+- **P-02** [pages/biology/cell-structure.js](pages/biology/cell-structure.js) 触控交互升级：
+  - 将原"tap 即放大"改为 long-press 350ms 预览 + 短按放大双模
+  - touchstart 设定 350ms 计时器命中器官 → 触发预览（hoveredOrganelle 高亮 + info 文本 + `navigator.vibrate(20)`）
+  - touchmove > 10px 取消计时与预览
+  - touchend 短按 → 直接 zoomTo（保留原行为），长按后 → 清除预览
+  - 解决 v4.1.1 报告 ⚠️ "移动端无 hover 预览必须先 tap 才放大"
+- **P-03** [doc/DEVELOPER_GUIDE.md](doc/DEVELOPER_GUIDE.md) 新增 §12.5「移动端开发规范」7 个子节：
+  - 12.5.1 Canvas 交互必须配套触控事件
+  - 12.5.2 Canvas DPR 适配模板
+  - 12.5.3 断点必覆盖项（1024/768/640/480 四档清单）
+  - 12.5.4 固定定位元素的 safe-area-inset（FAB / 通知条）
+  - 12.5.5 弹窗模态必须可滚动（max-height + overflow-y + -webkit-overflow-scrolling）
+  - 12.5.6 触控设备专属样式（hover:none + pointer:coarse）
+  - 12.5.7 真机验证局限（VS Code 集成 Playwright setViewportSize 不可靠记录）
+- **P-04** 三组件弹窗 480px 优化：
+  - [shared/css/experiment-guide.css](shared/css/experiment-guide.css) `.guide-card` 加 `max-height: 90vh; overflow-y: auto; -webkit-overflow-scrolling: touch`，`.experiment-guide-help-btn` bottom 加 `env(safe-area-inset-bottom)`，新增 480px 媒体查询（padding 1.25rem 1rem / width 96vw / 字号缩 1 级）
+  - [shared/css/experiment-rating.css](shared/css/experiment-rating.css) 768px 内 `.rating-card` bottom 改为 `max(16px, env(safe-area-inset-bottom, 16px))`
+  - [shared/css/experiment-quiz.css](shared/css/experiment-quiz.css) 640px 内 `.quiz-fab` bottom 改为 `calc(80px + env(safe-area-inset-bottom, 0px))`
+- **Cache bump**：sw.js CACHE_NAME `y` → `z`、`experiment-rating.css` `?v=20260418g` → `?v=20260422z`；index.html 三个 css + cell-structure.js 全部 `?v=20260422z`
+
+### 浏览器验证
+- 清除 SW + caches 后访问 `#biology` → 点击 cell-structure 卡片：实验加载成功、canvas 初始化（W=904）、0 console 错误
+- P-02 长按行为属移动端触控事件，桌面 Playwright 无法直接触发，已通过代码层 + 加载验证（无语法错误、对象正常初始化）确认
+- 引导/测验/评分三组件弹窗在 480px 视口下的实际滚动行为需真机验证
+
+### v4.1.1 报告项关闭状态
+- P-01 真机测试 — ⏸ 仍待真机回归
+- P-02 cell-structure long-press — ✅ 已完成
+- P-03 移动端开发规范文档 — ✅ 已完成
+- P-04 弹窗 480px 滚动 + safe-area — ✅ 已完成
+
+### 后续候选
+- 任务 5 α4 — 新增独立 #planets 路由（沉浸式 3D 镂空星系导航大屏，重型）
+- 任务 7 — 实验页文字排版逐项审视
+- 任务 8 — Phase 2 新实验扩展
+- v4.2.1 上 main 后 push（待用户明示）
 
 ---
 
