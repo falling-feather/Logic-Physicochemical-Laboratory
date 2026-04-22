@@ -1,4 +1,4 @@
-const CACHE_NAME = 'englab-static-v20260422v';
+const CACHE_NAME = 'englab-static-v20260422y';
 const APP_SHELL = [
   './',
   './index.html',
@@ -19,7 +19,7 @@ const APP_SHELL = [
   './shared/js/common.js?v=20260417c',
   './shared/js/main.js?v=20260417c',
   './pages/home/home.js?v=20260418f',
-  './shared/workers/particle-worker.js?v=20260418f',
+  './shared/workers/particle-worker.js?v=20260422y',
   './shared/css/tokens.css?v=20260417c',
   './shared/css/base.css?v=20260417c',
   './shared/css/typography.css?v=20260417c',
@@ -31,7 +31,7 @@ const APP_SHELL = [
   './shared/css/experiment-favorites.css?v=20260418f',
   './shared/css/experiment-rating.css?v=20260418g',
   './shared/css/responsive.css?v=20260417c',
-  './pages/home/home.css?v=20260422a'
+  './pages/home/home.css?v=20260422d'
 ];
 
 self.addEventListener('install', (event) => {
