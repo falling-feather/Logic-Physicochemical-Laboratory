@@ -164,7 +164,8 @@ Skip-nav  →    直接跳转主内容区
 | v4.0.3 | 首页主星球 starPulse "开灯"呼吸效果移除 — 静态柔光 | ✅ 已完成 |
 | **v4.0.4** | **UPDATE_PLAN 拆分 → 新增 `have_done.md` 历史归档** | ✅**已完成** |
 | **v4.0.5** | **首页移除 home-progress-widget（保留卫星 chips + 学科 hero 进度条）** | ✅**已完成** |
-| **v4.0.6** | **UI 排版审视 — 输出 [`UI_AUDIT_v4.0.5.md`](UI_AUDIT_v4.0.5.md) Bug 清单（29 项）** | ✅**已完成（当前版本）** |
+| **v4.0.6** | **UI 排版审视 — 输出 [`UI_AUDIT_v4.0.5.md`](UI_AUDIT_v4.0.5.md) Bug 清单（29 项）** | ✅**已完成** |
+| **v4.0.7** | **Batch 1 修复：`momentum-conservation.js` Canvas 字号 8/9/10/11px → 12px + CF.sans（10 处）** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -224,7 +225,7 @@ Skip-nav  →    直接跳转主内容区
 
 ---
 
-## 八、2026-04-22 v4.0.6 UI 排版审视（本轮）
+## 八、2026-04-22 v4.0.6 UI 排版审视
 
 ### 产出
 
@@ -251,3 +252,33 @@ Skip-nav  →    直接跳转主内容区
 1. **v4.0.7**：Momentum-Conservation 字号修复（1 文件 8 行）
 2. **v4.0.8**：硬编码字体一次性脚本替换（3 文件 24 处）
 3. **v4.1.0**：13 个 `_inject*` 幂等防护补全（按学科分批）
+
+
+---
+
+## 九、2026-04-22 v4.0.7 Canvas 字号修复 Batch 1（本轮）
+
+### 修改文件
+
+- `pages/physics/momentum-conservation.js` —— 10 处 `ctx.font` 重写
+
+### 修复明细
+
+| 原字号串 | 新字号串 | 出现行 |
+|----------|----------|--------|
+| `'10px system-ui, sans-serif'` | `'12px ' + CF.sans` | L364（标尺刻度）|
+| `'11px system-ui, sans-serif'` ×4 | `'12px ' + CF.sans` ×4 | L407,424,443,455（物块/速度标签）|
+| `'9px system-ui, sans-serif'` | `'12px ' + CF.sans` | L533（柱状图数值）|
+| `'8px system-ui, sans-serif'` | `'12px ' + CF.sans` | L540（柱状图标签）|
+| `'bold 13px system-ui, sans-serif'` ×2 | `'bold 13px ' + CF.sans` ×2 | L403,420（A/B 主标签）|
+| `'bold 12px system-ui, sans-serif'` | `'bold 12px ' + CF.sans` | L472（图表标题）|
+
+### 验证
+
+- Playwright 浏览器实际渲染：标尺刻度、物块标签、速度箭头、柱状图数值与标签全部清晰可读
+- 修复策略：所有过小字号统一抬升到 ≥ 12px，全部接入全局 `CF.sans` 字体回退链
+
+### 后续
+
+- v4.0.8 计划：Batch 2 — 24 处硬编码字体批量替换（charged-particle / force-composition / relativity）
+- v4.1.0 计划：Batch 3 — 13 个 `_inject*` 幂等防护补全

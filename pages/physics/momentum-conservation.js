@@ -361,7 +361,7 @@ const MomentumConservation = {
 
         // 刻度
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '10px system-ui, sans-serif';
+        ctx.font = '12px ' + CF.sans;
         ctx.textAlign = 'center';
         for (let i = 0; i <= this._trackLen; i += 2) {
             const cx = this._logicToCanvas(i);
@@ -400,11 +400,11 @@ const MomentumConservation = {
         ctx.stroke();
         // 标签
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 13px system-ui, sans-serif';
+        ctx.font = 'bold 13px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('A', cx1 + bw1 / 2, trackY - bh1 / 2 - 7);
-        ctx.font = '11px system-ui, sans-serif';
+        ctx.font = '12px ' + CF.sans;
         ctx.fillText(this.m1 + 'kg', cx1 + bw1 / 2, trackY - bh1 / 2 + 9);
         ctx.restore();
 
@@ -417,11 +417,11 @@ const MomentumConservation = {
         ctx.fill();
         ctx.stroke();
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 13px system-ui, sans-serif';
+        ctx.font = 'bold 13px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('B', cx2 + bw2 / 2, trackY - bh2 / 2 - 7);
-        ctx.font = '11px system-ui, sans-serif';
+        ctx.font = '12px ' + CF.sans;
         ctx.fillText(this.m2 + 'kg', cx2 + bw2 / 2, trackY - bh2 / 2 + 9);
         ctx.restore();
     },
@@ -440,7 +440,7 @@ const MomentumConservation = {
             this._drawArrow(ctx, cx1, arrowY, cx1 + this._v1 * arrowScale, arrowY, '#6495ED', 2);
             ctx.save();
             ctx.fillStyle = '#6495ED';
-            ctx.font = '11px system-ui, sans-serif';
+            ctx.font = '12px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText(`v₁=${this._v1.toFixed(1)}`, cx1 + this._v1 * arrowScale * 0.5, arrowY - 10);
             ctx.restore();
@@ -452,7 +452,7 @@ const MomentumConservation = {
             this._drawArrow(ctx, cx2, arrowY, cx2 + this._v2 * arrowScale, arrowY, '#EB5757', 2);
             ctx.save();
             ctx.fillStyle = '#EB5757';
-            ctx.font = '11px system-ui, sans-serif';
+            ctx.font = '12px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText(`v₂=${this._v2.toFixed(1)}`, cx2 + this._v2 * arrowScale * 0.5, arrowY - 10);
             ctx.restore();
@@ -469,7 +469,7 @@ const MomentumConservation = {
         // 标题
         ctx.save();
         ctx.fillStyle = 'rgba(255,255,255,0.6)';
-        ctx.font = 'bold 12px system-ui, sans-serif';
+        ctx.font = 'bold 12px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillText('动量 p (kg·m/s)', area.x + leftW * 0.5, area.y);
         ctx.fillText('动能 Ek (J)', midX + rightW * 0.5 + 20, area.y);
@@ -530,14 +530,14 @@ const MomentumConservation = {
 
             // 数值
             ctx.fillStyle = 'rgba(255,255,255,0.8)';
-            ctx.font = '9px system-ui, sans-serif';
+            ctx.font = '12px ' + CF.sans;
             ctx.textAlign = 'center';
             const valY = barH >= 0 ? baseY - barH - 4 : baseY - barH + 10;
             ctx.fillText(bar.value.toFixed(1), bx + barW / 2, valY);
 
             // 标签
             ctx.fillStyle = 'rgba(255,255,255,0.5)';
-            ctx.font = '8px system-ui, sans-serif';
+            ctx.font = '12px ' + CF.sans;
             ctx.save();
             ctx.translate(bx + barW / 2, baseY + 8);
             ctx.rotate(-Math.PI / 6);
