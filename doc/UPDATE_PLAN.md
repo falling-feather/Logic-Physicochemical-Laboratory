@@ -162,7 +162,8 @@ Skip-nav  →    直接跳转主内容区
 | ---- | ---- | ---- |
 | v4.0.2 | Canvas 字体标准化 + 冻结 Bug 修复 + UI 模板文档 | ✅ 已完成 |
 | v4.0.3 | 首页主星球 starPulse "开灯"呼吸效果移除 — 静态柔光 | ✅ 已完成 |
-| **v4.0.4** | **UPDATE_PLAN 拆分 → 新增 `have_done.md` 历史归档** | ✅**已完成（当前版本）** |
+| **v4.0.4** | **UPDATE_PLAN 拆分 → 新增 `have_done.md` 历史归档** | ✅**已完成** |
+| **v4.0.5** | **首页移除 home-progress-widget（保留卫星 chips + 学科 hero 进度条）** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -170,7 +171,7 @@ Skip-nav  →    直接跳转主内容区
 
 ---
 
-## 六、2026-04-22 v4.0.4 文档拆分（本轮）
+## 六、2026-04-22 v4.0.4 文档拆分
 
 ### 修改点
 
@@ -200,3 +201,22 @@ Skip-nav  →    直接跳转主内容区
 
 - 文件分别可读、章节锚点链接生效
 - 0 内容丢失（历史所有章节 100% 迁移）
+
+
+---
+
+## 七、2026-04-22 v4.0.5 首页移除 home-progress-widget（本轮）
+
+### 修改点
+
+1. **`shared/js/learning-progress.js`** — `_renderHomeProgress()` 中删除 "Overall progress widget below tagline" 整段（不再创建/更新 `#home-progress-widget` 元素）。保留：
+   - 卫星轨道上的 `.satellite-progress` 进度 chips（如 0/15、0/17）
+   - 学科 hero 内的 `.progress-bar` 学科进度条（`_renderProgressBar`）
+2. **`pages/home/home.css`** — 删除 `.home-progress-widget*` 4 条 CSS 规则（约 45 行）。
+3. **缓存破坏**：`index.html` + `sw.js` 中 `home.css` / `learning-progress.js` 版本号 → `20260422a`，SW `CACHE_NAME` → `englab-static-v20260422a`。
+
+### 浏览器验证
+
+- 清除 SW + caches 后硬刷新，首页 hero 区底部不再渲染"共 65 个实验等你探索"长条 widget
+- 5 个学科卫星轨道仍然显示 `0/15` `0/17` `0/12` `0/8` `0/13` 的小 chips
+- 0 控制台错误

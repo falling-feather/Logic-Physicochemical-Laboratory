@@ -144,27 +144,7 @@ const LearningProgress = {
 
     /** Render overall progress on the home page */
     _renderHomeProgress() {
-        // ── Overall progress widget below tagline ──
-        const tagline = document.getElementById('home-tagline');
-        if (tagline) {
-            const { visited, total, percent } = this.getOverallProgress();
-            let widget = document.getElementById('home-progress-widget');
-            if (!widget) {
-                widget = document.createElement('div');
-                widget.id = 'home-progress-widget';
-                widget.className = 'home-progress-widget';
-                widget.innerHTML = `
-                    <div class="home-progress-widget__bar">
-                        <div class="home-progress-widget__fill"></div>
-                    </div>
-                    <span class="home-progress-widget__text"></span>
-                `;
-                tagline.parentElement.appendChild(widget);
-            }
-            widget.querySelector('.home-progress-widget__fill').style.width = percent + '%';
-            widget.querySelector('.home-progress-widget__text').textContent =
-                visited === 0 ? `共 ${total} 个实验等你探索` : `已探索 ${visited}/${total} 个实验`;
-        }
+        // Overall progress widget removed in v4.0.5 — only per-satellite chips remain.
 
         // ── Per-satellite progress chips ──
         const subjects = ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology'];
