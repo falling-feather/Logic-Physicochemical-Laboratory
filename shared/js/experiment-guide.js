@@ -364,6 +364,36 @@ const ExperimentGuide = {
                 { icon: 'play', text: 'euler 模式：cx-theta 滑块或 cx-euler-anim 演示 e^(iθ)=cosθ+isinθ；θ=π 时即著名公式 e^(iπ)+1=0' },
                 { icon: 'book-open', text: '复数 z=a+bi 几何即向量；模 |z|=√(a²+b²)、辐角 arg(z)=arctan(b/a)；棣莫弗 (cosθ+isinθ)ⁿ=cos(nθ)+isin(nθ)（人教版必修二第7章）' }
             ]
+        },
+        'solid-geometry': {
+            title: '立体几何操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '5 个 .sg-shape-btn 切换几何体：正方体 / 正四面体 / 正八面体 / 圆柱体 / 圆锥体' },
+                { icon: 'sliders-horizontal', text: '#sg-cross 滑块控制水平截面位置，#sg-cross-val 显示当前 z 坐标；可观察截面形状随高度的变化（圆柱→圆，圆锥→圆缩小到点）' },
+                { icon: 'play', text: '#sg-speed 调旋转速度，#sg-pause 暂停/继续 3D 旋转动画；鼠标拖拽画布也可手动旋转视角' },
+                { icon: 'eye', text: '画布以 3D 透视投影显示几何体，正面线段实线、背面虚线，截面平面以半透明色高亮' },
+                { icon: 'book-open', text: '欧拉公式 V−E+F=2（凸多面体顶点−棱+面=2）；正多面体仅有 5 种（柏拉图体）；旋转体侧面积 S=2πrl（人教版必修二第8章）' }
+            ]
+        },
+        'circuit-analysis': {
+            title: '电路分析操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '2 个 .circuit-mode-btn：串联（电流处处相等）/ 并联（电压处处相等），切换不同等效电阻公式' },
+                { icon: 'sliders-horizontal', text: '#circuit-voltage 滑块（1~24V）调电源电压，#circuit-r1 / #circuit-r2 调两个电阻；右侧 -val 实时显示数值' },
+                { icon: 'play', text: '#circuit-pause 暂停电流粒子动画；#circuit-reset 复位时间。电流粒子流速正比于电流大小 I=U/R' },
+                { icon: 'eye', text: '画布渲染电路图与电流方向，circuit-info 教育面板列出欧姆定律、分压/分流规则、功率分配 P=UI=I²R' },
+                { icon: 'book-open', text: '串联：R=R₁+R₂、U=U₁+U₂、I 不变；并联：1/R=1/R₁+1/R₂、I=I₁+I₂、U 不变（人教版必修三第11章）' }
+            ]
+        },
+        'waves': {
+            title: '波动叠加操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '3 个 .wave-mode-btn 切换：叠加 superposition / 驻波 standing / 多普勒 doppler' },
+                { icon: 'sliders-horizontal', text: '叠加模式：wave-a1/f1/l1 调波 1 的振幅/频率/波长，wave-a2/f2/l2 调波 2；3 个复选框控制波 1、波 2、叠加波的显示' },
+                { icon: 'play', text: '4 个 [data-wave-preset] 一键预设：加强（同相）/ 抵消（反相）/ 驻波（反向同频）/ 拍频（频率略差）' },
+                { icon: 'eye', text: '画布同步绘制三条波形（红=波1、蓝=波2、紫=合成）；驻波模式额外显示波节/波腹与 wave-sw-n 谐波次数' },
+                { icon: 'book-open', text: '波速 v=fλ；同相加强 A=A₁+A₂、反相抵消 A=|A₁−A₂|；驻波频率 fₙ=nv/(2L)；多普勒 f′=f·(v±v₀)/(v∓vₛ)（人教版选必一第3章）' }
+            ]
         }
     },
 

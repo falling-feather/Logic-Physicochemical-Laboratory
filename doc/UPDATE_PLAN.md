@@ -179,7 +179,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.7** | **任务 3 转数学：trigonometry + probability + vector-ops 各加 5 步定制引导与测验题其他扯到 5 题/新增 5 题（嵌入诱导公式、大数定律、向量垂直判定等高考考点）** | ✅**已完成** |
 | **v4.1.8** | **任务 3 数学续推：sequences + inequality + conic-sections 各加 5 步定制引导 + 测验题扩/新增到 5 题（提及等差等比通项、线性规划顶点原理、离心率统一定义）** | ✅**已完成** |
 | **v4.1.9** | **任务 3 数学推进：function-properties + set-operations + permutation-combination 各加 5 步定制引导 + 测验题全部新增各 5 题（嵌入奇偶函数判定、德摩根律、二项式定理等）** | ✅**已完成** |
-| **v4.1.10** | **任务 3 数学冲刺完结：exp-log + geometry + complex-numbers 各加 5 步定制引导 + 测验题全部新增各 5 题（提及指对互为反函数、仿射变换不可交换、欧拉公式 e^(iπ)+1=0 等）** | ✅**已完成（当前版本）** |
+| **v4.1.10** | **任务 3 数学冲刺完结：exp-log + geometry + complex-numbers 各加 5 步定制引导 + 测验题全部新增各 5 题（提及指对互为反函数、仿射变换不可交换、欧拉公式 e^(iπ)+1=0 等）** | ✅**已完成** |
+| **v4.1.11** | **任务 3 数学完结 + 起步物理：solid-geometry + circuit-analysis + waves 各加 5 步定制引导 + 5 题测验（冸台体欧拉 V-E+F=2、串联/并联分压分流、波速 v=fλ与多普勒），数学 15/15 ✅** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -749,10 +750,42 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - **数学领域接近完结，剩余 solid-geometry（该项是否已有引导待检查）**
 
 ### 后续候选
-- v4.1.11 — 数学最后一项 solid-geometry + 转物理中学核心三项（circuit-analysis / waves / optics）
-- v4.1.11 — 转向物理领域（造访 circuit-analysis / waves / optics / kinematics）
+- v4.1.11 — 收尾 solid-geometry + 起步物理两项（circuit-analysis + waves）
+- v4.1.11 — 专攒物理（circuit-analysis + waves + optics 等）
 - v4.1.11 — 转向算法领域（sorting-compare / dynamic-programming / string-matching）
 - v4.1.11 — 转向生物领域（immune-system / ecosystem / neural-regulation）
+- 任务 5 — 镜空科技风星球
+- 任务 6 — 移动端深度优化
+
+---
+
+## 二十四、2026-04-22 v4.1.11 数学 15/15 完结 + 物理起步（立体几何/电路/波动）
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增 3 条：
+  - `solid-geometry`（5 步：5 个 .sg-shape-btn 几何体 / #sg-cross 截面滑块 / #sg-speed + #sg-pause / 3D 投影与高亮截面 / V−E+F=2 与柏拉图 5 体）
+  - `circuit-analysis`（5 步：2 个 .circuit-mode-btn 串联/并联 / circuit-voltage/r1/r2 滑块 / circuit-pause + circuit-reset / 电流粒子 + circuit-info / 串并联公式与功率）
+  - `waves`（5 步：3 个 .wave-mode-btn 叠加/驻波/多普勒 / wave-a1/f1/l1+a2/f2/l2 双波参数 / 4 个 [data-wave-preset] 预设 / 三色波形与波节波腹 / v=fλ 与多普勒公式）
+- `shared/js/quiz-data.js` 3 个题池全部 5 题：
+  - `circuit-analysis` 从 3 扩到 5（加入 4Ω+6Ω 串联 1A、并联 2.4Ω −5A）
+  - `waves` 新建（v=fλ / 同相 2A / 反相 0 / 波节定义 / 多普勒饱逆递变低）
+  - `solid-geometry` 新建（欧拉公式 V-E+F=2 / 柏拉图 5 体 / 圆柱平截为圆 / 球体积 (4/3)πR³ / 正四面体+正八面体面数和）
+- `sw.js` CACHE_NAME `englab-static-v20260422j` → `v20260422k`
+- `index.html` cache bust：experiment-guide.js & quiz-data.js 同步升级 `?v=20260422k`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches 后硬重载，6 项数据全部正确（3 标题 + 3 × 5 步 + 3 × 5 题）
+
+### 当前覆盖度
+- 引导定制化：34 / 63（化学 11/11 ✅ + 数学 15/15 ✅ + 物理 3/17 + 生物 6 + 算法 0）
+- 测验题库：43 / 63
+- **两个学科全部完结！下一个重点：物理（最大学科，17 项）**
+
+### 后续候选
+- v4.1.12 — 物理推进：optics + electromagnetic-induction + alternating-current 各 5 步
+- v4.1.12 — 物理推进：kinematics + projectile + circular-motion 各 5 步（运动学三件套）
+- v4.1.12 — 转向算法领域（sorting-compare / dynamic-programming / string-matching）
+- v4.1.12 — 转向生物领域（immune-system / ecosystem / neural-regulation）
 - 任务 5 — 镜空科技风星球
 - 任务 6 — 移动端深度优化
 ---
