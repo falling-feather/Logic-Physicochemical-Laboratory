@@ -304,6 +304,36 @@ const ExperimentGuide = {
                 { icon: 'bar-chart-2', text: '右侧 conic-info 实时显示标准方程、离心率 e=c/a、焦点坐标、渐近线（双曲线）等' },
                 { icon: 'book-open', text: '椭圆 0<e<1、双曲线 e>1、抛物线 e=1；统一定义：到焦点距离/到准线距离=e（人教版选必一第3章）' }
             ]
+        },
+        'function-properties': {
+            title: '函数性质探究操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '顶部 3 个 .fp-mode-btn：📈单调性 / 🔄奇偶性 / 🔁周期性，切换分析角度' },
+                { icon: 'mouse-pointer-click', text: '.fp-func-btn 切换不同函数（一次/二次/三次/绝对值/sin/exp/log 等）观察性质表现' },
+                { icon: 'sliders-horizontal', text: '单调性模式下，调整 fp-int-a / fp-int-b 区间输入框（或拖拽画布上的菱形标记）框选研究区间' },
+                { icon: 'eye', text: '画布以颜色高亮单调增/减区间、奇偶对称轴、周期 T；fp-info 给出严谨的数学判定' },
+                { icon: 'book-open', text: '判定：单调性看 f(x₁)−f(x₂) 符号；奇函数 f(−x)=−f(x) 关于原点对称；偶函数 f(−x)=f(x) 关于 y 轴对称（人教版必修一第3章）' }
+            ]
+        },
+        'set-operations': {
+            title: '集合运算操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '6 个 .setops-op-btn：A∪B（并）/ A∩B（交）/ A−B（差）/ B−A / Aᶜ（补）/ A∆B（对称差）' },
+                { icon: 'edit-3', text: 'setops-input-a / setops-input-b 输入集合 A、B 元素（如 1,2,3）；setops-input-u 设置全集 U' },
+                { icon: 'eye', text: '画布维恩图 (Venn) 高亮当前运算结果区域，深色填充表示属于结果集' },
+                { icon: 'bar-chart-2', text: 'setops-result 区显示运算结果集合 + 元素个数；setops-edu 给出公式与运算律' },
+                { icon: 'book-open', text: '德摩根律：(A∪B)ᶜ=Aᶜ∩Bᶜ、(A∩B)ᶜ=Aᶜ∪Bᶜ；分配律 A∩(B∪C)=(A∩B)∪(A∩C)（人教版必修一第1章）' }
+            ]
+        },
+        'permutation-combination': {
+            title: '排列组合操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '3 个 .permcomb-mode-btn：排列 P(n,r) 有序 / 组合 C(n,r) 无序 / 杨辉三角（C(n,k) 二项展开系数）' },
+                { icon: 'sliders-horizontal', text: 'permcomb-n 滑块设置元素总数 n，permcomb-r 滑块设置抽取数 r（杨辉三角自动生成行）' },
+                { icon: 'eye', text: '画布枚举或图示所有排列/组合方案，pc-info 同步显示公式 P(n,r)=n!/(n−r)!、C(n,r)=n!/(r!(n−r)!) 与具体值' },
+                { icon: 'grid', text: '杨辉三角模式：每个数等于上方两数之和，第 n 行就是 (a+b)ⁿ 的展开系数 C(n,0)…C(n,n)' },
+                { icon: 'book-open', text: '关键区分：排列考虑顺序（如班长副班长）、组合不考虑顺序（如选 r 人代表）；二项式定理是高考重点（人教版选必三第6章）' }
+            ]
         }
     },
 

@@ -177,7 +177,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.5** | **任务 3 续：chemical-bond + ionic-reaction + organic-chemistry 各加 5 步定制引导，三者测验全部新增/扩到 5 题** | ✅**已完成** |
 | **v4.1.6** | **任务 3 收尾化学：atomic-structure + molecular-structure + chemical-reactions + solution-ionization 各加 5 步定制引导 + 测验题全部新增 5 题，化学领域 11/11 全部覆盖** | ✅**已完成** |
 | **v4.1.7** | **任务 3 转数学：trigonometry + probability + vector-ops 各加 5 步定制引导与测验题其他扯到 5 题/新增 5 题（嵌入诱导公式、大数定律、向量垂直判定等高考考点）** | ✅**已完成** |
-| **v4.1.8** | **任务 3 数学续推：sequences + inequality + conic-sections 各加 5 步定制引导 + 测验题扩/新增到 5 题（提及等差等比通项、线性规划顶点原理、离心率统一定义）** | ✅**已完成（当前版本）** |
+| **v4.1.8** | **任务 3 数学续推：sequences + inequality + conic-sections 各加 5 步定制引导 + 测验题扩/新增到 5 题（提及等差等比通项、线性规划顶点原理、离心率统一定义）** | ✅**已完成** |
+| **v4.1.9** | **任务 3 数学推进：function-properties + set-operations + permutation-combination 各加 5 步定制引导 + 测验题全部新增各 5 题（嵌入奇偶函数判定、德摩根律、二项式定理等）** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -685,10 +686,40 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - 数学领域已完成 10/15（过半）
 
 ### 后续候选
-- v4.1.9 — 数学收尾（function-properties / set-operations / permutation-combination 等）
+- v4.1.9 — 数学推进（function-properties / set-operations / permutation-combination 等）
 - v4.1.9 — 转向物理领域（circuit-analysis / waves / optics）
-- v4.1.9 — 转向算法领域（sorting-compare / dynamic-programming / string-matching）
-- v4.1.9 — 转向生物领域（immune-system / ecosystem / neural-regulation）
+- 任务 5 — 镜空科技风星球
+- 任务 6 — 移动端深度优化
+
+---
+
+## 二十二、2026-04-22 v4.1.9 任务 3 数学推进（函数性质/集合/排列组合）
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增 3 个数学条目：
+  - `function-properties`（5 步：3 个 .fp-mode-btn 单调/奇偶/周期 / .fp-func-btn 切换函数 / fp-int-a/b 区间输入 + 拖拽菱形 / 高亮单调区间与对称轴 / 判定公式）
+  - `set-operations`（5 步：6 个 .setops-op-btn 并/交/差/补/对称差 / setops-input-a/b/u 输入 / 维恩图高亮结果区域 / 运算结果与个数 / 德摩根律与分配律）
+  - `permutation-combination`（5 步：3 个 .permcomb-mode-btn 排列 P(n,r)/组合 C(n,r)/杨辉三角 / permcomb-n + permcomb-r 滑块 / 枚举示意 + 公式 / 杨辉三角上方两数之和 / 顺序区别 + 二项式定理）
+- `shared/js/quiz-data.js` 新建 3 个题池，各 5 题：
+  - `function-properties`（奇函数定义 / x³ 性质 / cos 周期 2π / x²−2x 单调性 / 偶函数对称轴）
+  - `set-operations`（A∩B、A∪B、Aᶜ、德摩根 (A∪B)ᶜ、空集与子集关系）
+  - `permutation-combination`（P(5,3)=60、C(5,3)=10、杨辉 1 4 6 4 1、顺序与否区别、二项式系数 C(n,r)）
+- `sw.js` CACHE_NAME `englab-static-v20260422h` → `v20260422i`
+- `index.html` cache bust：`experiment-guide.js?v=20260422h` → `?v=20260422i`，`quiz-data.js?v=20260422h` → `?v=20260422i`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches，硬重载后查询 6 项数据全部正确：3 个引导标题/步骤数 + 3 个测验题池长度 = 5
+
+### 当前覆盖度
+- 引导定制化：28 / 63（化学 11/11 + 数学 13/15 + 物理 1 + 生物 6 + 算法 0）
+- 测验题库：37 / 63（3 个全部为新建）
+- **数学领域 13/15，近在咕咤：仅剩 exp-log + geometry**
+
+### 后续候选
+- v4.1.10 — 数学冲刺全覆盖（exp-log + geometry + complex-numbers 等最后 2 项）
+- v4.1.10 — 转向物理领域（circuit-analysis / waves / optics）
+- v4.1.10 — 转向算法领域（sorting-compare / dynamic-programming / string-matching）
+- v4.1.10 — 转向生物领域（immune-system / ecosystem / neural-regulation）
 - 任务 5 — 镜空科技风星球
 - 任务 6 — 移动端深度优化
 ---
