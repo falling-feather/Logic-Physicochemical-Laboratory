@@ -40,7 +40,8 @@
     <link rel="stylesheet" href="shared/css/experiment-favorites.css?v=20260418f">
     <link rel="stylesheet" href="shared/css/experiment-rating.css?v=20260422z">
     <!-- CSS: Pages -->
-    <link rel="stylesheet" href="pages/home/home.css?v=20260422d">
+    <link rel="stylesheet" href="pages/home/home.css?v=20260422e">
+    <link rel="stylesheet" href="pages/planets/planets.css?v=20260422e">
     <link rel="stylesheet" href="pages/mathematics/mathematics.css?v=20260417d">
     <link rel="stylesheet" href="pages/physics/physics.css?v=20260417d">
     <link rel="stylesheet" href="pages/chemistry/chemistry.css?v=20260417d">
@@ -278,6 +279,41 @@
                         </div>
                     </div>
                 </div>
+                <a href="#planets" class="planets-entry" aria-label="进入沉浸式星系导航大屏">星系大屏</a>
+            </div>
+        </section>
+
+        <!-- ────────── PLANETS (沉浸式 3D 镂空星系导航大屏 v4.2.0-α4) ────────── -->
+        <section id="page-planets" class="page" aria-label="星系大屏">
+            <canvas id="planets-canvas" class="planets-canvas" role="img" aria-label="3D 星系导航 Canvas"></canvas>
+            <a href="#home" class="planets-back">← 返回首页</a>
+            <div class="planets-title">
+                星 系 导 航
+                <div class="planets-subtitle">SUBJECT · GALAXY · MAP</div>
+            </div>
+            <div class="planets-hud planets-hud--tl">
+                <div><span class="blink">●</span> SYS.SCAN</div>
+                <div>MODE: ORBIT</div>
+                <div>NODES: 5</div>
+            </div>
+            <div class="planets-hud planets-hud--tr">
+                <div>v2026.06</div>
+                <div>FOV: 0.45</div>
+                <div>R: 1.40</div>
+            </div>
+            <div class="planets-hud planets-hud--bl">
+                <div>← DRAG TO ROTATE</div>
+                <div>TAP PLANET TO ENTER</div>
+            </div>
+            <div class="planets-hud planets-hud--br">
+                <div>α4 · HOLOGRAPHIC</div>
+                <div class="blink">● LIVE</div>
+            </div>
+            <div class="planets-info" id="planets-info">
+                <div class="planets-info__label">SUBJECT</div>
+                <div class="planets-info__name">—</div>
+                <div class="planets-info__desc">—</div>
+                <div class="planets-info__hint">CLICK TO ENTER →</div>
             </div>
         </section>
 
@@ -2750,12 +2786,13 @@
     <script src="shared/js/experiment-quiz.js?v=20260418e"></script>
     <script src="shared/js/experiment-favorites.js?v=20260418f"></script>
     <script src="shared/js/experiment-rating.js?v=20260418g"></script>
-    <script src="shared/js/router.js?v=20260418p"></script>
+    <script src="shared/js/router.js?v=20260418q2"></script>
     <script src="shared/js/scroll-animations.js?v=20260417d"></script>
     <script src="shared/js/cards.js?v=20260417d"></script>
     <script src="shared/js/common.js?v=20260417d"></script>
     <!-- Scripts: Home -->
     <script src="pages/home/home.js?v=20260418f"></script>
+    <script src="pages/planets/planets.js?v=20260422g"></script>
     <!-- Scripts: Bootstrap (before deferred modules for fast homepage boot) -->
     <script src="shared/js/main.js?v=20260417d"></script>
     <!-- Scripts: Subject modules (deferred — download in parallel, execute after core) -->

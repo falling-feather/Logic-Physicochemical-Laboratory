@@ -196,6 +196,7 @@ Skip-nav  →    直接跳转主内容区
 | **v4.2.0-α3** | **任务 5 续：首页背景全息化 —— 粒子网络 worker 颜色 蓝→青绿、3 层 nebula 紫/绿/橙 → 三色青绿、hex-grid overlay 蓝→青绿（透明度 3%→4.5%）、新增 `.home-container::after` 全屏 HUD 垂直扫描线（9s 循环）** | ✅**已完成（当前分支）** |
 | **v4.2.0** | **任务 5 镜空科技风首页 main 合并：α1 主星 + α2 5 卫星 + α3 全屏背景三件套合并到 main 并 push（feature/holographic-planets 保留）** | ✅**已上线** |
 | **v4.2.1** | **任务 6 移动端深度优化：P-02 cell-structure long-press（350ms）替代 hover 预览、P-03 DEVELOPER_GUIDE §12.5 移动端开发规范、P-04 弹窗小屏 safe-area-inset 与 guide-card 滚动修复（quiz/guide/rating 三组件）** | ✅**已完成** |
+| **v4.2.0-α4** | **任务 5 续：新增 `#planets` 独立路由 — 沉浸式 3D 镂空星系导航大屏（Vanilla Canvas 2D yaw/pitch 透视 + 5 学科行星轨道环绕 + 拖拽旋转 + 4s 自动慢转 + hover 信息卡 + 点击跳学科 + 4 角 HUD + 中央青色核心 + 220 颗背景星）** | ✅**已完成（feature/holographic-planets）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -1112,10 +1113,46 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - P-04 弹窗 480px 滚动 + safe-area — ✅ 已完成
 
 ### 后续候选
-- 任务 5 α4 — 新增独立 #planets 路由（沉浸式 3D 镂空星系导航大屏，重型）
+- 任务 5 α4 — 新增独立 #planets 路由（沉浸式 3D 镂空星系导航大屏，重型） — ✅ 已完成（v4.2.0-α4）
 - 任务 7 — 实验页文字排版逐项审视
 - 任务 8 — Phase 2 新实验扩展
-- v4.2.1 上 main 后 push（待用户明示）
+- v4.2.1 + α4 上 main 后 push（待用户明示）
+
+---
+
+## 三十九、2026-04-22 v4.2.0-α4 任务 5 续 — `#planets` 沉浸 3D 镂空星系导航大屏（feature/holographic-planets）
+
+### 设计动机
+α1~α3 完成首页镜空科技化后，主星与卫星仍受首页 bento 排版限制，无法呈现真正"全屏沉浸"的导航体验。α4 新增独立路由 `#planets`，作为可选的"全息导航大屏"入口，与首页平级共存。技术上选用纯 Vanilla Canvas 2D 模拟 yaw/pitch 透视投影（不引入 three.js），保持"无框架"架构纪律。
+
+### 新增文件
+- `pages/planets/planets.css` (~200 行)：青色 HUD 大屏样式，4 角 HUD/标题/返回按钮/信息卡/首页入口按钮
+- `pages/planets/planets.js` (~330 行)：`window.PlanetsView` 单对象，`init/destroy` 完整生命周期 + Canvas 2D 3D 投影 + 拖拽/触摸/hover 事件 + RAF 循环
+
+### 核心实现
+- **3D 透视**：`_project(x,y,z)` 先围绕 Y 轴 yaw 旋转、再围绕 X 轴 pitch 旋转，`fov = min(W,H) × 0.45`，`camZ = 3`，远小近大缩放
+- **5 学科轨道**：半径 `r = 1.4`，5 颗行星角度均分 `2π/5`，分布于 xz 平面
+- **行星渲染**：远→近排序，每颗渲染：光晕 radial-gradient → 半透明深色球体 → 青色描边圆 → 内部经纬椭圆 + 准星十字 → 学科色中心圆点 → 下方学科文字标签
+- **交互**：鼠标拖拽 yaw/pitch（pitch 限制 ±1.2），松开后 4s 恢复自动 yaw 慢转（0.0003 rad/ms）；hover 距离命中检测（半径随 perspective scale 缩放）；点击非拖拽时 `window.location.hash = '#' + subjectId` 跳学科页
+- **触摸支持**：touchstart/move/end 全套，preventDefault 防滚动
+- **背景细节**：220 颗随机分布的视差小星点 + 中央青色发光核心 + 80 段虚线轨道环
+- **信息卡**：右下青色描边卡片，hover 行星时滑入显示学科名/简介/CLICK TO ENTER →，左边框颜色随学科变化
+- **DPR 适配**：`canvas.width = innerWidth × dpr`，`ctx.setTransform(dpr,0,0,dpr,0,0)`
+
+### 集成改动
+- `index.html` 新增 `<section id="page-planets">`（含 canvas + 4 HUD 角标 + 标题 + 返回按钮 + 信息卡）；首页主星 bento 内追加 `<a class="planets-entry" href="#planets">星系大屏</a>` 入口（绝对定位右下，◉ 闪烁脉冲）；新增 `<link href="pages/planets/planets.css">` 与 `<script src="pages/planets/planets.js">`（同步加载，与 main.js 同序保证 router.init 时 `initPlanets` 已定义）
+- `shared/js/router.js` 五处改动：colors map 新增 `planets: 'rgba(0,255,213,0.10)'`、`onPageEnter` 新增 `planets → initPlanets()` 分支、`onPageLeave` 新增 `planets → destroyPlanets()` 分支、`_toggleRunningTime(initialPage !== 'home' && initialPage !== 'planets')`（隐藏运行时长 footer）、navigateTo 早返回 + heroVisual/scrollAnimations 等"非首页才执行"的判断全部追加 `&& page !== 'planets'`（视为与首页同级的独立沉浸页）
+- `sw.js` cache 三联升级：`englab-static-v20260422z` → `v20260422zc`，并将 `pages/planets/planets.css` `pages/planets/planets.js` `shared/js/router.js?v=20260418q2` 加入/同步 cache 列表
+
+### 验证
+- Playwright `?_=ts#planets` → screenshot：5 行星轨道环绕 + 4 角 HUD + 标题"星 系 导 航 SUBJECT · GALAXY · MAP"+ 返回首页按钮 + DRAG/TAP 提示文字全部正确显示
+- `window.PlanetsView.W = 1055, .rafId 非空`，确认 RAF 循环运行中
+- `?_=ts#home` → 首页右下出现 `.planets-entry` 按钮（青色 #00ffd5），可点击跳 #planets
+
+### 排查记录
+- 首次集成 `<script defer>` 加载 planets.js → router.init() 调 `onPageEnter('planets')` 时 `initPlanets` 仍未定义（同步脚本 main.js 早于 defer 脚本执行完）→ 改为同步 `<script>` 与 main.js 同列即修复
+- planets section 中 `.planets-canvas` 用 `position: fixed` 全屏；当 section `.page` 未 `.active` 时 `display: none` 自动隐藏所有后代（含 fixed），无干扰其他页面
+
 
 ---
 
