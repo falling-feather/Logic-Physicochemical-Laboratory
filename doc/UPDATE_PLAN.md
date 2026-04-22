@@ -172,7 +172,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.0** | **Batch 3 生物批复核：9 个 `_injectInfoPanel` 同样为幂等误报，§二B 整张表 13 项全部关闭** | ✅**已完成** |
 | **v4.1.1** | **任务 6 移动端适配审视：viewport / 断点体系 / 触控事件配套检查，产出 MOBILE_AUDIT_v4.1.1.md** | ✅**已完成** |
 | **v4.1.2** | **任务 3 引导/测验定制化：dna + cellular-respiration 各加 5 步定制引导，dna 测验 3→5 题，新增 cellular-respiration 5 题** | ✅**已完成** |
-| **v4.1.3** | **任务 3 续：photosynthesis + mitosis + electromagnetism 各加 5 步定制引导，三者测验全部扩到 5 题** | ✅**已完成（当前版本）** |
+| **v4.1.3** | **任务 3 续：photosynthesis + mitosis + electromagnetism 各加 5 步定制引导，三者测验全部扩到 5 题** | ✅**已完成** |
+| **v4.1.4** | **任务 3 续：reaction-rate + chemical-equilibrium + electrochemistry 各加 5 步定制引导，三者测验全部扩到 5 题** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -553,3 +554,40 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - 任务 5 — 镜空科技风星球（独立分支 feature/holographic-planets）
 - 任务 6 — 移动端深度优化（基于 v4.1.1 报告 P-01 ~ P-04 真机测试与修复）
 - 任务 8 — Phase 2 新增实验（从本文档第二节待开发列表中挑选）
+
+---
+
+## 十七、2026-04-22 v4.1.4 任务 3 引导/测验定制化（化学批次）
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增三个化学条目：
+  - `reaction-rate`（5 步：温度滑块 / 浓度滑块 / 催化剂复选 / 闪光碰撞与曲线 / 碰撞理论 + 麦克斯韦-玻尔兹曼分布）
+  - `chemical-equilibrium`（5 步：N₂+3H₂⇌2NH₃ 反应 / 7 个扰动按钮 / 浓度曲线与 K_c / 升温向吸热方向 / 勒夏特列原理）
+  - `electrochemistry`（5 步：原电池/电解池模式切换 / 电子离子动画 / Zn-Cu E°=1.10V / 阳氧阴还 / 电极判断口诀）
+- `shared/js/quiz-data.js`：
+  - `chemical-equilibrium` 由 3 题扩到 5 题（增加加压平衡移动判断 + K_c 仅与温度有关）
+  - 新增 `reaction-rate` 5 题（速率定义 / 升温活化分子百分比 / 催化剂降低活化能 / 浓度对碰撞频率 / 有效碰撞两要素）
+  - 新增 `electrochemistry` 5 题（负极氧化反应 / 电子流动方向 / 阳极接电源正极 / CuCl₂ 阴极反应 / 原电池 vs 电解池本质）
+- `sw.js` CACHE_NAME `englab-static-v20260422c` → `v20260422d`
+- `index.html` cache bust：`experiment-guide.js?v=20260422c` → `?v=20260422d`，`quiz-data.js?v=20260422c` → `?v=20260422d`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches，硬重载后查询 6 项数据全部正确：
+  - `_experimentGuides['reaction-rate'].title` = "化学反应速率操作指南"，5 步
+  - `_experimentGuides['chemical-equilibrium'].title` = "化学平衡操作指南"，5 步
+  - `_experimentGuides['electrochemistry'].title` = "电化学操作指南"，5 步
+  - `QUIZ_DATA['reaction-rate'].length` = 5
+  - `QUIZ_DATA['chemical-equilibrium'].length` = 5
+  - `QUIZ_DATA['electrochemistry'].length` = 5
+
+### 当前覆盖度
+- 引导定制化：12 / 63（新增 reaction-rate、chemical-equilibrium、electrochemistry）
+- 测验题库：24 / 63 实验拥有专属题池（reaction-rate、electrochemistry 为新增条目）
+
+### 后续候选
+- v4.1.5 — 继续定制其他化学引导（chemical-bond / ionic-reaction / organic-chemistry）
+- v4.1.5 — 转向数学领域（trigonometry / probability / vector-ops）
+- v4.1.5 — 转向物理领域（circuit-analysis / waves / optics）
+- 任务 5 — 镜空科技风星球（独立分支 feature/holographic-planets）
+- 任务 6 — 移动端深度优化（基于 v4.1.1 报告真机测试）
+

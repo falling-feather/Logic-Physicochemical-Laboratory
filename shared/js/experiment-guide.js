@@ -144,6 +144,36 @@ const ExperimentGuide = {
                 { icon: 'crosshair', text: '勾选测量探针后在画布上点击查看任意点的电场强度与电势' },
                 { icon: 'book-open', text: '粒子轨迹模式演示电荷在场中的运动；磁场模式展示通电导线周围磁感线' }
             ]
+        },
+        'reaction-rate': {
+            title: '化学反应速率操作指南',
+            steps: [
+                { icon: 'sliders-horizontal', text: '调节温度滑块改变粒子运动速度，观察有效碰撞频率变化' },
+                { icon: 'sliders-horizontal', text: '调节浓度滑块改变粒子数量，模拟单位体积反应物增减' },
+                { icon: 'check-square', text: '勾选「催化剂」可降低活化能，加速反应而不改变产物总量' },
+                { icon: 'play', text: '左侧粒子区实时模拟有效碰撞（闪光），右侧绘制反应进度曲线' },
+                { icon: 'book-open', text: '基于碰撞理论 + Maxwell-Boltzmann 分布（人教版选必一第2章）' }
+            ]
+        },
+        'chemical-equilibrium': {
+            title: '化学平衡操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '示例反应 N₂ + 3H₂ ⇌ 2NH₃（放热），点击「开始」反应趋向平衡' },
+                { icon: 'plus', text: '7 个扰动按钮：加 N₂ / 加 H₂ / 移除 NH₃ / 升温 / 降温 / 加压 / 减压' },
+                { icon: 'bar-chart-2', text: '右侧曲线实时展示三组分浓度变化与平衡常数 K_c 演化' },
+                { icon: 'thermometer', text: '升温→平衡向吸热方向（逆反应）移动；加压→平衡向气体分子数减少的方向移动' },
+                { icon: 'book-open', text: '勒夏特列原理：平衡总是向减弱外界扰动的方向移动（人教版选必一第2章）' }
+            ]
+        },
+        'electrochemistry': {
+            title: '电化学操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '顶部按钮切换两种模式：原电池（Zn-Cu，自发产电）/ 电解池（CuCl₂，外加电压）' },
+                { icon: 'play', text: '播放/暂停按钮控制电子在外电路 + 离子在溶液中的迁移动画' },
+                { icon: 'zap', text: '原电池：Zn 失电子（负极氧化），Cu²⁺ 得电子（正极还原），E°=1.10 V' },
+                { icon: 'zap', text: '电解池：阳极氧化（2Cl⁻−2e⁻→Cl₂↑），阴极还原（Cu²⁺+2e⁻→Cu）' },
+                { icon: 'book-open', text: '判断电极口诀「正得负失」（原电池）/「阴还阳氧」（电解池）— 人教版选必一第4章' }
+            ]
         }
     },
 
