@@ -484,6 +484,36 @@ const ExperimentGuide = {
                 { icon: 'eye', text: '轨道模式：行星沿椭圆运动、近日点速度大、远日点速度小（开普勒第二定律面积速度恒定）；场模式：场线由质点中心向四周辐射' },
                 { icon: 'book-open', text: 'F = GMm/r²（牛顿万有引力）；圆轨道 v=√(GM/r)、T=2π√(r³/GM)；开普勒三定律 T²/r³=4π²/GM；地表 g≈GM地/R地²≈9.8（人教版必修二第7章）' }
             ]
+        },
+        'electromagnetic': {
+            title: '电磁场操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '5 个 .em-mode-btn 切换：电力线 / 等势线 / 电势图（热力图）/ 粒子轨迹 / 磁场（B 由电流产生）' },
+                { icon: 'hand', text: '直接在画布上拖拽红/蓝点电荷（+/−）改变位置；4 个 .em-preset-btn 一键加载：偶极子 / 四极子 / 平行板 / 三角形' },
+                { icon: 'sliders-horizontal', text: 'em-pause 暂停场动画、em-reset 复位电荷分布；em-toggle-probe 显示测量探针，em-toggle-lines / em-toggle-vectors 切换电力线与场矢量箭头' },
+                { icon: 'eye', text: '电力线由 +Q 出发指向 −Q（不相交）；等势线垂直于电力线；磁场模式按右手定则给出环绕电流的磁感线' },
+                { icon: 'book-open', text: '点电荷场强 E=kQ/r²、电势 φ=kQ/r、势能 W=qφ；安培环路 ∮B·dl=μ₀I；洛伦兹力 F=qv×B；右手定则 + 左手定则（人教版必修三 + 选必二）' }
+            ]
+        },
+        'charged-particle': {
+            title: '带电粒子运动操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '3 个 .cp-mode-btn 切换：洛伦兹力偏转（圆周运动）/ 质谱仪（V 加速 + B 偏转分离同位素）/ 速度选择器（电场磁场正交相消）' },
+                { icon: 'sliders-horizontal', text: '洛伦兹模式：q / m / v₀ / B 四滑块；质谱模式：accV（加速电压）+ B；选择器：E + B；cp-info 实时显示 r=mv/(qB) 与周期 T=2πm/(qB)' },
+                { icon: 'play', text: 'cp-play 开始模拟、cp-reset 复位粒子初始位置；可在三种模式之间随时切换观察不同物理图景' },
+                { icon: 'eye', text: '洛伦兹模式：单粒子做圆周运动；质谱模式：H⁺/D⁺/He⁺ 三种粒子分离成不同半径圆弧；选择器：当 v=E/B 时直线通过、其他偏转' },
+                { icon: 'book-open', text: '洛伦兹力 F=qvB（v⊥B）→ 圆周 r=mv/(qB)、T=2πm/(qB)（与 v 无关！）；质谱仪 r=√(2mV/q)/B；速度选择器 v=E/B（人教版选必二第1章）' }
+            ]
+        },
+        'relativity': {
+            title: '相对论操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '7 个 .rel-mode-btn 切换：时间膨胀 / 长度收缩 / 质能等价 / 时空图 / 速度叠加 / 双生子 / 多普勒 / Lorentz 变换' },
+                { icon: 'sliders-horizontal', text: 'rel-velocity 滑块调相对速度 β=v/c（0~0.99c）；γ=1/√(1−β²) 实时显示；某些模式额外有 u（叠加速度）和双生子距离滑块' },
+                { icon: 'play', text: 'rel-pause 暂停/继续；rel-reset 复位时间 t、时空事件；时空图模式可在画布上双击添加事件、拖拽调整' },
+                { icon: 'eye', text: '时间膨胀：动钟变慢 Δt=γΔτ；长度收缩：L=L₀/γ；时空图：世界线 + 光锥 + Lorentz 变换坐标系；多普勒：红/蓝移频率比' },
+                { icon: 'book-open', text: 'γ=1/√(1−v²/c²)；时间膨胀 Δt=γΔτ；长度收缩 L=L₀/γ；质能 E=mc²、E²=(pc)²+(mc²)²；速度叠加 w=(u+v)/(1+uv/c²)（人教版选必三第5章）' }
+            ]
         }
     },
 

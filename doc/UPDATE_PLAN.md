@@ -183,7 +183,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.11** | **任务 3 数学完结 + 起步物理：solid-geometry + circuit-analysis + waves 各加 5 步定制引导 + 5 题测验（冸台体欧拉 V-E+F=2、串联/并联分压分流、波速 v=fλ与多普勒），数学 15/15 ✅** | ✅**已完成** |
 | **v4.1.12** | **任务 3 物理运动学三件套：kinematics + projectile + circular-motion 各加 5 步定制引导 + 5 题测验（匀变速 v²−v₀²=2as、斜抛 45° 最远、圆周 v=ωr/F=mv²/r），物理 6/17** | ✅**已完成** |
 | **v4.1.13** | **任务 3 物理电磁学三件套：optics + electromagnetic-induction + alternating-current 各加 5 步定制引导 + 5 题测验（透镜公式 1/u+1/v=1/f、法拉第 ε=-dΦ/dt、变压器匝数比），物理 9/17** | ✅**已完成** |
-| **v4.1.14** | **任务 3 物理力学三件套：force-composition + momentum-conservation + gravitation 各加 5 步定制引导 + 5 题测验（平行四边形定则、3 种碰撞型式、万有引力 F=GMm/r²），物理 12/17** | ✅**已完成（当前版本）** |
+| **v4.1.14** | **任务 3 物理力学三件套：force-composition + momentum-conservation + gravitation 各加 5 步定制引导 + 5 题测验（平行四边形定则、3 种碰撞型式、万有引力 F=GMm/r²），物理 12/17** | ✅**已完成** |
+| **v4.1.15** | **任务 3 物理高阶三件套：electromagnetic + charged-particle + relativity 各加 5 步定制引导 + 5 题测验（库仑 E=kQ/r²、洛伦兹力 r=mv/(qB)、相对论 γ=1/√(1−β²)），物理 15/17** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -789,6 +790,36 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - v4.1.12 — 物理推进：kinematics + projectile + circular-motion 各 5 步（运动学三件套）
 - v4.1.12 — 转向算法领域（sorting-compare / dynamic-programming / string-matching）
 - v4.1.12 — 转向生物领域（immune-system / ecosystem / neural-regulation）
+- 任务 5 — 镜空科技风星球
+- 任务 6 — 移动端深度优化
+---
+
+## 二十八、2026-04-22 v4.1.15 物理高阶三件套（电磁场+带电粒子+相对论）
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增 3 条：
+  - `electromagnetic`（5 步：5 个 .em-mode-btn 电力线/等势线/电势热力图/粒子轨迹/磁场 / 4 个 .em-preset-btn dipole+quadrupole+capacitor+triangle / em-pause+reset+toggle-probe/lines/vectors / 电力线+等势面+磁感线 / E=kQ/r²、安培环路 ∮B·dl=μ₀I、F=qv×B）
+  - `charged-particle`（5 步：3 个 .cp-mode-btn lorentz/spectrometer/selector / 各模式不同滑块（q·m·v₀·B、accV·B、E·B） / cp-play+reset / 圆周运动 + 同位素分离 + 直线通过选选器 / r=mv/(qB)、T=2πm/(qB)与 v 无关、选选器 v=E/B）
+  - `relativity`（5 步：7 个 .rel-mode-btn 时间膨胀/长度收缩/质能/时空图/速度叠加/双生子/多普勒 + Lorentz / rel-velocity 0~0.99c 滑块 + u + 双生子距离 / rel-pause+reset / 动钟变慢、动尺变短、世界线+光锥 / γ=1/√(1−β²)、Δt=γΔτ、L=L₀/γ、E=mc²、速度叠加 w=(u+v)/(1+uv/c²)）
+- `shared/js/quiz-data.js` 3 个题池全部新建各 5 题：
+  - `electromagnetic`（E∝1/r²、电力线不相交、U=Ed=100V、右手螺旋定则、安培力 BIL=0.4N）
+  - `charged-particle`（r=mv/(qB)、T 与 v 无关、选选器 v=E/B、质谱仪 r=√(2mV/q)/B、洛伦兹力不做功）
+  - `relativity`（两公设、γ(0.8c)=1.67、0.6c 下 1秒→地面 1.25秒、1g 质能 9×10¹³ J、0.5c+0.5c=0.8c）
+- `sw.js` CACHE_NAME `englab-static-v20260422n` → `v20260422o`
+- `index.html` cache bust：experiment-guide.js & quiz-data.js 同步升级 `?v=20260422o`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches 后硬重载，6 项数据全部正确（3 标题 + 3 × 5 步 + 3 × 5 题）
+
+### 当前覆盖度
+- 引导定制化：46 / 63（化学 11/11 ✅ + 数学 15/15 ✅ + 物理 15/17 冲钛 3-+ 生物 6 + 算法 0）
+- 测验题库：55 / 63
+- **物理 15/17 ≡ 88％冲钛收尾！仅剩 energy-conservation + fluid-dynamics 2 项**
+
+### 后续候选
+- v4.1.16 — 物理最后两项 + 1 补充：energy-conservation + fluid-dynamics + 1 个 各 5 步（物理 17/17 ✅）
+- v4.1.16 — 转向算法领域（sorting-compare / dynamic-programming / string-matching）
+- v4.1.16 — 转向生物领域（immune-system / ecosystem / neural-regulation）
 - 任务 5 — 镜空科技风星球
 - 任务 6 — 移动端深度优化
 ---
