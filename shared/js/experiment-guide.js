@@ -204,6 +204,46 @@ const ExperimentGuide = {
                 { icon: 'tag', text: '右侧面板高亮官能团（—OH 羟基 / —COOH 羧基 / C=C 双键 / 苯环）' },
                 { icon: 'book-open', text: '展示典型反应：取代、加成、消去、酯化等（人教版选必三第3章）' }
             ]
+        },
+        'atomic-structure': {
+            title: '原子结构与电子排布操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '顶部 3 模式：轨道形状（s/p/d 电子云）/ 电子排布（轨道方框图）/ 玻尔模型（壳层动画）' },
+                { icon: 'list', text: '元素选择支持 Z=1~36（H 到 Kr），覆盖人教版必修一周期表前 4 周期' },
+                { icon: 'circle', text: '轨道模式：电子云密度图直观展示电子出现概率（亮区概率高）' },
+                { icon: 'arrow-up-down', text: '排布模式：方框 + ↑↓ 箭头展示泡利不相容、洪特规则填充顺序' },
+                { icon: 'book-open', text: '玻尔模型展示分层 K-L-M-N 与跃迁吸/放光（人教版必修一第4章 / 选必二第1章）' }
+            ]
+        },
+        'molecular-structure': {
+            title: '分子结构操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '左侧选择经典分子：H₂O / CO₂ / CH₄ / NH₃ 等，含杂化与极性信息' },
+                { icon: 'move', text: '画布上拖拽鼠标自由旋转 3D 球棍模型，观察分子立体构型' },
+                { icon: 'crosshair', text: '测量模式：依次点选两/三个原子，自动显示键长 / 键角' },
+                { icon: 'eye', text: '轨道模式：可视化孤对电子（lone pair）与杂化轨道方向' },
+                { icon: 'book-open', text: 'VSEPR 价层电子对互斥理论：键角与构型由总电子对数决定（人教版选必二第2章）' }
+            ]
+        },
+        'chemical-reactions': {
+            title: '化学反应操作指南',
+            steps: [
+                { icon: 'play', text: '播放/暂停/重置按钮控制反应动画进度（progress 0→1）' },
+                { icon: 'sliders-horizontal', text: '速度滑块调节动画快慢，便于观察断键-成键过程细节' },
+                { icon: 'zap', text: '内置反应：甲烷燃烧 CH₄+2O₂→CO₂+2H₂O 等，展示原子重组' },
+                { icon: 'bar-chart-2', text: '右侧能量条直观对比反应物 / 过渡态 / 生成物能量（含活化能 Eₐ）' },
+                { icon: 'book-open', text: '化学反应本质：旧键断裂吸能 + 新键形成放能，二者代数和决定吸/放热（人教版必修2）' }
+            ]
+        },
+        'solution-ionization': {
+            title: '溶液与电离操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '6 种物质按钮：HCl / NaOH（强电解质）/ CH₃COOH / NH₃·H₂O（弱电解质）/ NaCl / NaHCO₃' },
+                { icon: 'sliders-horizontal', text: '浓度滑块调节 c（mol/L），实时计算 pH 与电离度 α' },
+                { icon: 'eye', text: '画布粒子可视化：强电解质完全电离（无原分子），弱电解质 ⇌ 平衡状态' },
+                { icon: 'play', text: '速度 / 暂停按钮控制粒子动画；鼠标悬停显示离子标签' },
+                { icon: 'book-open', text: '弱酸 Ka、弱碱 Kb 反映电离程度；NaHCO₃ 因 HCO₃⁻ 水解溶液呈碱性（人教版选必一第3章）' }
+            ]
         }
     },
 

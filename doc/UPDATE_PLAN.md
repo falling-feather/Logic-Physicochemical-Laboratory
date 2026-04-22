@@ -174,7 +174,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.2** | **任务 3 引导/测验定制化：dna + cellular-respiration 各加 5 步定制引导，dna 测验 3→5 题，新增 cellular-respiration 5 题** | ✅**已完成** |
 | **v4.1.3** | **任务 3 续：photosynthesis + mitosis + electromagnetism 各加 5 步定制引导，三者测验全部扩到 5 题** | ✅**已完成** |
 | **v4.1.4** | **任务 3 续：reaction-rate + chemical-equilibrium + electrochemistry 各加 5 步定制引导，三者测验全部扩到 5 题** | ✅**已完成** |
-| **v4.1.5** | **任务 3 续：chemical-bond + ionic-reaction + organic-chemistry 各加 5 步定制引导，三者测验全部新增/扩到 5 题** | ✅**已完成（当前版本）** |
+| **v4.1.5** | **任务 3 续：chemical-bond + ionic-reaction + organic-chemistry 各加 5 步定制引导，三者测验全部新增/扩到 5 题** | ✅**已完成** |
+| **v4.1.6** | **任务 3 收尾：atomic-structure + molecular-structure + chemical-reactions + solution-ionization 各加 5 步定制引导 + 测验题全部新增 5 题，化学领域 11/11 全部覆盖** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -626,6 +627,40 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - v4.1.6 — 收尾化学最后几项（atomic-structure / molecular-structure / chemical-reactions / solution-ionization）
 - v4.1.6 — 转向数学领域（trigonometry / probability / vector-ops）
 - v4.1.6 — 转向物理领域（circuit-analysis / waves / optics）
+- 任务 5 — 镜空科技风星球
+- 任务 6 — 移动端深度优化
+
+---
+
+## 十九、2026-04-22 v4.1.6 任务 3 化学领域收尾（全覆盖里程碑）
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增 4 个化学收尾条目：
+  - `atomic-structure`（5 步：3 模式 / Z=1～36 / 轨道云 / 泡利洪特填充 / 玻尔跨迁）
+  - `molecular-structure`（5 步：分子选择 / 拖拽旋转 / 测量键长键角 / 轨道模式 / VSEPR 理论）
+  - `chemical-reactions`（5 步：播放/重置 / 速度调节 / 甲烷燃烧原子重组 / 能量条 / 断键成键原理）
+  - `solution-ionization`（5 步：6 种物质 / 浓度滑块 + pH / 强弱电解质可视化 / 暂停拖动 / Ka Kb 与水解）
+- `shared/js/quiz-data.js`：新增 4 个题池，各 5 题：
+  - `atomic-structure`（碳原子排布式 / p 轨道三方向 / 泡利原理 / 洪特规则 / Na⁺ 与 Ne 同构）
+  - `molecular-structure`（H₂O V 形 / CO₂ 非极性 / CH₄ sp³ / NH₃ 三角锥 / 极性判断依据）
+  - `chemical-reactions`（原子重组 / 燃烧为氧化放热 / 活化能定义 / 放热反应特征 / 催化剂不变 ΔH）
+  - `solution-ionization`（强电解质 HCl / 0.1 M HCl pH=1 / 稀释促进弱酸电离 / NaHCO₃ 水解呈碱性 / Ka 仅受温度影响）
+- `sw.js` CACHE_NAME `englab-static-v20260422e` → `v20260422f`
+- `index.html` cache bust：`experiment-guide.js?v=20260422e` → `?v=20260422f`，`quiz-data.js?v=20260422e` → `?v=20260422f`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches，硬重载后查询 8 项数据全部正确：4 个引导标题/步骤数 + 4 个测验题池长度 = 5
+
+### 当前覆盖度
+- 引导定制化：19 / 63（化学 11/11 + 其他学科 8）
+- 测验题库：31 / 63（4 个全部为新增）
+- **化学领域 11/11 实验全部拥有专属引导 + 测验题池，达成首个学科全覆盖里程碑！**
+
+### 后续候选
+- v4.1.7 — 数学批次（trigonometry / probability / vector-ops 等，已有56进度 4/15）
+- v4.1.7 — 物理批次（circuit-analysis / waves / optics 等，已有56进度 2/17）
+- v4.1.7 — 算法批次（sorting-compare / dynamic-programming / string-matching）
+- v4.1.7 — 生物批次（immune-system / ecosystem / neural-regulation）
 - 任务 5 — 镜空科技风星球
 - 任务 6 — 移动端深度优化
 
