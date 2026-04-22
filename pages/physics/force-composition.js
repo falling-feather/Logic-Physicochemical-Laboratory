@@ -490,7 +490,7 @@ const ForceComposition = {
         ctx.fillRect(-boxSize / 2, -boxSize, boxSize, boxSize);
         ctx.strokeRect(-boxSize / 2, -boxSize, boxSize, boxSize);
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 11px ' + CF.sans;
+        ctx.font = 'bold 12px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('m', 0, -boxSize / 2);
@@ -627,7 +627,7 @@ const ForceComposition = {
         const ty = cy - Math.sin(midAngle) * (radius + 14);
         ctx.globalAlpha = 0.7;
         ctx.fillStyle = color;
-        ctx.font = '11px ' + CF.sans;
+        ctx.font = '12px ' + CF.sans;
         ctx.textAlign = 'center';
         const deg = Math.abs(endAngle - startAngle) * 180 / Math.PI;
         ctx.fillText(deg.toFixed(0) + '°', tx, ty);
