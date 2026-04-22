@@ -176,7 +176,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.4** | **任务 3 续：reaction-rate + chemical-equilibrium + electrochemistry 各加 5 步定制引导，三者测验全部扩到 5 题** | ✅**已完成** |
 | **v4.1.5** | **任务 3 续：chemical-bond + ionic-reaction + organic-chemistry 各加 5 步定制引导，三者测验全部新增/扩到 5 题** | ✅**已完成** |
 | **v4.1.6** | **任务 3 收尾化学：atomic-structure + molecular-structure + chemical-reactions + solution-ionization 各加 5 步定制引导 + 测验题全部新增 5 题，化学领域 11/11 全部覆盖** | ✅**已完成** |
-| **v4.1.7** | **任务 3 转数学：trigonometry + probability + vector-ops 各加 5 步定制引导与测验题其他扯到 5 题/新增 5 题（嵌入诱导公式、大数定律、向量垂直判定等高考考点）** | ✅**已完成（当前版本）** |
+| **v4.1.7** | **任务 3 转数学：trigonometry + probability + vector-ops 各加 5 步定制引导与测验题其他扯到 5 题/新增 5 题（嵌入诱导公式、大数定律、向量垂直判定等高考考点）** | ✅**已完成** |
+| **v4.1.8** | **任务 3 数学续推：sequences + inequality + conic-sections 各加 5 步定制引导 + 测验题扩/新增到 5 题（提及等差等比通项、线性规划顶点原理、离心率统一定义）** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -656,8 +657,38 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 ### 后续候选
 - v4.1.8 — 数学续推（sequences / inequality / conic-sections 等）
 - v4.1.8 — 转向物理领域（circuit-analysis / waves / optics）
-- v4.1.8 — 转向算法领域（sorting-compare / dynamic-programming / string-matching）
-- v4.1.8 — 转向生物领域（immune-system / ecosystem / neural-regulation）
+- 任务 5 — 镜空科技风星球
+- 任务 6 — 移动端深度优化
+
+---
+
+## 二十一、2026-04-22 v4.1.8 任务 3 数学续推（数列不等式圆锥曲线）
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增 3 个数学条目：
+  - `sequences`（5 步：等差/等比 .seq-mode-btn 切换 / a₁、d/q、n 滑块 / 悬停高亮柱条 / 线性 vs 指数对比 / 通项公式 Sₙ）
+  - `inequality`（5 步：3 个 ineq-c0/1/2 约束滑块 / 可行域阴影 / ineq-show-obj + ineq-obj 目标函数等高线 / 顶点最优解 / 一元二次 + 线性规划）
+  - `conic-sections`（5 步：3 个 .conic-type-btn 椭圆/双曲线/抛物线 / conic-a/b/p 滑块 / 轨迹 + 焦点 + 准线可视化 / conic-info 离心率 / 统一定义）
+- `shared/js/quiz-data.js`：
+  - `sequences` 3 题 → 5 题（新增等差通项计算、等比公比识别）
+  - `inequality` 新建 5 题题池（x²−4<0、x(x−1)≥0、线性规划顶点、绝对值|x−3|<2、不等式性质）
+  - `conic-sections` 新建 5 题题池（椭圆离心率 3/5、抛物线焦点 (1,0)、双曲线渐近线、统一定义 e=1、椭圆 c²=a²−b²）
+- `sw.js` CACHE_NAME `englab-static-v20260422g` → `v20260422h`
+- `index.html` cache bust：`experiment-guide.js?v=20260422g` → `?v=20260422h`，`quiz-data.js?v=20260422g` → `?v=20260422h`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches，硬重载后查询 6 项数据全部正确：3 个引导标题/步骤数 + 3 个测验题池长度 = 5
+
+### 当前覆盖度
+- 引导定制化：25 / 63（化学 11/11 + 数学 10/15 + 物理 1 + 生物 6 + 算法 0）
+- 测验题库：34 / 63（inequality 、conic-sections 为新建）
+- 数学领域已完成 10/15（过半）
+
+### 后续候选
+- v4.1.9 — 数学收尾（function-properties / set-operations / permutation-combination 等）
+- v4.1.9 — 转向物理领域（circuit-analysis / waves / optics）
+- v4.1.9 — 转向算法领域（sorting-compare / dynamic-programming / string-matching）
+- v4.1.9 — 转向生物领域（immune-system / ecosystem / neural-regulation）
 - 任务 5 — 镜空科技风星球
 - 任务 6 — 移动端深度优化
 ---

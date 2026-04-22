@@ -274,6 +274,36 @@ const ExperimentGuide = {
                 { icon: 'eye', text: '加减法看几何路径（首尾相连），数量积 A·B=|A||B|cosθ（标量），投影 = (A·B)/|B|' },
                 { icon: 'book-open', text: '向量是高考解析几何与立体几何工具：垂直⇔A·B=0，共线⇔A=λB（人教版必修二第6章）' }
             ]
+        },
+        'sequences': {
+            title: '数列可视化操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '顶部「等差数列 / 等比数列」两个 .seq-mode-btn 切换数列类型' },
+                { icon: 'sliders-horizontal', text: '调节首项 a₁、公差 d（或公比 q）、项数 n 滑块，画布柱状图实时绘出 aₙ' },
+                { icon: 'mouse-pointer-2', text: '鼠标悬停柱条高亮显示对应 (n, aₙ) 数值，便于读取具体项' },
+                { icon: 'eye', text: '观察等差数列线性增长 vs 等比数列指数变化（|q|>1 时爆炸式增长）' },
+                { icon: 'book-open', text: '等差通项 aₙ=a₁+(n−1)d，等比通项 aₙ=a₁·qⁿ⁻¹；前 n 项和 Sₙ 公式见教育面板（人教版选必二第4章）' }
+            ]
+        },
+        'inequality': {
+            title: '不等式与线性规划操作指南',
+            steps: [
+                { icon: 'sliders-horizontal', text: '3 个约束滑块 ineq-c0/c1/c2 控制 ax+by≤c 中的常数项 c，可行域随之伸缩' },
+                { icon: 'eye', text: '画布显示三条约束直线交叉围成的可行域（多边形），半平面阴影表示不等式方向' },
+                { icon: 'sliders-horizontal', text: '勾选「显示目标函数」后，ineq-obj 滑块平移目标函数 z=ax+by 的等高线，找最大/最小值' },
+                { icon: 'corner-up-right', text: '最优解通常出现在可行域的顶点（线性规划基本定理）' },
+                { icon: 'book-open', text: '一元二次不等式：解集与抛物线开口/判别式有关；线性规划是高考重点应用题型（人教版必修一/选必二）' }
+            ]
+        },
+        'conic-sections': {
+            title: '圆锥曲线操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '3 个 .conic-type-btn：椭圆 / 双曲线 / 抛物线，切换不同标准方程与几何性质' },
+                { icon: 'sliders-horizontal', text: '滑块 conic-a / conic-b 控制椭圆/双曲线半轴；conic-p 控制抛物线焦准距' },
+                { icon: 'eye', text: '画布动态描绘曲线轨迹，红色焦点、橙色准线、蓝色离心率几何意义同步可视化' },
+                { icon: 'bar-chart-2', text: '右侧 conic-info 实时显示标准方程、离心率 e=c/a、焦点坐标、渐近线（双曲线）等' },
+                { icon: 'book-open', text: '椭圆 0<e<1、双曲线 e>1、抛物线 e=1；统一定义：到焦点距离/到准线距离=e（人教版选必一第3章）' }
+            ]
         }
     },
 
