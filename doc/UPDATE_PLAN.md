@@ -182,7 +182,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.10** | **任务 3 数学冲刺完结：exp-log + geometry + complex-numbers 各加 5 步定制引导 + 测验题全部新增各 5 题（提及指对互为反函数、仿射变换不可交换、欧拉公式 e^(iπ)+1=0 等）** | ✅**已完成** |
 | **v4.1.11** | **任务 3 数学完结 + 起步物理：solid-geometry + circuit-analysis + waves 各加 5 步定制引导 + 5 题测验（冸台体欧拉 V-E+F=2、串联/并联分压分流、波速 v=fλ与多普勒），数学 15/15 ✅** | ✅**已完成** |
 | **v4.1.12** | **任务 3 物理运动学三件套：kinematics + projectile + circular-motion 各加 5 步定制引导 + 5 题测验（匀变速 v²−v₀²=2as、斜抛 45° 最远、圆周 v=ωr/F=mv²/r），物理 6/17** | ✅**已完成** |
-| **v4.1.13** | **任务 3 物理电磁学三件套：optics + electromagnetic-induction + alternating-current 各加 5 步定制引导 + 5 题测验（透镜公式 1/u+1/v=1/f、法拉第 ε=-dΦ/dt、变压器匝数比），物理 9/17** | ✅**已完成（当前版本）** |
+| **v4.1.13** | **任务 3 物理电磁学三件套：optics + electromagnetic-induction + alternating-current 各加 5 步定制引导 + 5 题测验（透镜公式 1/u+1/v=1/f、法拉第 ε=-dΦ/dt、变压器匝数比），物理 9/17** | ✅**已完成** |
+| **v4.1.14** | **任务 3 物理力学三件套：force-composition + momentum-conservation + gravitation 各加 5 步定制引导 + 5 题测验（平行四边形定则、3 种碰撞型式、万有引力 F=GMm/r²），物理 12/17** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -788,6 +789,36 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - v4.1.12 — 物理推进：kinematics + projectile + circular-motion 各 5 步（运动学三件套）
 - v4.1.12 — 转向算法领域（sorting-compare / dynamic-programming / string-matching）
 - v4.1.12 — 转向生物领域（immune-system / ecosystem / neural-regulation）
+- 任务 5 — 镜空科技风星球
+- 任务 6 — 移动端深度优化
+---
+
+## 二十七、2026-04-22 v4.1.14 物理力学三件套（力的合成+动量守恒+万有引力）
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增 3 条：
+  - `force-composition`（5 步：3 个 .fc-mode-btn 合成/正交分解/斜面 / 拖拽箭头变 F₁ F₂ / 斜面 fc-inc·mass·mu 三滑块 / 平行四边形 + 正交虚线 + 斜面三力 / R=√(F₁²+F₂²+2F₁F₂cosθ)、N=mgcosα、F∥=mgsinα、f=μN）
+  - `momentum-conservation`（5 步：3 个 .mc-mode-btn elastic/inelastic/perfectly / mc-m1·m2·v1·v2 加 mc-e 恢复系数 / play+reset / 两物块 + 速度向量 + 碰撞高亮 / 动量 m₁v₁+m₂v₂守恒 + 弹性动能亦守恒 + 完全非弹 v′=(m₁v₁+m₂v₂)/(m₁+m₂)）
+  - `gravitation`（5 步：2 个 .grav-mode-btn 轨道/引力场 / 中心质量 M 滑块 100~1500 / “力向量”切换+grav-pause/reset / 椭圆轨道 + 开普勒面积速度息息 / F=GMm/r²、v=√(GM/r)、T²/r³=4π²/GM、第一宇宙速度 7.9 km/s）
+- `shared/js/quiz-data.js` 3 个题池全部新建各 5 题：
+  - `force-composition`（3-4-5 勾股合力、5 N、力的分解无唯一解、光滑斜面加速度 5 m/s²、N=mg·cosα、合力随夹角变化规律）
+  - `momentum-conservation`（守恒条件、完全非弹 2 m/s、等质量弹性“交换速度”、弹性与完全非弹区别、炸弹 1:3 质量反冲速度 3:1）
+  - `gravitation`（F=GMm/r²、v=√(GM/r) 高轨慢、开普勒第三定律 T²/r³=const、半径减半 g 变 4 倍、第一宇宙速度是环绕最大发射最小）
+- `sw.js` CACHE_NAME `englab-static-v20260422m` → `v20260422n`
+- `index.html` cache bust：experiment-guide.js & quiz-data.js 同步升级 `?v=20260422n`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches 后硬重载，6 项数据全部正确（3 标题 + 3 × 5 步 + 3 × 5 题）
+
+### 当前覆盖度
+- 引导定制化：43 / 63（化学 11/11 ✅ + 数学 15/15 ✅ + 物理 12/17 + 生物 6 + 算法 0）
+- 测验题库：52 / 63
+- **物理 12/17 ≡ 70%！力学三件套 + 运动学三件套 + 电磁学三件套 + 波动 + 电路 + 立体**
+
+### 后续候选
+- v4.1.15 — 物理高阶三件套：electromagnetic + charged-particle + relativity 各 5 步
+- v4.1.15 — 转向算法领域（sorting-compare / dynamic-programming / string-matching）
+- v4.1.15 — 转向生物领域（immune-system / ecosystem / neural-regulation）
 - 任务 5 — 镜空科技风星球
 - 任务 6 — 移动端深度优化
 ---

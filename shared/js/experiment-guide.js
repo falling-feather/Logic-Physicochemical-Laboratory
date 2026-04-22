@@ -454,6 +454,36 @@ const ExperimentGuide = {
                 { icon: 'eye', text: '波形模式：u = U₀sin(2πft+φ) 滚动绘制；相量模式：旋转矢量 + 投影；变压器模式：原副线圈电压条形图实时联动 N₂/N₁' },
                 { icon: 'book-open', text: '正弦交流 u=U₀sin(ωt)；有效值 U=U₀/√2（≈0.707U₀）；变压器电压比 U₁/U₂=N₁/N₂、电流比反比 I₁/I₂=N₂/N₁；功率守恒 U₁I₁=U₂I₂（人教版选必二第3章）' }
             ]
+        },
+        'force-composition': {
+            title: '力的合成与分解操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '3 个 .fc-mode-btn 切换：力的合成（平行四边形定则）/ 正交分解（Fx Fy）/ 斜面分析（重力沿/垂直斜面分解 + 摩擦）' },
+                { icon: 'hand', text: '合成/分解模式：直接拖拽红蓝箭头端点改变力 F₁/F₂ 的大小和方向；fc-info 实时显示合力 R 和角度' },
+                { icon: 'sliders-horizontal', text: '斜面模式专属：fc-inc-slider 调斜面角 α、fc-mass-slider 调质量 m、fc-mu-slider 调摩擦系数 μ；面板同步显示 mg/N/sin/cos 各分量' },
+                { icon: 'eye', text: '画布同步绘制力的箭头 + 平行四边形/三角形（合成）、正交虚线投影（分解）、斜面 + 重力分解 + 摩擦力（斜面）' },
+                { icon: 'book-open', text: '平行四边形定则：R = √(F₁²+F₂²+2F₁F₂cosθ)；正交分解 Fx=Fcosθ、Fy=Fsinθ；斜面分解 N=mgcosα、F∥=mgsinα、f=μN（人教版必修一第3章）' }
+            ]
+        },
+        'momentum-conservation': {
+            title: '动量守恒操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '3 个 .mc-mode-btn 切换：弹性碰撞 elastic（动量+动能都守恒）/ 非弹性 inelastic（动量守恒、e 可调）/ 完全非弹性 perfectly（碰后粘在一起）' },
+                { icon: 'sliders-horizontal', text: '4 个滑块：mc-m1 / mc-m2 调两物块质量，mc-v1 / mc-v2 调初速度（正负代表方向）；非弹性模式额外有 mc-e 恢复系数（0~1）' },
+                { icon: 'play', text: '#mc-play-btn 开始模拟，#mc-reset-btn 重置；mc-info 实时显示碰前碰后动量 p 与动能 Eₖ' },
+                { icon: 'eye', text: '画布同步绘制 A、B 两物块的运动 + 速度向量 + 碰撞瞬间高亮；mc-edu 给出动量与能量守恒计算与等质量"交换速度"等典型结论' },
+                { icon: 'book-open', text: '动量守恒（外力为 0 或可忽略）：m₁v₁+m₂v₂=m₁v₁′+m₂v₂′；弹性碰撞额外 ½m₁v₁²+½m₂v₂²=½m₁v₁′²+½m₂v₂′²；完全非弹性 v′=(m₁v₁+m₂v₂)/(m₁+m₂)（人教版选必一第1章）' }
+            ]
+        },
+        'gravitation': {
+            title: '万有引力操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '2 个 .grav-mode-btn 切换：轨道模拟（行星绕中心天体椭圆/圆轨道）/ 引力场（场线与等势面可视化）' },
+                { icon: 'sliders-horizontal', text: '中心质量 M 滑块（100~1500）：M 越大引力越强、轨道周期越短、近距离弯曲越剧烈' },
+                { icon: 'play', text: '"力向量"按钮切换是否显示行星受到的瞬时引力箭头；grav-pause 暂停/继续；grav-reset 复位轨道初值' },
+                { icon: 'eye', text: '轨道模式：行星沿椭圆运动、近日点速度大、远日点速度小（开普勒第二定律面积速度恒定）；场模式：场线由质点中心向四周辐射' },
+                { icon: 'book-open', text: 'F = GMm/r²（牛顿万有引力）；圆轨道 v=√(GM/r)、T=2π√(r³/GM)；开普勒三定律 T²/r³=4π²/GM；地表 g≈GM地/R地²≈9.8（人教版必修二第7章）' }
+            ]
         }
     },
 
