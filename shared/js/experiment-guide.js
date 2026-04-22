@@ -664,6 +664,36 @@ const ExperimentGuide = {
                 { icon: 'gauge', text: '一表对比：自由扩散+协助扩散 = 被动运输（顺浓度，不耗能，差别在是否需载体）；主动运输+胞吞胞吐 = 需要细胞代谢能量（ATP）' },
                 { icon: 'book-open', text: '人教版必修 1 第 4 章：细胞膜的流动镶嵌模型（磷脂双分子层 + 蛋白质 + 多糖），运输方式由分子大小、极性、浓度梯度共同决定；胞吞胞吐体现膜的流动性，是大分子（如蛋白质、多糖）进出细胞的唯一方式' }
             ]
+        },
+        'meiosis': {
+            title: '减数分裂操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '#meiosis-controls 内 3 个 .meio-btn：◀ 上一步 / ▶ 播放(切换暂停) / 下一步 ▶；按顺序遍历 8 个时期（前期 I → 中期 I → 后期 I → 末期 I → 前期 II → 中期 II → 后期 II → 末期 II）' },
+                { icon: 'sliders-horizontal', text: '速度滑块 .meio-speed（0.2~3 倍速）控制 autoPlay 时的相变速度；当前阶段名/描述同步显示在 #meio-phase-name 和 #meio-phase-desc' },
+                { icon: 'eye', text: '#meiosis-canvas 上分别绘制 8 个阶段的染色体形态：前期 I 同源染色体联会形成四分体并发生交叉互换 → 中期 I 同源染色体对排列于赤道板两侧 → 后期 I 同源分离 → ... → 末期 II 形成 4 个单倍体配子' },
+                { icon: 'info', text: '#meio-info 面板显示染色体数变化：开始 2n，减 I 后 n（同源分离），减 II 后仍 n（着丝粒断裂，姐妹分开）；DNA 复制 1 次、细胞分裂 2 次 → 4 个 n 细胞' },
+                { icon: 'book-open', text: '人教版必修 2 第 2 章：减数分裂是有性生殖细胞形成的特殊分裂；减 I 同源分离 + 减 II 着丝粒分离；交叉互换（前期 I）和自由组合（后期 I）是基因重组的两大来源，与基因突变共同构成可遗传变异' }
+            ]
+        },
+        'gene-expression': {
+            title: '基因表达操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '#gene-expression-controls 内 2 个 .btn 切换两阶段：转录 (DNA→mRNA) / 翻译 (mRNA→蛋白质)；当前模式显示在 #genexp-mode-display' },
+                { icon: 'eye', text: '#gene-expression-canvas 转录模式：DNA 双链解开 → RNA 聚合酶沿模板链 3\u2032→5\u2032 移动 → 互补合成 mRNA（A-U/T-A/G-C/C-G）；翻译模式：核糖体大小亚基扣合在 mRNA 起始密码子（AUG）→ tRNA 携带氨基酸按密码子依次进入 A/P/E 位 → 肽键延伸→ 终止密码子（UAA/UAG/UGA）释放' },
+                { icon: 'info', text: '#genexp-info 面板分块解释中心法则、5\u2032 端 3\u2032 端方向性、密码子兼并性（64 个密码子→ 20 种氨基酸+终止）；起始密码子 AUG 同时编码 Met（蛋氨酸）' },
+                { icon: 'gauge', text: '场所对比：转录在细胞核内（真核生物，原核在细胞质）；翻译在核糖体（游离核糖体合成胞内蛋白，附着在内质网上的合成分泌蛋白）' },
+                { icon: 'book-open', text: '人教版必修 2 第 4 章：中心法则 DNA→mRNA→蛋白质（转录+翻译），逆向有逆转录（HIV）和 RNA 复制（病毒）；密码子表是通用的，体现生物界的统一性；基因 = 有遗传效应的 DNA 片段，编码 1 条多肽链' }
+            ]
+        },
+        'gene-mutation': {
+            title: '基因突变操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '#gene-mutation-controls 内 3 个 .gmut-btn[data-mode] 切换：碱基替换（第 5 位 A→G，错义点突变）/ 插入突变（第 5 位后插 C，移码突变）/ 缺失突变（删第 5 位 A，移码突变）' },
+                { icon: 'zap', text: '#gmut-trigger 触发突变动画；#gmut-pause 暂停/继续；#gmut-reset 重置回原序列；#gmut-speed 滑块调速' },
+                { icon: 'eye', text: '#gene-mutation-canvas 同时显示 3 行：原 DNA + 转录产生的 mRNA + 翻译出的氨基酸序列（密码子 3 个一组）；点突变后只有该位密码子改变 1 个氨基酸；移码突变后从突变位起所有密码子重排' },
+                { icon: 'info', text: '#gmut-info 显示当前突变类型 + 颜色编码（替换=橙、插入=红、缺失=紫），并标注是否改变阅读框（reading frame）' },
+                { icon: 'book-open', text: '人教版必修 2 第 5 章：基因突变（DNA 碱基增/缺/替换）+ 基因重组（同源染色体交叉互换 + 非同源染色体自由组合）+ 染色体变异（数目/结构）三类可遗传变异；移码突变常导致蛋白质完全失活，影响远大于点突变' }
+            ]
         }
     },
 

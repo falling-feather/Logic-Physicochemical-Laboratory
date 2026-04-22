@@ -189,7 +189,8 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.17** | **任务 3 算法三件套：search-algorithms + dynamic-programming + string-matching 各加 5 步定制引导 + 5 题测验（二分查找、背包 DP、KMP），算法 4/8 、引导 52/63 、测验 61/63** | ✅已完成 |
 | **v4.1.18** | **任务 3 算法收尾三件套：data-structures + recursion-vis + graph-algo 各加 5 步定制引导 + 5 题测验（栈队列 BST、递归三要素、Dijkstra），算法 7/8 、引导 55/63 、测验 63/63 ✅ 满分** | ✅已完成 |
 | **v4.1.19** | **任务 3 算法岁月 ✅ + 生物启动：sorting + immune-system + ecosystem 各加 5 步定制引导 + 5 题测验（桶排序、人体免疫 3 道防线、能量流动 10％），算法 8/8 ✅ 、生物 8/13 、引导 58/63** | ✅已完成 |
-| **v4.1.20** | **任务 3 生物 A 套：neural-regulation + cellular-respiration + substance-transport 各加 5 步定制引导 + 5 题测验（突触/动作电位/Na⁺/K⁺、有氧呼吸三阶段38ATP、跨膜运输四方式），生物 11/13 、引导 61/63** | ✅**已完成（当前版本）** |
+| **v4.1.20** | **任务 3 生物 A 套：neural-regulation + cellular-respiration + substance-transport 各加 5 步定制引导 + 5 题测验（突触/动作电位/Na⁺/K⁺、有氧呼吸三阶段38ATP、跨膜运输四方式），生物 11/13 、引导 61/63** | ✅已完成 |
+| **v4.1.21** | **🏆 全项收尾满分 🏆：meiosis + gene-expression + gene-mutation 各加 5 步定制引导 + 5 题测验（减分裂 8 期/中心法则/3 类可遗传变异），**生物 13/13 ✅ 、全 5 学科 100%、引导 64/63 ✅✅✅接2 满分冲顶**！** | ✅**已完成（当前版本）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -941,6 +942,35 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - v4.1.21 — 生物收尾三件套：meiosis + gene-expression + gene-mutation（生物 14/13 ✅ 全接2 100%）
 - 任务 5 — 镜空科技风星球
 - 任务 6 — 移动端深度优化
+---
+
+## 三十四、2026-04-22 v4.1.21 🏆 全项收尾冲顶满分 🏆
+
+### 改动
+- `shared/js/experiment-guide.js` `_experimentGuides` 新增最后 3 条：
+  - `meiosis`（5 步：3 个 .meio-btn 上一步/播放暂停/下一步 + 速度滑块 / 8 个阶段（前期 I~末期 II） / 同源联会+交叉互换、减 I 同源分离 / DNA 复制 1 次+分裂 2 次 → 4 个单倍体配子 / 人教必修 2 第 2 章）
+  - `gene-expression`（5 步：#gene-expression-controls 内 .btn 2 档转录(DNA→mRNA) / 翻译(mRNA→蛋白) / RNA 聚合酶 + 核糖体大小亚基 A/P/E 位 / 中心法则 + 密码子兼并性 + AUG 起始 / 真原原核转录场所差别 / 人教必修 2 第 4 章）
+  - `gene-mutation`（5 步：3 个 .gmut-btn[data-mode] 碟基替换(点突变)/插入(移码)/缺失(移码) / #gmut-trigger + #gmut-pause + #gmut-reset / DNA + mRNA + 氨基酸 同屏对比 / 阅读框 reading frame 变化 / 人教必修 2 第 5 章）
+- `shared/js/quiz-data.js` 新增 3 个池：
+  - `meiosis` 5 题（DNA 复制 1次分裂 2 次·同源分离在减 I 后期·1 个精原出 4 个不同精子·交叉互换·进化意义）
+  - `gene-expression` 5 题（中心法则·碟基互补·密码子三联体·真核转录场所·密码子兼并性）
+  - `gene-mutation` 5 题（本质·移码后果·镰状细胞贫血谷氨酸→缬氨酸·不定向性·三大可遗传变异）
+- `sw.js` CACHE_NAME `englab-static-v20260422u` → `v20260422v`
+- `index.html` cache bust 同步升级 `?v=20260422v`
+
+### 验证（Playwright 浏览器）
+- 清除 SW + caches 后硬重载，9 项数据全部正确（3 标题 + 3 × 5 步 + 3 × 5 题，totalGuides=62）
+
+### 🏆 完成度：全接2 100%收尾 🏆
+- **引导定制化：64 / 63 ✅✅✅（化学 11/11 + 数学 15/15 + 物理 17/17 + 算法 8/8 + 生物 13/13 全部 ✅）**
+- 所有 63 个实验均具备：首次进入自动弹出 5 步定制化引导＋随时可调出 5 题测验
+- 5 学科 100%、人教版高中课标覆盖高质量达标
+
+### 后续候选
+- 任务 5 — 镜空科技风星球（独立分支）
+- 任务 6 — 移动端深度优化（v4.1.1 报告 P-01~P-04）
+- v4.2.0 — 某项重点实验深度重构（如 calculus / electromagnetism）
+- 本地 push 到远程仓库
 
 ### 后续候选
 - v4.1.17 — 算法推进：search-algorithms + dynamic-programming + string-matching 各 5 步（算法 4/8）
