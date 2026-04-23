@@ -812,6 +812,12 @@ const ExperimentGuide = {
         btn.style.display = 'none';
 
         btn.addEventListener('click', () => this.showForCurrent());
+        btn.addEventListener('click', () => {
+            btn.classList.remove('is-rippling');
+            void btn.offsetWidth;
+            btn.classList.add('is-rippling');
+            setTimeout(() => btn.classList.remove('is-rippling'), 600);
+        });
         document.body.appendChild(btn);
         this._helpBtn = btn;
     },

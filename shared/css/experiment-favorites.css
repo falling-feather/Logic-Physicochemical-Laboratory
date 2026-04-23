@@ -41,6 +41,21 @@
     color: var(--accent-pink, #f472b6);
 }
 
+/* ── 点击水波 ripple（v4.2.16）── */
+.favorite-fab.is-rippling::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    background: rgba(244, 114, 182, 0.45);
+    pointer-events: none;
+    animation: fab-ripple-pink 0.55s ease-out forwards;
+}
+@keyframes fab-ripple-pink {
+    0%   { transform: scale(0.8); opacity: 0.6; }
+    100% { transform: scale(2.2); opacity: 0; }
+}
+
 /* ── Gallery card heart indicator ── */
 .module-card__fav {
     position: absolute;

@@ -55,6 +55,12 @@ const ThemeSwitch = {
         btn.setAttribute('aria-label', '切换暗/亮主题');
         btn.setAttribute('data-tip', '切换主题');
         btn.addEventListener('click', () => this.toggle());
+        btn.addEventListener('click', function() {
+            btn.classList.remove('is-rippling');
+            void btn.offsetWidth; // reflow 以重启动画
+            btn.classList.add('is-rippling');
+            setTimeout(() => btn.classList.remove('is-rippling'), 600);
+        });
         document.body.appendChild(btn);
         this._btn = btn;
         this._updateIcon(document.documentElement.getAttribute('data-theme') || 'dark');

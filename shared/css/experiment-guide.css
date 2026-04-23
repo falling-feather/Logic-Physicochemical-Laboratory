@@ -172,6 +172,21 @@
     animation: none;
 }
 
+/* ── 点击水波 ripple（v4.2.16）── */
+.experiment-guide-help-btn.is-rippling::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    background: rgba(91, 141, 206, 0.45);
+    pointer-events: none;
+    animation: fab-ripple-blue 0.55s ease-out forwards;
+}
+@keyframes fab-ripple-blue {
+    0%   { transform: scale(0.8); opacity: 0.6; }
+    100% { transform: scale(2.2); opacity: 0; }
+}
+
 /* ── Responsive ── */
 
 @media (max-width: 768px) {

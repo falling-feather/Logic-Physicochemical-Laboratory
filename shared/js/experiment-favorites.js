@@ -82,6 +82,12 @@ const ExperimentFavorites = {
         btn.setAttribute('data-tip', '收藏实验');
         var self = this;
         btn.addEventListener('click', function() { self._toggle(moduleId); });
+        btn.addEventListener('click', function() {
+            btn.classList.remove('is-rippling');
+            void btn.offsetWidth;
+            btn.classList.add('is-rippling');
+            setTimeout(function() { btn.classList.remove('is-rippling'); }, 600);
+        });
         document.body.appendChild(btn);
         this._btn = btn;
         this._updateButton(moduleId);
