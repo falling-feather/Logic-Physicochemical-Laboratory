@@ -3,7 +3,7 @@
 /* ── FAB heart button ── */
 .favorite-fab {
     position: fixed;
-    bottom: 168px;
+    bottom: 150px;
     right: 24px;
     z-index: 9000;
     width: 40px;
@@ -55,7 +55,7 @@
 /* ── Responsive ── */
 @media (max-width: 768px) {
     .favorite-fab {
-        bottom: 158px;
+        bottom: 140px;
         right: 16px;
         width: 36px;
         height: 36px;
