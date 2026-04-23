@@ -146,6 +146,20 @@ body[data-fab-expanded="true"] .favorite-fab               { transition-delay: 0
 body[data-fab-expanded="true"] .theme-fab                  { transition-delay: 0.10s; }
 body[data-fab-expanded="true"] .back-to-top-fab            { transition-delay: 0.15s; }
 
+/* v4.2.28：菜单展开时常驻中文标签（取代 hover-only tooltip） */
+body[data-fab-expanded="true"] .theme-fab[data-tip]::after,
+body[data-fab-expanded="true"] .favorite-fab[data-tip]::after,
+body[data-fab-expanded="true"] .experiment-guide-help-btn[data-tip]::after,
+body[data-fab-expanded="true"] .back-to-top-fab[data-tip]::after {
+    display: block !important;
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+}
+body[data-fab-expanded="true"] .experiment-guide-help-btn[data-tip]::after { transition-delay: 0.05s; }
+body[data-fab-expanded="true"] .favorite-fab[data-tip]::after              { transition-delay: 0.10s; }
+body[data-fab-expanded="true"] .theme-fab[data-tip]::after                 { transition-delay: 0.15s; }
+body[data-fab-expanded="true"] .back-to-top-fab[data-tip]::after           { transition-delay: 0.20s; }
+
 @media (max-width: 768px) {
     .fab-trigger {
         bottom: calc(16px + env(safe-area-inset-bottom, 0px));
