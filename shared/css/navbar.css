@@ -160,7 +160,7 @@
     background: var(--surface-3, #1c1f2e);
     border: 1px solid rgba(0, 255, 213, 0.25);
     border-radius: 50%;
-    color: var(--text-secondary, #8a90a0);
+    color: rgba(0, 255, 213, 0.7);
     cursor: pointer;
     transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
