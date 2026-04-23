@@ -1,4 +1,4 @@
-const CACHE_NAME = 'englab-static-v20260423v';
+const CACHE_NAME = 'englab-static-v20260423w';
 const APP_SHELL = [
   './',
   './index.html',
@@ -6,7 +6,7 @@ const APP_SHELL = [
   './shared/js/config.js?v=20260418q',
   './shared/js/learning-progress.js?v=20260422a',
   './shared/js/theme-switch.js?v=20260423q',
-  './shared/js/back-to-top.js?v=20260423r',
+  './shared/js/back-to-top.js?v=20260423w',
   './shared/js/fab-trigger.js?v=20260423v',
   './shared/js/touch-gestures.js?v=20260418a',
   './shared/js/experiment-export.js?v=20260418f',

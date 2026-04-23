@@ -817,6 +817,8 @@ const ExperimentGuide = {
             void btn.offsetWidth;
             btn.classList.add('is-rippling');
             setTimeout(() => btn.classList.remove('is-rippling'), 600);
+            // v4.2.22：单次动作后自动收起折叠菜单
+            if (typeof FabTrigger !== 'undefined') FabTrigger.collapse();
         });
         document.body.appendChild(btn);
         this._helpBtn = btn;
