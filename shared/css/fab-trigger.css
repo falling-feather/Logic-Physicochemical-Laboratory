@@ -54,6 +54,21 @@
     100% { transform: translateY(0) scale(1); }
 }
 
+/* v4.2.26：点击 ripple 水波（青色） */
+.fab-trigger.is-rippling::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    background: rgba(0, 255, 213, 0.45);
+    pointer-events: none;
+    animation: fab-trigger-ripple 0.55s ease-out forwards;
+}
+@keyframes fab-trigger-ripple {
+    0%   { transform: scale(0.8); opacity: 0.6; }
+    100% { transform: scale(2.2); opacity: 0; }
+}
+
 .fab-trigger i {
     width: 20px;
     height: 20px;

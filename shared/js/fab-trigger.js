@@ -25,6 +25,11 @@
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.toggle();
+                // v4.2.26：点击 ripple 水波
+                btn.classList.remove('is-rippling');
+                void btn.offsetWidth;
+                btn.classList.add('is-rippling');
+                setTimeout(() => btn.classList.remove('is-rippling'), 600);
             });
             document.body.appendChild(btn);
             this._btn = btn;
