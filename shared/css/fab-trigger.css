@@ -13,9 +13,9 @@
     align-items: center;
     justify-content: center;
     background: var(--surface-3, #1c1f2e);
-    border: 1px solid rgba(229, 231, 235, 0.25);
+    border: 1px solid rgba(0, 255, 213, 0.3);
     border-radius: 50%;
-    color: rgba(229, 231, 235, 0.8);
+    color: rgba(0, 255, 213, 0.8);
     cursor: pointer;
     z-index: 9100;
     transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -24,16 +24,16 @@
 }
 
 @keyframes fab-trigger-pulse {
-    0%, 100% { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 0 0 rgba(229, 231, 235, 0); }
-    50%      { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 12px 2px rgba(229, 231, 235, 0.18); }
+    0%, 100% { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 0 0 rgba(0, 255, 213, 0); }
+    50%      { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 14px 2px rgba(0, 255, 213, 0.22); }
 }
 
 .fab-trigger:hover {
     background: var(--surface-4, #24273a);
-    border-color: #e5e7eb;
-    color: #ffffff;
+    border-color: #00ffd5;
+    color: #00ffd5;
     transform: scale(1.08);
-    box-shadow: 0 4px 18px rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 18px rgba(0, 255, 213, 0.35);
     animation: none;
 }
 
@@ -51,7 +51,7 @@
     transform: rotate(90deg);
 }
 
-/* tooltip 沿用通用样式（中性灰白） */
+/* tooltip 沿用通用样式（HUD 青） */
 .fab-trigger[data-tip]::after {
     content: attr(data-tip);
     position: absolute;
@@ -60,8 +60,8 @@
     transform: translateY(-50%) translateX(6px);
     padding: 5px 10px;
     background: rgba(20, 23, 35, 0.95);
-    color: rgba(245, 245, 245, 0.95);
-    border: 1px solid rgba(229, 231, 235, 0.45);
+    color: rgba(180, 255, 240, 0.95);
+    border: 1px solid rgba(0, 255, 213, 0.55);
     border-radius: 6px;
     font-size: 12px;
     line-height: 1;
