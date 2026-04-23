@@ -807,7 +807,7 @@ const ExperimentGuide = {
         btn.className = 'experiment-guide-help-btn';
         btn.id = 'experiment-guide-help';
         btn.setAttribute('aria-label', '查看操作提示');
-        btn.setAttribute('title', '操作提示');
+        btn.setAttribute('data-tip', '操作提示');
         btn.textContent = '?';
         btn.style.display = 'none';
 

@@ -53,7 +53,7 @@ const ThemeSwitch = {
         const btn = document.createElement('button');
         btn.className = 'theme-fab';
         btn.setAttribute('aria-label', '切换暗/亮主题');
-        btn.setAttribute('title', '切换暗/亮主题');
+        btn.setAttribute('data-tip', '切换主题');
         btn.addEventListener('click', () => this.toggle());
         document.body.appendChild(btn);
         this._btn = btn;
