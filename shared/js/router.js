@@ -282,6 +282,11 @@ const Router = {
             if (page === 'home') ThemeSwitch.hide();
             else ThemeSwitch.show();
         }
+        // v4.2.17：非首页显示返回顶部 FAB
+        if (typeof BackToTop !== 'undefined') {
+            if (page === 'home') BackToTop.hide();
+            else BackToTop.show();
+        }
 
         // === Page Initialization ===
         // Home page initializes directly; subject pages rely on ModuleSelector
