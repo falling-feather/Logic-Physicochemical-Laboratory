@@ -1,4 +1,4 @@
-const CACHE_NAME = 'englab-static-v20260423w';
+const CACHE_NAME = 'englab-static-v20260423x';
 const APP_SHELL = [
   './',
   './index.html',
