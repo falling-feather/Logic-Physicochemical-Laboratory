@@ -19,6 +19,7 @@
     transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     animation: favorite-fab-pulse 3s ease-in-out infinite;
+    animation-delay: 1s;
 }
 @keyframes favorite-fab-pulse {
     0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 0 0 0 rgba(244, 114, 182, 0.0); }
