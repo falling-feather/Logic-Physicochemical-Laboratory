@@ -27,6 +27,9 @@
     padding: 2rem 2.5rem;
     max-width: 480px;
     width: 90vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     box-shadow: 0 24px 80px rgba(0,0,0,0.5);
     transform: translateY(20px) scale(0.96);
     transition: transform 0.3s ease;
@@ -135,29 +138,58 @@
 
 .experiment-guide-help-btn {
     position: fixed;
-    bottom: 80px;
+    bottom: calc(80px + env(safe-area-inset-bottom, 0px));
     right: 24px;
     z-index: 9000;
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: var(--surface-3, #1c1f2e);
-    border: 1px solid var(--border-default, rgba(255,255,255,0.07));
+    border: 1px solid rgba(91, 141, 206, 0.3);
     border-radius: 50%;
-    color: var(--text-secondary, #8a90a0);
+    color: rgba(91, 141, 206, 0.75);
     font-size: 1rem;
     font-weight: 700;
     cursor: pointer;
     transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    animation: guide-help-pulse 3s ease-in-out infinite;
+    animation-delay: 0s;
+}
+
+@keyframes guide-help-pulse {
+    0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 0 0 0 rgba(91, 141, 206, 0.0); }
+    50%      { box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 0 14px 2px rgba(91, 141, 206, 0.3); }
 }
 
 .experiment-guide-help-btn:hover {
     background: var(--surface-4, #24273a);
     border-color: var(--accent-blue, #5b8dce);
     color: var(--accent-blue, #5b8dce);
+    box-shadow: 0 4px 16px rgba(91, 141, 206, 0.45);
+    animation: none;
+}
+
+/* ── 点击水波 ripple（v4.2.16）── */
+.experiment-guide-help-btn.is-rippling::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    background: rgba(91, 141, 206, 0.45);
+    pointer-events: none;
+    animation: fab-ripple-blue 0.55s ease-out forwards;
+}
+@keyframes fab-ripple-blue {
+    0%   { transform: scale(0.8); opacity: 0.6; }
+    100% { transform: scale(2.2); opacity: 0; }
+}
+/* v4.2.18：tooltip 边框跟随蓝色 */
+.experiment-guide-help-btn[data-tip]::after {
+    border-color: rgba(91, 141, 206, 0.55);
+    color: rgba(199, 218, 240, 0.95);
 }
 
 /* ── Responsive ── */
@@ -174,10 +206,24 @@
     }
 
     .experiment-guide-help-btn {
-        bottom: 70px;
+        bottom: calc(70px + env(safe-area-inset-bottom, 0px));
         right: 16px;
-        width: 32px;
-        height: 32px;
+        width: 36px;
+        height: 36px;
         font-size: 0.875rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .guide-card {
+        padding: 1.25rem 1rem;
+        width: 96vw;
+        max-height: 88vh;
+    }
+    .guide-card__title {
+        font-size: 1.05rem;
+    }
+    .guide-step__text {
+        font-size: 0.82rem;
     }
 }

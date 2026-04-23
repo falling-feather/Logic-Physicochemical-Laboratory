@@ -67,7 +67,7 @@
 /* ── Responsive ── */
 @media (max-width: 768px) {
     .rating-card {
-        bottom: 16px;
+        bottom: max(16px, env(safe-area-inset-bottom, 16px));
         left: 16px;
         right: 16px;
         justify-content: center;

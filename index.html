@@ -30,17 +30,20 @@
     <link rel="stylesheet" href="shared/css/tokens.css?v=20260418c">
     <link rel="stylesheet" href="shared/css/base.css?v=20260417f">
     <link rel="stylesheet" href="shared/css/typography.css?v=20260417d">
-    <link rel="stylesheet" href="shared/css/navbar.css?v=20260418c">
+    <link rel="stylesheet" href="shared/css/navbar.css?v=20260423s">
     <link rel="stylesheet" href="shared/css/page-layout.css?v=20260417d">
     <link rel="stylesheet" href="shared/css/cards.css?v=20260417d">
     <link rel="stylesheet" href="shared/css/module-selector.css?v=20260418c">
-    <link rel="stylesheet" href="shared/css/experiment-guide.css?v=20260417d">
+    <link rel="stylesheet" href="shared/css/experiment-guide.css?v=20260423s">
     <link rel="stylesheet" href="shared/css/experiment-export.css?v=20260418f">
-    <link rel="stylesheet" href="shared/css/experiment-quiz.css?v=20260418e">
-    <link rel="stylesheet" href="shared/css/experiment-favorites.css?v=20260418f">
-    <link rel="stylesheet" href="shared/css/experiment-rating.css?v=20260418g">
+    <link rel="stylesheet" href="shared/css/experiment-quiz.css?v=20260422z">
+    <link rel="stylesheet" href="shared/css/experiment-favorites.css?v=20260423s">
+    <link rel="stylesheet" href="shared/css/experiment-rating.css?v=20260422z">
+    <link rel="stylesheet" href="shared/css/back-to-top.css?v=20260423s">
+    <link rel="stylesheet" href="shared/css/fab-trigger.css?v=20260423cc">
     <!-- CSS: Pages -->
-    <link rel="stylesheet" href="pages/home/home.css?v=20260422a">
+    <link rel="stylesheet" href="pages/home/home.css?v=20260422e">
+    <link rel="stylesheet" href="pages/planets/planets.css?v=20260423b">
     <link rel="stylesheet" href="pages/mathematics/mathematics.css?v=20260417d">
     <link rel="stylesheet" href="pages/physics/physics.css?v=20260417d">
     <link rel="stylesheet" href="pages/chemistry/chemistry.css?v=20260417d">
@@ -278,6 +281,41 @@
                         </div>
                     </div>
                 </div>
+                <a href="#planets" class="planets-entry" aria-label="进入沉浸式星系导航大屏">星系大屏</a>
+            </div>
+        </section>
+
+        <!-- ────────── PLANETS (沉浸式 3D 镂空星系导航大屏 v4.2.0-α4) ────────── -->
+        <section id="page-planets" class="page" aria-label="星系大屏">
+            <canvas id="planets-canvas" class="planets-canvas" role="img" aria-label="3D 星系导航 Canvas"></canvas>
+            <a href="#home" class="planets-back">← 返回首页</a>
+            <div class="planets-title">
+                星 系 导 航
+                <div class="planets-subtitle">SUBJECT · GALAXY · MAP</div>
+            </div>
+            <div class="planets-hud planets-hud--tl">
+                <div><span class="blink">●</span> SYS.SCAN</div>
+                <div>MODE: ORBIT</div>
+                <div>NODES: 5</div>
+            </div>
+            <div class="planets-hud planets-hud--tr">
+                <div>v2026.06</div>
+                <div>FOV: 0.45</div>
+                <div>R: 1.40</div>
+            </div>
+            <div class="planets-hud planets-hud--bl">
+                <div>← DRAG TO ROTATE</div>
+                <div>TAP PLANET TO ENTER</div>
+            </div>
+            <div class="planets-hud planets-hud--br">
+                <div>α4 · HOLOGRAPHIC</div>
+                <div class="blink">● LIVE</div>
+            </div>
+            <div class="planets-info" id="planets-info">
+                <div class="planets-info__label">SUBJECT</div>
+                <div class="planets-info__name">—</div>
+                <div class="planets-info__desc">—</div>
+                <div class="planets-info__hint">CLICK TO ENTER →</div>
             </div>
         </section>
 
@@ -2741,21 +2779,24 @@
     <!-- Application Scripts: Shared -->
     <script src="shared/js/config.js?v=20260418p"></script>
     <script src="shared/js/learning-progress.js?v=20260422a"></script>
-    <script src="shared/js/theme-switch.js?v=20260418c"></script>
+    <script src="shared/js/theme-switch.js?v=20260423q"></script>
+    <script src="shared/js/back-to-top.js?v=20260423w"></script>
+    <script src="shared/js/fab-trigger.js?v=20260423bb"></script>
     <script src="shared/js/touch-gestures.js?v=20260418a"></script>
     <script src="shared/js/module-selector.js?v=20260418p"></script>
-    <script src="shared/js/experiment-guide.js?v=20260422v"></script>
+    <script src="shared/js/experiment-guide.js?v=20260423w"></script>
     <script src="shared/js/experiment-export.js?v=20260418f"></script>
     <script src="shared/js/quiz-data.js?v=20260422v"></script>
     <script src="shared/js/experiment-quiz.js?v=20260418e"></script>
-    <script src="shared/js/experiment-favorites.js?v=20260418f"></script>
+    <script src="shared/js/experiment-favorites.js?v=20260423q"></script>
     <script src="shared/js/experiment-rating.js?v=20260418g"></script>
-    <script src="shared/js/router.js?v=20260418p"></script>
+    <script src="shared/js/router.js?v=20260423t"></script>
     <script src="shared/js/scroll-animations.js?v=20260417d"></script>
     <script src="shared/js/cards.js?v=20260417d"></script>
     <script src="shared/js/common.js?v=20260417d"></script>
     <!-- Scripts: Home -->
     <script src="pages/home/home.js?v=20260418f"></script>
+    <script src="pages/planets/planets.js?v=20260422g"></script>
     <!-- Scripts: Bootstrap (before deferred modules for fast homepage boot) -->
     <script src="shared/js/main.js?v=20260417d"></script>
     <!-- Scripts: Subject modules (deferred — download in parallel, execute after core) -->
@@ -2813,18 +2854,18 @@
     <script defer src="pages/algorithms/dynamic-programming.js"></script>
     <script defer src="pages/algorithms/string-matching.js"></script>
     <script defer src="pages/biology/biology.js?v=20260416b"></script>
-    <script defer src="pages/biology/cell-structure.js?v=20260416b"></script>
+    <script defer src="pages/biology/cell-structure.js?v=20260422z"></script>
     <script defer src="pages/biology/dna-helix.js?v=20260416b"></script>
     <script defer src="pages/biology/photosynthesis.js?v=20260416b"></script>
     <script defer src="pages/biology/genetics.js?v=20260416b"></script>
     <script defer src="pages/biology/mitosis.js?v=20260416b"></script>
     <script defer src="pages/biology/neural-regulation.js?v=20260416b"></script>
-    <script defer src="pages/biology/immune-system.js?v=20260416b"></script>
-    <script defer src="pages/biology/ecosystem.js?v=20260416b"></script>
+    <script defer src="pages/biology/immune-system.js?v=20260423a"></script>
+    <script defer src="pages/biology/ecosystem.js?v=20260423a"></script>
     <script defer src="pages/biology/biology-zoom.js?v=20260416b"></script>
     <script defer src="pages/biology/meiosis.js?v=20260416b"></script>
     <script defer src="pages/biology/gene-expression.js?v=20260416b"></script>
-    <script defer src="pages/biology/cellular-respiration.js?v=20260416b"></script>
+    <script defer src="pages/biology/cellular-respiration.js?v=20260423a"></script>
     <script defer src="pages/biology/substance-transport.js?v=20260416b"></script>
     <script defer src="pages/biology/gene-mutation.js?v=20260416b"></script>
 </body>

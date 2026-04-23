@@ -1,6 +1,6 @@
 // ===== X-03: Theme Switch =====
-// Respects prefers-color-scheme, persists user choice in localStorage.
-// Adds a toggle button to the navbar.
+// v4.2.4 重构：以右下角浮动按钮（FAB）形式呈现，默认黑夜模式，
+//        仅在非首页页面显示（由 router 调度 show/hide）。
 
 const ThemeSwitch = {
     _KEY: 'englab-theme',
@@ -9,14 +9,13 @@ const ThemeSwitch = {
     init() {
         const theme = this._resolve();
         this._apply(theme);
-        this._injectToggle();
+        // 不再默认注入按钮；由 router 在进入非首页时调用 show()
     },
 
-    /** Determine the active theme: stored preference > system preference > dark */
+    /** v4.2.4：默认黑夜模式。仅当用户显式存过 'light' 才返回 light。 */
     _resolve() {
         const stored = localStorage.getItem(this._KEY);
-        if (stored === 'light' || stored === 'dark') return stored;
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
+        if (stored === 'light') return 'light';
         return 'dark';
     },
 
@@ -30,6 +29,12 @@ const ThemeSwitch = {
         const next = current === 'dark' ? 'light' : 'dark';
         localStorage.setItem(this._KEY, next);
 
+        // v4.2.10：图标切换 180° 旋转动画
+        if (this._btn) {
+            this._btn.classList.add('theme-fab--spinning');
+            setTimeout(() => this._btn && this._btn.classList.remove('theme-fab--spinning'), 360);
+        }
+
         // Enable transition, then apply
         document.documentElement.classList.add('theme-transitioning');
         this._apply(next);
@@ -42,39 +47,38 @@ const ThemeSwitch = {
         setTimeout(() => document.documentElement.classList.remove('theme-transitioning'), 350);
     },
 
-    _injectToggle() {
-        const navContainer = document.querySelector('.nav-container');
-        if (!navContainer) return;
-
+    /** v4.2.4：在右下角浮动控件区注入主题切换按钮（由 router 在非首页时调用） */
+    show() {
+        if (this._btn) return; // 已存在
         const btn = document.createElement('button');
-        btn.className = 'theme-toggle';
-        btn.setAttribute('aria-label', '切换主题');
-        btn.setAttribute('title', '切换暗/亮主题');
-        btn.innerHTML = '<i data-lucide="moon"></i>';
+        btn.className = 'theme-fab';
+        btn.setAttribute('aria-label', '切换暗/亮主题');
+        btn.setAttribute('data-tip', '切换主题');
         btn.addEventListener('click', () => this.toggle());
-
-        navContainer.appendChild(btn);
+        btn.addEventListener('click', function() {
+            btn.classList.remove('is-rippling');
+            void btn.offsetWidth; // reflow 以重启动画
+            btn.classList.add('is-rippling');
+            setTimeout(() => btn.classList.remove('is-rippling'), 600);
+        });
+        document.body.appendChild(btn);
         this._btn = btn;
-
-        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [btn] });
-
         this._updateIcon(document.documentElement.getAttribute('data-theme') || 'dark');
+    },
 
-        // Listen for system theme changes
-        if (window.matchMedia) {
-            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
-                // Only auto-switch if user hasn't set explicit preference
-                if (!localStorage.getItem(this._KEY)) {
-                    this._apply(e.matches ? 'light' : 'dark');
-                }
-            });
-        }
+    /** v4.2.4：移除右下角主题切换按钮（由 router 在返回首页时调用） */
+    hide() {
+        if (this._btn && this._btn.parentNode) this._btn.parentNode.removeChild(this._btn);
+        this._btn = null;
     },
 
     _updateIcon(theme) {
         if (!this._btn) return;
+        // theme === 'dark' 时显示太阳图标（表示点击切到亮色），反之亮色显示月亮
         const iconName = theme === 'dark' ? 'sun' : 'moon';
         this._btn.innerHTML = `<i data-lucide="${iconName}"></i>`;
         if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [this._btn] });
     }
 };
+
+window.ThemeSwitch = ThemeSwitch;

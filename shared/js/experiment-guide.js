@@ -732,6 +732,8 @@ const ExperimentGuide = {
     hideHelpButton() {
         this._currentModule = null;
         if (this._helpBtn) this._helpBtn.style.display = 'none';
+        // v4.2.3：同时关闭可能仍处于显示状态的引导浮层，避免随页面切换残留
+        this._dismiss();
     },
 
     // ── Internal ──
@@ -805,11 +807,19 @@ const ExperimentGuide = {
         btn.className = 'experiment-guide-help-btn';
         btn.id = 'experiment-guide-help';
         btn.setAttribute('aria-label', '查看操作提示');
-        btn.setAttribute('title', '操作提示');
+        btn.setAttribute('data-tip', '操作提示');
         btn.textContent = '?';
         btn.style.display = 'none';
 
         btn.addEventListener('click', () => this.showForCurrent());
+        btn.addEventListener('click', () => {
+            btn.classList.remove('is-rippling');
+            void btn.offsetWidth;
+            btn.classList.add('is-rippling');
+            setTimeout(() => btn.classList.remove('is-rippling'), 600);
+            // v4.2.22：单次动作后自动收起折叠菜单
+            if (typeof FabTrigger !== 'undefined') FabTrigger.collapse();
+        });
         document.body.appendChild(btn);
         this._helpBtn = btn;
     },

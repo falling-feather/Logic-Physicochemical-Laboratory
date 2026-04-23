@@ -59,7 +59,7 @@ const Router = {
         this.onPageEnter(initialPage);
 
         // Show running time footer for non-home pages
-        this._toggleRunningTime(initialPage !== 'home');
+        this._toggleRunningTime(initialPage !== 'home' && initialPage !== 'planets');
 
         window.addEventListener('hashchange', () => this.handleHash());
 
@@ -101,7 +101,7 @@ const Router = {
         }
 
         // Toggle running time footer
-        this._toggleRunningTime(page !== 'home');
+        this._toggleRunningTime(page !== 'home' && page !== 'planets');
 
         const prevPage = this.currentPage;
         this.currentPage = page;
@@ -129,7 +129,8 @@ const Router = {
             chemistry: 'rgba(77,158,126,0.12)',
             algorithms: 'rgba(196,121,58,0.12)',
             biology: 'rgba(58,158,143,0.12)',
-            home: 'rgba(91,141,206,0.08)'
+            home: 'rgba(91,141,206,0.08)',
+            planets: 'rgba(0,255,213,0.10)'
         };
         this.overlay.style.background = `linear-gradient(135deg, ${colors[page] || colors.home}, var(--surface-0))`;
 
@@ -176,7 +177,7 @@ const Router = {
             gsap.set(targetEl, { opacity: 0, y: 20 });
             // Pre-hide hero children so they never flash visible during the page fade-in.
             // animatePageContent will animate them in individually afterwards.
-            if (page !== 'home') {
+            if (page !== 'home' && page !== 'planets') {
                 const heroKids = targetEl.querySelectorAll(
                     '.page-hero__eyebrow, .page-hero__title, .page-hero__desc, .page-hero__actions, .page-hero__visual'
                 );
@@ -185,7 +186,7 @@ const Router = {
             // Start hero canvas rendering immediately in the background.
             // The canvas is invisible (opacity 0) but already drawing, so when
             // it fades in with the hero animation there is no blank-canvas flash.
-            if (page !== 'home' && typeof initHeroVisual === 'function') {
+            if (page !== 'home' && page !== 'planets' && typeof initHeroVisual === 'function') {
                 initHeroVisual(page);
             }
         }, '-=0.1');
@@ -216,7 +217,7 @@ const Router = {
             return;
         }
 
-        if (page === 'home') {
+        if (page === 'home' || page === 'planets') {
             this.onPageEnter(page);
             return;
         }
@@ -276,11 +277,29 @@ const Router = {
     onPageEnter(page) {
         document.body.classList.toggle('home-scroll-locked', page === 'home');
 
+        // v4.2.4：非首页统一显示右下角主题切换 FAB；返回首页则隐藏
+        if (typeof ThemeSwitch !== 'undefined') {
+            if (page === 'home') ThemeSwitch.hide();
+            else ThemeSwitch.show();
+        }
+        // v4.2.17：非首页显示返回顶部 FAB
+        if (typeof BackToTop !== 'undefined') {
+            if (page === 'home') BackToTop.hide();
+            else BackToTop.show();
+        }
+        // v4.2.19：非首页显示 FAB 折叠主控按钮（默认折叠）
+        if (typeof FabTrigger !== 'undefined') {
+            if (page === 'home') FabTrigger.hide();
+            else FabTrigger.show();
+        }
+
         // === Page Initialization ===
         // Home page initializes directly; subject pages rely on ModuleSelector
         // for lazy per-experiment initialization (triggered when user opens an experiment).
         if (page === 'home') {
             if (typeof initHome === 'function') initHome();
+        } else if (page === 'planets') {
+            if (typeof initPlanets === 'function') initPlanets();
         }
         // Subject pages: show sidebar toggle if an experiment was previously open,
         // but don't eagerly initialize any experiments (ModuleSelector handles it).
@@ -291,7 +310,7 @@ const Router = {
         }
 
         // Trigger scroll animations for the new page
-        if (page !== 'home' && typeof initPageScrollAnimations === 'function') {
+        if (page !== 'home' && page !== 'planets' && typeof initPageScrollAnimations === 'function') {
             initPageScrollAnimations(page);
         }
 
@@ -299,7 +318,7 @@ const Router = {
 
         // Initialize hero canvas (also serves as fallback for non-animated path).
         // canvas.dataset.initialized prevents double-init on the animated path.
-        if (page !== 'home' && typeof initHeroVisual === 'function') {
+        if (page !== 'home' && page !== 'planets' && typeof initHeroVisual === 'function') {
             initHeroVisual(page);
         }
     },
@@ -312,7 +331,24 @@ const Router = {
         if (page === 'home') {
             if (typeof ParticleNetwork !== 'undefined' && ParticleNetwork.destroy) ParticleNetwork.destroy();
             if (typeof SatelliteSystem !== 'undefined') SatelliteSystem.isRunning = false;
+        } else if (page === 'planets') {
+            if (typeof destroyPlanets === 'function') destroyPlanets();
         } else {
+            // v4.2.3 Bug3 修复：先调用 closeModule 隐藏全部浮动控件
+            // （ExperimentExport / ExperimentQuiz / ExperimentFavorites / ExperimentRating /
+            //   ExperimentGuide），避免离开学科页面后控件仍残留在首页/星系大屏。
+            if (typeof ModuleSelector !== 'undefined' && ModuleSelector.activeModule
+                && ModuleSelector.activeModule[page]
+                && typeof ModuleSelector.closeModule === 'function') {
+                try { ModuleSelector.closeModule(page); } catch (e) { /* ignore */ }
+            }
+            // 兜底：即便 ModuleSelector 未记录 active module，也强制隐藏全部浮动控件
+            try { if (window.ExperimentGuide) ExperimentGuide.hideHelpButton(); } catch(e){}
+            try { if (window.ExperimentExport) ExperimentExport.hide(); } catch(e){}
+            try { if (window.ExperimentQuiz) ExperimentQuiz.hide(); } catch(e){}
+            try { if (window.ExperimentFavorites) ExperimentFavorites.hide(); } catch(e){}
+            try { if (window.ExperimentRating) ExperimentRating.hide(); } catch(e){}
+
             // Destroy all modules that were initialized for this page
             const destroyMap = {
                 mathematics: [

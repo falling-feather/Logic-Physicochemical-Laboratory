@@ -190,7 +190,15 @@ Skip-nav  →    直接跳转主内容区
 | **v4.1.18** | **任务 3 算法收尾三件套：data-structures + recursion-vis + graph-algo 各加 5 步定制引导 + 5 题测验（栈队列 BST、递归三要素、Dijkstra），算法 7/8 、引导 55/63 、测验 63/63 ✅ 满分** | ✅已完成 |
 | **v4.1.19** | **任务 3 算法岁月 ✅ + 生物启动：sorting + immune-system + ecosystem 各加 5 步定制引导 + 5 题测验（桶排序、人体免疫 3 道防线、能量流动 10％），算法 8/8 ✅ 、生物 8/13 、引导 58/63** | ✅已完成 |
 | **v4.1.20** | **任务 3 生物 A 套：neural-regulation + cellular-respiration + substance-transport 各加 5 步定制引导 + 5 题测验（突触/动作电位/Na⁺/K⁺、有氧呼吸三阶段38ATP、跨膜运输四方式），生物 11/13 、引导 61/63** | ✅已完成 |
-| **v4.1.21** | **🏆 全项收尾满分 🏆：meiosis + gene-expression + gene-mutation 各加 5 步定制引导 + 5 题测验（减分裂 8 期/中心法则/3 类可遗传变异），**生物 13/13 ✅ 、全 5 学科 100%、引导 64/63 ✅✅✅接2 满分冲顶**！** | ✅**已完成（当前版本）** |
+| **v4.1.21** | **🏆 全项收尾满分 🏆：meiosis + gene-expression + gene-mutation 各加 5 步定制引导 + 5 题测验（减分裂 8 期/中心法则/3 类可遗传变异），**生物 13/13 ✅ 、全 5 学科 100%、引导 64/63 ✅✅✅接2 满分冲顶**！** | ✅**已完成** |
+| **v4.2.0-α1** | **任务 5 镜空/镂空科技风星球（独立分支 `feature/holographic-planets`）：首页 `#main-star` 重塑为深空青绿 Tron 风全息 HUD —— 经纬球面网格 + 准星十字 + 双层扫描环 + 青绿外圈/眼睛/标题/Tagline** | ✅**已完成（当前分支）** |
+| **v4.2.0-α2** | **任务 5 续：5 个学科卫星球 `.satellite-1~5` 同步 HUD 化 —— 透明深空底 + 青绿外圈 + 内部经纬网格/准星十字（继承主星样式）+ 学科色辅助辉光保留识别度（数学蓝/物理紫/化学绿/算法橙/生物teal）** | ✅**已完成（当前分支）** |
+| **v4.2.0-α3** | **任务 5 续：首页背景全息化 —— 粒子网络 worker 颜色 蓝→青绿、3 层 nebula 紫/绿/橙 → 三色青绿、hex-grid overlay 蓝→青绿（透明度 3%→4.5%）、新增 `.home-container::after` 全屏 HUD 垂直扫描线（9s 循环）** | ✅**已完成（当前分支）** |
+| **v4.2.0** | **任务 5 镜空科技风首页 main 合并：α1 主星 + α2 5 卫星 + α3 全屏背景三件套合并到 main 并 push（feature/holographic-planets 保留）** | ✅**已上线** |
+| **v4.2.1** | **任务 6 移动端深度优化：P-02 cell-structure long-press（350ms）替代 hover 预览、P-03 DEVELOPER_GUIDE §12.5 移动端开发规范、P-04 弹窗小屏 safe-area-inset 与 guide-card 滚动修复（quiz/guide/rating 三组件）** | ✅**已完成** |
+| **v4.2.0-α4** | **任务 5 续：新增 `#planets` 独立路由 — 沉浸式 3D 镂空星系导航大屏（Vanilla Canvas 2D yaw/pitch 透视 + 5 学科行星轨道环绕 + 拖拽旋转 + 4s 自动慢转 + hover 信息卡 + 点击跳学科 + 4 角 HUD + 中央青色核心 + 220 颗背景星）** | ✅**已完成（feature/holographic-planets）** |
+| **v4.2.2-audit** | **任务 7 启动：生物 13 实验文字排版只读审视（172 处 ctx.font + 41 处 fs 全统计、Top10 待修问题汇总、4 阶段修复工作量估算）→ `doc/BIOLOGY_TYPO_AUDIT.md`** | ✅**已完成（main）** |
+| **v4.2.2-phase1** | **任务 7 Phase 1：cellular-respiration / ecosystem / immune-system 三件套 P0 修复（fs 公式 `Math.max(13, W*0.012)` → `Math.max(14, Math.min(22, W*0.018))` 提升 W=900 字号 13→16.27px、immune-system HUD 透明度 0.25/0.4/0.5 → 0.7/0.85/0.95 满足 WCAG AA）** | ✅**已完成（main）** |
 | v4.1 | 交互增强（步骤引导 + 触控 + 键盘） | 🔜 规划中 |
 | v4.5 | 性能优化 + 学习进度 + PWA + 数据导出 | 🔜 规划中 |
 | v5.0 | Phase 2 内容扩展（人教版深化知识点 20+ 实验） | 🔜 规划中 |
@@ -967,10 +975,188 @@ edu.innerHTML = '<h4>...</h4><p>...</p>';
 - 5 学科 100%、人教版高中课标覆盖高质量达标
 
 ### 后续候选
-- 任务 5 — 镜空科技风星球（独立分支）
+- 任务 5 — 镜空科技风星球（独立分支） ✅ v4.2.0-α1 已落地（首页主星球 HUD 改造）
 - 任务 6 — 移动端深度优化（v4.1.1 报告 P-01~P-04）
 - v4.2.0 — 某项重点实验深度重构（如 calculus / electromagnetism）
 - 本地 push 到远程仓库
+
+---
+
+## 三十五、2026-04-22 v4.2.0-α1 任务 5 镜空科技风主星球（feature/holographic-planets）
+
+### 改动
+- 独立分支 `feature/holographic-planets`（不污染 main 上的 v4.1.21 全 100% 里程碑）
+- `pages/home/home.css` 重塑 `.main-star` 视觉系（HTML/JS 零侵入，保留眼睛交互、shake、orbits）：
+  - **`.star-atmosphere`** → 双层青绿光晕 + `conic-gradient` 30° 扫描亮带 + 6s `hudScan` 旋转
+  - **`.star-body`** → 深空透明底（`rgba(0,30,30,0.85)`）+ 1.5px 青绿外圈（`rgba(0,255,213,0.45)`）+ 多层青绿辉光 box-shadow + 内插光效
+  - **`.star-body::before / ::after`** → 内圈虚线准星圈（18s 反向慢转）+ 中心实线圆环（30s 慢转）
+  - **`.planet-surface`** → 经线（90° 38px 一条）+ 纬线（0° 22px 一条）+ 赤道带高亮，`mask: radial-gradient` 在边缘衰减模拟球面投影
+  - **`.planet-highlight`** → 横竖准星十字（`linear-gradient` 中段亮带）+ 顶部弱高光，`mask` 限制在球内
+  - **`.star-title`** → `#d4fff3` 青白文字 + 三层青绿发光文字阴影 + `glitch2` 蓝色 → 青绿
+  - **`.eye / .pupil / .pupil-shine`** → 青白虹膜 + 深青绿瞳孔 + 青绿高光，`box-shadow: 0 0 10px rgba(0,255,213,0.85)`
+  - **`.home-tagline p / .tagline-cursor`** → 蓝色文字 → 青绿（`rgba(0,255,213,0.72)` + 青绿光晕）
+- `sw.js` CACHE_NAME `englab-static-v20260422v` → `v20260422w`
+- `index.html` & `sw.js` `home.css?v=20260422a` → `?v=20260422b`
+
+### 视觉特征（Tron / Cyberpunk 冷调全息 HUD 风）
+- 主星球不再是实心蓝色 → 透明镂空青绿球面感（经纬网格 + 准星圈 + 扫描带）
+- 眼睛、标题、Tagline 全部青绿主调，与 HUD 风一致
+- 5 个学科卫星球保持原有色彩（数学蓝 / 物理紫 / 生物绿 / 化学绿 / 算法橙），与 HUD 主星形成"冷科技中心 + 暖学科卫星"对比
+
+### 浏览器验证（Playwright pageId 8477b81b）
+- 清除 SW + caches 后硬重载，截图确认：
+  - 主星球可见经纬球面网格 + 4 个准星十字象限 + 青绿外圈辉光
+  - 顺时针扫描亮带（atmosphere conic）+ 反向虚线圈（::before）双层旋转
+  - "工科实验室"标题青绿发光、双眼睛青绿瞳孔正常显示
+  - "Visualize. Interact. Understand." Tagline 青绿色 + 青绿光标
+- 0 控制台错误，眼睛跟随鼠标交互正常，shake/glitch 动画正常
+
+### 范围说明
+- 用户选择「①只改首页 #main-star 主星球（最聚焦）」 → 5 个学科卫星球与全局背景未触动
+- 后续可选：α2 卫星球同步 HUD 化、α3 全息背景重构、α4 全新 #planets 路由
+
+### 后续候选（feature 分支内）
+- α2 — 5 个学科卫星球（.satellite）改造为青绿小型 HUD 球（与主星统一风格） ✅ 已完成
+- α3 — 整页背景：粒子网络 → 全息镂空地球/星系
+- α4 — 新增独立 #planets 路由：沉浸式 3D 镂空星系导航大屏
+- 合并到 main 并 push（需用户明示）
+
+---
+
+## 三十六、2026-04-22 v4.2.0-α2 任务 5 续 — 5 个学科卫星球 HUD 化
+
+### 改动
+- `pages/home/home.css` 重塑 `.satellite-icon` 与 5 个 `.satellite-N .satellite-icon`：
+  - **`.satellite-icon`** → 加 `1.5px solid rgba(0,255,213,0.32)` 青绿外圈（hover → `rgba(0,255,213,0.85)`），统一 HUD 语言
+  - **`.satellite-icon .planet-highlight`** 覆写 → 卫星专属版本：青绿准星十字（更细 28% 透明度，60° linear-gradient mask 适配 80px 小球）+ 弱顶部高光
+  - 5 个 `.satellite-N .satellite-icon` 全部改为：径向渐变内核（学科色 18% 透明度作为色调暗示）→ 深空底 `rgba(0,30,40,0.85)` → 青绿底 `rgba(0,40,55,0.55)`；box-shadow 三层（学科色辉光 + 青绿弱辉光 + 内插青绿）
+  - 5 个 hover：学科色辉光 18→32px，青绿辉光 8→18px，inset 12→16px
+  - 内部 `.planet-surface` 自动继承 α1 的青绿经纬网格（`animation-duration: 22s` 保留卫星更慢的滚动）
+- `sw.js` CACHE_NAME `englab-static-v20260422w` → `v20260422x`
+- `index.html` & `sw.js` `home.css?v=20260422b` → `?v=20260422c`
+
+### 视觉特征
+- 5 个卫星球与主星形成"中心大 HUD + 5 个小 HUD 卫星"的统一全息星系图谱
+- 学科色保留识别度（box-shadow 仍可分辨数学蓝/物理紫/化学绿/算法橙/生物 teal），但不再是花花绿绿的实心彩球
+- hover 时学科色辉光增强 + 青绿外圈变亮，交互反馈强烈
+
+### 浏览器验证
+- 截图确认：5 个卫星球均为透明球面 + 青绿网格 + 准星十字 + 学科色辅助辉光，与主星视觉统一
+- 学科 label 文字颜色未改（仍为白底+学科色 border-bottom），保留可读性
+- 0 控制台错误，眼睛跟随、轨道动画、satellite hover scale(1.15) 全正常
+
+### 后续候选（feature 分支内）
+- α3 — 整页背景：粒子网络 → 全息镂空地球/星系 ✅ 已完成
+- α4 — 新增独立 #planets 路由：沉浸式 3D 镂空星系导航大屏
+- 合并到 main 并 push（需用户明示）
+
+---
+
+## 三十七、2026-04-22 v4.2.0-α3 任务 5 续 — 首页背景全息化
+
+### 改动
+- `shared/workers/particle-worker.js` 粒子网络颜色 蓝→青绿：
+  - 粒子点 `rgba(91,141,206,0.4)` → `rgba(0,255,213,0.42)`
+  - 粒子连线 `rgba(91,141,206,${alphas[b]})` → `rgba(0,255,213,${alphas[b]})`
+- `pages/home/home.css` 多处颜色统一：
+  - `.hex-grid-overlay` 6 层 linear-gradient 蓝→青绿，opacity 3%→4.5% 增强可见性
+  - `.nebula-1/2/3` 紫(100,70,180)/绿(50,130,100)/橙(180,100,50) → 青绿三档（255,213 / 180,166 / 255,170），保留 30/25/35s 三 nebula 不同节奏
+  - 新增 `.home-container::after` 全屏 HUD 垂直扫描线（透明 → `rgba(0,255,213,0.10)` 50% 中段亮带 → 透明），9s `hudVerticalScan` 从顶到底循环
+- `sw.js` CACHE_NAME `englab-static-v20260422x` → `v20260422y`，particle-worker.js 同步 `?v=20260422y`
+- `index.html` & `sw.js` `home.css?v=20260422c` → `?v=20260422d`
+
+### 视觉特征
+- 首页全屏统一冷调青绿 Tron 美学：粒子网络 + 星云 + 网格 + 主星 + 5 卫星 + 标题/Tagline + 扫描线
+- 扫描线缓慢向下扫过整页，强化"控制台/雷达"的动态全息感
+- 蓝/紫/绿/橙等多色不再出现在背景层，但学科色仍在 5 个卫星球的辉光中保留识别度
+
+### 浏览器验证
+- 截图确认：粒子网络可见青绿小点 + 青绿细连线，nebula 弱青绿晕染，hex grid 青绿菱形网，扫描线在中段切过 Tagline 区域时打字效果"Unders|"还在进行
+- 0 控制台错误，eyes/satellite/orbit 全部交互正常
+
+### 后续候选（feature 分支内）
+- α4 — 新增独立 #planets 路由：沉浸式 3D 镂空星系导航大屏（工作量较大，可分多个 patch）
+- 合并 feature/holographic-planets → main 并 push（α1+α2+α3 三件套上线） ✅ 已完成
+
+---
+
+## 三十八、2026-04-22 v4.2.1 任务 6 移动端深度优化
+
+### 改动
+- **P-02** [pages/biology/cell-structure.js](pages/biology/cell-structure.js) 触控交互升级：
+  - 将原"tap 即放大"改为 long-press 350ms 预览 + 短按放大双模
+  - touchstart 设定 350ms 计时器命中器官 → 触发预览（hoveredOrganelle 高亮 + info 文本 + `navigator.vibrate(20)`）
+  - touchmove > 10px 取消计时与预览
+  - touchend 短按 → 直接 zoomTo（保留原行为），长按后 → 清除预览
+  - 解决 v4.1.1 报告 ⚠️ "移动端无 hover 预览必须先 tap 才放大"
+- **P-03** [doc/DEVELOPER_GUIDE.md](doc/DEVELOPER_GUIDE.md) 新增 §12.5「移动端开发规范」7 个子节：
+  - 12.5.1 Canvas 交互必须配套触控事件
+  - 12.5.2 Canvas DPR 适配模板
+  - 12.5.3 断点必覆盖项（1024/768/640/480 四档清单）
+  - 12.5.4 固定定位元素的 safe-area-inset（FAB / 通知条）
+  - 12.5.5 弹窗模态必须可滚动（max-height + overflow-y + -webkit-overflow-scrolling）
+  - 12.5.6 触控设备专属样式（hover:none + pointer:coarse）
+  - 12.5.7 真机验证局限（VS Code 集成 Playwright setViewportSize 不可靠记录）
+- **P-04** 三组件弹窗 480px 优化：
+  - [shared/css/experiment-guide.css](shared/css/experiment-guide.css) `.guide-card` 加 `max-height: 90vh; overflow-y: auto; -webkit-overflow-scrolling: touch`，`.experiment-guide-help-btn` bottom 加 `env(safe-area-inset-bottom)`，新增 480px 媒体查询（padding 1.25rem 1rem / width 96vw / 字号缩 1 级）
+  - [shared/css/experiment-rating.css](shared/css/experiment-rating.css) 768px 内 `.rating-card` bottom 改为 `max(16px, env(safe-area-inset-bottom, 16px))`
+  - [shared/css/experiment-quiz.css](shared/css/experiment-quiz.css) 640px 内 `.quiz-fab` bottom 改为 `calc(80px + env(safe-area-inset-bottom, 0px))`
+- **Cache bump**：sw.js CACHE_NAME `y` → `z`、`experiment-rating.css` `?v=20260418g` → `?v=20260422z`；index.html 三个 css + cell-structure.js 全部 `?v=20260422z`
+
+### 浏览器验证
+- 清除 SW + caches 后访问 `#biology` → 点击 cell-structure 卡片：实验加载成功、canvas 初始化（W=904）、0 console 错误
+- P-02 长按行为属移动端触控事件，桌面 Playwright 无法直接触发，已通过代码层 + 加载验证（无语法错误、对象正常初始化）确认
+- 引导/测验/评分三组件弹窗在 480px 视口下的实际滚动行为需真机验证
+
+### v4.1.1 报告项关闭状态
+- P-01 真机测试 — ⏸ 仍待真机回归
+- P-02 cell-structure long-press — ✅ 已完成
+- P-03 移动端开发规范文档 — ✅ 已完成
+- P-04 弹窗 480px 滚动 + safe-area — ✅ 已完成
+
+### 后续候选
+- 任务 5 α4 — 新增独立 #planets 路由（沉浸式 3D 镂空星系导航大屏，重型） — ✅ 已完成（v4.2.0-α4）
+- 任务 7 — 实验页文字排版逐项审视
+- 任务 8 — Phase 2 新实验扩展
+- v4.2.1 + α4 上 main 后 push（待用户明示）
+
+---
+
+## 三十九、2026-04-22 v4.2.0-α4 任务 5 续 — `#planets` 沉浸 3D 镂空星系导航大屏（feature/holographic-planets）
+
+### 设计动机
+α1~α3 完成首页镜空科技化后，主星与卫星仍受首页 bento 排版限制，无法呈现真正"全屏沉浸"的导航体验。α4 新增独立路由 `#planets`，作为可选的"全息导航大屏"入口，与首页平级共存。技术上选用纯 Vanilla Canvas 2D 模拟 yaw/pitch 透视投影（不引入 three.js），保持"无框架"架构纪律。
+
+### 新增文件
+- `pages/planets/planets.css` (~200 行)：青色 HUD 大屏样式，4 角 HUD/标题/返回按钮/信息卡/首页入口按钮
+- `pages/planets/planets.js` (~330 行)：`window.PlanetsView` 单对象，`init/destroy` 完整生命周期 + Canvas 2D 3D 投影 + 拖拽/触摸/hover 事件 + RAF 循环
+
+### 核心实现
+- **3D 透视**：`_project(x,y,z)` 先围绕 Y 轴 yaw 旋转、再围绕 X 轴 pitch 旋转，`fov = min(W,H) × 0.45`，`camZ = 3`，远小近大缩放
+- **5 学科轨道**：半径 `r = 1.4`，5 颗行星角度均分 `2π/5`，分布于 xz 平面
+- **行星渲染**：远→近排序，每颗渲染：光晕 radial-gradient → 半透明深色球体 → 青色描边圆 → 内部经纬椭圆 + 准星十字 → 学科色中心圆点 → 下方学科文字标签
+- **交互**：鼠标拖拽 yaw/pitch（pitch 限制 ±1.2），松开后 4s 恢复自动 yaw 慢转（0.0003 rad/ms）；hover 距离命中检测（半径随 perspective scale 缩放）；点击非拖拽时 `window.location.hash = '#' + subjectId` 跳学科页
+- **触摸支持**：touchstart/move/end 全套，preventDefault 防滚动
+- **背景细节**：220 颗随机分布的视差小星点 + 中央青色发光核心 + 80 段虚线轨道环
+- **信息卡**：右下青色描边卡片，hover 行星时滑入显示学科名/简介/CLICK TO ENTER →，左边框颜色随学科变化
+- **DPR 适配**：`canvas.width = innerWidth × dpr`，`ctx.setTransform(dpr,0,0,dpr,0,0)`
+
+### 集成改动
+- `index.html` 新增 `<section id="page-planets">`（含 canvas + 4 HUD 角标 + 标题 + 返回按钮 + 信息卡）；首页主星 bento 内追加 `<a class="planets-entry" href="#planets">星系大屏</a>` 入口（绝对定位右下，◉ 闪烁脉冲）；新增 `<link href="pages/planets/planets.css">` 与 `<script src="pages/planets/planets.js">`（同步加载，与 main.js 同序保证 router.init 时 `initPlanets` 已定义）
+- `shared/js/router.js` 五处改动：colors map 新增 `planets: 'rgba(0,255,213,0.10)'`、`onPageEnter` 新增 `planets → initPlanets()` 分支、`onPageLeave` 新增 `planets → destroyPlanets()` 分支、`_toggleRunningTime(initialPage !== 'home' && initialPage !== 'planets')`（隐藏运行时长 footer）、navigateTo 早返回 + heroVisual/scrollAnimations 等"非首页才执行"的判断全部追加 `&& page !== 'planets'`（视为与首页同级的独立沉浸页）
+- `sw.js` cache 三联升级：`englab-static-v20260422z` → `v20260422zc`，并将 `pages/planets/planets.css` `pages/planets/planets.js` `shared/js/router.js?v=20260418q2` 加入/同步 cache 列表
+
+### 验证
+- Playwright `?_=ts#planets` → screenshot：5 行星轨道环绕 + 4 角 HUD + 标题"星 系 导 航 SUBJECT · GALAXY · MAP"+ 返回首页按钮 + DRAG/TAP 提示文字全部正确显示
+- `window.PlanetsView.W = 1055, .rafId 非空`，确认 RAF 循环运行中
+- `?_=ts#home` → 首页右下出现 `.planets-entry` 按钮（青色 #00ffd5），可点击跳 #planets
+
+### 排查记录
+- 首次集成 `<script defer>` 加载 planets.js → router.init() 调 `onPageEnter('planets')` 时 `initPlanets` 仍未定义（同步脚本 main.js 早于 defer 脚本执行完）→ 改为同步 `<script>` 与 main.js 同列即修复
+- planets section 中 `.planets-canvas` 用 `position: fixed` 全屏；当 section `.page` 未 `.active` 时 `display: none` 自动隐藏所有后代（含 fixed），无干扰其他页面
+
+
+---
 
 ### 后续候选
 - v4.1.17 — 算法推进：search-algorithms + dynamic-programming + string-matching 各 5 步（算法 4/8）
