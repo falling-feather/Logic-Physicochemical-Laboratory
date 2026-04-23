@@ -287,6 +287,11 @@ const Router = {
             if (page === 'home') BackToTop.hide();
             else BackToTop.show();
         }
+        // v4.2.19：非首页显示 FAB 折叠主控按钮（默认折叠）
+        if (typeof FabTrigger !== 'undefined') {
+            if (page === 'home') FabTrigger.hide();
+            else FabTrigger.show();
+        }
 
         // === Page Initialization ===
         // Home page initializes directly; subject pages rely on ModuleSelector
