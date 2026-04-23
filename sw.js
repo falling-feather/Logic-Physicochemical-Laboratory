@@ -1,4 +1,4 @@
-const CACHE_NAME = 'englab-static-v20260423r';
+const CACHE_NAME = 'englab-static-v20260423s';
 const APP_SHELL = [
   './',
   './index.html',
@@ -24,12 +24,12 @@ const APP_SHELL = [
   './shared/css/tokens.css?v=20260417c',
   './shared/css/base.css?v=20260417c',
   './shared/css/typography.css?v=20260417c',
-  './shared/css/navbar.css?v=20260423q',
+  './shared/css/navbar.css?v=20260423s',
   './shared/css/page-layout.css?v=20260417c',
   './shared/css/cards.css?v=20260417c',
   './shared/css/module-selector.css?v=20260417c',
   './shared/css/experiment-export.css?v=20260418f',
-  './shared/css/experiment-favorites.css?v=20260423q',
+  './shared/css/experiment-favorites.css?v=20260423s',
   './shared/css/experiment-rating.css?v=20260422z',
   './shared/css/responsive.css?v=20260417c',
   './pages/home/home.css?v=20260422e',

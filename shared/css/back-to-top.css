@@ -59,8 +59,8 @@
     transform: translateY(-50%) translateX(6px);
     padding: 5px 10px;
     background: rgba(20, 23, 35, 0.95);
-    color: #e5e7eb;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(220, 210, 255, 0.95);
+    border: 1px solid rgba(167, 139, 250, 0.55);
     border-radius: 6px;
     font-size: 12px;
     line-height: 1;

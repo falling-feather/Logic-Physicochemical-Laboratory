@@ -241,6 +241,11 @@
     opacity: 1;
     transform: translateY(-50%) translateX(0);
 }
+/* v4.2.18：tooltip 边框跟随主色 */
+.theme-fab[data-tip]::after {
+    border-color: rgba(0, 255, 213, 0.55);
+    color: rgba(180, 255, 240, 0.95);
+}
 @media (max-width: 768px) {
     .theme-fab[data-tip]::after,
     .favorite-fab[data-tip]::after,
