@@ -277,6 +277,11 @@ const Router = {
     onPageEnter(page) {
         document.body.classList.toggle('home-scroll-locked', page === 'home');
 
+        // v4.2.45：主题切换不再受路由强制干预；主页内容区由 CSS 锁定 dark token，
+        // 仅顶栏（navbar）会响应主题切换；其它页面照常完整响应主题。
+        const stored = localStorage.getItem('englab-theme');
+        document.documentElement.setAttribute('data-theme', stored === 'light' ? 'light' : 'dark');
+
         // v4.2.4：非首页统一显示右下角主题切换 FAB；返回首页则隐藏
         if (typeof ThemeSwitch !== 'undefined') {
             if (page === 'home') ThemeSwitch.hide();

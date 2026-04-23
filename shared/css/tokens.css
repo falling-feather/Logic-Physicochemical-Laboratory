@@ -164,3 +164,50 @@ html.theme-transitioning *::before,
 html.theme-transitioning *::after {
     transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease !important;
 }
+
+/* ── v4.2.45：首页内容区永远使用 dark token（宇宙风不被白天主题破坏）。
+       仅 navbar / 其他页面会响应 light 主题切换 ── */
+html[data-theme="light"] #page-home {
+    --surface-0: #08090e;
+    --surface-1: #0e1019;
+    --surface-2: #151822;
+    --surface-3: #1c1f2e;
+    --surface-4: #24273a;
+
+    --border-subtle: rgba(255,255,255,0.04);
+    --border-default: rgba(255,255,255,0.07);
+    --border-hover: rgba(255,255,255,0.12);
+    --border-accent: rgba(91,141,206,0.2);
+
+    --accent-blue: #5b8dce;
+    --accent-purple: #8b6fc0;
+    --accent-green: #4d9e7e;
+    --accent-orange: #c4793a;
+    --accent-red: #b85450;
+    --accent-cyan: #4fa8a3;
+    --accent-teal: #3a9e8f;
+
+    --accent-blue-wash: rgba(91,141,206,0.08);
+    --accent-purple-wash: rgba(139,111,192,0.08);
+    --accent-green-wash: rgba(77,158,126,0.08);
+    --accent-orange-wash: rgba(196,121,58,0.08);
+    --accent-teal-wash: rgba(58,158,143,0.08);
+
+    --text-primary: #d8dce6;
+    --text-secondary: #8a90a0;
+    --text-tertiary: #5a5f70;
+
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.15);
+    --shadow-lg: 0 12px 40px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.2);
+    --shadow-glow-blue: 0 0 20px rgba(91,141,206,0.12);
+    --shadow-glow-purple: 0 0 20px rgba(139,111,192,0.12);
+    --shadow-glow-green: 0 0 20px rgba(77,158,126,0.12);
+    --shadow-glow-orange: 0 0 20px rgba(196,121,58,0.12);
+
+    --noise-opacity: 0.035;
+
+    /* 强制内容区背景为 dark surface-0，避免 body 浅色透出 */
+    background: var(--surface-0);
+    color: var(--text-primary);
+}
