@@ -9,6 +9,7 @@
         _btn: null,
         _expanded: false,
         _onDocClick: null,
+        _onKeyDown: null,
 
         show() {
             if (this._btn) return;
@@ -44,6 +45,14 @@
                 this.collapse();
             };
             document.addEventListener('click', this._onDocClick, true);
+
+            // v4.2.21：ESC 键收起菜单（键盘友好）
+            this._onKeyDown = (e) => {
+                if (e.key === 'Escape' && this._expanded) {
+                    this.collapse();
+                }
+            };
+            document.addEventListener('keydown', this._onKeyDown);
         },
 
         hide() {
@@ -54,6 +63,10 @@
             if (this._onDocClick) {
                 document.removeEventListener('click', this._onDocClick, true);
                 this._onDocClick = null;
+            }
+            if (this._onKeyDown) {
+                document.removeEventListener('keydown', this._onKeyDown);
+                this._onKeyDown = null;
             }
         },
 
