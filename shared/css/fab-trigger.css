@@ -41,6 +41,19 @@
     animation: none;
 }
 
+/* v4.2.25：首次出现 bounce 提示动画（每会话仅一次） */
+.fab-trigger--bouncing {
+    animation: fab-trigger-pulse 3.2s ease-in-out infinite, fab-trigger-bounce 1.4s ease-out;
+}
+@keyframes fab-trigger-bounce {
+    0%   { transform: translateY(0) scale(1); }
+    20%  { transform: translateY(-12px) scale(1.06); }
+    40%  { transform: translateY(0) scale(1); }
+    55%  { transform: translateY(-6px) scale(1.03); }
+    75%  { transform: translateY(0) scale(1); }
+    100% { transform: translateY(0) scale(1); }
+}
+
 .fab-trigger i {
     width: 20px;
     height: 20px;

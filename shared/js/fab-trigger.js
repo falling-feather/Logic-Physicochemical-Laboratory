@@ -30,6 +30,15 @@
             this._btn = btn;
             if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [btn] });
 
+            // v4.2.25：每会话首次出现时跳动 2 次，提示用户发现
+            try {
+                if (!sessionStorage.getItem('englab-fab-discovered')) {
+                    btn.classList.add('fab-trigger--bouncing');
+                    setTimeout(() => btn.classList.remove('fab-trigger--bouncing'), 1500);
+                    sessionStorage.setItem('englab-fab-discovered', '1');
+                }
+            } catch (e) { /* sessionStorage 不可用则跳过 */ }
+
             // v4.2.20：点击 FAB 面板外区域自动收起
             this._onDocClick = (e) => {
                 if (!this._expanded) return;
