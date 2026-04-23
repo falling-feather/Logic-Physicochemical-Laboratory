@@ -177,6 +177,16 @@
 .theme-fab i {
     width: 16px;
     height: 16px;
+    transition: transform 0.35s ease;
+}
+
+.theme-fab--spinning i {
+    animation: theme-fab-spin 0.35s ease;
+}
+
+@keyframes theme-fab-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(180deg); }
 }
 
 @media (max-width: 768px) {

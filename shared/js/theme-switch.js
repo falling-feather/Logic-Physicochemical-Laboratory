@@ -29,6 +29,12 @@ const ThemeSwitch = {
         const next = current === 'dark' ? 'light' : 'dark';
         localStorage.setItem(this._KEY, next);
 
+        // v4.2.10：图标切换 180° 旋转动画
+        if (this._btn) {
+            this._btn.classList.add('theme-fab--spinning');
+            setTimeout(() => this._btn && this._btn.classList.remove('theme-fab--spinning'), 360);
+        }
+
         // Enable transition, then apply
         document.documentElement.classList.add('theme-transitioning');
         this._apply(next);
