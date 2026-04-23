@@ -3,6 +3,23 @@
  * 主控按钮位于右下 bottom 24px；展开时另外 4 个 FAB 错峰飞入。
  */
 
+/* v4.2.27：菜单展开时半透明遮罩 */
+.fab-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 10, 18, 0.45);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 9050;
+}
+.fab-scrim--visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
 .fab-trigger {
     position: fixed;
     bottom: calc(20px + env(safe-area-inset-bottom, 0px));

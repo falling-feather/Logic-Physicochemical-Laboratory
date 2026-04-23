@@ -7,6 +7,7 @@
 
     const FabTrigger = {
         _btn: null,
+        _scrim: null,
         _expanded: false,
         _onDocClick: null,
         _onKeyDown: null,
@@ -34,6 +35,13 @@
             document.body.appendChild(btn);
             this._btn = btn;
             if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [btn] });
+
+            // v4.2.27：创建半透明遮罩（默认隐藏）
+            const scrim = document.createElement('div');
+            scrim.className = 'fab-scrim';
+            scrim.addEventListener('click', () => this.collapse());
+            document.body.appendChild(scrim);
+            this._scrim = scrim;
 
             // v4.2.25：每会话首次出现时跳动 2 次，提示用户发现
             try {
@@ -72,6 +80,8 @@
         hide() {
             if (this._btn && this._btn.parentNode) this._btn.parentNode.removeChild(this._btn);
             this._btn = null;
+            if (this._scrim && this._scrim.parentNode) this._scrim.parentNode.removeChild(this._scrim);
+            this._scrim = null;
             document.body.removeAttribute('data-fab-expanded');
             this._expanded = false;
             if (this._onDocClick) {
@@ -92,6 +102,7 @@
                 this._btn.classList.remove('fab-trigger--open');
                 this._btn.setAttribute('data-tip', '更多操作');
             }
+            if (this._scrim) this._scrim.classList.remove('fab-scrim--visible');
         },
 
         toggle() {
@@ -101,6 +112,7 @@
                 this._btn.classList.toggle('fab-trigger--open', this._expanded);
                 this._btn.setAttribute('data-tip', this._expanded ? '收起菜单' : '更多操作');
             }
+            if (this._scrim) this._scrim.classList.toggle('fab-scrim--visible', this._expanded);
         }
     };
 
