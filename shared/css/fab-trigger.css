@@ -20,6 +20,65 @@
     pointer-events: auto;
 }
 
+/* v4.2.32：fan-out 弧形轨迹（仅桌面端） */
+/* v4.2.36：状态化（展开常驻 + 走马灯微粒沿弧线运动） */
+.fab-trace {
+    position: fixed;
+    width: 250px;
+    height: 250px;
+    bottom: -83px;
+    right: -83px;
+    z-index: 9098;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.45s ease;
+}
+.fab-trace svg { width: 100%; height: 100%; overflow: visible; }
+.fab-trace .fab-trace-line {
+    fill: none;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 4px rgba(0, 255, 213, 0.45));
+    stroke-dasharray: 200;
+    stroke-dashoffset: 200;
+    transition: stroke-dashoffset 0.6s ease-out;
+}
+.fab-trace .fab-trace-particle {
+    filter: drop-shadow(0 0 4px rgba(0, 255, 213, 0.95));
+    opacity: 0;
+    transition: opacity 0.3s ease 0.2s;
+}
+.fab-trace .fab-trace-particle--alt {
+    filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.9));
+}
+/* v4.2.41：4 个静默定位锚点（弧线角度对应 4 FAB） */
+.fab-trace .fab-trace-anchors circle {
+    filter: drop-shadow(0 0 3px rgba(0, 255, 213, 0.6));
+    opacity: 0;
+    transition: opacity 0.4s ease 0.15s;
+}
+body[data-fab-expanded="true"] .fab-trace .fab-trace-anchors circle { opacity: 0.9; }
+
+/* v4.2.42：锚点呼吸动画（柔和 2.4s ease-in-out 透明度 0.6↔0.95） */
+@keyframes fab-trace-anchor-breath {
+    0%, 100% { opacity: 0.6; }
+    50%      { opacity: 0.95; }
+}
+body[data-fab-expanded="true"] .fab-trace .fab-trace-anchors circle {
+    animation: fab-trace-anchor-breath 2.4s ease-in-out 0.45s infinite;
+}
+body[data-fab-expanded="true"] .fab-trace .fab-trace-anchors circle:nth-child(2) { animation-delay: 0.75s; }
+body[data-fab-expanded="true"] .fab-trace .fab-trace-anchors circle:nth-child(3) { animation-delay: 1.05s; }
+body[data-fab-expanded="true"] .fab-trace .fab-trace-anchors circle:nth-child(4) { animation-delay: 1.35s; }
+body[data-fab-expanded="true"] .fab-trace { opacity: 1; }
+body[data-fab-expanded="true"] .fab-trace .fab-trace-line { stroke-dashoffset: 0; }
+body[data-fab-expanded="true"] .fab-trace .fab-trace-particle { opacity: 1; }
+body[data-fab-expanded="false"] .fab-trace .fab-trace-line { transition: stroke-dashoffset 0.5s ease-in; }
+
+@media (max-width: 768px) {
+    .fab-trace { display: none; }
+}
+
 .fab-trigger {
     position: fixed;
     bottom: calc(20px + env(safe-area-inset-bottom, 0px));
@@ -58,6 +117,20 @@
     animation: none;
 }
 
+/* v4.2.39：展开后主控按钮轻微上浮 3px，强化"推出"状态 */
+.fab-trigger {
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+                border-color 0.25s ease,
+                color 0.25s ease,
+                box-shadow 0.25s ease;
+}
+.fab-trigger--open {
+    transform: translateY(-3px);
+}
+.fab-trigger--open:hover {
+    transform: translateY(-3px) scale(1.08);
+}
+
 /* v4.2.25：首次出现 bounce 提示动画（每会话仅一次） */
 .fab-trigger--bouncing {
     animation: fab-trigger-pulse 3.2s ease-in-out infinite, fab-trigger-bounce 1.4s ease-out;
@@ -86,6 +159,32 @@
     100% { transform: scale(2.2); opacity: 0; }
 }
 
+/* v4.2.29：菜单展开瞬间主控 FAB 周围青色光环扩散 */
+.fab-trigger-halo {
+    position: fixed;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    right: 20px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 2px solid rgba(0, 255, 213, 0.7);
+    pointer-events: none;
+    z-index: 9099;
+    animation: fab-trigger-halo 0.6s ease-out forwards;
+}
+@keyframes fab-trigger-halo {
+    0%   { transform: scale(1);   opacity: 0.85; border-width: 2px; }
+    100% { transform: scale(2.0); opacity: 0;    border-width: 1px; }
+}
+@media (max-width: 768px) {
+    .fab-trigger-halo {
+        bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+        right: 16px;
+        width: 40px;
+        height: 40px;
+    }
+}
+
 .fab-trigger i {
     width: 20px;
     height: 20px;
@@ -94,6 +193,49 @@
 
 .fab-trigger--open i {
     transform: rotate(90deg);
+}
+
+/* v4.2.34：图标双层叠加，展开时 menu 淡出 + close 淡入 */
+.fab-trigger { position: fixed; }
+.fab-trigger .fab-trigger-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    transition: opacity 0.25s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+}
+.fab-trigger .fab-trigger-icon--menu  { opacity: 1; transform: rotate(0deg) scale(1); }
+.fab-trigger .fab-trigger-icon--close { opacity: 0; transform: rotate(-90deg) scale(0.6); }
+.fab-trigger--open .fab-trigger-icon--menu  { opacity: 0; transform: rotate(90deg)  scale(0.6); }
+.fab-trigger--open .fab-trigger-icon--close { opacity: 1; transform: rotate(0deg)   scale(1); }
+
+/* v4.2.38：主控按钮 badge（右上角小圆点，数字 4 提示可用按钮数） */
+.fab-trigger .fab-trigger-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #f472b6, #a78bfa);
+    color: #fff;
+    font-size: 10px;
+    line-height: 16px;
+    font-weight: 700;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+    pointer-events: none;
+    transform: scale(1);
+    transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 1;
+}
+.fab-trigger--open .fab-trigger-badge {
+    opacity: 0;
+    transform: scale(0.4);
 }
 
 /* tooltip 沿用通用样式（HUD 青） */
@@ -123,10 +265,12 @@
 }
 
 /* ── 折叠/展开状态：控制 4 个功能 FAB 的可见性 ── */
+/* v4.2.43：纳入 .experiment-export-btn 作为第 5 个 FAB（遵循同样的隐藏与动画规则） */
 body[data-fab-expanded="false"] .experiment-guide-help-btn,
 body[data-fab-expanded="false"] .favorite-fab,
 body[data-fab-expanded="false"] .theme-fab,
-body[data-fab-expanded="false"] .back-to-top-fab {
+body[data-fab-expanded="false"] .back-to-top-fab,
+body[data-fab-expanded="false"] .experiment-export-btn {
     opacity: 0 !important;
     transform: translateY(20px) scale(0.5) !important;
     pointer-events: none !important;
@@ -136,15 +280,77 @@ body[data-fab-expanded="false"] .back-to-top-fab {
 body[data-fab-expanded="true"] .experiment-guide-help-btn,
 body[data-fab-expanded="true"] .favorite-fab,
 body[data-fab-expanded="true"] .theme-fab,
-body[data-fab-expanded="true"] .back-to-top-fab {
-    transition: opacity 0.28s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+body[data-fab-expanded="true"] .back-to-top-fab,
+body[data-fab-expanded="true"] .experiment-export-btn {
+    transition: opacity 0.28s ease,
+                transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1),
+                bottom 0.42s cubic-bezier(0.34, 1.56, 0.64, 1),
+                right 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* 错峰飞入：从下到上依次出现 */
+/* 错峰飞入：从下到上依次出现（v4.2.43 加入 export 作为第 5 项 0.20s） */
 body[data-fab-expanded="true"] .experiment-guide-help-btn { transition-delay: 0.00s; }
 body[data-fab-expanded="true"] .favorite-fab               { transition-delay: 0.05s; }
 body[data-fab-expanded="true"] .theme-fab                  { transition-delay: 0.10s; }
 body[data-fab-expanded="true"] .back-to-top-fab            { transition-delay: 0.15s; }
+body[data-fab-expanded="true"] .experiment-export-btn      { transition-delay: 0.20s; }
+
+/* v4.2.30：桌面端 fan-out 弧形扫出（类扬弥肩） */
+@media (min-width: 769px) {
+    body[data-fab-expanded="true"] .experiment-guide-help-btn {
+        bottom: calc(132px + env(safe-area-inset-bottom, 0px)) !important;
+        right: 22px !important;
+    }
+    body[data-fab-expanded="true"] .favorite-fab {
+        bottom: calc(124px + env(safe-area-inset-bottom, 0px)) !important;
+        right: 64px !important;
+    }
+    body[data-fab-expanded="true"] .theme-fab {
+        bottom: calc(100px + env(safe-area-inset-bottom, 0px)) !important;
+        right: 100px !important;
+    }
+    body[data-fab-expanded="true"] .back-to-top-fab {
+        bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+        right: 124px !important;
+    }
+    /* v4.2.43：导出按钮 fan-out 第 5 位（180°，水平最左端） */
+    body[data-fab-expanded="true"] .experiment-export-btn {
+        bottom: calc(22px + env(safe-area-inset-bottom, 0px)) !important;
+        right: 152px !important;
+    }
+
+    /* v4.2.31：fan-out 后 tooltip 按角度调整方向，避免重叠 */
+    /* FAB1 帮助（顶部 90°）：tooltip 在按钮上方 */
+    body[data-fab-expanded="true"] .experiment-guide-help-btn[data-tip]::after {
+        right: 50% !important;
+        top: auto !important;
+        bottom: calc(100% + 10px) !important;
+        transform: translateX(50%) translateY(0) !important;
+    }
+    /* FAB2 收藏（112.5°）：tooltip 在按钮左上 */
+    body[data-fab-expanded="true"] .favorite-fab[data-tip]::after {
+        right: calc(100% + 8px) !important;
+        top: auto !important;
+        bottom: calc(100% + 6px) !important;
+        transform: translateY(0) translateX(0) !important;
+    }
+    /* FAB3 主题（135°）：保持左侧 default（无需覆盖） */
+    /* FAB4 返回顶部（157.5°）：tooltip 在按钮左下 */
+    body[data-fab-expanded="true"] .back-to-top-fab[data-tip]::after {
+        right: calc(100% + 8px) !important;
+        top: calc(100% + 6px) !important;
+        bottom: auto !important;
+        transform: translateY(0) translateX(0) !important;
+    }
+    /* v4.2.43 FAB5 导出（180°）：tooltip 在按钮正下方 */
+    body[data-fab-expanded="true"] .experiment-export-btn[data-tip]::after,
+    body[data-fab-expanded="true"] .experiment-export-btn[title]::after {
+        right: 50% !important;
+        top: calc(100% + 10px) !important;
+        bottom: auto !important;
+        transform: translateX(50%) translateY(0) !important;
+    }
+}
 
 /* v4.2.28：菜单展开时常驻中文标签（取代 hover-only tooltip） */
 body[data-fab-expanded="true"] .theme-fab[data-tip]::after,
@@ -160,6 +366,14 @@ body[data-fab-expanded="true"] .favorite-fab[data-tip]::after              { tra
 body[data-fab-expanded="true"] .theme-fab[data-tip]::after                 { transition-delay: 0.15s; }
 body[data-fab-expanded="true"] .back-to-top-fab[data-tip]::after           { transition-delay: 0.20s; }
 
+/* v4.2.33：收起时反向错峰（远端先归位 → 近端最后） */
+/* v4.2.33：收起时反向错峰（远端先归位 → 近端最后；v4.2.43 加入 export 作为最远端） */
+body[data-fab-collapsing="true"] .experiment-export-btn      { transition-delay: 0.00s; }
+body[data-fab-collapsing="true"] .back-to-top-fab            { transition-delay: 0.05s; }
+body[data-fab-collapsing="true"] .theme-fab                  { transition-delay: 0.10s; }
+body[data-fab-collapsing="true"] .favorite-fab               { transition-delay: 0.15s; }
+body[data-fab-collapsing="true"] .experiment-guide-help-btn  { transition-delay: 0.20s; }
+
 @media (max-width: 768px) {
     .fab-trigger {
         bottom: calc(16px + env(safe-area-inset-bottom, 0px));
@@ -168,5 +382,6 @@ body[data-fab-expanded="true"] .back-to-top-fab[data-tip]::after           { tra
         height: 40px;
     }
     .fab-trigger i { width: 18px; height: 18px; }
+    .fab-trigger .fab-trigger-icon { width: 18px; height: 18px; margin: -9px 0 0 -9px; }
     .fab-trigger[data-tip]::after { display: none; }
 }

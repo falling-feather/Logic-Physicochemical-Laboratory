@@ -17,7 +17,7 @@
     border-radius: 50%;
     color: rgba(167, 139, 250, 0.7);
     cursor: pointer;
-    z-index: 8999;
+    z-index: 9060;
     transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     animation: back-to-top-pulse 3s ease-in-out infinite;
