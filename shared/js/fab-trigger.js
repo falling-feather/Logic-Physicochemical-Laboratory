@@ -8,6 +8,7 @@
     const FabTrigger = {
         _btn: null,
         _expanded: false,
+        _onDocClick: null,
 
         show() {
             if (this._btn) return;
@@ -20,10 +21,29 @@
             btn.setAttribute('aria-label', '展开/收起浮动按钮');
             btn.setAttribute('data-tip', '更多操作');
             btn.innerHTML = '<i data-lucide="more-vertical"></i>';
-            btn.addEventListener('click', () => this.toggle());
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggle();
+            });
             document.body.appendChild(btn);
             this._btn = btn;
             if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [btn] });
+
+            // v4.2.20：点击 FAB 面板外区域自动收起
+            this._onDocClick = (e) => {
+                if (!this._expanded) return;
+                const t = e.target;
+                if (!t || !t.closest) return;
+                if (t.closest('.fab-trigger') ||
+                    t.closest('.theme-fab') ||
+                    t.closest('.favorite-fab') ||
+                    t.closest('.experiment-guide-help-btn') ||
+                    t.closest('.back-to-top-fab')) {
+                    return; // 点击在任何 FAB 上，不收起
+                }
+                this.collapse();
+            };
+            document.addEventListener('click', this._onDocClick, true);
         },
 
         hide() {
@@ -31,6 +51,20 @@
             this._btn = null;
             document.body.removeAttribute('data-fab-expanded');
             this._expanded = false;
+            if (this._onDocClick) {
+                document.removeEventListener('click', this._onDocClick, true);
+                this._onDocClick = null;
+            }
+        },
+
+        collapse() {
+            if (!this._expanded) return;
+            this._expanded = false;
+            document.body.setAttribute('data-fab-expanded', 'false');
+            if (this._btn) {
+                this._btn.classList.remove('fab-trigger--open');
+                this._btn.setAttribute('data-tip', '更多操作');
+            }
         },
 
         toggle() {
