@@ -107,35 +107,11 @@ function initPageScrollAnimations(page) {
         );
     });
 
-    // Page hero text
-    const heroText = pageEl.querySelector('.page-hero__text');
-    if (heroText) {
-        const children = heroText.children;
-        gsap.fromTo(children,
-            { y: 20, opacity: 0 },
-            {
-                y: 0, opacity: 1,
-                duration: 0.6,
-                ease: 'power3.out',
-                stagger: 0.1,
-                delay: 0.15
-            }
-        );
-    }
+    // Page hero text — NOTE: hero elements are already animated by Router.animatePageContent()
+    // on page transition. Running a second fromTo here caused triple-flicker (appear→hide→appear).
+    // Hero animation is intentionally omitted here to avoid the conflict.
 
-    // Page hero visual
-    const heroVisual = pageEl.querySelector('.page-hero__visual');
-    if (heroVisual) {
-        gsap.fromTo(heroVisual,
-            { scale: 0.9, opacity: 0 },
-            {
-                scale: 1, opacity: 1,
-                duration: 0.8,
-                ease: 'power2.out',
-                delay: 0.3
-            }
-        );
-    }
+    // Page hero visual — same reason as above, handled by animatePageContent.
 }
 
 // Hero visual animations (SVG/Canvas decorations)
@@ -147,18 +123,19 @@ function initHeroVisual(page) {
     const ctx = canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    // Use offsetWidth fallback if getBoundingClientRect returns 0 (page not yet painted)
+    const w = rect.width || canvas.offsetWidth || (canvas.parentElement && canvas.parentElement.offsetWidth) || 400;
+    const h = rect.height || canvas.offsetHeight || (canvas.parentElement && canvas.parentElement.offsetHeight) || 220;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
     ctx.scale(dpr, dpr);
-
-    const w = rect.width;
-    const h = rect.height;
 
     const visuals = {
         mathematics: () => drawLissajous(ctx, w, h),
         physics: () => drawWaveInterference(ctx, w, h),
         chemistry: () => drawMolecule(ctx, w, h),
-        algorithms: () => drawSortBars(ctx, w, h)
+        algorithms: () => drawSortBars(ctx, w, h),
+        biology: () => drawDNAHelix(ctx, w, h)
     };
 
     if (visuals[page]) visuals[page]();
@@ -340,3 +317,59 @@ function drawSortBars(ctx, w, h) {
 window.initScrollAnimations = initScrollAnimations;
 window.initPageScrollAnimations = initPageScrollAnimations;
 window.initHeroVisual = initHeroVisual;
+
+// ── DNA double helix for Biology ──
+function drawDNAHelix(ctx, w, h) {
+    let t = 0;
+    const cx = w / 2;
+    const amplitude = Math.min(w, h) * 0.18;
+    const freq = 0.022;
+    const baseColor1 = 'rgba(58,158,143,';
+    const baseColor2 = 'rgba(77,200,170,';
+    const bondColor = 'rgba(58,158,143,0.12)';
+
+    function draw() {
+        ctx.clearRect(0, 0, w, h);
+
+        // Draw backbone strands
+        for (let strand = 0; strand < 2; strand++) {
+            const phase = strand * Math.PI;
+            ctx.beginPath();
+            for (let y = 0; y <= h; y += 2) {
+                const x = cx + Math.sin(y * freq + t + phase) * amplitude;
+                if (y === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            const alpha = 0.3 - strand * 0.08;
+            ctx.strokeStyle = strand === 0 ? baseColor1 + alpha + ')' : baseColor2 + alpha + ')';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        // Draw base pair rungs
+        const step = Math.PI / (freq * 8);
+        for (let k = 0; k < 12; k++) {
+            const y = ((k * step - t / freq) % h + h) % h;
+            const x1 = cx + Math.sin(y * freq + t) * amplitude;
+            const x2 = cx + Math.sin(y * freq + t + Math.PI) * amplitude;
+            ctx.beginPath();
+            ctx.moveTo(x1, y);
+            ctx.lineTo(x2, y);
+            ctx.strokeStyle = bondColor;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Nodes at each end
+            [x1, x2].forEach((x, i) => {
+                ctx.beginPath();
+                ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+                ctx.fillStyle = i === 0 ? 'rgba(58,158,143,0.35)' : 'rgba(77,200,170,0.35)';
+                ctx.fill();
+            });
+        }
+
+        t += 0.012;
+        requestAnimationFrame(draw);
+    }
+    draw();
+}

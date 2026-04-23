@@ -109,9 +109,30 @@ async function startBucketSort() {
         }
     }
     updateSortInfo('完成！');
+    updateSortEdu(arr.length, buckets);
     document.querySelectorAll('#sorted-array .array-bar').forEach((b,i)=>setTimeout(()=>b.classList.add('sorted'), i*50));
     isSorting = false;
     document.querySelectorAll('.sort-toolbar .btn').forEach(b => b.disabled = false);
+}
+
+function updateSortEdu(n, buckets) {
+    let eduEl = document.getElementById('sort-edu');
+    if (!eduEl) {
+        const parent = document.getElementById('sort-info');
+        if (!parent || !parent.parentElement) return;
+        eduEl = document.createElement('div');
+        eduEl.id = 'sort-edu';
+        eduEl.style.cssText = 'font-size:12px;color:#c4793a;margin-top:8px;line-height:1.6;opacity:0.85;';
+        parent.parentElement.appendChild(eduEl);
+    }
+    const k = buckets.filter(b => b.length > 0).length;
+    const maxBucket = Math.max(...buckets.map(b => b.length));
+    eduEl.innerHTML =
+        `<strong>桶排序 (Bucket Sort)</strong>` +
+        `<br>时间复杂度：平均 O(n + k)，最坏 O(n²)（所有元素落入同一个桶）` +
+        `<br>空间复杂度：O(n + k)，k = 桶数` +
+        `<br>本次：n=${n} 个元素 → ${k} 个非空桶，最大桶含 ${maxBucket} 个元素` +
+        `<br>💡 桶排序适合数据均匀分布的场景。数据越均匀，桶内排序越快。`;
 }
 
 function resetBucketSort() {

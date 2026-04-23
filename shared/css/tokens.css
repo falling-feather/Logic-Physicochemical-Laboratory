@@ -2,7 +2,7 @@
 /* Fonts now loaded via <link> in HTML for faster initial render */
 
 :root {
-    /* ── Surfaces ── */
+    /* ── Surfaces (dark) ── */
     --surface-0: #08090e;
     --surface-1: #0e1019;
     --surface-2: #151822;
@@ -37,8 +37,24 @@
     --text-tertiary: #5a5f70;
     --text-accent: var(--accent-blue);
 
+    /* ── Navbar background ── */
+    --navbar-bg: rgba(8,9,14,0.75);
+
+    /* ── Shadows (neutral, not colored) ── */
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.15);
+    --shadow-lg: 0 12px 40px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.2);
+    --shadow-glow-blue: 0 0 20px rgba(91,141,206,0.12);
+    --shadow-glow-purple: 0 0 20px rgba(139,111,192,0.12);
+    --shadow-glow-green: 0 0 20px rgba(77,158,126,0.12);
+    --shadow-glow-orange: 0 0 20px rgba(196,121,58,0.12);
+
+    /* ── Noise overlay opacity ── */
+    --noise-opacity: 0.035;
+
     /* ── Typography ── */
     --font-display: 'Noto Sans SC', 'Inter', system-ui, -apple-system, sans-serif;
+    --font-sans: 'Inter', 'Noto Sans SC', system-ui, sans-serif;
     --font-body: 'Inter', 'Noto Sans SC', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
 
@@ -72,15 +88,6 @@
     --radius-md: 6px;
     --radius-lg: 8px;
 
-    /* ── Shadows (neutral, not colored) ── */
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-    --shadow-md: 0 4px 16px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.15);
-    --shadow-lg: 0 12px 40px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.2);
-    --shadow-glow-blue: 0 0 20px rgba(91,141,206,0.12);
-    --shadow-glow-purple: 0 0 20px rgba(139,111,192,0.12);
-    --shadow-glow-green: 0 0 20px rgba(77,158,126,0.12);
-    --shadow-glow-orange: 0 0 20px rgba(196,121,58,0.12);
-
     /* ── Easings ── */
     --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
@@ -92,6 +99,50 @@
     --duration-slow: 0.4s;
 }
 
+/* ── X-03: Light theme overrides ── */
+html[data-theme="light"] {
+    --surface-0: #f5f6fa;
+    --surface-1: #ffffff;
+    --surface-2: #eef0f5;
+    --surface-3: #e2e5ed;
+    --surface-4: #d5d9e3;
+
+    --border-subtle: rgba(0,0,0,0.04);
+    --border-default: rgba(0,0,0,0.10);
+    --border-hover: rgba(0,0,0,0.18);
+    --border-accent: rgba(91,141,206,0.25);
+
+    --accent-blue: #3a6fad;
+    --accent-purple: #6d4ea6;
+    --accent-green: #3a8266;
+    --accent-orange: #a66028;
+    --accent-red: #a83c38;
+    --accent-cyan: #378e89;
+    --accent-teal: #2a7e71;
+
+    --accent-blue-wash: rgba(58,111,173,0.08);
+    --accent-purple-wash: rgba(109,78,166,0.08);
+    --accent-green-wash: rgba(58,130,102,0.08);
+    --accent-orange-wash: rgba(166,96,40,0.08);
+    --accent-teal-wash: rgba(42,126,113,0.08);
+
+    --text-primary: #1a1d26;
+    --text-secondary: #5a6070;
+    --text-tertiary: #8a90a0;
+
+    --navbar-bg: rgba(245,246,250,0.85);
+
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+    --shadow-lg: 0 12px 40px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.05);
+    --shadow-glow-blue: 0 0 20px rgba(58,111,173,0.10);
+    --shadow-glow-purple: 0 0 20px rgba(109,78,166,0.10);
+    --shadow-glow-green: 0 0 20px rgba(58,130,102,0.10);
+    --shadow-glow-orange: 0 0 20px rgba(166,96,40,0.10);
+
+    --noise-opacity: 0.015;
+}
+
 /* ── Noise / Grain overlay ── */
 body::after {
     content: '';
@@ -100,8 +151,16 @@ body::after {
     width: 100%; height: 100%;
     pointer-events: none;
     z-index: 9999;
-    opacity: 0.035;
+    opacity: var(--noise-opacity, 0.035);
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     background-repeat: repeat;
     background-size: 200px 200px;
+}
+
+/* ── Theme transition (applied after first paint) ── */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease !important;
 }

@@ -1,5 +1,84 @@
 /* ===== Periodic Table ===== */
 
+/* 搜索框 */
+.pt-search-wrap {
+    position: relative;
+    margin-bottom: var(--space-3);
+    max-width: 320px;
+}
+
+.pt-search-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: var(--radius-sm);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-primary);
+    font-size: var(--text-sm);
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.pt-search-input::placeholder {
+    color: var(--text-tertiary);
+}
+
+.pt-search-input:focus {
+    border-color: var(--accent-blue, #3b82f6);
+}
+
+.pt-search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--surface-2);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    margin-top: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 50;
+    display: none;
+}
+
+.pt-search-results.active {
+    display: block;
+}
+
+.pt-search-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    transition: background 0.1s;
+}
+
+.pt-search-item:hover {
+    background: rgba(255,255,255,0.06);
+    color: var(--text-primary);
+}
+
+.pt-search-item .pt-sr-num {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    min-width: 24px;
+}
+
+.pt-search-item .pt-sr-sym {
+    font-weight: 700;
+    min-width: 28px;
+}
+
+.pt-element.pt-search-match {
+    box-shadow: 0 0 0 2px var(--accent-blue, #3b82f6);
+    z-index: 5;
+}
+
 .pt-wrapper {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -116,27 +195,45 @@
     flex-shrink: 0;
 }
 
+/* 详情面板 - 遮罩层 */
+.pt-detail-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99;
+    background: rgba(0,0,0,0.45);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0s 0.3s;
+}
+.pt-detail-overlay.active {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.3s ease, visibility 0s;
+}
+
 /* 详情面板 */
 .pt-detail {
     position: fixed;
-    bottom: -280px;
+    top: 50%;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translate(-50%, -50%) scale(0.9);
     width: min(400px, calc(100vw - 32px));
     background: var(--surface-2);
     border: 1px solid var(--border-default);
     border-radius: var(--radius-lg);
     padding: var(--space-5) var(--space-6);
     z-index: 100;
-    transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s 0.3s;
-    box-shadow: 0 -4px 24px rgba(0,0,0,0.4);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, visibility 0s 0.3s;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
     visibility: hidden;
+    opacity: 0;
 }
 
 .pt-detail.active {
-    bottom: 24px;
+    transform: translate(-50%, -50%) scale(1);
     visibility: visible;
-    transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s;
+    opacity: 1;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, visibility 0s;
 }
 
 .pt-detail-header {
@@ -222,6 +319,16 @@
 .pt-detail-close:hover {
     color: var(--text-primary);
 }
+
+/* Periodic table education panel */
+.pt-edu-info { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(77,158,126,.06); border:1px solid rgba(77,158,126,.12); font-size:.85rem; line-height:1.65; }
+.pt-edu-info .chem-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.pt-edu-info .chem-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(77,158,126,.18); color:rgba(77,158,126,.9); }
+.pt-edu-info .chem-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.pt-edu-info .chem-key { flex-shrink:0; font-weight:600; color:rgba(77,158,126,.85); }
+.pt-edu-info .chem-key--purple { color:rgba(139,111,192,.85); }
+.pt-edu-info .chem-key--amber { color:rgba(229,192,123,.85); }
+.pt-edu-info .chem-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(77,158,126,.1); color:var(--text-tertiary); font-size:.82rem; }
 
 /* 响应式 */
 @media (max-width: 768px) {
@@ -338,6 +445,14 @@
     font-size: 0.78rem;
     font-weight: 600;
 }
+.mol-edu { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(77,158,126,.06); border:1px solid rgba(77,158,126,.12); font-size:.85rem; line-height:1.65; }
+.mol-edu .chem-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.mol-edu .chem-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(77,158,126,.18); color:rgba(77,158,126,.9); }
+.mol-edu .chem-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.mol-edu .chem-key { flex-shrink:0; font-weight:600; color:rgba(77,158,126,.85); min-width:80px; }
+.mol-edu .chem-key--purple { color:rgba(139,111,192,.85); }
+.mol-edu .chem-key--amber { color:rgba(229,192,123,.85); }
+.mol-edu .chem-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(77,158,126,.1); color:var(--text-tertiary); font-size:.82rem; }
 
 @media (max-width: 768px) {
     .mol-controls { gap: 6px; }
@@ -461,9 +576,378 @@
     color: rgba(255,255,255,0.5);
     min-width: 60px;
 }
+.rxn-edu { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(77,158,126,.06); border:1px solid rgba(77,158,126,.12); font-size:.85rem; line-height:1.65; }
+.rxn-edu .chem-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.rxn-edu .chem-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(77,158,126,.18); color:rgba(77,158,126,.9); }
+.rxn-edu .chem-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.rxn-edu .chem-key { flex-shrink:0; font-weight:600; color:rgba(77,158,126,.85); min-width:70px; }
+.rxn-edu .chem-key--purple { color:rgba(139,111,192,.85); }
+.rxn-edu .chem-key--amber { color:rgba(229,192,123,.85); }
+.rxn-edu .chem-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(77,158,126,.1); color:var(--text-tertiary); font-size:.82rem; }
 
 @media (max-width: 768px) {
     .rxn-controls { gap: 6px; }
     .rxn-select-btn { padding: 5px 10px; font-size: 0.78rem; }
     .rxn-actions { flex-direction: column; align-items: flex-start; }
+}
+
+/* ── Buttons (green accent override) ── */
+#page-chemistry .btn-primary {
+    background: rgba(77,158,126,0.18);
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+}
+
+#page-chemistry .btn-primary:hover {
+    background: rgba(77,158,126,0.28);
+    box-shadow: 0 0 12px rgba(77,158,126,0.15);
+}
+
+#page-chemistry .btn-secondary:hover {
+    border-color: var(--accent-green);
+}
+
+/* ===== Periodic Table Mode Buttons & Scale ===== */
+.pt-modes {
+    display: flex;
+    gap: 6px;
+    margin-bottom: var(--space-3);
+    flex-wrap: wrap;
+}
+
+.pt-mode-btn {
+    padding: 5px 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: var(--radius-sm);
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.6);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.pt-mode-btn:hover {
+    border-color: var(--accent-green);
+    color: #fff;
+}
+
+.pt-mode-btn.active {
+    background: rgba(77,158,126,0.15);
+    border-color: var(--accent-green);
+    color: #fff;
+}
+
+.pt-scale-legend {
+    margin-top: var(--space-3);
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.02);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255,255,255,0.06);
+}
+
+.pt-scale-title {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    margin-bottom: 4px;
+}
+
+.pt-scale-bar {
+    height: 10px;
+    border-radius: 5px;
+    background: linear-gradient(to right, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000);
+}
+
+.pt-scale-ticks {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-tertiary);
+    margin-top: 2px;
+}
+
+/* ===== Molecular Mode Buttons ===== */
+.mol-modes {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.mol-mode-btn {
+    padding: 5px 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.6);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mol-mode-btn:hover {
+    border-color: var(--accent-green);
+    color: #fff;
+}
+
+.mol-mode-btn.active {
+    background: rgba(77,158,126,0.15);
+    border-color: var(--accent-green);
+    color: #fff;
+}
+
+@media (max-width: 768px) {
+    .pt-modes, .mol-modes { gap: 4px; }
+    .pt-mode-btn, .mol-mode-btn { padding: 4px 10px; font-size: 0.78rem; }
+}
+
+@media (max-width: 480px) {
+    .pt-modes, .mol-modes { gap: 3px; }
+    .pt-mode-btn, .mol-mode-btn { padding: 3px 8px; font-size: 0.72rem; }
+}
+
+/* ══════ Chemical Equilibrium ══════ */
+.cheq-controls {
+    display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center;
+    margin-bottom: var(--space-3);
+}
+.cheq-actions {
+    display: flex; gap: var(--space-2);
+}
+.cheq-perturb {
+    display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;
+}
+.cheq-label {
+    font-size: var(--text-xs); color: var(--text-muted); min-width: 40px;
+}
+.cheq-info {
+    text-align: center; margin-top: var(--space-2); padding: var(--space-2) var(--space-3);
+    background: rgba(77,158,126,0.06); border-radius: var(--radius-md);
+}
+.cheq-info p {
+    font-size: var(--text-sm); color: var(--text-muted);
+    font-family: var(--font-mono, monospace); margin: 2px 0;
+}
+.chem-canvas-wrap {
+    width: 100%; border-radius: var(--radius-md); overflow: hidden;
+    background: rgba(77,158,126,0.03); border: 1px solid rgba(77,158,126,0.1);
+}
+.chem-canvas-wrap canvas {
+    display: block; width: 100%;
+}
+
+@media (max-width: 768px) {
+    .cheq-controls { flex-direction: column; align-items: flex-start; }
+    .cheq-perturb { width: 100%; }
+}
+
+/* ── Electrochemistry ── */
+.echem-controls { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-bottom: 1rem; }
+.echem-modes { display: flex; gap: .5rem; }
+.echem-mode-btn {
+    padding: .35rem .9rem; border-radius: 6px; border: 1px solid rgba(255,255,255,.12);
+    background: transparent; color: rgba(255,255,255,.6); font-size: .85rem; cursor: pointer; transition: .2s;
+}
+.echem-mode-btn:hover { border-color: var(--accent-green); color: #fff; }
+.echem-mode-btn.active { background: var(--accent-green, #4d9e7e); color: #fff; border-color: var(--accent-green); }
+.echem-info {
+    margin-top: .75rem; font-size: .82rem; color: rgba(255,255,255,.55); line-height: 1.7;
+    font-family: var(--font-mono, monospace);
+}
+
+@media (max-width: 768px) {
+    .echem-controls { flex-direction: column; }
+}
+
+/* ── Chemical Bond ── */
+.chembond-controls {
+    display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .75rem;
+}
+.chembond-mode-btn {
+    padding: .4rem 1rem; border-radius: 6px; border: 1.5px solid rgba(77,158,126,.35);
+    background: transparent; color: rgba(255,255,255,.7); cursor: pointer; font-size: .82rem;
+    transition: all .2s;
+}
+.chembond-mode-btn.active, .chembond-mode-btn:hover {
+    background: rgba(77,158,126,.25); border-color: var(--chemistry);
+    color: #fff;
+}
+.chembond-info {
+    margin-top: .75rem; font-size: .82rem; color: rgba(255,255,255,.55); line-height: 1.7;
+    font-family: var(--font-mono, monospace);
+}
+@media (max-width: 768px) {
+    .chembond-controls { flex-direction: column; }
+}
+
+/* ── Organic Chemistry v2 ── */
+.organic-controls {
+    display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .75rem;
+    align-items: center; justify-content: space-between;
+}
+.organic-mol-btns {
+    display: flex; gap: .4rem; flex-wrap: wrap;
+}
+.organic-mol-btn {
+    padding: .4rem 1rem; border-radius: 6px; border: 1.5px solid rgba(77,158,126,.35);
+    background: transparent; color: rgba(255,255,255,.7); cursor: pointer; font-size: .82rem;
+    transition: all .2s;
+}
+.organic-mol-btn.active, .organic-mol-btn:hover {
+    background: rgba(77,158,126,.25); border-color: var(--chemistry);
+    color: #fff;
+}
+
+/* ── Atomic Structure 原子结构与电子排布 ── */
+.as-controls { margin-bottom: .75rem; }
+.as-mode-btns { display: flex; gap: .5rem; flex-wrap: wrap; border: none; padding: 0; margin: 0 0 .75rem; }
+.as-mode-btn {
+    padding: .4rem 1rem; border-radius: 6px; border: 1.5px solid rgba(77,158,126,.35);
+    background: transparent; color: rgba(255,255,255,.7); cursor: pointer; font-size: .82rem;
+    transition: all .2s;
+}
+.as-mode-btn.active, .as-mode-btn:hover {
+    background: rgba(77,158,126,.25); border-color: var(--chemistry, #4d9e7e); color: #fff;
+}
+.as-params { margin-bottom: .75rem; }
+.as-orbital-btns { display: flex; gap: .4rem; flex-wrap: wrap; }
+.as-orb-btn {
+    padding: .3rem .8rem; border-radius: 5px; border: 1px solid rgba(77,158,126,.3);
+    background: transparent; color: rgba(255,255,255,.6); cursor: pointer; font-size: .8rem;
+    font-family: var(--font-mono, monospace); transition: all .2s;
+}
+.as-orb-btn.active, .as-orb-btn:hover {
+    background: rgba(77,158,126,.2); border-color: var(--chemistry, #4d9e7e); color: #fff;
+}
+.as-slider-row { margin-bottom: .5rem; }
+.as-label { font-size: .85rem; color: rgba(255,255,255,.7); margin-bottom: .25rem; }
+.as-label strong { color: #4d9e7e; }
+.as-slider { width: 100%; max-width: 280px; accent-color: #4d9e7e; }
+.as-info {
+    margin-top: .5rem; font-size: .82rem; color: rgba(255,255,255,.55); line-height: 1.7;
+    font-family: var(--font-mono, monospace);
+}
+.as-mode-tag {
+    display: inline-block; padding: .15rem .6rem; border-radius: 4px; font-size: .75rem;
+    background: rgba(77,158,126,.15); color: #4d9e7e; margin-bottom: .3rem;
+}
+.as-data-row { margin: .15rem 0; }
+.as-data-row strong { color: #4d9e7e; }
+.as-tip { color: rgba(255,200,50,.7); font-size: .78rem; margin-top: .25rem; }
+.as-edu { font-size: .88rem; line-height: 1.8; color: rgba(255,255,255,.65); margin-top: 1rem; }
+.as-edu h4 { color: var(--chemistry, #4d9e7e); margin-bottom: .5rem; }
+.as-edu strong { color: #4d9e7e; }
+.as-edu ul { padding-left: 1.2rem; margin: .3rem 0; }
+.as-edu li { margin: .2rem 0; }
+.as-formula { font-family: var(--font-mono, monospace); color: rgba(255,255,255,.5); font-size: .82rem; }
+@media (max-width: 768px) {
+    .as-mode-btns { flex-direction: column; }
+    .as-orbital-btns { gap: .3rem; }
+}
+.organic-info {
+    margin-top: .75rem; font-size: .82rem; color: rgba(255,255,255,.6); line-height: 1.8;
+}
+.oc-hd { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: .5rem; }
+.oc-name { font-weight: 600; font-size: .92rem; color: #fff; }
+.oc-badge { font-size: .72rem; padding: .12rem .5rem; border-radius: 4px; background: rgba(77,158,126,.15); color: rgba(255,255,255,.6); }
+.oc-badge--mw { background: rgba(229,192,123,.12); }
+.oc-row { margin-bottom: .3rem; }
+.oc-tag { display: inline-block; padding: .1rem .45rem; border-radius: 3px; font-size: .72rem; font-weight: 600;
+    background: rgba(77,158,126,.18); color: var(--chemistry); margin-right: .4rem; vertical-align: middle; }
+.oc-tag--blue { background: rgba(91,141,206,.15); color: #7eb8f0; }
+.oc-tag--amber { background: rgba(229,192,123,.12); color: #e5c07b; }
+.oc-tag--red { background: rgba(224,108,117,.12); color: #e06c75; }
+.oc-rxns ul { margin: .3rem 0 0 1.2rem; padding: 0; }
+.oc-rxns li { margin-bottom: .2rem; font-family: var(--font-mono, monospace); font-size: .78rem; }
+@media (max-width: 768px) {
+    .organic-controls { flex-direction: column; align-items: flex-start; }
+    .organic-mol-btns { width: 100%; }
+}
+
+/* ══════ Reaction Rate v2 ══════ */
+.rxr-controls { display:flex; gap:.75rem; flex-wrap:wrap; align-items:center; margin-bottom:.75rem; }
+.rxr-label { font-size:.82rem; color:var(--text-secondary); display:flex; align-items:center; gap:4px; }
+.rxr-label input[type="range"] { width:75px; accent-color:var(--chemistry,#4d9e7e); }
+.rxr-label input[type="checkbox"] { accent-color:var(--chemistry,#4d9e7e); }
+.rxr-reset-btn { padding:4px 12px; border-radius:var(--radius-sm); border:1px solid rgba(77,158,126,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.rxr-reset-btn:hover { background:rgba(77,158,126,.12); }
+.rxr-ctrl-right { display:flex; align-items:center; gap:8px; margin-left:auto; }
+.rxr-pause-btn { width:30px; height:30px; border-radius:var(--radius-sm); border:1px solid rgba(77,158,126,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.9rem; display:flex; align-items:center; justify-content:center; transition:all .2s; }
+.rxr-pause-btn:hover { background:rgba(77,158,126,.12); }
+.rxr-info { background:rgba(77,158,126,.04); border:1px solid rgba(77,158,126,.12); border-radius:var(--radius-md); padding:14px 18px; margin-top:14px; font-size:.85rem; line-height:1.75; }
+.rxr-hd { font-weight:600; margin-bottom:6px; font-size:.92rem; }
+.rxr-tag { display:inline-block; background:rgba(77,158,126,.15); color:var(--chemistry,#4d9e7e); padding:1px 8px; border-radius:var(--radius-xs); font-size:.78rem; margin-right:6px; }
+.rxr-row { display:flex; gap:8px; align-items:baseline; }
+.rxr-key { display:inline-block; min-width:64px; color:var(--chemistry,#4d9e7e); font-weight:500; font-size:.8rem; }
+.rxr-key--purple { color:var(--accent-purple,#c678dd); }
+.rxr-key--amber { color:var(--accent-amber,#e5c07b); }
+.rxr-note { margin-top:8px; color:var(--text-tertiary); font-size:.8rem; }
+@media (max-width: 768px) { .rxr-controls { flex-direction:column; align-items:flex-start; } .rxr-ctrl-right { margin-left:0; } }
+
+/* ══════ Solution & Ionization v2 ══════ */
+.sol-controls { display:flex; align-items:flex-start; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.sol-substance-btns { display:flex; gap:5px; flex-wrap:wrap; }
+.sol-substance-btn { padding:4px 10px; border-radius:var(--radius-sm); border:1px solid rgba(77,158,126,.25); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.78rem; transition:all .2s; }
+.sol-substance-btn:hover { background:rgba(77,158,126,.08); }
+.sol-substance-btn.active { background:rgba(77,158,126,.18); color:var(--text-primary); border-color:rgba(77,158,126,.5); }
+.sol-ctrl-right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.sol-ctrl-right label { font-size:.78rem; color:var(--text-secondary); display:flex; align-items:center; gap:4px; }
+.sol-ctrl-right input[type="range"] { width:72px; accent-color:var(--chemistry); }
+.sol-pause-btn { padding:4px 12px; border-radius:var(--radius-sm); border:1px solid rgba(77,158,126,.25); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.78rem; transition:all .2s; }
+.sol-pause-btn:hover { background:rgba(77,158,126,.1); }
+.sol-info { margin-top:10px; padding:12px 14px; border-radius:var(--radius-md); border:1px solid rgba(77,158,126,.12); background:rgba(77,158,126,.04); font-size:.82rem; line-height:1.6; }
+.sol-hd { font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+.sol-tag { display:inline-block; padding:1px 7px; border-radius:var(--radius-sm); background:rgba(77,158,126,.14); color:rgba(77,158,126,.8); font-size:.72rem; }
+.sol-tag--amber { background:rgba(229,192,123,.14); color:rgba(229,192,123,.8); }
+.sol-row { margin:4px 0; color:var(--text-secondary); }
+.sol-key { display:inline-block; min-width:72px; padding:1px 6px; border-radius:2px; margin-right:6px; background:rgba(77,158,126,.1); color:rgba(77,158,126,.7); font-size:.72rem; }
+.sol-key--purple { background:rgba(139,111,192,.1); color:rgba(139,111,192,.7); }
+.sol-key--amber { background:rgba(229,192,123,.1); color:rgba(229,192,123,.7); }
+.sol-key--teal { background:rgba(86,182,194,.1); color:rgba(86,182,194,.7); }
+.sol-note { margin-top:8px; padding:6px 10px; border-radius:var(--radius-sm); background:rgba(77,158,126,.06); color:var(--text-secondary); font-size:.78rem; }
+@media (max-width: 768px) { .sol-controls { flex-direction:column; align-items:flex-start; } .sol-ctrl-right { flex-direction:column; align-items:flex-start; } }
+
+/* ══════ Ionic Reaction ══════ */
+.ionrxn-controls { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.ionrxn-select { padding:5px 10px; border-radius:var(--radius-sm); border:1px solid rgba(77,158,126,.3); background:rgba(77,158,126,.08); color:var(--text-primary); font-size:.82rem; }
+.ionrxn-mode-btns { display:flex; gap:6px; }
+.ionrxn-mode-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(77,158,126,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.ionrxn-mode-btn.active { background:rgba(77,158,126,.18); color:var(--text-primary); border-color:rgba(77,158,126,.5); }
+@media (max-width: 768px) { .ionrxn-controls { flex-direction: column; align-items: flex-start; } }
+
+/* Ionic Reaction education panel */
+.ionic-info { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(77,158,126,.06); border:1px solid rgba(77,158,126,.12); font-size:.85rem; line-height:1.65; }
+.ionic-info .chem-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.ionic-info .chem-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(77,158,126,.18); color:rgba(77,158,126,.9); }
+.ionic-info .chem-tag--amber { background:rgba(229,192,123,.15); color:rgba(229,192,123,.9); }
+.ionic-info .chem-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.ionic-info .chem-key { flex-shrink:0; font-weight:600; color:rgba(77,158,126,.85); }
+.ionic-info .chem-key--purple { color:rgba(139,111,192,.85); }
+.ionic-info .chem-key--amber { color:rgba(229,192,123,.85); }
+.ionic-info .chem-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(77,158,126,.1); color:var(--text-tertiary); font-size:.82rem; }
+
+/* ══════ Redox ══════ */
+.redox-controls { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.redox-select { padding:5px 10px; border-radius:var(--radius-sm); border:1px solid rgba(77,158,126,.3); background:rgba(77,158,126,.08); color:var(--text-primary); font-size:.82rem; }
+.redox-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(77,158,126,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.redox-btn:hover { background:rgba(77,158,126,.12); }
+.redox-slider-wrap { display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--text-secondary); }
+.redox-slider-label { white-space:nowrap; }
+.redox-slider { width:80px; accent-color:rgba(77,158,126,.7); }
+.redox-slider-val { font-variant-numeric:tabular-nums; min-width:2.5em; }
+/* info panel */
+.redox-info { margin-top:14px; padding:14px 18px; border-radius:var(--radius-md,10px); background:rgba(77,158,126,.05); border:1px solid rgba(77,158,126,.12); font-size:.85rem; line-height:1.7; }
+.redox-info__row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.redox-info__tag { padding:2px 8px; border-radius:4px; background:rgba(77,158,126,.15); color:rgba(77,158,126,.9); font-size:.75rem; font-weight:600; white-space:nowrap; }
+.redox-info__equation { font-weight:600; color:var(--text-primary); }
+.redox-info__half { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:8px; }
+.redox-info__half-ox, .redox-info__half-red { display:flex; flex-direction:column; gap:2px; }
+.redox-info__half-ox .redox-info__label { color:rgba(255,120,80,.85); font-weight:600; font-size:.78rem; }
+.redox-info__half-red .redox-info__label { color:rgba(80,140,255,.85); font-weight:600; font-size:.78rem; }
+.redox-info__half code { font-size:.82rem; color:var(--text-primary); background:rgba(255,255,255,.04); padding:2px 6px; border-radius:4px; }
+.redox-info__half small { color:var(--text-secondary); font-size:.76rem; }
+.redox-info__note { margin:0; color:var(--text-secondary); font-size:.8rem; }
+@media (max-width: 768px) {
+    .redox-controls { flex-direction:column; align-items:flex-start; }
+    .redox-info__half { grid-template-columns:1fr; }
 }
