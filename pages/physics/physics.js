@@ -1,4 +1,5 @@
-// ===== 力学模拟引擎 =====
+// ===== 力学模拟引擎 (v2) =====
+// ResizeObserver + DPR + 教育面板 + destroy
 
 const PhysicsSim = {
     canvas: null,
@@ -28,6 +29,8 @@ const PhysicsSim = {
         '#818cf8', '#c084fc', '#e879f9', '#a855f7'
     ],
 
+    _resizeObs: null,
+
     init() {
         this.canvas = document.getElementById('physics-canvas');
         if (!this.canvas) return;
@@ -37,21 +40,35 @@ const PhysicsSim = {
         this.bindControls();
         this.bindCanvas();
 
-        window.addEventListener('resize', () => this.resizeCanvas());
+        // ResizeObserver
+        if (typeof ResizeObserver !== 'undefined') {
+            this._resizeObs = new ResizeObserver(() => this.resizeCanvas());
+            this._resizeObs.observe(this.canvas.parentElement);
+        } else {
+            window.addEventListener('resize', () => this.resizeCanvas());
+        }
+    },
+
+    destroy() {
+        this.running = false;
+        if (this._resizeObs) { this._resizeObs.disconnect(); this._resizeObs = null; }
     },
 
     resizeCanvas() {
         if (!this.canvas) return;
+        if (window.PhysicsZoom && window.PhysicsZoom.movedCanvas === this.canvas) return;
         const container = this.canvas.parentElement;
-        const rect = container.getBoundingClientRect();
+        const w = container.getBoundingClientRect().width;
+        // 用宽度推算高度，防止 ResizeObserver 循环膨胀
+        const h = Math.min(Math.max(w * 0.56, 320), 560);
         const dpr = window.devicePixelRatio || 1;
-        this.canvas.width = rect.width * dpr;
-        this.canvas.height = rect.height * dpr;
-        this.canvas.style.width = rect.width + 'px';
-        this.canvas.style.height = rect.height + 'px';
+        this.canvas.width = w * dpr;
+        this.canvas.height = h * dpr;
+        this.canvas.style.width = w + 'px';
+        this.canvas.style.height = h + 'px';
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        this.W = rect.width;
-        this.H = rect.height;
+        this.W = w;
+        this.H = h;
     },
 
     bindControls() {
@@ -83,14 +100,39 @@ const PhysicsSim = {
         });
 
         if (clearBtn) clearBtn.addEventListener('click', () => {
-            this.balls = [];
-            this.updateStats();
+            this.resetScene();
         });
 
         if (pauseBtn) pauseBtn.addEventListener('click', () => {
             this.paused = !this.paused;
             pauseBtn.textContent = this.paused ? '继续' : '暂停';
         });
+    },
+
+    resetScene() {
+        this.balls = [];
+        this.gravity = 980;
+        this.restitution = 0.75;
+        this.friction = 0.10;
+        this.ballRadius = 16;
+        this.paused = false;
+
+        const set = (id, value, outId, fmt) => {
+            const el = document.getElementById(id);
+            const out = document.getElementById(outId);
+            if (el) el.value = value;
+            if (out) out.textContent = fmt ? fmt(value) : String(value);
+        };
+        set('gravity-slider', 980, 'gravity-value');
+        set('restitution-slider', 75, 'restitution-value', v => (v / 100).toFixed(2));
+        set('friction-slider', 10, 'friction-value', v => (v / 100).toFixed(2));
+        set('radius-slider', 16, 'radius-value');
+
+        const pauseBtn = document.getElementById('physics-pause');
+        if (pauseBtn) pauseBtn.textContent = '暂停';
+
+        this.updateStats();
+        this.draw();
     },
 
     bindCanvas() {
@@ -418,10 +460,10 @@ const PhysicsSim = {
         // Empty state hint
         if (this.balls.length === 0 && !this.isDragging) {
             ctx.fillStyle = 'rgba(255,255,255,0.15)';
-            ctx.font = '16px "Inter", sans-serif';
+            ctx.font = '20px ' + CF.sans;
             ctx.textAlign = 'center';
             ctx.fillText('在画布上拖拽来发射小球', this.W / 2, this.H / 2 - 10);
-            ctx.font = '13px "Inter", sans-serif';
+            ctx.font = '18px ' + CF.sans;
             ctx.fillStyle = 'rgba(255,255,255,0.08)';
             ctx.fillText('拖拽方向和距离决定发射速度', this.W / 2, this.H / 2 + 15);
         }
@@ -430,6 +472,34 @@ const PhysicsSim = {
     updateStats() {
         const el = document.getElementById('ball-count');
         if (el) el.textContent = this.balls.length;
+        this.updateEdu();
+    },
+
+    updateEdu() {
+        let eduEl = document.getElementById('physics-edu');
+        if (!eduEl) {
+            const parent = document.getElementById('physics-info') || document.getElementById('ball-count')?.closest('.physics-info');
+            if (!parent) return;
+            const container = parent.parentElement || parent;
+            eduEl = document.createElement('div');
+            eduEl.id = 'physics-edu';
+            eduEl.style.cssText = 'font-size:12px;color:#a78bfa;margin-top:8px;line-height:1.5;opacity:0.8;';
+            container.appendChild(eduEl);
+        }
+        if (this.balls.length === 0) {
+            eduEl.innerHTML = `<strong>牵引探索</strong>：在画布上拖拽发射小球，观察牵引力、弹性碰撞与摩擦力的作用。`;
+        } else {
+            const totalKE = this.balls.reduce((s, b) => s + 0.5 * (b.vx * b.vx + b.vy * b.vy), 0);
+            const totalPE = this.balls.reduce((s, b) => s + this.gravity * (this.H - b.y), 0);
+            eduEl.innerHTML =
+                `<strong>牛顿力学</strong>：` +
+                `F=ma，重力 g=${this.gravity} px/s²，恢复系数 e=${this.restitution.toFixed(2)}，摩擦 μ=${this.friction.toFixed(2)}` +
+                `<br>球数: ${this.balls.length}，` +
+                `总动能 ∝ ${totalKE.toFixed(0)}，` +
+                `总势能 ∝ ${totalPE.toFixed(0)}，` +
+                `E<sub>total</sub> ∝ ${(totalKE + totalPE).toFixed(0)}` +
+                `<br>ℹ️ 弹性碰撞守恒动量·非完全弹性碰撞损失动能`;
+        }
     }
 };
 

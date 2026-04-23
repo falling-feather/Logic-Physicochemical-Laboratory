@@ -227,7 +227,7 @@
     50% { transform: scale(1.1); opacity: 1; }
 }
 
-/* Star body */
+/* Star body — steady soft glow (开灯呼吸效果已移除 v4.0.3) */
 .star-body {
     background: radial-gradient(circle at 35% 30%, #6da3d8 0%, #5b8dce 15%, #3a6da8 35%, #2a5590 55%, #1e3d6e 80%, #15254a 100%);
     border-radius: 50%;
@@ -235,22 +235,12 @@
     display: flex; align-items: center; justify-content: center;
     position: relative;
     overflow: hidden;
-    animation: starPulse 4s ease-in-out infinite;
     box-shadow:
-        0 0 30px rgba(91,141,206,0.5),
-        0 0 60px rgba(91,141,206,0.2),
-        0 0 100px rgba(91,141,206,0.06),
-        inset -20px -20px 45px rgba(0,0,0,0.5),
-        inset 8px 8px 22px rgba(255,255,255,0.03);
-}
-
-@keyframes starPulse {
-    0%, 100% {
-        box-shadow: 0 0 30px rgba(91,141,206,0.5), 0 0 60px rgba(91,141,206,0.2), 0 0 100px rgba(91,141,206,0.06), inset -20px -20px 45px rgba(0,0,0,0.5), inset 8px 8px 22px rgba(255,255,255,0.03);
-    }
-    50% {
-        box-shadow: 0 0 40px rgba(91,141,206,0.7), 0 0 80px rgba(91,141,206,0.3), 0 0 130px rgba(91,141,206,0.1), inset -28px -28px 60px rgba(0,0,0,0.5), inset 8px 8px 30px rgba(255,255,255,0.04);
-    }
+        0 0 34px rgba(91,141,206,0.55),
+        0 0 70px rgba(91,141,206,0.22),
+        0 0 110px rgba(91,141,206,0.07),
+        inset -22px -22px 50px rgba(0,0,0,0.5),
+        inset 8px 8px 24px rgba(255,255,255,0.035);
 }
 
 /* Planet surface texture */
@@ -444,10 +434,18 @@
     animation: orbitGlow4 7s ease-in-out infinite;
 }
 
+.orbit-path-5 {
+    width: 760px; height: 480px;
+    border-color: rgba(58,158,143,0.07);
+    transform: translate(-50%, -50%) perspective(1200px) rotateX(62deg) rotateZ(18deg);
+    animation: orbitGlow5 9s ease-in-out infinite;
+}
+
 @keyframes orbitGlow1 { 0%,100%{border-color:rgba(91,141,206,0.08)} 50%{border-color:rgba(91,141,206,0.2)} }
 @keyframes orbitGlow2 { 0%,100%{border-color:rgba(139,111,192,0.07)} 50%{border-color:rgba(139,111,192,0.18)} }
 @keyframes orbitGlow3 { 0%,100%{border-color:rgba(77,158,126,0.06)} 50%{border-color:rgba(77,158,126,0.16)} }
 @keyframes orbitGlow4 { 0%,100%{border-color:rgba(196,121,58,0.07)} 50%{border-color:rgba(196,121,58,0.18)} }
+@keyframes orbitGlow5 { 0%,100%{border-color:rgba(58,158,143,0.07)} 50%{border-color:rgba(58,158,143,0.18)} }
 
 /* ── Satellite container ── */
 .satellites-orbit {
@@ -484,6 +482,7 @@
 .satellite-2 .satellite-glow { background: radial-gradient(circle, rgba(139,111,192,0.3), transparent 70%); }
 .satellite-3 .satellite-glow { background: radial-gradient(circle, rgba(77,158,126,0.3), transparent 70%); }
 .satellite-4 .satellite-glow { background: radial-gradient(circle, rgba(196,121,58,0.3), transparent 70%); }
+.satellite-5 .satellite-glow { background: radial-gradient(circle, rgba(58,158,143,0.3), transparent 70%); }
 
 /* Satellite sphere */
 .satellite-icon {
@@ -524,11 +523,17 @@
     box-shadow: 0 0 18px rgba(196,121,58,0.35), inset -15px -15px 30px rgba(0,0,0,0.45);
 }
 
+.satellite-5 .satellite-icon {
+    background: radial-gradient(circle at 35% 30%, #5cc0b0 0%, #3a9e8f 25%, #2a7d70 50%, #1a5048 100%);
+    box-shadow: 0 0 18px rgba(58,158,143,0.35), inset -15px -15px 30px rgba(0,0,0,0.45);
+}
+
 /* Hover glow enhancement */
 .satellite-1:hover .satellite-icon { box-shadow: 0 0 40px rgba(91,141,206,0.6), inset -15px -15px 30px rgba(0,0,0,0.45); }
 .satellite-2:hover .satellite-icon { box-shadow: 0 0 40px rgba(139,111,192,0.6), inset -15px -15px 30px rgba(0,0,0,0.45); }
 .satellite-3:hover .satellite-icon { box-shadow: 0 0 40px rgba(77,158,126,0.6), inset -15px -15px 30px rgba(0,0,0,0.45); }
 .satellite-4:hover .satellite-icon { box-shadow: 0 0 40px rgba(196,121,58,0.6), inset -15px -15px 30px rgba(0,0,0,0.45); }
+.satellite-5:hover .satellite-icon { box-shadow: 0 0 40px rgba(58,158,143,0.6), inset -15px -15px 30px rgba(0,0,0,0.45); }
 
 /* Saturn-style ring */
 .satellite-ring {
@@ -595,11 +600,13 @@
 .satellite-2 .satellite-label { border-color: rgba(139,111,192,0.25); border-bottom-color: rgba(139,111,192,0.5); }
 .satellite-3 .satellite-label { border-color: rgba(77,158,126,0.25); border-bottom-color: rgba(77,158,126,0.5); }
 .satellite-4 .satellite-label { border-color: rgba(196,121,58,0.25); border-bottom-color: rgba(196,121,58,0.5); }
+.satellite-5 .satellite-label { border-color: rgba(58,158,143,0.25); border-bottom-color: rgba(58,158,143,0.5); }
 
 .satellite-1:hover .satellite-label { border-bottom-color: rgba(91,141,206,0.8); box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 30px rgba(91,141,206,0.2); }
 .satellite-2:hover .satellite-label { border-bottom-color: rgba(139,111,192,0.8); box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 30px rgba(139,111,192,0.2); }
 .satellite-3:hover .satellite-label { border-bottom-color: rgba(77,158,126,0.8); box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 30px rgba(77,158,126,0.2); }
 .satellite-4:hover .satellite-label { border-bottom-color: rgba(196,121,58,0.8); box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 30px rgba(196,121,58,0.2); }
+.satellite-5:hover .satellite-label { border-bottom-color: rgba(58,158,143,0.8); box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 30px rgba(58,158,143,0.2); }
 
 .satellite-desc {
     display: block; color: var(--text-tertiary);
@@ -627,4 +634,25 @@
 @keyframes particleFade {
     from { opacity: 1; transform: scale(1); }
     to   { opacity: 0; transform: scale(0); }
+}
+
+/* ── Home Progress Widget removed in v4.0.5 (UI 冗余) ── */
+
+/* ── Satellite Progress Chips ── */
+.satellite-progress {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.35);
+    font-family: var(--font-mono);
+    letter-spacing: 0.1em;
+    transition: color 0.3s;
+}
+
+.satellite-progress--active {
+    color: rgba(91,141,206,0.7);
+}
+
+.satellite:hover .satellite-progress {
+    color: rgba(91,141,206,0.9);
 }

@@ -11,3 +11,5 @@ Thumbs.db
 # Temp files
 *.tmp
 *~
+# Test screenshots
+test-screenshots/

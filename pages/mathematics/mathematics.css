@@ -1,104 +1,126 @@
 /* ===== Mathematics Page ===== */
 
-/* ── Abacus Controls ── */
-.abacus-controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-4);
-    align-items: center;
-    margin-bottom: var(--space-6);
-}
-
-.control-group {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-}
-
-.control-group label {
-    font-weight: 500;
-    color: var(--text-secondary);
-    white-space: nowrap;
-}
-
-.control-group input,
-.control-group select {
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--border-default);
-    background: var(--surface-2);
-    color: var(--text-primary);
-    border-radius: var(--radius-default);
-    font-size: var(--text-sm);
-    transition: border-color var(--duration-fast) ease;
-}
-
-.control-group input:focus,
-.control-group select:focus {
-    outline: none;
-    border-color: var(--accent-blue);
-    box-shadow: 0 0 0 3px var(--accent-blue-wash);
-}
-
-/* ── Abacus Display ── */
-.abacus-display {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-6);
-}
-
-.abacus-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-    padding: var(--space-5);
-    background: var(--surface-2);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-default);
-}
-
-.abacus-row.result-row {
-    border-color: rgba(91,141,206,0.15);
-}
-
-.abacus-label {
-    min-width: 90px;
-    font-weight: 500;
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-}
-
-.abacus-sticks {
-    display: flex;
-    gap: var(--space-2);
-    flex-wrap: wrap;
-}
-
-.stick {
-    width: 8px;
-    height: 56px;
-    background: linear-gradient(180deg, #b8873a, #c4973f);
-    border-radius: var(--radius-sm);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    animation: stickAppear 0.3s ease-out;
-}
-
-.stick.horizontal {
-    width: 56px;
-    height: 8px;
-}
-
-@keyframes stickAppear {
-    from { opacity: 0; transform: scale(0) rotate(-3deg); }
-    to { opacity: 1; transform: scale(1) rotate(0); }
-}
-
 /* ── Function Graph ── */
 .graph-controls {
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
+}
+
+/* ── Multi-curve controls ── */
+.fg-multi-curves {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+/* ── Calculus dynamic panels ── */
+.calc-dyn-panel {
+    display: none;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    align-items: center;
+    margin-bottom: var(--space-3);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+}
+
+.calc-dyn-panel select,
+.calc-dyn-panel input[type="number"] {
+    padding: 2px 6px;
+    background: var(--surface-1);
+    color: var(--text-primary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-xs);
+}
+
+.calc-dyn-panel input[type="range"] {
+    width: 100px;
+}
+
+.calc-dyn-panel .mono-val {
+    font-family: var(--font-mono);
+    min-width: 24px;
+}
+
+/* ── Geometry dynamic panels ── */
+.geo-mode-btns {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.geo-tri-panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin-bottom: 12px;
+    padding: 12px 16px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-default);
+}
+
+.geo-tri-panel label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.geo-tri-panel input[type="checkbox"] {
+    accent-color: var(--accent-blue);
+}
+
+.geo-tri-hint {
+    width: 100%;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-top: 4px;
+}
+
+.fg-curve-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    animation: stickAppear 0.2s ease-out;
+}
+
+.fg-curve-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.fg-curve-input {
+    flex: 1;
+    min-width: 120px;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+}
+
+.fg-curve-remove {
+    padding: 2px 6px !important;
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+}
+
+.fg-hint {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    margin-top: var(--space-1);
+}
+
+.graph-canvas {
+    cursor: grab;
+}
+
+.graph-canvas:active {
+    cursor: grabbing;
 }
 
 .control-group--col {
@@ -311,14 +333,17 @@
 
 .calc-info {
     margin-top: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    background: var(--surface-2);
     border-radius: var(--radius-sm);
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
     min-height: 24px;
 }
+.calc-edu { padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(139,111,192,.06); border:1px solid rgba(139,111,192,.12); font-size:.85rem; line-height:1.65; }
+.calc-edu .math-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.calc-edu .math-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(139,111,192,.18); color:rgba(139,111,192,.9); }
+.calc-edu .math-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.calc-edu .math-key { flex-shrink:0; font-weight:600; color:rgba(91,141,206,.85); min-width:90px; }
+.calc-edu .math-key--amber { color:rgba(229,192,123,.85); }
+.calc-edu .math-key--red { color:rgba(224,108,117,.85); }
+.calc-edu .math-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(139,111,192,.1); color:var(--text-tertiary); font-size:.82rem; }
 
 .calc-legend {
     display: flex;
@@ -347,6 +372,8 @@
 .cl-tangent::before { background: #c4793a !important; border-style: dashed; }
 .cl-deriv::before { background: rgba(196,121,58,0.5) !important; }
 .cl-area::before { background: rgba(77,158,126,0.3) !important; width: 16px; height: 12px; border-radius: 2px; }
+.cl-riemann::before { background: rgba(91,141,206,0.3) !important; width: 16px; height: 12px; border-radius: 2px; border: 1px solid rgba(91,141,206,0.5); }
+.cl-taylor::before { background: #e06c75 !important; }
 
 @media (max-width: 768px) {
     #calc-controls {
@@ -371,6 +398,11 @@
 .geo-canvas {
     width: 100%;
     display: block;
+    cursor: grab;
+}
+
+.geo-canvas:active {
+    cursor: grabbing;
 }
 
 #geo-controls {
@@ -454,6 +486,15 @@
     color: var(--text-secondary);
 }
 
+.geo-edu {
+    padding: 6px 14px;
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.45);
+    line-height: 1.6;
+}
+.geo-edu b { color: var(--accent-orange, #c4793a); font-weight: 600; }
+.geo-edu code { color: var(--accent-blue, #5b8dce); font-family: var(--font-mono, monospace); font-size: 0.72rem; }
+
 .geo-legend span {
     display: flex;
     align-items: center;
@@ -470,6 +511,19 @@
 
 .gl-orig::before { background: rgba(91,141,206,0.15) !important; border: 1.5px dashed rgba(91,141,206,0.3); }
 .gl-trans::before { background: rgba(196,121,58,0.15) !important; border: 2px solid #c4793a; }
+
+.geo-mode-btn {
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--border-default);
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: var(--radius-default);
+    font-size: var(--text-xs);
+    cursor: pointer;
+    transition: all var(--duration-fast) ease;
+}
+.geo-mode-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+.geo-mode-btn.active { background: var(--accent-blue-wash); color: var(--accent-blue); border-color: rgba(91,141,206,0.3); }
 
 @media (max-width: 768px) {
     #geo-controls { flex-direction: column; }
@@ -658,9 +712,464 @@
 .cxl-z2::before { background: #8b6fc0; }
 .cxl-result::before { background: #4d9e7e; }
 
+/* Complex mode / panel buttons */
+.cx-mode-btn {
+    padding: 5px 12px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.7);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.cx-mode-btn:hover { border-color: var(--accent-blue); color: #fff; }
+.cx-mode-btn.active {
+    background: rgba(91,141,206,0.15);
+    border-color: var(--accent-blue);
+    color: #fff;
+}
+
+.cx-roots-panel, .cx-domain-panel {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+.cx-roots-panel label {
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.6);
+}
+.cx-roots-panel input[type="range"] { width: 160px; }
+
+.cx-domain-funcs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.cx-domain-btn {
+    padding: 6px 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.7);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.cx-domain-btn:hover { border-color: var(--accent-green); color: #fff; }
+.cx-domain-btn.active {
+    background: rgba(77,158,126,0.15);
+    border-color: var(--accent-green);
+    color: #fff;
+}
+
 @media (max-width: 768px) {
     .cx-controls { flex-direction: column; align-items: flex-start; }
     .cx-inputs { flex-direction: column; align-items: flex-start; }
     .cx-euler-controls { flex-direction: column; align-items: flex-start; }
     .cx-euler-controls input[type="range"] { width: 100%; }
+    .cx-roots-panel input[type="range"] { width: 100%; }
+}
+
+/* ═══ Trigonometry Visualization ═══ */
+.trig-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+    margin-bottom: var(--space-4);
+}
+
+.trig-mode-group {
+    display: flex;
+    gap: var(--space-1);
+}
+
+.trig-mode-btn {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.trig-mode-btn:hover { border-color: var(--accent-blue); color: #fff; }
+.trig-mode-btn.active {
+    background: rgba(91,141,206,0.15);
+    border-color: var(--accent-blue);
+    color: #fff;
+}
+
+.trig-param {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    flex: 1;
+    min-width: 200px;
+}
+.trig-param label {
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    color: var(--accent-blue);
+}
+.trig-param input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent-blue);
+}
+
+.trig-preset-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+}
+
+.trig-action-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+}
+
+.trig-speed-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+}
+.trig-speed-group input[type="range"] {
+    width: 80px;
+    accent-color: var(--accent-blue);
+}
+
+.trig-canvas-wrap {
+    position: relative;
+    width: 100%;
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    overflow: hidden;
+}
+
+.trig-canvas {
+    display: block;
+    width: 100%;
+    cursor: crosshair;
+}
+
+.trig-info {
+    display: flex;
+    gap: var(--space-6);
+    padding: var(--space-3) 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+}
+.ti-sin { color: #e06c75; }
+.ti-cos { color: #61afef; }
+.ti-tan { color: #e5c07b; }
+
+@media (max-width: 768px) {
+    .trig-controls { flex-direction: column; align-items: flex-start; }
+    .trig-param { min-width: 100%; }
+    .trig-info { flex-direction: column; gap: var(--space-2); }
+}
+@media (max-width: 480px) {
+    .trig-preset-group { gap: 4px; }
+    .trig-preset-group .btn { padding: 4px 8px; font-size: 11px; }
+}
+
+/* Trigonometry education panel */
+.trig-edu-info { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(139,111,192,.06); border:1px solid rgba(139,111,192,.12); font-size:.85rem; line-height:1.65; }
+.trig-edu-info .math-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.trig-edu-info .math-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(139,111,192,.18); color:rgba(139,111,192,.9); }
+.trig-edu-info .math-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.trig-edu-info .math-key { flex-shrink:0; font-weight:600; color:rgba(91,141,206,.85); }
+.trig-edu-info .math-key--red { color:rgba(224,108,117,.85); }
+.trig-edu-info .math-key--amber { color:rgba(229,192,123,.85); }
+.trig-edu-info .math-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(139,111,192,.1); color:var(--text-tertiary); font-size:.82rem; }
+
+/* Probability education panel */
+.prob-edu-info { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(139,111,192,.06); border:1px solid rgba(139,111,192,.12); font-size:.85rem; line-height:1.65; }
+.prob-edu-info .math-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.prob-edu-info .math-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(139,111,192,.18); color:rgba(139,111,192,.9); }
+.prob-edu-info .math-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.prob-edu-info .math-key { flex-shrink:0; font-weight:600; color:rgba(91,141,206,.85); }
+.prob-edu-info .math-key--red { color:rgba(224,108,117,.85); }
+.prob-edu-info .math-key--amber { color:rgba(229,192,123,.85); }
+.prob-edu-info .math-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(139,111,192,.1); color:var(--text-tertiary); font-size:.82rem; }
+
+/* ══════ Set Operations ══════ */
+.setops-controls {
+    display: flex; flex-direction: column; gap: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+.setops-ops-row {
+    display: flex; flex-wrap: wrap; gap: var(--space-2);
+}
+.setops-op-btn {
+    padding: 6px 14px; border-radius: var(--radius-sm);
+    background: rgba(91,141,206,0.08); border: 1px solid rgba(91,141,206,0.2);
+    color: var(--text-muted); font-size: var(--text-sm); cursor: pointer;
+    transition: all 0.2s;
+}
+.setops-op-btn:hover { border-color: var(--accent-blue); color: #fff; }
+.setops-op-btn.active {
+    background: rgba(91,141,206,0.2); border-color: var(--accent-blue);
+    color: #fff; box-shadow: 0 0 8px rgba(91,141,206,0.15);
+}
+.setops-inputs {
+    display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center;
+}
+.setops-inputs label {
+    font-size: var(--text-sm); color: var(--text-muted);
+    display: flex; align-items: center; gap: 4px;
+}
+.setops-inputs input[type="text"] {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: var(--radius-sm); color: var(--text-primary);
+    padding: 4px 8px; font-size: var(--text-sm); font-family: var(--font-mono, monospace);
+}
+.setops-info {
+    text-align: center; margin-top: var(--space-3); padding: var(--space-3);
+    background: rgba(91,141,206,0.06); border-radius: var(--radius-md);
+}
+.setops-info h3 {
+    font-size: var(--text-base); color: var(--accent-blue); margin-bottom: var(--space-1);
+}
+.setops-info p {
+    font-size: var(--text-sm); color: var(--text-muted);
+}
+.setops-result {
+    font-family: var(--font-mono, monospace); color: #56b6c2 !important;
+    margin-top: var(--space-2) !important;
+}
+
+@media (max-width: 768px) {
+    .setops-ops-row { gap: var(--space-1); }
+    .setops-op-btn { padding: 4px 10px; font-size: 12px; }
+    .setops-inputs { flex-direction: column; align-items: flex-start; }
+}
+
+/* ══════ Probability ══════ */
+.prob-controls {
+    display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center;
+    margin-bottom: var(--space-3);
+}
+.prob-modes {
+    display: flex; gap: var(--space-2);
+}
+.prob-mode-btn {
+    padding: 6px 14px; border-radius: var(--radius-sm);
+    background: rgba(91,141,206,0.08); border: 1px solid rgba(91,141,206,0.2);
+    color: var(--text-muted); font-size: var(--text-sm); cursor: pointer;
+    transition: all 0.2s;
+}
+.prob-mode-btn:hover { border-color: var(--accent-blue); color: #fff; }
+.prob-mode-btn.active {
+    background: rgba(91,141,206,0.2); border-color: var(--accent-blue);
+    color: #fff;
+}
+.prob-actions {
+    display: flex; gap: var(--space-2); flex-wrap: wrap;
+}
+.prob-speed-row {
+    display: flex; align-items: center; gap: var(--space-2);
+}
+.prob-speed-row label {
+    font-size: var(--text-xs); color: var(--text-muted);
+}
+.prob-speed-row input[type="range"] { width: 80px; }
+.prob-info {
+    text-align: center; margin-top: var(--space-2); padding: var(--space-2);
+    background: rgba(91,141,206,0.06); border-radius: var(--radius-md);
+    font-size: var(--text-sm); color: var(--text-muted);
+    font-family: var(--font-mono, monospace);
+}
+
+@media (max-width: 768px) {
+    .prob-controls { flex-direction: column; align-items: flex-start; }
+    .prob-actions { width: 100%; }
+}
+
+/* ── Vector Ops ── */
+.vecops-controls { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-bottom: 1rem; }
+.vecops-ops-row { display: flex; gap: .5rem; flex-wrap: wrap; }
+.vecops-op-btn {
+    padding: .35rem .9rem; border-radius: 6px; border: 1px solid rgba(255,255,255,.12);
+    background: transparent; color: rgba(255,255,255,.6); font-size: .85rem; cursor: pointer; transition: .2s;
+}
+.vecops-op-btn:hover { border-color: var(--accent-blue); color: #fff; }
+.vecops-op-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+.vecops-info { margin-top: .75rem; }
+.vecops-info h3 { font-size: 1rem; color: #ddd; margin-bottom: .25rem; }
+.vecops-info p { font-size: .82rem; color: rgba(255,255,255,.55); line-height: 1.5; }
+.vecops-result { font-family: var(--font-mono, monospace); font-size: .78rem; color: rgba(255,255,255,.6); margin-top: .4rem; word-break: break-all; }
+
+@media (max-width: 768px) {
+    .vecops-ops-row { width: 100%; }
+}
+
+/* ── Inequality / LP ── */
+.ineq-controls { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; margin-bottom: 1rem; }
+.ineq-sliders { display: flex; flex-direction: column; gap: .4rem; }
+.ineq-sliders label { font-size: .82rem; color: rgba(255,255,255,.6); display: flex; align-items: center; gap: .5rem; }
+.ineq-sliders input[type="range"] { width: 100px; accent-color: var(--accent-blue, #5b8dce); }
+.ineq-obj-row { display: flex; flex-direction: column; gap: .4rem; }
+.ineq-obj-row label { font-size: .82rem; color: rgba(255,255,255,.6); display: flex; align-items: center; gap: .5rem; }
+.ineq-obj-row input[type="range"] { width: 100px; accent-color: #98c379; }
+.ineq-info {
+    margin-top: .6rem; font-family: var(--font-mono, monospace); font-size: .78rem;
+    color: rgba(255,255,255,.55); word-break: break-all;
+}
+
+@media (max-width: 768px) {
+    .ineq-controls { flex-direction: column; }
+}
+
+/* ── Conic Sections ── */
+.conic-controls {
+    display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: .75rem;
+}
+.conic-controls label {
+    font-size: .82rem; color: rgba(255,255,255,.6); display: flex; align-items: center; gap: .35rem;
+}
+.conic-controls input[type="range"] { width: 70px; accent-color: var(--accent-blue, #5b8dce); }
+.conic-type-btn {
+    padding: .35rem .9rem; border-radius: 6px; border: 1.5px solid rgba(91,141,206,.35);
+    background: transparent; color: rgba(255,255,255,.7); cursor: pointer; font-size: .82rem;
+    transition: all .2s;
+}
+.conic-type-btn.active, .conic-type-btn:hover {
+    background: rgba(91,141,206,.25); border-color: var(--accent-blue, #5b8dce); color: #fff;
+}
+.conic-info {
+    margin-top: .75rem; font-size: .82rem; color: rgba(255,255,255,.55); line-height: 1.7;
+    font-family: var(--font-mono, monospace);
+}
+@media (max-width: 768px) { .conic-controls { flex-direction: column; } }
+
+/* ══════ Solid Geometry v2 ══════ */
+.sg-controls { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.sg-shape-btns { display:flex; gap:6px; flex-wrap:wrap; }
+.sg-shape-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(91,141,206,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.sg-shape-btn.active { background:rgba(91,141,206,.18); color:var(--text-primary); border-color:rgba(91,141,206,.5); }
+.sg-ctrl-right { display:flex; align-items:center; gap:10px; margin-left:auto; flex-wrap:wrap; }
+.sg-label { font-size:.82rem; color:var(--text-secondary); display:flex; align-items:center; gap:4px; }
+.sg-label input[type="range"] { width:70px; accent-color:var(--accent-blue,#5b8dce); }
+.sg-pause-btn { width:30px; height:30px; border-radius:var(--radius-sm); border:1px solid rgba(91,141,206,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.9rem; display:flex; align-items:center; justify-content:center; transition:all .2s; }
+.sg-pause-btn:hover { background:rgba(91,141,206,.12); }
+.sg-info { background:rgba(91,141,206,.04); border:1px solid rgba(91,141,206,.12); border-radius:var(--radius-md); padding:14px 18px; margin-top:14px; font-size:.85rem; line-height:1.75; }
+.sg-hd { font-weight:600; margin-bottom:6px; font-size:.92rem; }
+.sg-tag { display:inline-block; background:rgba(91,141,206,.15); color:var(--accent-blue,#5b8dce); padding:1px 8px; border-radius:var(--radius-xs); font-size:.78rem; margin-right:6px; }
+.sg-row { display:flex; gap:8px; align-items:baseline; }
+.sg-key { display:inline-block; min-width:54px; color:var(--accent-blue,#5b8dce); font-weight:500; font-size:.8rem; }
+.sg-key--purple { color:var(--accent-purple,#c678dd); }
+.sg-key--amber { color:var(--accent-amber,#e5c07b); }
+.sg-note { margin-top:8px; color:var(--text-tertiary); font-size:.8rem; }
+@media (max-width: 768px) { .sg-controls { flex-direction:column; align-items:flex-start; } .sg-ctrl-right { margin-left:0; } }
+
+/* ══════ Permutation & Combination v2 ══════ */
+.permcomb-controls { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.permcomb-mode-btns { display:flex; gap:6px; }
+.permcomb-mode-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(91,141,206,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.permcomb-mode-btn:hover { background:rgba(91,141,206,.08); }
+.permcomb-mode-btn.active { background:rgba(91,141,206,.18); color:var(--text-primary); border-color:rgba(91,141,206,.5); }
+.permcomb-controls label { font-size:.82rem; color:var(--text-secondary); display:flex; align-items:center; gap:4px; }
+.permcomb-controls input[type="range"] { width:60px; accent-color:var(--accent-blue,#5b8dce); }
+.pc-info { margin-top:10px; padding:12px 14px; border-radius:var(--radius-md); border:1px solid rgba(91,141,206,.12); background:rgba(91,141,206,.04); font-size:.82rem; line-height:1.6; }
+.pc-hd { font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+.pc-tag { display:inline-block; padding:1px 7px; border-radius:var(--radius-sm); background:rgba(91,141,206,.14); color:rgba(91,141,206,.8); font-size:.72rem; }
+.pc-tag--amber { background:rgba(229,192,123,.14); color:rgba(229,192,123,.8); }
+.pc-row { margin:4px 0; color:var(--text-secondary); }
+.pc-key { display:inline-block; min-width:68px; padding:1px 6px; border-radius:2px; margin-right:6px; background:rgba(91,141,206,.1); color:rgba(91,141,206,.7); font-size:.72rem; }
+.pc-key--purple { background:rgba(139,111,192,.1); color:rgba(139,111,192,.7); }
+.pc-key--amber { background:rgba(229,192,123,.1); color:rgba(229,192,123,.7); }
+.pc-note { margin-top:8px; padding:6px 10px; border-radius:var(--radius-sm); background:rgba(91,141,206,.06); color:var(--text-secondary); font-size:.78rem; }
+@media (max-width: 768px) { .permcomb-controls { flex-direction: column; align-items: flex-start; } }
+
+/* ══════ Sequences ══════ */
+.seq-controls { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.seq-mode-btns { display:flex; gap:6px; }
+.seq-mode-btn { padding:5px 14px; border-radius:var(--radius-sm); border:1px solid rgba(91,141,206,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.seq-mode-btn.active { background:rgba(91,141,206,.18); color:var(--text-primary); border-color:rgba(91,141,206,.5); }
+.seq-param { display:flex; align-items:center; gap:4px; font-size:.82rem; color:var(--text-secondary); }
+.seq-param input[type="range"] { width:60px; accent-color:var(--accent-blue,#5b8dce); }
+.seq-val { min-width:20px; text-align:center; }
+/* info panel */
+.seq-info { margin-top:14px; padding:14px 18px; border-radius:var(--radius-md,10px); background:rgba(91,141,206,.05); border:1px solid rgba(91,141,206,.12); font-size:.85rem; line-height:1.7; }
+.seq-info__row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.seq-info__tag { padding:2px 8px; border-radius:4px; background:rgba(91,141,206,.15); color:rgba(91,141,206,.9); font-size:.75rem; font-weight:600; white-space:nowrap; }
+.seq-info__detail { color:var(--text-secondary); font-size:.82rem; }
+.seq-info__formulas { display:flex; flex-direction:column; gap:4px; margin-bottom:8px; }
+.seq-info__formulas code { font-size:.82rem; color:var(--text-primary); background:rgba(255,255,255,.04); padding:2px 8px; border-radius:4px; }
+.seq-info__note { margin:0; color:var(--text-secondary); font-size:.8rem; }
+@media (max-width: 768px) { .seq-controls { flex-direction: column; align-items: flex-start; } }
+
+/* ═══ Function Properties Explorer ═══ */
+.fp-controls { display:flex; flex-direction:column; gap:10px; margin-bottom:14px; }
+.fp-modes { display:flex; gap:6px; }
+.fp-mode-btn { padding:6px 16px; border-radius:var(--radius-sm); border:1px solid rgba(91,141,206,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.85rem; transition:all .2s; }
+.fp-mode-btn.active { background:rgba(91,141,206,.18); color:var(--text-primary); border-color:rgba(91,141,206,.5); }
+.fp-funcs { display:flex; gap:5px; flex-wrap:wrap; }
+.fp-func-btn { padding:4px 12px; border-radius:var(--radius-sm); border:1px solid rgba(139,111,192,.25); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; font-family:'Cambria Math','Latin Modern Math',serif; transition:all .2s; }
+.fp-func-btn.active { background:rgba(139,111,192,.18); color:var(--text-primary); border-color:rgba(139,111,192,.5); }
+.fp-interval { display:flex; align-items:center; gap:6px; font-size:.85rem; color:var(--text-secondary); }
+.fp-int-input { width:56px; padding:3px 6px; border-radius:4px; border:1px solid rgba(91,141,206,.3); background:rgba(0,0,0,.2); color:var(--text-primary); font-size:.82rem; text-align:center; }
+.fp-hint { font-size:.75rem; color:var(--text-tertiary); margin-left:6px; }
+.fp-info { margin-top:14px; padding:14px 18px; border-radius:var(--radius-md,10px); background:rgba(91,141,206,.05); border:1px solid rgba(91,141,206,.12); font-size:.85rem; line-height:1.7; }
+.fp-info-title { font-size:1.1rem; font-weight:700; color:var(--text-primary); font-family:'Cambria Math','Latin Modern Math',serif; margin-bottom:2px; }
+.fp-info-subtitle { font-size:.82rem; font-weight:600; color:rgba(91,141,206,.85); margin-bottom:8px; }
+.fp-edu { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(139,111,192,.06); border:1px solid rgba(139,111,192,.12); }
+.fp-edu .math-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.fp-edu .math-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(139,111,192,.18); color:rgba(139,111,192,.9); }
+.fp-edu .math-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.fp-edu .math-key { flex-shrink:0; font-weight:600; color:rgba(91,141,206,.85); min-width:90px; }
+.fp-edu .math-key--amber { flex-shrink:0; font-weight:600; color:rgba(229,192,123,.85); min-width:90px; }
+.fp-edu .math-key--red { flex-shrink:0; font-weight:600; color:rgba(224,108,117,.85); min-width:90px; }
+.fp-edu .math-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(139,111,192,.1); color:var(--text-tertiary); font-size:.82rem; }
+@media (max-width: 768px) {
+    .fp-modes, .fp-funcs { flex-wrap:wrap; }
+    .fp-interval { flex-wrap:wrap; }
+    .fp-edu .math-row { flex-direction:column; gap:2px; }
+}
+
+/* ═══ Exponential & Logarithmic Functions ═══ */
+.el-controls { display:flex; flex-direction:column; gap:10px; margin-bottom:14px; }
+.el-row { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.el-base-group { display:flex; align-items:center; gap:8px; font-size:.85rem; color:var(--text-secondary); }
+.el-base-display { font-weight:700; color:var(--text-primary); font-family:'Cambria Math','Latin Modern Math',serif; min-width:40px; display:inline-block; }
+.el-slider { width:180px; accent-color:var(--accent-blue,#5b8dce); }
+.el-presets { display:flex; gap:5px; }
+.el-preset { padding:4px 12px; border-radius:var(--radius-sm); border:1px solid rgba(139,111,192,.25); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.el-preset.active { background:rgba(139,111,192,.18); color:var(--text-primary); border-color:rgba(139,111,192,.5); }
+.el-toggles { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.el-toggle { display:flex; align-items:center; gap:5px; font-size:.82rem; color:var(--text-secondary); cursor:pointer; }
+.el-toggle input { accent-color:var(--accent-blue,#5b8dce); }
+.el-swatch { width:12px; height:3px; border-radius:2px; display:inline-block; }
+.el-swatch--exp { background:#5b9bd5; }
+.el-swatch--log { background:#e06c75; }
+.el-swatch--mirror { background:rgba(255,255,255,.25); }
+.el-swatch--asy { background:rgba(255,255,255,.15); }
+.el-anim-btn { padding:4px 14px; border-radius:var(--radius-sm); border:1px solid rgba(91,141,206,.3); background:transparent; color:var(--text-secondary); cursor:pointer; font-size:.82rem; transition:all .2s; }
+.el-anim-btn:hover { background:rgba(91,141,206,.12); color:var(--text-primary); }
+.el-info { margin-top:14px; padding:14px 18px; border-radius:var(--radius-md,10px); background:rgba(91,141,206,.05); border:1px solid rgba(91,141,206,.12); font-size:.85rem; line-height:1.7; }
+.el-info-title { font-size:1.1rem; font-weight:700; color:var(--text-primary); font-family:'Cambria Math','Latin Modern Math',serif; margin-bottom:2px; }
+.el-info-subtitle { font-size:.82rem; font-weight:600; color:rgba(91,141,206,.85); margin-bottom:8px; }
+.el-edu { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(139,111,192,.06); border:1px solid rgba(139,111,192,.12); }
+.el-edu .math-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.el-edu .math-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(139,111,192,.18); color:rgba(139,111,192,.9); }
+.el-edu .math-row { display:flex; gap:8px; margin:3px 0; color:var(--text-secondary); }
+.el-edu .math-key { flex-shrink:0; font-weight:600; color:rgba(91,141,206,.85); min-width:90px; }
+.el-edu .math-key--amber { flex-shrink:0; font-weight:600; color:rgba(229,192,123,.85); min-width:90px; }
+.el-edu .math-note { margin-top:6px; padding-top:6px; border-top:1px solid rgba(139,111,192,.1); color:var(--text-tertiary); font-size:.82rem; }
+@media (max-width: 768px) {
+    .el-row { flex-direction:column; align-items:flex-start; }
+    .el-slider { width:100%; }
+    .el-edu .math-row { flex-direction:column; gap:2px; }
 }

@@ -17,7 +17,7 @@ function initExperimentCards() {
                 : '可探索';
 
             return `
-                <div class="card card--${accent} ${variantClass}" onclick="openExperiment('${exp.id}', event)" tabindex="0" role="button">
+                <div class="card card--${accent} ${variantClass}" onclick="openExperiment('${exp.id}', event)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openExperiment('${exp.id}', event)}" tabindex="0" role="button" aria-label="${exp.title}">
                     <div class="card-icon">
                         <i data-lucide="${exp.icon}"></i>
                     </div>
@@ -32,7 +32,11 @@ function initExperimentCards() {
     });
 }
 
+let _openExpBusy = false;
 function openExperiment(id, evt) {
+    if (_openExpBusy) return;
+    _openExpBusy = true;
+
     // Find which page this experiment belongs to
     let page = null;
     for (const [category, experiments] of Object.entries(CONFIG.experiments)) {
@@ -51,9 +55,13 @@ function openExperiment(id, evt) {
             if (page && typeof ModuleSelector !== 'undefined') {
                 ModuleSelector.openModule(page, id);
             }
+            _openExpBusy = false;
         }, 150);
     } else if (page && typeof ModuleSelector !== 'undefined') {
         ModuleSelector.openModule(page, id);
+        _openExpBusy = false;
+    } else {
+        _openExpBusy = false;
     }
 }
 
