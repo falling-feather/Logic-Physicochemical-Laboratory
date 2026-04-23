@@ -152,8 +152,8 @@
     bottom: calc(256px + env(safe-area-inset-bottom, 0px));
     right: 24px;
     z-index: 9000;
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -183,7 +183,7 @@
     .theme-fab {
         bottom: calc(244px + env(safe-area-inset-bottom, 0px));
         right: 16px;
-        width: 32px;
-        height: 32px;
+        width: 36px;
+        height: 36px;
     }
 }

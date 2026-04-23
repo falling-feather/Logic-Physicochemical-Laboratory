@@ -6,8 +6,8 @@
     bottom: 168px;
     right: 24px;
     z-index: 9000;
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -49,7 +49,7 @@
     .favorite-fab {
         bottom: 158px;
         right: 16px;
-        width: 32px;
-        height: 32px;
+        width: 36px;
+        height: 36px;
     }
 }
