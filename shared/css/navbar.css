@@ -149,7 +149,7 @@
 /* ── v4.2.4: Theme FAB（右下角浮动主题切换按钮，仅非首页显示） ── */
 .theme-fab {
     position: fixed;
-    bottom: calc(212px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(256px + env(safe-area-inset-bottom, 0px));
     right: 24px;
     z-index: 9000;
     width: 36px;
@@ -180,7 +180,7 @@
 
 @media (max-width: 768px) {
     .theme-fab {
-        bottom: calc(200px + env(safe-area-inset-bottom, 0px));
+        bottom: calc(244px + env(safe-area-inset-bottom, 0px));
         right: 16px;
         width: 32px;
         height: 32px;
