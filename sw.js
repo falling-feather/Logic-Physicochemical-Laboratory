@@ -1,11 +1,11 @@
-const CACHE_NAME = 'englab-static-v20260423a';
+const CACHE_NAME = 'englab-static-v20260423b';
 const APP_SHELL = [
   './',
   './index.html',
   './shared/js/lucide.min.js?v=20260417c',
   './shared/js/config.js?v=20260418q',
   './shared/js/learning-progress.js?v=20260422a',
-  './shared/js/theme-switch.js?v=20260418c',
+  './shared/js/theme-switch.js?v=20260423b',
   './shared/js/touch-gestures.js?v=20260418a',
   './shared/js/experiment-export.js?v=20260418f',
   './shared/js/quiz-data.js?v=20260418e',
@@ -13,7 +13,7 @@ const APP_SHELL = [
   './shared/js/experiment-favorites.js?v=20260418f',
   './shared/js/experiment-rating.js?v=20260418g',
   './shared/js/module-selector.js?v=20260418q',
-  './shared/js/router.js?v=20260418q2',
+  './shared/js/router.js?v=20260423b',
   './shared/js/scroll-animations.js?v=20260417c',
   './shared/js/cards.js?v=20260417c',
   './shared/js/common.js?v=20260417c',

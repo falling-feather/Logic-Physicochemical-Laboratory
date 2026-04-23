@@ -9,7 +9,9 @@ const ThemeSwitch = {
     init() {
         const theme = this._resolve();
         this._apply(theme);
-        this._injectToggle();
+        // v4.2.3 移除主题切换按钮：站点采用统一深色 HUD 风格，不再提供白天模式入口。
+        // 主题仍按存储/系统偏好静默应用，保留切换 API 以兼容潜在调用。
+        // this._injectToggle();
     },
 
     /** Determine the active theme: stored preference > system preference > dark */

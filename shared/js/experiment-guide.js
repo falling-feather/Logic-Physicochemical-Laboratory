@@ -732,6 +732,8 @@ const ExperimentGuide = {
     hideHelpButton() {
         this._currentModule = null;
         if (this._helpBtn) this._helpBtn.style.display = 'none';
+        // v4.2.3：同时关闭可能仍处于显示状态的引导浮层，避免随页面切换残留
+        this._dismiss();
     },
 
     // ── Internal ──

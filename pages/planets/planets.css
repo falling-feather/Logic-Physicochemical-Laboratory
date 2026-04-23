@@ -1,7 +1,12 @@
 /* ===== Planets View — 沉浸式 3D 镂空星系导航大屏（v4.2.0-α4） ===== */
 
-#page-planets {
+/* v4.2.3 修复：仅在 active 时使用 relative 定位，否则继承 .page 的 absolute，
+   避免未激活时仍占据正常文档流，导致其他学科页面顶部出现大块空白。 */
+#page-planets.active {
     position: relative;
+}
+
+#page-planets {
     background: radial-gradient(ellipse at center, #001a1a 0%, #000508 70%, #000 100%);
     overflow: hidden;
     min-height: 100vh;

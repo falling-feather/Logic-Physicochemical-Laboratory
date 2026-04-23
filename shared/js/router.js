@@ -318,6 +318,21 @@ const Router = {
         } else if (page === 'planets') {
             if (typeof destroyPlanets === 'function') destroyPlanets();
         } else {
+            // v4.2.3 Bug3 修复：先调用 closeModule 隐藏全部浮动控件
+            // （ExperimentExport / ExperimentQuiz / ExperimentFavorites / ExperimentRating /
+            //   ExperimentGuide），避免离开学科页面后控件仍残留在首页/星系大屏。
+            if (typeof ModuleSelector !== 'undefined' && ModuleSelector.activeModule
+                && ModuleSelector.activeModule[page]
+                && typeof ModuleSelector.closeModule === 'function') {
+                try { ModuleSelector.closeModule(page); } catch (e) { /* ignore */ }
+            }
+            // 兜底：即便 ModuleSelector 未记录 active module，也强制隐藏全部浮动控件
+            try { if (window.ExperimentGuide) ExperimentGuide.hideHelpButton(); } catch(e){}
+            try { if (window.ExperimentExport) ExperimentExport.hide(); } catch(e){}
+            try { if (window.ExperimentQuiz) ExperimentQuiz.hide(); } catch(e){}
+            try { if (window.ExperimentFavorites) ExperimentFavorites.hide(); } catch(e){}
+            try { if (window.ExperimentRating) ExperimentRating.hide(); } catch(e){}
+
             // Destroy all modules that were initialized for this page
             const destroyMap = {
                 mathematics: [
