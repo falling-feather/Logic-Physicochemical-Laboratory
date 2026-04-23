@@ -145,3 +145,44 @@
     width: 16px;
     height: 16px;
 }
+
+/* ── v4.2.4: Theme FAB（右下角浮动主题切换按钮，仅非首页显示） ── */
+.theme-fab {
+    position: fixed;
+    bottom: calc(212px + env(safe-area-inset-bottom, 0px));
+    right: 24px;
+    z-index: 9000;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-3, #1c1f2e);
+    border: 1px solid var(--border-default, rgba(255,255,255,0.07));
+    border-radius: 50%;
+    color: var(--text-secondary, #8a90a0);
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.theme-fab:hover {
+    background: var(--surface-4, #24273a);
+    border-color: var(--accent-blue, #5b8dce);
+    color: var(--accent-blue, #5b8dce);
+    transform: scale(1.08);
+}
+
+.theme-fab i {
+    width: 16px;
+    height: 16px;
+}
+
+@media (max-width: 768px) {
+    .theme-fab {
+        bottom: calc(200px + env(safe-area-inset-bottom, 0px));
+        right: 16px;
+        width: 32px;
+        height: 32px;
+    }
+}

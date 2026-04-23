@@ -277,6 +277,12 @@ const Router = {
     onPageEnter(page) {
         document.body.classList.toggle('home-scroll-locked', page === 'home');
 
+        // v4.2.4：非首页统一显示右下角主题切换 FAB；返回首页则隐藏
+        if (typeof ThemeSwitch !== 'undefined') {
+            if (page === 'home') ThemeSwitch.hide();
+            else ThemeSwitch.show();
+        }
+
         // === Page Initialization ===
         // Home page initializes directly; subject pages rely on ModuleSelector
         // for lazy per-experiment initialization (triggered when user opens an experiment).
