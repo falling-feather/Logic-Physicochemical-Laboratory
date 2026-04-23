@@ -59,19 +59,19 @@
 .hud-data--left { top: 90px; left: 28px; }
 .hud-data--right { top: 90px; right: 28px; }
 
-/* ── Hex Grid Overlay ── */
+/* ── Hex Grid Overlay — 青绿 HUD 调 ── */
 .hex-grid-overlay {
     position: absolute; top: 0; left: 0;
     width: 100%; height: 100%;
     pointer-events: none; z-index: 0;
-    opacity: 0.03;
+    opacity: 0.045;
     background-image:
-        linear-gradient(30deg, rgba(91,141,206,0.5) 12%, transparent 12.5%, transparent 87%, rgba(91,141,206,0.5) 87.5%, rgba(91,141,206,0.5)),
-        linear-gradient(150deg, rgba(91,141,206,0.5) 12%, transparent 12.5%, transparent 87%, rgba(91,141,206,0.5) 87.5%, rgba(91,141,206,0.5)),
-        linear-gradient(30deg, rgba(91,141,206,0.5) 12%, transparent 12.5%, transparent 87%, rgba(91,141,206,0.5) 87.5%, rgba(91,141,206,0.5)),
-        linear-gradient(150deg, rgba(91,141,206,0.5) 12%, transparent 12.5%, transparent 87%, rgba(91,141,206,0.5) 87.5%, rgba(91,141,206,0.5)),
-        linear-gradient(60deg, rgba(91,141,206,0.35) 25%, transparent 25.5%, transparent 75%, rgba(91,141,206,0.35) 75%, rgba(91,141,206,0.35)),
-        linear-gradient(60deg, rgba(91,141,206,0.35) 25%, transparent 25.5%, transparent 75%, rgba(91,141,206,0.35) 75%, rgba(91,141,206,0.35));
+        linear-gradient(30deg, rgba(0,255,213,0.5) 12%, transparent 12.5%, transparent 87%, rgba(0,255,213,0.5) 87.5%, rgba(0,255,213,0.5)),
+        linear-gradient(150deg, rgba(0,255,213,0.5) 12%, transparent 12.5%, transparent 87%, rgba(0,255,213,0.5) 87.5%, rgba(0,255,213,0.5)),
+        linear-gradient(30deg, rgba(0,255,213,0.5) 12%, transparent 12.5%, transparent 87%, rgba(0,255,213,0.5) 87.5%, rgba(0,255,213,0.5)),
+        linear-gradient(150deg, rgba(0,255,213,0.5) 12%, transparent 12.5%, transparent 87%, rgba(0,255,213,0.5) 87.5%, rgba(0,255,213,0.5)),
+        linear-gradient(60deg, rgba(0,255,213,0.35) 25%, transparent 25.5%, transparent 75%, rgba(0,255,213,0.35) 75%, rgba(0,255,213,0.35)),
+        linear-gradient(60deg, rgba(0,255,213,0.35) 25%, transparent 25.5%, transparent 75%, rgba(0,255,213,0.35) 75%, rgba(0,255,213,0.35));
     background-size: 80px 140px;
     background-position: 0 0, 0 0, 40px 70px, 40px 70px, 0 0, 40px 70px;
 }
@@ -129,21 +129,21 @@
 .nebula-1 {
     width: 500px; height: 500px;
     top: -8%; right: -3%;
-    background: radial-gradient(ellipse, rgba(100,70,180,0.1), transparent 70%);
+    background: radial-gradient(ellipse, rgba(0,255,213,0.10), transparent 70%);
     animation: nebulaDrift 30s ease-in-out infinite;
 }
 
 .nebula-2 {
     width: 400px; height: 350px;
     bottom: 5%; left: -6%;
-    background: radial-gradient(ellipse, rgba(50,130,100,0.06), transparent 70%);
+    background: radial-gradient(ellipse, rgba(0,180,166,0.08), transparent 70%);
     animation: nebulaDrift 25s ease-in-out infinite reverse;
 }
 
 .nebula-3 {
     width: 300px; height: 280px;
     top: 35%; left: 62%;
-    background: radial-gradient(ellipse, rgba(180,100,50,0.05), transparent 70%);
+    background: radial-gradient(ellipse, rgba(45,255,170,0.06), transparent 70%);
     animation: nebulaDrift 35s ease-in-out infinite 5s;
 }
 
@@ -193,6 +193,31 @@
     perspective: 1200px;
 }
 
+/* HUD 全屏扫描线 — α3 镂空科技风背景增强 */
+.home-container::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 1;
+    background: linear-gradient(180deg,
+        transparent 0%,
+        transparent 47%,
+        rgba(0,255,213,0.045) 49%,
+        rgba(0,255,213,0.10) 50%,
+        rgba(0,255,213,0.045) 51%,
+        transparent 53%,
+        transparent 100%);
+    animation: hudVerticalScan 9s linear infinite;
+    will-change: transform;
+}
+
+@keyframes hudVerticalScan {
+    from { transform: translateY(-100%); }
+    to   { transform: translateY(100%); }
+}
+
 /* ── Central star ── */
 .main-star {
     position: relative; z-index: 10;
@@ -211,70 +236,122 @@
     80% { transform: translate(8px, 6px) rotate(2deg); }
 }
 
-/* Atmosphere */
+/* Atmosphere — HUD 全息光晕（双层青绿扫描环） */
 .star-atmosphere {
     position: absolute;
-    width: 140%; height: 140%;
-    top: -20%; left: -20%;
+    width: 160%; height: 160%;
+    top: -30%; left: -30%;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(91,141,206,0.18) 20%, rgba(91,141,206,0.06) 50%, transparent 72%);
-    animation: atmospherePulse 5s ease-in-out infinite;
+    background:
+        radial-gradient(circle, transparent 56%, rgba(0,255,213,0.06) 60%, transparent 64%),
+        radial-gradient(circle, transparent 70%, rgba(0,255,213,0.10) 73%, transparent 76%),
+        conic-gradient(from 0deg, transparent 0deg, rgba(0,255,213,0.18) 30deg, transparent 60deg, transparent 360deg);
+    animation: atmospherePulse 5s ease-in-out infinite, hudScan 6s linear infinite;
     pointer-events: none;
+    filter: blur(0.4px);
 }
 
 @keyframes atmospherePulse {
-    0%, 100% { transform: scale(1); opacity: 0.6; }
-    50% { transform: scale(1.1); opacity: 1; }
+    0%, 100% { transform: scale(1); opacity: 0.55; }
+    50%      { transform: scale(1.06); opacity: 0.95; }
 }
 
-/* Star body — steady soft glow (开灯呼吸效果已移除 v4.0.3) */
+@keyframes hudScan {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+/* Star body — 镂空全息球体（深空背景 + 青绿外圈 + 准星圈） */
 .star-body {
-    background: radial-gradient(circle at 35% 30%, #6da3d8 0%, #5b8dce 15%, #3a6da8 35%, #2a5590 55%, #1e3d6e 80%, #15254a 100%);
+    /* 深空底，半透明，让经纬线浮现 */
+    background:
+        radial-gradient(circle at 50% 50%, rgba(0,30,30,0.85) 0%, rgba(0,20,30,0.75) 50%, rgba(0,40,55,0.55) 100%);
     border-radius: 50%;
     width: 200px; height: 200px;
     display: flex; align-items: center; justify-content: center;
     position: relative;
     overflow: hidden;
+    /* 青绿外圈 + 多层青绿辉光 */
+    border: 1.5px solid rgba(0,255,213,0.45);
     box-shadow:
-        0 0 34px rgba(91,141,206,0.55),
-        0 0 70px rgba(91,141,206,0.22),
-        0 0 110px rgba(91,141,206,0.07),
-        inset -22px -22px 50px rgba(0,0,0,0.5),
-        inset 8px 8px 24px rgba(255,255,255,0.035);
+        0 0 22px rgba(0,255,213,0.55),
+        0 0 60px rgba(0,255,213,0.30),
+        0 0 120px rgba(0,180,166,0.12),
+        inset 0 0 24px rgba(0,255,213,0.18),
+        inset 0 0 60px rgba(0,40,55,0.6);
 }
 
-/* Planet surface texture */
+/* 装饰：内圈准星圈（绝对定位伪元素） */
+.star-body::before {
+    content: '';
+    position: absolute;
+    top: 12%; left: 12%; width: 76%; height: 76%;
+    border: 1px dashed rgba(0,255,213,0.30);
+    border-radius: 50%;
+    pointer-events: none;
+    animation: hudScan 18s linear infinite reverse;
+    z-index: 1;
+}
+.star-body::after {
+    content: '';
+    position: absolute;
+    top: 28%; left: 28%; width: 44%; height: 44%;
+    border: 1px solid rgba(0,255,213,0.22);
+    border-radius: 50%;
+    pointer-events: none;
+    animation: hudScan 30s linear infinite;
+    z-index: 1;
+}
+
+/* Planet surface — 经纬线网格（HUD 经纬球面感） */
 .planet-surface {
     position: absolute; top: 0; left: 0;
-    width: 200%; height: 100%;
+    width: 100%; height: 100%;
     background:
-        repeating-linear-gradient(0deg, transparent, transparent 26px, rgba(255,255,255,0.025) 26px, rgba(255,255,255,0.025) 28px),
-        repeating-linear-gradient(0deg, transparent, transparent 42px, rgba(0,0,0,0.05) 42px, rgba(0,0,0,0.05) 45px);
-    animation: surfaceScroll 35s linear infinite;
+        /* 经线（垂直，模拟球面取 5 段） */
+        repeating-linear-gradient(90deg, transparent 0, transparent 38px, rgba(0,255,213,0.16) 38px, rgba(0,255,213,0.16) 39px),
+        /* 纬线（水平） */
+        repeating-linear-gradient(0deg,  transparent 0, transparent 22px, rgba(0,255,213,0.12) 22px, rgba(0,255,213,0.12) 23px),
+        /* 中央高亮赤道带 */
+        linear-gradient(0deg, transparent 47%, rgba(0,255,213,0.10) 50%, transparent 53%);
+    /* 球面投影（让网格在边缘"卷曲" → 圆形遮罩 + 透明度衰减） */
+    -webkit-mask: radial-gradient(circle at 50% 50%, #000 55%, rgba(0,0,0,0.55) 80%, transparent 98%);
+            mask: radial-gradient(circle at 50% 50%, #000 55%, rgba(0,0,0,0.55) 80%, transparent 98%);
     pointer-events: none;
+    animation: surfaceScroll 35s linear infinite;
 }
 
 @keyframes surfaceScroll {
-    from { transform: translateX(0); }
-    to   { transform: translateX(-50%); }
+    from { background-position: 0 0, 0 0, 0 0; }
+    to   { background-position: -76px 0, 0 -46px, 0 0; }
 }
 
-/* Highlight */
+/* Highlight — HUD 准星十字 + 中心锚点 + 4 个角标 */
 .planet-highlight {
     position: absolute; top: 0; left: 0;
     width: 100%; height: 100%;
-    border-radius: 50%;
-    background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.06) 22%, transparent 58%);
     pointer-events: none; z-index: 2;
+    background:
+        /* 横十字 */
+        linear-gradient(0deg, transparent 49.5%, rgba(0,255,213,0.32) 49.5%, rgba(0,255,213,0.32) 50.5%, transparent 50.5%),
+        /* 竖十字 */
+        linear-gradient(90deg, transparent 49.5%, rgba(0,255,213,0.32) 49.5%, rgba(0,255,213,0.32) 50.5%, transparent 50.5%),
+        /* 顶部高光 */
+        radial-gradient(ellipse at 35% 22%, rgba(180,255,235,0.20) 0%, rgba(0,255,213,0.05) 25%, transparent 55%);
+    -webkit-mask: radial-gradient(circle at 50% 50%, #000 92%, transparent 99%);
+            mask: radial-gradient(circle at 50% 50%, #000 92%, transparent 99%);
 }
 
 .star-title {
     font-size: 1.4rem;
     font-weight: 700;
-    color: white;
-    text-shadow: 0 0 12px rgba(255,255,255,0.4), 0 2px 8px rgba(0,0,0,0.6);
+    color: #d4fff3;
+    text-shadow:
+        0 0 10px rgba(0,255,213,0.85),
+        0 0 22px rgba(0,255,213,0.45),
+        0 2px 8px rgba(0,0,0,0.6);
     z-index: 3; position: relative;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.18em;
     font-family: var(--font-display);
 }
 
@@ -289,12 +366,12 @@
     pointer-events: none;
 }
 .star-title::before {
-    color: #ff6b6b;
+    color: #ff5577;
     animation: glitch1 8s ease-in-out infinite;
     clip-path: inset(20% 0 60% 0);
 }
 .star-title::after {
-    color: #5b8dce;
+    color: #00ffd5;
     animation: glitch2 8s ease-in-out infinite 0.3s;
     clip-path: inset(50% 0 10% 0);
 }
@@ -329,9 +406,12 @@
 
 .eye {
     width: 18px; height: 18px;
-    background: radial-gradient(circle at 40% 40%, #fff, #e8e8e8);
+    background: radial-gradient(circle at 40% 40%, #d4fff3, #a8f5e0);
     border-radius: 50%;
-    box-shadow: 0 0 8px rgba(255,255,255,0.7), inset 0 -2px 4px rgba(0,0,0,0.1);
+    box-shadow:
+        0 0 10px rgba(0,255,213,0.85),
+        0 0 18px rgba(0,255,213,0.35),
+        inset 0 -2px 4px rgba(0,40,40,0.25);
     position: relative;
     transition: transform 0.12s ease;
 }
@@ -340,18 +420,20 @@
 
 .pupil {
     width: 11px; height: 11px;
-    background: radial-gradient(circle at 35% 35%, #2a3040, #0a0e16);
+    background: radial-gradient(circle at 35% 35%, #003a36, #001416);
     border-radius: 50%;
     position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
     transition: transform 0.06s ease-out;
+    box-shadow: inset 0 0 4px rgba(0,255,213,0.6);
 }
 
 .pupil-shine {
     position: absolute; top: 2px; left: 3px;
     width: 4px; height: 4px;
-    background: white; border-radius: 50%;
-    opacity: 0.9;
+    background: #d4fff3; border-radius: 50%;
+    opacity: 0.95;
+    box-shadow: 0 0 4px rgba(0,255,213,0.9);
 }
 
 /* ── Tagline ── */
@@ -371,20 +453,21 @@
 
 .home-tagline p {
     font-size: 0.95rem;
-    color: rgba(91,141,206,0.6);
+    color: rgba(0,255,213,0.72);
     letter-spacing: 0.15em;
     font-weight: 400;
     font-family: var(--font-mono);
-    text-shadow: 0 0 12px rgba(91,141,206,0.3);
+    text-shadow: 0 0 12px rgba(0,255,213,0.45);
     min-width: 16ch;
 }
 
 .tagline-cursor {
     width: 2px;
     height: 1.1em;
-    background: rgba(91,141,206,0.7);
+    background: rgba(0,255,213,0.85);
     animation: cursorBlink 1s step-end infinite;
     flex-shrink: 0;
+    box-shadow: 0 0 6px rgba(0,255,213,0.7);
 }
 
 @keyframes cursorBlink {
@@ -484,56 +567,69 @@
 .satellite-4 .satellite-glow { background: radial-gradient(circle, rgba(196,121,58,0.3), transparent 70%); }
 .satellite-5 .satellite-glow { background: radial-gradient(circle, rgba(58,158,143,0.3), transparent 70%); }
 
-/* Satellite sphere */
+/* Satellite sphere — α2 HUD 化：透明底 + 学科色外圈 + 青绿弱辅助光 */
 .satellite-icon {
     width: 100%; height: 100%;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     position: relative; overflow: hidden;
-    transition: box-shadow 0.3s ease, transform 0.3s var(--ease-spring);
+    border: 1.5px solid rgba(0,255,213,0.32); /* 青绿外圈统一语言 */
+    transition: box-shadow 0.3s ease, transform 0.3s var(--ease-spring), border-color 0.3s ease;
 }
 
 .satellite:hover .satellite-icon {
     transform: scale(1.15);
+    border-color: rgba(0,255,213,0.85);
 }
 
 .satellite-icon .planet-surface { animation-duration: 22s; }
+/* 保留 α1 准星十字（年本环境下准备变薄到适合 80px 小球） */
 .satellite-icon .planet-highlight {
-    background: radial-gradient(circle at 28% 22%, rgba(255,255,255,0.45) 0%, transparent 48%);
+    background:
+        linear-gradient(0deg, transparent 49%, rgba(0,255,213,0.28) 49%, rgba(0,255,213,0.28) 51%, transparent 51%),
+        linear-gradient(90deg, transparent 49%, rgba(0,255,213,0.28) 49%, rgba(0,255,213,0.28) 51%, transparent 51%),
+        radial-gradient(circle at 30% 25%, rgba(180,255,235,0.22) 0%, transparent 45%);
+    -webkit-mask: radial-gradient(circle at 50% 50%, #000 90%, transparent 99%);
+            mask: radial-gradient(circle at 50% 50%, #000 90%, transparent 99%);
 }
 
-/* Planet colors (more muted) */
+/* Planet colors — 学科色作为辅色辉光 + 透明深空底 */
 .satellite-1 .satellite-icon {
-    background: radial-gradient(circle at 35% 30%, #7daed0 0%, #5b8dce 25%, #3a6da8 50%, #1e3d6e 100%);
-    box-shadow: 0 0 18px rgba(91,141,206,0.35), inset -15px -15px 30px rgba(0,0,0,0.45);
+    background:
+        radial-gradient(circle at 50% 50%, rgba(91,141,206,0.18) 0%, rgba(0,30,40,0.85) 60%, rgba(0,40,55,0.55) 100%);
+    box-shadow: 0 0 14px rgba(91,141,206,0.35), 0 0 8px rgba(0,255,213,0.18), inset 0 0 12px rgba(0,255,213,0.10);
 }
 
 .satellite-2 .satellite-icon {
-    background: radial-gradient(circle at 35% 30%, #a895d0 0%, #8b6fc0 25%, #6a4ba0 50%, #452880 100%);
-    box-shadow: 0 0 18px rgba(139,111,192,0.35), inset -15px -15px 30px rgba(0,0,0,0.45);
+    background:
+        radial-gradient(circle at 50% 50%, rgba(139,111,192,0.18) 0%, rgba(0,30,40,0.85) 60%, rgba(0,40,55,0.55) 100%);
+    box-shadow: 0 0 14px rgba(139,111,192,0.35), 0 0 8px rgba(0,255,213,0.18), inset 0 0 12px rgba(0,255,213,0.10);
 }
 
 .satellite-3 .satellite-icon {
-    background: radial-gradient(circle at 35% 30%, #6dc0a0 0%, #4d9e7e 25%, #37805e 50%, #205040 100%);
-    box-shadow: 0 0 18px rgba(77,158,126,0.35), inset -15px -15px 30px rgba(0,0,0,0.45);
+    background:
+        radial-gradient(circle at 50% 50%, rgba(77,158,126,0.18) 0%, rgba(0,30,40,0.85) 60%, rgba(0,40,55,0.55) 100%);
+    box-shadow: 0 0 14px rgba(77,158,126,0.35), 0 0 8px rgba(0,255,213,0.18), inset 0 0 12px rgba(0,255,213,0.10);
 }
 
 .satellite-4 .satellite-icon {
-    background: radial-gradient(circle at 35% 30%, #d8a070 0%, #c4793a 25%, #a05a28 50%, #6a3818 100%);
-    box-shadow: 0 0 18px rgba(196,121,58,0.35), inset -15px -15px 30px rgba(0,0,0,0.45);
+    background:
+        radial-gradient(circle at 50% 50%, rgba(196,121,58,0.18) 0%, rgba(0,30,40,0.85) 60%, rgba(0,40,55,0.55) 100%);
+    box-shadow: 0 0 14px rgba(196,121,58,0.35), 0 0 8px rgba(0,255,213,0.18), inset 0 0 12px rgba(0,255,213,0.10);
 }
 
 .satellite-5 .satellite-icon {
-    background: radial-gradient(circle at 35% 30%, #5cc0b0 0%, #3a9e8f 25%, #2a7d70 50%, #1a5048 100%);
-    box-shadow: 0 0 18px rgba(58,158,143,0.35), inset -15px -15px 30px rgba(0,0,0,0.45);
+    background:
+        radial-gradient(circle at 50% 50%, rgba(58,158,143,0.18) 0%, rgba(0,30,40,0.85) 60%, rgba(0,40,55,0.55) 100%);
+    box-shadow: 0 0 14px rgba(58,158,143,0.35), 0 0 8px rgba(0,255,213,0.18), inset 0 0 12px rgba(0,255,213,0.10);
 }
 
-/* Hover glow enhancement */
-.satellite-1:hover .satellite-icon { box-shadow: 0 0 40px rgba(91,141,206,0.6), inset -15px -15px 30px rgba(0,0,0,0.45); }
-.satellite-2:hover .satellite-icon { box-shadow: 0 0 40px rgba(139,111,192,0.6), inset -15px -15px 30px rgba(0,0,0,0.45); }
-.satellite-3:hover .satellite-icon { box-shadow: 0 0 40px rgba(77,158,126,0.6), inset -15px -15px 30px rgba(0,0,0,0.45); }
-.satellite-4:hover .satellite-icon { box-shadow: 0 0 40px rgba(196,121,58,0.6), inset -15px -15px 30px rgba(0,0,0,0.45); }
-.satellite-5:hover .satellite-icon { box-shadow: 0 0 40px rgba(58,158,143,0.6), inset -15px -15px 30px rgba(0,0,0,0.45); }
+/* Hover glow enhancement — 学科色 + 青绿双重辉光 */
+.satellite-1:hover .satellite-icon { box-shadow: 0 0 32px rgba(91,141,206,0.6),  0 0 18px rgba(0,255,213,0.45), inset 0 0 16px rgba(0,255,213,0.18); }
+.satellite-2:hover .satellite-icon { box-shadow: 0 0 32px rgba(139,111,192,0.6), 0 0 18px rgba(0,255,213,0.45), inset 0 0 16px rgba(0,255,213,0.18); }
+.satellite-3:hover .satellite-icon { box-shadow: 0 0 32px rgba(77,158,126,0.6),  0 0 18px rgba(0,255,213,0.45), inset 0 0 16px rgba(0,255,213,0.18); }
+.satellite-4:hover .satellite-icon { box-shadow: 0 0 32px rgba(196,121,58,0.6),  0 0 18px rgba(0,255,213,0.45), inset 0 0 16px rgba(0,255,213,0.18); }
+.satellite-5:hover .satellite-icon { box-shadow: 0 0 32px rgba(58,158,143,0.6),  0 0 18px rgba(0,255,213,0.45), inset 0 0 16px rgba(0,255,213,0.18); }
 
 /* Saturn-style ring */
 .satellite-ring {

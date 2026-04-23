@@ -97,9 +97,42 @@ const CellStructure = {
             if (this.zoomed) { this.zoomOut(); return; }
             const r = this.canvas.getBoundingClientRect();
             const t = e.touches[0];
-            const o = hitTest((t.clientX - r.left) / this.W, (t.clientY - r.top) / this.H);
-            if (o) this.zoomTo(o);
+            this._lpStartXY = { x: t.clientX, y: t.clientY };
+            this._lpOrg = hitTest((t.clientX - r.left) / this.W, (t.clientY - r.top) / this.H);
+            this._lpPreview = false;
+            if (!this._lpOrg) return;
+            this._lpTimer = setTimeout(() => {
+                this._lpPreview = true;
+                this.hoveredOrganelle = this._lpOrg;
+                if (this.info) this.info.innerHTML =
+                    `<strong>${this._lpOrg.name}</strong>：${this._lpOrg.desc}<br><span style="opacity:0.5;font-size:0.85em">松开返回 / 短按放大</span>`;
+                if (navigator.vibrate) navigator.vibrate(20);
+                this._lpTimer = null;
+            }, 350);
         }, { passive: false });
+
+        this.canvas.addEventListener('touchmove', (e) => {
+            if (!this._lpStartXY || !e.touches[0]) return;
+            const dx = e.touches[0].clientX - this._lpStartXY.x;
+            const dy = e.touches[0].clientY - this._lpStartXY.y;
+            if (dx * dx + dy * dy > 100) {
+                if (this._lpTimer) { clearTimeout(this._lpTimer); this._lpTimer = null; }
+                if (this._lpPreview) { this.hoveredOrganelle = null; this._lpPreview = false; }
+                this._lpOrg = null;
+            }
+        }, { passive: true });
+
+        this.canvas.addEventListener('touchend', () => {
+            if (this._lpTimer) {
+                clearTimeout(this._lpTimer); this._lpTimer = null;
+                if (this._lpOrg) this.zoomTo(this._lpOrg);
+            } else if (this._lpPreview) {
+                this.hoveredOrganelle = null;
+                this._lpPreview = false;
+            }
+            this._lpStartXY = null;
+            this._lpOrg = null;
+        });
     },
 
     zoomTo(org) {

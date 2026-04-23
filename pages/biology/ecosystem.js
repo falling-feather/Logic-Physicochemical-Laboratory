@@ -203,7 +203,7 @@ const Ecosystem = {
 
     _drawFoodChain(dt, t) {
         const ctx = this.ctx, W = this.W, H = this.H;
-        const fs = Math.max(13, W * 0.012);
+        const fs = Math.max(14, Math.min(22, W * 0.018));
         const spd = this._speed;
         /* sky */
         const sky = ctx.createLinearGradient(0, 0, 0, H);
@@ -491,7 +491,7 @@ const Ecosystem = {
     },
     _drawPopulation(dt) {
         const ctx = this.ctx, W = this.W, H = this.H;
-        const fs = Math.max(13, W * 0.012);
+        const fs = Math.max(14, Math.min(22, W * 0.018));
         if (!this._paused) this._stepPopulation(dt);
 
         const margin = { top: 50, right: 30, bottom: 55, left: 60 };

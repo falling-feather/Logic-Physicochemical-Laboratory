@@ -103,7 +103,7 @@ const CellularResp = {
     },
     _drawGlycolysis(t) {
         const ctx = this.ctx, W = this.W, H = this.H, p = this.progress;
-        const fs = Math.max(13, W * 0.012);
+        const fs = Math.max(14, Math.min(22, W * 0.018));
         // cytoplasm background
         ctx.fillStyle = 'rgba(100,200,100,0.04)';
         ctx.fillRect(20, 50, W - 40, H - 80);
@@ -190,7 +190,7 @@ const CellularResp = {
     },
     _drawKrebs(t) {
         const ctx = this.ctx, W = this.W, H = this.H, p = this.progress;
-        const fs = Math.max(13, W * 0.012);
+        const fs = Math.max(14, Math.min(22, W * 0.018));
         // mitochondria matrix background
         ctx.fillStyle = 'rgba(255,180,50,0.04)';
         ctx.beginPath();
@@ -276,7 +276,7 @@ const CellularResp = {
     },
     _drawETC(t) {
         const ctx = this.ctx, W = this.W, H = this.H, p = this.progress;
-        const fs = Math.max(13, W * 0.012);
+        const fs = Math.max(14, Math.min(22, W * 0.018));
         // inner membrane
         ctx.fillStyle = 'rgba(100,150,255,0.04)';
         ctx.fillRect(30, H * 0.25, W - 60, H * 0.5);
@@ -379,7 +379,7 @@ const CellularResp = {
     },
     _draw(t) {
         const ctx = this.ctx, W = this.W, H = this.H;
-        const fs = Math.max(13, W * 0.012);
+        const fs = Math.max(14, Math.min(22, W * 0.018));
         ctx.clearRect(0, 0, W, H);
         const s = this.stages[this.stage];
         ctx.font = 'bold ' + (fs + 8) + 'px ' + CF.sans;

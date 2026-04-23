@@ -1,0 +1,172 @@
+/**
+ * FAB 折叠触发器样式（v4.2.19）
+ * 主控按钮位于右下 bottom 24px；展开时另外 4 个 FAB 错峰飞入。
+ */
+
+/* v4.2.27：菜单展开时半透明遮罩 */
+.fab-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 10, 18, 0.45);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 9050;
+}
+.fab-scrim--visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.fab-trigger {
+    position: fixed;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    right: 20px;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-3, #1c1f2e);
+    border: 1px solid rgba(0, 255, 213, 0.3);
+    border-radius: 50%;
+    color: rgba(0, 255, 213, 0.8);
+    cursor: pointer;
+    z-index: 9100;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    animation: fab-trigger-pulse 3.2s ease-in-out infinite;
+}
+
+@keyframes fab-trigger-pulse {
+    0%, 100% { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 0 0 rgba(0, 255, 213, 0); }
+    50%      { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 14px 2px rgba(0, 255, 213, 0.22); }
+}
+
+.fab-trigger:hover {
+    background: var(--surface-4, #24273a);
+    border-color: #00ffd5;
+    color: #00ffd5;
+    transform: scale(1.08);
+    box-shadow: 0 4px 18px rgba(0, 255, 213, 0.35);
+    animation: none;
+}
+
+.fab-trigger--open {
+    animation: none;
+}
+
+/* v4.2.25：首次出现 bounce 提示动画（每会话仅一次） */
+.fab-trigger--bouncing {
+    animation: fab-trigger-pulse 3.2s ease-in-out infinite, fab-trigger-bounce 1.4s ease-out;
+}
+@keyframes fab-trigger-bounce {
+    0%   { transform: translateY(0) scale(1); }
+    20%  { transform: translateY(-12px) scale(1.06); }
+    40%  { transform: translateY(0) scale(1); }
+    55%  { transform: translateY(-6px) scale(1.03); }
+    75%  { transform: translateY(0) scale(1); }
+    100% { transform: translateY(0) scale(1); }
+}
+
+/* v4.2.26：点击 ripple 水波（青色） */
+.fab-trigger.is-rippling::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    background: rgba(0, 255, 213, 0.45);
+    pointer-events: none;
+    animation: fab-trigger-ripple 0.55s ease-out forwards;
+}
+@keyframes fab-trigger-ripple {
+    0%   { transform: scale(0.8); opacity: 0.6; }
+    100% { transform: scale(2.2); opacity: 0; }
+}
+
+.fab-trigger i {
+    width: 20px;
+    height: 20px;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.fab-trigger--open i {
+    transform: rotate(90deg);
+}
+
+/* tooltip 沿用通用样式（HUD 青） */
+.fab-trigger[data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    right: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%) translateX(6px);
+    padding: 5px 10px;
+    background: rgba(20, 23, 35, 0.95);
+    color: rgba(180, 255, 240, 0.95);
+    border: 1px solid rgba(0, 255, 213, 0.55);
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    z-index: 9101;
+}
+.fab-trigger[data-tip]:hover::after {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+}
+
+/* ── 折叠/展开状态：控制 4 个功能 FAB 的可见性 ── */
+body[data-fab-expanded="false"] .experiment-guide-help-btn,
+body[data-fab-expanded="false"] .favorite-fab,
+body[data-fab-expanded="false"] .theme-fab,
+body[data-fab-expanded="false"] .back-to-top-fab {
+    opacity: 0 !important;
+    transform: translateY(20px) scale(0.5) !important;
+    pointer-events: none !important;
+    animation: none !important;
+}
+
+body[data-fab-expanded="true"] .experiment-guide-help-btn,
+body[data-fab-expanded="true"] .favorite-fab,
+body[data-fab-expanded="true"] .theme-fab,
+body[data-fab-expanded="true"] .back-to-top-fab {
+    transition: opacity 0.28s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 错峰飞入：从下到上依次出现 */
+body[data-fab-expanded="true"] .experiment-guide-help-btn { transition-delay: 0.00s; }
+body[data-fab-expanded="true"] .favorite-fab               { transition-delay: 0.05s; }
+body[data-fab-expanded="true"] .theme-fab                  { transition-delay: 0.10s; }
+body[data-fab-expanded="true"] .back-to-top-fab            { transition-delay: 0.15s; }
+
+/* v4.2.28：菜单展开时常驻中文标签（取代 hover-only tooltip） */
+body[data-fab-expanded="true"] .theme-fab[data-tip]::after,
+body[data-fab-expanded="true"] .favorite-fab[data-tip]::after,
+body[data-fab-expanded="true"] .experiment-guide-help-btn[data-tip]::after,
+body[data-fab-expanded="true"] .back-to-top-fab[data-tip]::after {
+    display: block !important;
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+}
+body[data-fab-expanded="true"] .experiment-guide-help-btn[data-tip]::after { transition-delay: 0.05s; }
+body[data-fab-expanded="true"] .favorite-fab[data-tip]::after              { transition-delay: 0.10s; }
+body[data-fab-expanded="true"] .theme-fab[data-tip]::after                 { transition-delay: 0.15s; }
+body[data-fab-expanded="true"] .back-to-top-fab[data-tip]::after           { transition-delay: 0.20s; }
+
+@media (max-width: 768px) {
+    .fab-trigger {
+        bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+        right: 16px;
+        width: 40px;
+        height: 40px;
+    }
+    .fab-trigger i { width: 18px; height: 18px; }
+    .fab-trigger[data-tip]::after { display: none; }
+}

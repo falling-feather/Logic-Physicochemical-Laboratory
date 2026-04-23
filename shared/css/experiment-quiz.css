@@ -211,7 +211,7 @@
 /* ── Responsive ── */
 @media (max-width: 640px) {
     .quiz-fab {
-        bottom: 80px;
+        bottom: calc(80px + env(safe-area-inset-bottom, 0px));
         right: 16px;
         padding: 8px 14px;
         font-size: 13px;

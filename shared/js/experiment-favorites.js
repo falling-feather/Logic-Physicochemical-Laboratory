@@ -79,8 +79,15 @@ const ExperimentFavorites = {
         var btn = document.createElement('button');
         btn.className = 'favorite-fab';
         btn.setAttribute('aria-label', '收藏实验');
+        btn.setAttribute('data-tip', '收藏实验');
         var self = this;
         btn.addEventListener('click', function() { self._toggle(moduleId); });
+        btn.addEventListener('click', function() {
+            btn.classList.remove('is-rippling');
+            void btn.offsetWidth;
+            btn.classList.add('is-rippling');
+            setTimeout(function() { btn.classList.remove('is-rippling'); }, 600);
+        });
         document.body.appendChild(btn);
         this._btn = btn;
         this._updateButton(moduleId);
@@ -92,6 +99,7 @@ const ExperimentFavorites = {
         this._btn.classList.toggle('favorite-fab--active', active);
         this._btn.title = active ? '取消收藏' : '收藏实验';
         this._btn.setAttribute('aria-label', active ? '取消收藏' : '收藏实验');
+        this._btn.setAttribute('data-tip', active ? '取消收藏' : '收藏实验');
         if (active) {
             this._btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/></svg>';
         } else {
