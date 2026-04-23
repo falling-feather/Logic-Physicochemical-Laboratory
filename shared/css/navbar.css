@@ -168,9 +168,10 @@
 
 .theme-fab:hover {
     background: var(--surface-4, #24273a);
-    border-color: var(--accent-blue, #5b8dce);
-    color: var(--accent-blue, #5b8dce);
+    border-color: #00ffd5;
+    color: #00ffd5;
     transform: scale(1.08);
+    box-shadow: 0 4px 16px rgba(0, 255, 213, 0.25);
 }
 
 .theme-fab i {
