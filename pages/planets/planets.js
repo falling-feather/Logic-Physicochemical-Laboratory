@@ -247,7 +247,7 @@ window.PlanetsView = {
         // 双环分布：偶数索引内环，奇数索引外环，避免拥挤
         this.satellites = list.map((e, i) => {
             const ring = i % 2 === 0 ? 0 : 1;
-            const radius = ring === 0 ? 1.0 : 1.45;
+            const radius = ring === 0 ? 1.10 : 1.65;   // v44c：外环远一点，拉开层次
             // 同一环内均匀分布
             const sameRingItems = list.filter((_, j) => (j % 2) === ring).length || 1;
             const idxInRing = Math.floor(i / 2);
@@ -259,7 +259,7 @@ window.PlanetsView = {
                 icon: e.icon || 'box',
                 radius,
                 angle,
-                yJitter: ((i % 5) - 2) * 0.06,
+                yJitter: ((i % 5) - 2) * 0.04,           // v44c：垂直抖动变弱，轨道更平
                 ring
             };
         });
@@ -353,7 +353,7 @@ window.PlanetsView = {
                     return { sat, proj };
                 }).sort((a, b) => b.proj.z - a.proj.z);
                 for (const { sat, proj } of projected) {
-                    const radius = Math.max(20, 36 * proj.scale / 200);
+                    const radius = Math.max(22, 40 * proj.scale / 200);   // v44c：热区跳本体略大，手机友好
                     const dx = mx - proj.x, dy = my - proj.y;
                     if (dx * dx + dy * dy <= radius * radius) { this.hovered = sat; break; }
                 }
@@ -410,8 +410,8 @@ window.PlanetsView = {
         this.yaw += (this.targetYaw - this.yaw) * 0.12;
         this.pitch += (this.targetPitch - this.pitch) * 0.12;
 
-        // 过渡动画：tIn 以缓动靠近 tInTarget
-        this.tIn += (this.tInTarget - this.tIn) * 0.10;
+        // 过渡动画：tIn 以缓动靠近 tInTarget（v44c：节奏略快）
+        this.tIn += (this.tInTarget - this.tIn) * 0.15;
         if (Math.abs(this.tIn - this.tInTarget) < 0.001) this.tIn = this.tInTarget;
         // 子星系时间坑（仅 subject 状态下推进）
         if (this.mode === 'subject' || this.tIn > 0) this.subjTime += dt;
@@ -530,8 +530,8 @@ window.PlanetsView = {
             ctx.fillStyle = 'rgba(58,169,255,0.7)';
             ctx.fillText('BACK · ESC', cx, cy + sunR * 0.42);
 
-            // 卫星轨道环（双环）
-            for (const ringR of [1.0, 1.45]) {
+            // 卫星轨道环（双环，与 _buildSatellites 半径保持一致）
+            for (const ringR of [1.10, 1.65]) {
                 ctx.strokeStyle = 'rgba(58,169,255,0.12)';
                 ctx.lineWidth = 1;
                 ctx.setLineDash([3, 6]);
@@ -610,17 +610,17 @@ window.PlanetsView = {
     },
 
     _drawSatellite(ctx, sat, proj, isHover, accent) {
-        const satR = Math.max(14, 28 * proj.scale / 200);
+        const satR = Math.max(18, 34 * proj.scale / 200);   // v44c：本体加大，点击热区更宽松
         const depthFactor = (proj.z + 2) / 4;
         const alpha = 0.5 + 0.5 * Math.max(0.25, depthFactor);
 
         // 微弱光晕
-        const glow = ctx.createRadialGradient(proj.x, proj.y, 0, proj.x, proj.y, satR * 2.2);
-        glow.addColorStop(0, this._hexA(accent, isHover ? 0.35 : 0.15 * alpha));
+        const glow = ctx.createRadialGradient(proj.x, proj.y, 0, proj.x, proj.y, satR * 2.4);
+        glow.addColorStop(0, this._hexA(accent, isHover ? 0.4 : 0.18 * alpha));
         glow.addColorStop(1, this._hexA(accent, 0));
         ctx.fillStyle = glow;
         ctx.beginPath();
-        ctx.arc(proj.x, proj.y, satR * 2.2, 0, Math.PI * 2);
+        ctx.arc(proj.x, proj.y, satR * 2.4, 0, Math.PI * 2);
         ctx.fill();
 
         // 卫星本体
@@ -629,8 +629,8 @@ window.PlanetsView = {
         ctx.arc(proj.x, proj.y, satR, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.strokeStyle = isHover ? '#3aa9ff' : `rgba(58,169,255,${0.55 * alpha})`;
-        ctx.lineWidth = isHover ? 1.8 : 1;
+        ctx.strokeStyle = isHover ? '#3aa9ff' : `rgba(58,169,255,${0.6 * alpha})`;
+        ctx.lineWidth = isHover ? 2 : 1.1;
         ctx.beginPath();
         ctx.arc(proj.x, proj.y, satR, 0, Math.PI * 2);
         ctx.stroke();
@@ -641,14 +641,13 @@ window.PlanetsView = {
         ctx.arc(proj.x, proj.y, satR * 0.22, 0, Math.PI * 2);
         ctx.fill();
 
-        // 标签（仅 hover 或正面深度时显示，避免拥挤）
-        if (isHover || depthFactor > 0.5) {
-            ctx.fillStyle = isHover ? '#3aa9ff' : `rgba(212,232,255,${0.78 * alpha})`;
-            ctx.font = `${isHover ? 'bold ' : ''}${Math.max(10, 12 * proj.scale / 200)}px var(--font-display, system-ui)`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            ctx.fillText(sat.title, proj.x, proj.y + satR + 6);
-        }
+        // v44c：所有卫星都显示标签，背面以低透明度避免丢失信息
+        const labelAlpha = isHover ? 1 : (depthFactor > 0.5 ? 0.85 * alpha : 0.45 * alpha);
+        ctx.fillStyle = isHover ? '#3aa9ff' : `rgba(212,232,255,${labelAlpha})`;
+        ctx.font = `${isHover ? 'bold ' : ''}${Math.max(11, 14 * proj.scale / 200)}px var(--font-display, system-ui)`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText(sat.title, proj.x, proj.y + satR + 6);
     },
 
     _hexA(hex, a) {
