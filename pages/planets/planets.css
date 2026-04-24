@@ -77,6 +77,72 @@
     opacity: 0.6;
 }
 
+/* v4.4-α7：subject 模式下的面包屑导航 */
+#page-planets .planets-crumb-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.05rem;
+    letter-spacing: 0.18em;
+    pointer-events: auto;
+}
+
+#page-planets .planets-crumb {
+    color: rgba(212, 232, 255, 0.85);
+    background: transparent;
+    border: 0;
+    padding: 4px 6px;
+    font-family: var(--font-display);
+    font-size: inherit;
+    letter-spacing: inherit;
+    text-shadow: 0 0 8px rgba(58,169,255,0.4);
+    cursor: default;
+    transition: color var(--duration-fast, 150ms) ease, text-shadow var(--duration-fast, 150ms) ease;
+}
+
+#page-planets .planets-crumb--root {
+    cursor: pointer;
+    color: rgba(58, 169, 255, 0.95);
+}
+
+#page-planets .planets-crumb--root:hover,
+#page-planets .planets-crumb--root:focus-visible {
+    color: #3aa9ff;
+    text-shadow: 0 0 12px rgba(58,169,255,0.75);
+    outline: none;
+}
+
+#page-planets .planets-crumb--subject {
+    font-weight: 600;
+    color: #d4ecff;
+    text-shadow: 0 0 12px rgba(58,169,255,0.6);
+}
+
+#page-planets .planets-crumb--exp {
+    color: rgba(58, 169, 255, 0.85);
+    font-size: 0.92em;
+    letter-spacing: 0.14em;
+}
+
+#page-planets .planets-crumb-sep {
+    color: rgba(58, 169, 255, 0.55);
+    font-size: 1.1em;
+    line-height: 1;
+}
+
+#page-planets .planets-crumb-sep--exp {
+    opacity: 0;
+    transition: opacity var(--duration-normal, 220ms) ease;
+}
+
+@media (max-width: 640px) {
+    #page-planets .planets-crumb-row {
+        font-size: 0.85rem;
+        gap: 6px;
+    }
+    #page-planets .planets-crumb { padding: 3px 4px; }
+}
+
 /* 返回按钮 */
 #page-planets .planets-back {
     position: fixed;

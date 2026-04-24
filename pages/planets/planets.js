@@ -299,21 +299,41 @@ window.PlanetsView = {
     _updateChrome() {
         // 切换 HUD 中的标题/提示文案
         const title = document.querySelector('#page-planets .planets-title');
-        const subtitle = document.querySelector('#page-planets .planets-subtitle');
         const hudBL = document.querySelector('#page-planets .planets-hud--bl');
         const hudTL = document.querySelector('#page-planets .planets-hud--tl');
         if (this.mode === 'subject' && this.currentSubject) {
             const s = this.currentSubject;
-            if (title) title.firstChild && (title.firstChild.nodeValue = `${s.label} · 实验集`);
-            if (subtitle) subtitle.textContent = 'TAP SATELLITE TO ENTER · ESC RETURN';
+            // v4.4-α7：subject 模式下把标题区替换为面包屑
+            if (title) {
+                title.innerHTML = `
+                    <div class="planets-crumb-row">
+                        <button type="button" class="planets-crumb planets-crumb--root" data-action="back-to-galaxy" aria-label="返回主星系">主星系</button>
+                        <span class="planets-crumb-sep">›</span>
+                        <span class="planets-crumb planets-crumb--subject">${s.label}</span>
+                        <span class="planets-crumb-sep planets-crumb-sep--exp" data-exp-sep>·</span>
+                        <span class="planets-crumb planets-crumb--exp" data-exp-name></span>
+                    </div>
+                    <div class="planets-subtitle">TAP SATELLITE TO ENTER · ESC RETURN</div>
+                `;
+                const backBtn = title.querySelector('[data-action="back-to-galaxy"]');
+                if (backBtn) backBtn.addEventListener('click', () => this._exitSubject());
+            }
             if (hudBL) hudBL.innerHTML = '<div>← DRAG TO ROTATE</div><div>TAP SATELLITE / ESC RETURN</div>';
             if (hudTL) hudTL.innerHTML = `<div><span class="blink">●</span> ${s.id.toUpperCase()}.SCAN</div><div>MODE: SUB-ORBIT</div><div>NODES: ${this.satellites.length}</div>`;
         } else {
-            if (title) title.firstChild && (title.firstChild.nodeValue = '星 系 导 航');
-            if (subtitle) subtitle.textContent = 'SUBJECT · GALAXY · MAP';
+            if (title) {
+                title.innerHTML = `星 系 导 航<div class="planets-subtitle">SUBJECT · GALAXY · MAP</div>`;
+            }
             if (hudBL) hudBL.innerHTML = '<div>← DRAG TO ROTATE</div><div>TAP PLANET TO ENTER</div>';
             if (hudTL) hudTL.innerHTML = '<div><span class="blink">●</span> SYS.SCAN</div><div>MODE: ORBIT</div><div>NODES: 5</div>';
         }
+    },
+
+    _updateBreadcrumbExp(text) {
+        const expEl = document.querySelector('#page-planets .planets-crumb--exp');
+        const sepEl = document.querySelector('#page-planets [data-exp-sep]');
+        if (expEl) expEl.textContent = text || '';
+        if (sepEl) sepEl.style.opacity = text ? '0.55' : '0';
     },
 
     _project(x, y, z) {
@@ -391,6 +411,7 @@ window.PlanetsView = {
         const hintEl = this.info.querySelector('.planets-info__hint');
         if (!this.hovered) {
             this.info.classList.remove('planets-info--visible');
+            if (this.mode === 'subject') this._updateBreadcrumbExp('');
             return;
         }
         this.info.classList.add('planets-info--visible');
@@ -408,6 +429,7 @@ window.PlanetsView = {
             if (descEl) descEl.textContent = '点击中央或 ESC 返回主星系';
             if (hintEl) hintEl.textContent = '← BACK TO GALAXY';
             this.info.style.borderLeftColor = (this.currentSubject && this.currentSubject.color) || '#3aa9ff';
+            this._updateBreadcrumbExp('');
         } else if (this.mode === 'subject' && this.hovered && this.hovered.id) {
             // 卫星实验
             if (labelEl) labelEl.textContent = 'EXPERIMENT';
@@ -415,6 +437,7 @@ window.PlanetsView = {
             if (descEl) descEl.textContent = this.hovered.desc || '';
             if (hintEl) hintEl.textContent = 'CLICK TO LAUNCH →';
             this.info.style.borderLeftColor = (this.currentSubject && this.currentSubject.color) || '#3aa9ff';
+            this._updateBreadcrumbExp(this.hovered.title);
         }
     },
 
