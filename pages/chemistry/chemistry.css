@@ -445,6 +445,134 @@
     font-size: 0.78rem;
     font-weight: 600;
 }
+
+/* ===== 键参数表（v4.5.0-α4） ===== */
+.mol-bondparams {
+    margin-top: 10px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md, 8px);
+    background: rgba(100, 200, 255, 0.05);
+    border: 1px solid rgba(100, 200, 255, 0.14);
+}
+.mol-bondparams__title {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+.mol-bondparams__sub {
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.4);
+}
+.mol-bondparams__tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.78);
+}
+.mol-bondparams__tbl th,
+.mol-bondparams__tbl td {
+    padding: 4px 6px;
+    text-align: left;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+}
+.mol-bondparams__tbl th {
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.74rem;
+}
+.mol-bondparams__tbl tr:last-child td { border-bottom: none; }
+.mol-bondparams__bond {
+    font-family: 'JetBrains Mono', var(--font-mono, monospace);
+    font-weight: 600;
+    color: rgba(100, 200, 255, 0.95);
+}
+.mol-bondparams__type {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 0.74rem;
+}
+.mol-bondparams__hint {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(100, 200, 255, 0.1);
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 0.76rem;
+    line-height: 1.5;
+}
+
+/* ===== 同族对比表（v4.5.0-α5：H₂S vs H₂O 等） ===== */
+.mol-compare {
+    margin-top: 10px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md, 8px);
+    background: rgba(229, 192, 123, 0.06);
+    border: 1px solid rgba(229, 192, 123, 0.18);
+}
+.mol-compare__title {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+    margin-bottom: 6px;
+}
+.mol-compare__title b {
+    color: rgba(229, 192, 123, 0.95);
+    font-weight: 700;
+}
+.mol-compare__sub {
+    font-size: 0.74rem;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.4);
+}
+.mol-compare__tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.82);
+}
+.mol-compare__tbl th,
+.mol-compare__tbl td {
+    padding: 4px 8px;
+    text-align: left;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+}
+.mol-compare__tbl th {
+    font-weight: 600;
+    color: rgba(229, 192, 123, 0.85);
+    font-size: 0.78rem;
+}
+.mol-compare__tbl td:first-child {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 0.78rem;
+    width: 32%;
+}
+.mol-compare__tbl tr:last-child td { border-bottom: none; }
+.mol-compare__hint {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(229, 192, 123, 0.15);
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.76rem;
+    line-height: 1.5;
+}
+@media (max-width: 768px) {
+    .mol-compare { padding: 8px 10px; }
+    .mol-compare__tbl { font-size: 0.74rem; }
+    .mol-compare__tbl th,
+    .mol-compare__tbl td { padding: 3px 5px; }
+}
+
+@media (max-width: 768px) {
+    .mol-bondparams { padding: 8px 10px; }
+    .mol-bondparams__tbl { font-size: 0.74rem; }
+    .mol-bondparams__tbl th,
+    .mol-bondparams__tbl td { padding: 3px 4px; }
+    .mol-bondparams__type { font-size: 0.7rem; }
+}
+
 .mol-edu { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(77,158,126,.06); border:1px solid rgba(77,158,126,.12); font-size:.85rem; line-height:1.65; }
 .mol-edu .chem-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
 .mol-edu .chem-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(77,158,126,.18); color:rgba(77,158,126,.9); }
@@ -857,6 +985,14 @@
 .oc-tag--blue { background: rgba(91,141,206,.15); color: #7eb8f0; }
 .oc-tag--amber { background: rgba(229,192,123,.12); color: #e5c07b; }
 .oc-tag--red { background: rgba(224,108,117,.12); color: #e06c75; }
+.oc-tag--purple { background: rgba(155,141,206,.16); color: #b29bdc; }      /* v4.5.0-α9 几何标签 */
+.oc-tag--green { background: rgba(140,200,140,.16); color: #95d495; }       /* v4.5.0-α9 交互标签 */
+.organic-disabled-flash { animation: organicDisabledFlash .55s ease; }      /* v4.5.0-α9 σ 键按钮无效反馈 */
+@keyframes organicDisabledFlash {
+    0% { background: rgba(224,108,117,.0); }
+    40% { background: rgba(224,108,117,.35); }
+    100% { background: rgba(224,108,117,.0); }
+}
 .oc-rxns ul { margin: .3rem 0 0 1.2rem; padding: 0; }
 .oc-rxns li { margin-bottom: .2rem; font-family: var(--font-mono, monospace); font-size: .78rem; }
 @media (max-width: 768px) {
