@@ -49,6 +49,8 @@
     <link rel="stylesheet" href="pages/chemistry/chemistry.css?v=20260417d">
     <link rel="stylesheet" href="pages/algorithms/algorithms.css?v=20260417d">
     <link rel="stylesheet" href="pages/biology/biology.css?v=20260417d">
+    <!-- v4.5-α1 全局搜索 -->
+    <link rel="stylesheet" href="shared/css/global-search.css?v=20260424v45a">
     <!-- CSS: Responsive (must be last) -->
     <link rel="stylesheet" href="shared/css/responsive.css?v=20260417d">
 
@@ -152,6 +154,11 @@
                     <i data-lucide="leaf"></i>
                     <span>生物</span>
                 </a>
+                <button type="button" id="nav-search-trigger" aria-label="全局搜索实验" title="搜索实验 (Ctrl+K)">
+                    <i data-lucide="search"></i>
+                    <span>搜索</span>
+                    <span class="gsearch-kbd">Ctrl K</span>
+                </button>
                 <div class="nav-indicator"></div>
             </div>
         </div>
@@ -2813,7 +2820,8 @@
     <script src="pages/home/home.js?v=20260424v44a"></script>
     <script src="pages/planets/planets.js?v=20260424v44g"></script>
     <!-- Scripts: Bootstrap (before deferred modules for fast homepage boot) -->
-    <script src="shared/js/main.js?v=20260417d"></script>
+    <script src="shared/js/global-search.js?v=20260424v45a"></script>
+    <script src="shared/js/main.js?v=20260424v45a"></script>
     <!-- Scripts: Subject modules (deferred — download in parallel, execute after core) -->
     <script defer src="pages/mathematics/mathematics.js"></script>
     <script defer src="pages/mathematics/calculus.js"></script>
@@ -2883,5 +2891,17 @@
     <script defer src="pages/biology/cellular-respiration.js?v=20260423a"></script>
     <script defer src="pages/biology/substance-transport.js?v=20260416b"></script>
     <script defer src="pages/biology/gene-mutation.js?v=20260416b"></script>
+
+    <!-- v4.5-α1 全局搜索浮层 -->
+    <div class="gsearch-overlay" id="global-search-overlay" role="dialog" aria-modal="true" aria-label="全局实验搜索">
+        <div class="gsearch-panel">
+            <div class="gsearch__inputwrap">
+                <i data-lucide="search"></i>
+                <input class="gsearch__input" type="text" placeholder="搜索实验名 / 描述 / 学科…" aria-label="搜索关键词" autocomplete="off" spellcheck="false">
+                <span class="gsearch__hint">↑↓ 选择 · Enter 进入 · Esc 关闭</span>
+            </div>
+            <div class="gsearch__list" role="listbox" aria-label="搜索结果"></div>
+        </div>
+    </div>
 </body>
 </html>

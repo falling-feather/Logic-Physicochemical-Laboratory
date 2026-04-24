@@ -30,6 +30,9 @@ function initApp() {
     // 1f. Initialize theme switch (X-03)
     if (typeof ThemeSwitch !== 'undefined') ThemeSwitch.init();
 
+    // 1g. Initialize global search (v4.5-α1)
+    if (typeof GlobalSearch !== 'undefined') GlobalSearch.init();
+
     // 2. Homepage init moved to Router.onPageEnter('home') for lazy loading
 
     // 3. All experiment module inits moved to Router.onPageEnter() for lazy loading
