@@ -264,22 +264,22 @@ window.PlanetsView = {
         const cx = this.W / 2, cy = this.H / 2;
         const coreR = Math.min(this.W, this.H) * 0.06;
         const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 2);
-        grad.addColorStop(0, 'rgba(0,255,213,0.4)');
-        grad.addColorStop(0.5, 'rgba(0,255,213,0.1)');
-        grad.addColorStop(1, 'rgba(0,255,213,0)');
+        grad.addColorStop(0, 'rgba(58,169,255,0.4)');
+        grad.addColorStop(0.5, 'rgba(58,169,255,0.1)');
+        grad.addColorStop(1, 'rgba(58,169,255,0)');
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.arc(cx, cy, coreR * 2, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.strokeStyle = 'rgba(0,255,213,0.6)';
+        ctx.strokeStyle = 'rgba(58,169,255,0.6)';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
         ctx.stroke();
 
         // orbit ring (project a circle in xz plane at y=0)
-        ctx.strokeStyle = 'rgba(0,255,213,0.18)';
+        ctx.strokeStyle = 'rgba(58,169,255,0.18)';
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 6]);
         ctx.beginPath();
@@ -316,19 +316,19 @@ window.PlanetsView = {
             ctx.fill();
 
             // body — translucent dark + cyan ring
-            ctx.fillStyle = `rgba(0,30,30,${0.65 * alpha})`;
+            ctx.fillStyle = `rgba(0,18,40,${0.65 * alpha})`;
             ctx.beginPath();
             ctx.arc(proj.x, proj.y, planetR, 0, Math.PI * 2);
             ctx.fill();
 
-            ctx.strokeStyle = isHover ? '#00ffd5' : `rgba(0,255,213,${0.55 * alpha})`;
+            ctx.strokeStyle = isHover ? '#3aa9ff' : `rgba(58,169,255,${0.55 * alpha})`;
             ctx.lineWidth = isHover ? 2 : 1.2;
             ctx.beginPath();
             ctx.arc(proj.x, proj.y, planetR, 0, Math.PI * 2);
             ctx.stroke();
 
             // inner crosshair / equator ring
-            ctx.strokeStyle = `rgba(0,255,213,${0.35 * alpha})`;
+            ctx.strokeStyle = `rgba(58,169,255,${0.35 * alpha})`;
             ctx.lineWidth = 0.8;
             ctx.beginPath();
             ctx.ellipse(proj.x, proj.y, planetR * 0.85, planetR * 0.25, 0, 0, Math.PI * 2);
@@ -347,7 +347,7 @@ window.PlanetsView = {
             ctx.fill();
 
             // label
-            ctx.fillStyle = isHover ? '#00ffd5' : `rgba(212,255,243,${0.85 * alpha})`;
+            ctx.fillStyle = isHover ? '#3aa9ff' : `rgba(212,232,255,${0.85 * alpha})`;
             ctx.font = `${isHover ? 'bold ' : ''}${Math.max(11, 14 * proj.scale / 200)}px var(--font-display, system-ui)`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';

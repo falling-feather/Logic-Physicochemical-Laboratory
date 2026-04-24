@@ -66,12 +66,12 @@
     pointer-events: none; z-index: 0;
     opacity: 0.045;
     background-image:
-        linear-gradient(30deg, rgba(0,255,213,0.5) 12%, transparent 12.5%, transparent 87%, rgba(0,255,213,0.5) 87.5%, rgba(0,255,213,0.5)),
-        linear-gradient(150deg, rgba(0,255,213,0.5) 12%, transparent 12.5%, transparent 87%, rgba(0,255,213,0.5) 87.5%, rgba(0,255,213,0.5)),
-        linear-gradient(30deg, rgba(0,255,213,0.5) 12%, transparent 12.5%, transparent 87%, rgba(0,255,213,0.5) 87.5%, rgba(0,255,213,0.5)),
-        linear-gradient(150deg, rgba(0,255,213,0.5) 12%, transparent 12.5%, transparent 87%, rgba(0,255,213,0.5) 87.5%, rgba(0,255,213,0.5)),
-        linear-gradient(60deg, rgba(0,255,213,0.35) 25%, transparent 25.5%, transparent 75%, rgba(0,255,213,0.35) 75%, rgba(0,255,213,0.35)),
-        linear-gradient(60deg, rgba(0,255,213,0.35) 25%, transparent 25.5%, transparent 75%, rgba(0,255,213,0.35) 75%, rgba(0,255,213,0.35));
+        linear-gradient(30deg, rgba(58,169,255,0.5) 12%, transparent 12.5%, transparent 87%, rgba(58,169,255,0.5) 87.5%, rgba(58,169,255,0.5)),
+        linear-gradient(150deg, rgba(58,169,255,0.5) 12%, transparent 12.5%, transparent 87%, rgba(58,169,255,0.5) 87.5%, rgba(58,169,255,0.5)),
+        linear-gradient(30deg, rgba(58,169,255,0.5) 12%, transparent 12.5%, transparent 87%, rgba(58,169,255,0.5) 87.5%, rgba(58,169,255,0.5)),
+        linear-gradient(150deg, rgba(58,169,255,0.5) 12%, transparent 12.5%, transparent 87%, rgba(58,169,255,0.5) 87.5%, rgba(58,169,255,0.5)),
+        linear-gradient(60deg, rgba(58,169,255,0.35) 25%, transparent 25.5%, transparent 75%, rgba(58,169,255,0.35) 75%, rgba(58,169,255,0.35)),
+        linear-gradient(60deg, rgba(58,169,255,0.35) 25%, transparent 25.5%, transparent 75%, rgba(58,169,255,0.35) 75%, rgba(58,169,255,0.35));
     background-size: 80px 140px;
     background-position: 0 0, 0 0, 40px 70px, 40px 70px, 0 0, 40px 70px;
 }
@@ -129,21 +129,21 @@
 .nebula-1 {
     width: 500px; height: 500px;
     top: -8%; right: -3%;
-    background: radial-gradient(ellipse, rgba(0,255,213,0.10), transparent 70%);
+    background: radial-gradient(ellipse, rgba(58,169,255,0.10), transparent 70%);
     animation: nebulaDrift 30s ease-in-out infinite;
 }
 
 .nebula-2 {
     width: 400px; height: 350px;
     bottom: 5%; left: -6%;
-    background: radial-gradient(ellipse, rgba(0,180,166,0.08), transparent 70%);
+    background: radial-gradient(ellipse, rgba(58,124,206,0.08), transparent 70%);
     animation: nebulaDrift 25s ease-in-out infinite reverse;
 }
 
 .nebula-3 {
     width: 300px; height: 280px;
     top: 35%; left: 62%;
-    background: radial-gradient(ellipse, rgba(45,255,170,0.06), transparent 70%);
+    background: radial-gradient(ellipse, rgba(100,180,255,0.06), transparent 70%);
     animation: nebulaDrift 35s ease-in-out infinite 5s;
 }
 
@@ -204,9 +204,9 @@
     background: linear-gradient(180deg,
         transparent 0%,
         transparent 47%,
-        rgba(0,255,213,0.045) 49%,
-        rgba(0,255,213,0.10) 50%,
-        rgba(0,255,213,0.045) 51%,
+        rgba(58,169,255,0.045) 49%,
+        rgba(58,169,255,0.10) 50%,
+        rgba(58,169,255,0.045) 51%,
         transparent 53%,
         transparent 100%);
     animation: hudVerticalScan 9s linear infinite;
@@ -243,9 +243,9 @@
     top: -30%; left: -30%;
     border-radius: 50%;
     background:
-        radial-gradient(circle, transparent 56%, rgba(0,255,213,0.06) 60%, transparent 64%),
-        radial-gradient(circle, transparent 70%, rgba(0,255,213,0.10) 73%, transparent 76%),
-        conic-gradient(from 0deg, transparent 0deg, rgba(0,255,213,0.18) 30deg, transparent 60deg, transparent 360deg);
+        radial-gradient(circle, transparent 56%, rgba(58,169,255,0.06) 60%, transparent 64%),
+        radial-gradient(circle, transparent 70%, rgba(58,169,255,0.10) 73%, transparent 76%),
+        conic-gradient(from 0deg, transparent 0deg, rgba(58,169,255,0.18) 30deg, transparent 60deg, transparent 360deg);
     animation: atmospherePulse 5s ease-in-out infinite, hudScan 6s linear infinite;
     pointer-events: none;
     filter: blur(0.4px);
@@ -265,20 +265,20 @@
 .star-body {
     /* 深空底，半透明，让经纬线浮现 */
     background:
-        radial-gradient(circle at 50% 50%, rgba(0,30,30,0.85) 0%, rgba(0,20,30,0.75) 50%, rgba(0,40,55,0.55) 100%);
+        radial-gradient(circle at 50% 50%, rgba(0,18,40,0.85) 0%, rgba(0,12,40,0.75) 50%, rgba(0,28,60,0.55) 100%);
     border-radius: 50%;
     width: 200px; height: 200px;
     display: flex; align-items: center; justify-content: center;
     position: relative;
     overflow: hidden;
     /* 青绿外圈 + 多层青绿辉光 */
-    border: 1.5px solid rgba(0,255,213,0.45);
+    border: 1.5px solid rgba(58,169,255,0.45);
     box-shadow:
-        0 0 22px rgba(0,255,213,0.55),
-        0 0 60px rgba(0,255,213,0.30),
-        0 0 120px rgba(0,180,166,0.12),
-        inset 0 0 24px rgba(0,255,213,0.18),
-        inset 0 0 60px rgba(0,40,55,0.6);
+        0 0 22px rgba(58,169,255,0.55),
+        0 0 60px rgba(58,169,255,0.30),
+        0 0 120px rgba(58,124,206,0.12),
+        inset 0 0 24px rgba(58,169,255,0.18),
+        inset 0 0 60px rgba(0,28,60,0.6);
 }
 
 /* 装饰：内圈准星圈（绝对定位伪元素） */
@@ -286,7 +286,7 @@
     content: '';
     position: absolute;
     top: 12%; left: 12%; width: 76%; height: 76%;
-    border: 1px dashed rgba(0,255,213,0.30);
+    border: 1px dashed rgba(58,169,255,0.30);
     border-radius: 50%;
     pointer-events: none;
     animation: hudScan 18s linear infinite reverse;
@@ -296,7 +296,7 @@
     content: '';
     position: absolute;
     top: 28%; left: 28%; width: 44%; height: 44%;
-    border: 1px solid rgba(0,255,213,0.22);
+    border: 1px solid rgba(58,169,255,0.22);
     border-radius: 50%;
     pointer-events: none;
     animation: hudScan 30s linear infinite;
@@ -309,11 +309,11 @@
     width: 100%; height: 100%;
     background:
         /* 经线（垂直，模拟球面取 5 段） */
-        repeating-linear-gradient(90deg, transparent 0, transparent 38px, rgba(0,255,213,0.16) 38px, rgba(0,255,213,0.16) 39px),
+        repeating-linear-gradient(90deg, transparent 0, transparent 38px, rgba(58,169,255,0.16) 38px, rgba(58,169,255,0.16) 39px),
         /* 纬线（水平） */
-        repeating-linear-gradient(0deg,  transparent 0, transparent 22px, rgba(0,255,213,0.12) 22px, rgba(0,255,213,0.12) 23px),
+        repeating-linear-gradient(0deg,  transparent 0, transparent 22px, rgba(58,169,255,0.12) 22px, rgba(58,169,255,0.12) 23px),
         /* 中央高亮赤道带 */
-        linear-gradient(0deg, transparent 47%, rgba(0,255,213,0.10) 50%, transparent 53%);
+        linear-gradient(0deg, transparent 47%, rgba(58,169,255,0.10) 50%, transparent 53%);
     /* 球面投影（让网格在边缘"卷曲" → 圆形遮罩 + 透明度衰减） */
     -webkit-mask: radial-gradient(circle at 50% 50%, #000 55%, rgba(0,0,0,0.55) 80%, transparent 98%);
             mask: radial-gradient(circle at 50% 50%, #000 55%, rgba(0,0,0,0.55) 80%, transparent 98%);
@@ -333,11 +333,11 @@
     pointer-events: none; z-index: 2;
     background:
         /* 横十字 */
-        linear-gradient(0deg, transparent 49.5%, rgba(0,255,213,0.32) 49.5%, rgba(0,255,213,0.32) 50.5%, transparent 50.5%),
+        linear-gradient(0deg, transparent 49.5%, rgba(58,169,255,0.32) 49.5%, rgba(58,169,255,0.32) 50.5%, transparent 50.5%),
         /* 竖十字 */
-        linear-gradient(90deg, transparent 49.5%, rgba(0,255,213,0.32) 49.5%, rgba(0,255,213,0.32) 50.5%, transparent 50.5%),
+        linear-gradient(90deg, transparent 49.5%, rgba(58,169,255,0.32) 49.5%, rgba(58,169,255,0.32) 50.5%, transparent 50.5%),
         /* 顶部高光 */
-        radial-gradient(ellipse at 35% 22%, rgba(180,255,235,0.20) 0%, rgba(0,255,213,0.05) 25%, transparent 55%);
+        radial-gradient(ellipse at 35% 22%, rgba(180,210,255,0.20) 0%, rgba(58,169,255,0.05) 25%, transparent 55%);
     -webkit-mask: radial-gradient(circle at 50% 50%, #000 92%, transparent 99%);
             mask: radial-gradient(circle at 50% 50%, #000 92%, transparent 99%);
 }
@@ -345,10 +345,10 @@
 .star-title {
     font-size: 1.4rem;
     font-weight: 700;
-    color: #d4fff3;
+    color: #d4ecff;
     text-shadow:
-        0 0 10px rgba(0,255,213,0.85),
-        0 0 22px rgba(0,255,213,0.45),
+        0 0 10px rgba(58,169,255,0.85),
+        0 0 22px rgba(58,169,255,0.45),
         0 2px 8px rgba(0,0,0,0.6);
     z-index: 3; position: relative;
     letter-spacing: 0.18em;
@@ -371,7 +371,7 @@
     clip-path: inset(20% 0 60% 0);
 }
 .star-title::after {
-    color: #00ffd5;
+    color: #3aa9ff;
     animation: glitch2 8s ease-in-out infinite 0.3s;
     clip-path: inset(50% 0 10% 0);
 }
@@ -406,12 +406,12 @@
 
 .eye {
     width: 18px; height: 18px;
-    background: radial-gradient(circle at 40% 40%, #d4fff3, #a8f5e0);
+    background: radial-gradient(circle at 40% 40%, #d4ecff, #a8d4ff);
     border-radius: 50%;
     box-shadow:
-        0 0 10px rgba(0,255,213,0.85),
-        0 0 18px rgba(0,255,213,0.35),
-        inset 0 -2px 4px rgba(0,40,40,0.25);
+        0 0 10px rgba(58,169,255,0.85),
+        0 0 18px rgba(58,169,255,0.35),
+        inset 0 -2px 4px rgba(0,24,55,0.25);
     position: relative;
     transition: transform 0.12s ease;
 }
@@ -420,20 +420,20 @@
 
 .pupil {
     width: 11px; height: 11px;
-    background: radial-gradient(circle at 35% 35%, #003a36, #001416);
+    background: radial-gradient(circle at 35% 35%, #003a6e, #00141c);
     border-radius: 50%;
     position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
     transition: transform 0.06s ease-out;
-    box-shadow: inset 0 0 4px rgba(0,255,213,0.6);
+    box-shadow: inset 0 0 4px rgba(58,169,255,0.6);
 }
 
 .pupil-shine {
     position: absolute; top: 2px; left: 3px;
     width: 4px; height: 4px;
-    background: #d4fff3; border-radius: 50%;
+    background: #d4ecff; border-radius: 50%;
     opacity: 0.95;
-    box-shadow: 0 0 4px rgba(0,255,213,0.9);
+    box-shadow: 0 0 4px rgba(58,169,255,0.9);
 }
 
 /* ── Tagline ── */
@@ -453,21 +453,21 @@
 
 .home-tagline p {
     font-size: 0.95rem;
-    color: rgba(0,255,213,0.72);
+    color: rgba(58,169,255,0.72);
     letter-spacing: 0.15em;
     font-weight: 400;
     font-family: var(--font-mono);
-    text-shadow: 0 0 12px rgba(0,255,213,0.45);
+    text-shadow: 0 0 12px rgba(58,169,255,0.45);
     min-width: 16ch;
 }
 
 .tagline-cursor {
     width: 2px;
     height: 1.1em;
-    background: rgba(0,255,213,0.85);
+    background: rgba(58,169,255,0.85);
     animation: cursorBlink 1s step-end infinite;
     flex-shrink: 0;
-    box-shadow: 0 0 6px rgba(0,255,213,0.7);
+    box-shadow: 0 0 6px rgba(58,169,255,0.7);
 }
 
 @keyframes cursorBlink {
@@ -573,22 +573,22 @@
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     position: relative; overflow: hidden;
-    border: 1.5px solid rgba(0,255,213,0.32); /* 青绿外圈统一语言 */
+    border: 1.5px solid rgba(58,169,255,0.32); /* 青绿外圈统一语言 */
     transition: box-shadow 0.3s ease, transform 0.3s var(--ease-spring), border-color 0.3s ease;
 }
 
 .satellite:hover .satellite-icon {
     transform: scale(1.15);
-    border-color: rgba(0,255,213,0.85);
+    border-color: rgba(58,169,255,0.85);
 }
 
 .satellite-icon .planet-surface { animation-duration: 22s; }
 /* 保留 α1 准星十字（年本环境下准备变薄到适合 80px 小球） */
 .satellite-icon .planet-highlight {
     background:
-        linear-gradient(0deg, transparent 49%, rgba(0,255,213,0.28) 49%, rgba(0,255,213,0.28) 51%, transparent 51%),
-        linear-gradient(90deg, transparent 49%, rgba(0,255,213,0.28) 49%, rgba(0,255,213,0.28) 51%, transparent 51%),
-        radial-gradient(circle at 30% 25%, rgba(180,255,235,0.22) 0%, transparent 45%);
+        linear-gradient(0deg, transparent 49%, rgba(58,169,255,0.28) 49%, rgba(58,169,255,0.28) 51%, transparent 51%),
+        linear-gradient(90deg, transparent 49%, rgba(58,169,255,0.28) 49%, rgba(58,169,255,0.28) 51%, transparent 51%),
+        radial-gradient(circle at 30% 25%, rgba(180,210,255,0.22) 0%, transparent 45%);
     -webkit-mask: radial-gradient(circle at 50% 50%, #000 90%, transparent 99%);
             mask: radial-gradient(circle at 50% 50%, #000 90%, transparent 99%);
 }
@@ -596,40 +596,40 @@
 /* Planet colors — 学科色作为辅色辉光 + 透明深空底 */
 .satellite-1 .satellite-icon {
     background:
-        radial-gradient(circle at 50% 50%, rgba(91,141,206,0.18) 0%, rgba(0,30,40,0.85) 60%, rgba(0,40,55,0.55) 100%);
-    box-shadow: 0 0 14px rgba(91,141,206,0.35), 0 0 8px rgba(0,255,213,0.18), inset 0 0 12px rgba(0,255,213,0.10);
+        radial-gradient(circle at 50% 50%, rgba(91,141,206,0.18) 0%, rgba(0,20,50,0.85) 60%, rgba(0,28,60,0.55) 100%);
+    box-shadow: 0 0 14px rgba(91,141,206,0.35), 0 0 8px rgba(58,169,255,0.18), inset 0 0 12px rgba(58,169,255,0.10);
 }
 
 .satellite-2 .satellite-icon {
     background:
-        radial-gradient(circle at 50% 50%, rgba(139,111,192,0.18) 0%, rgba(0,30,40,0.85) 60%, rgba(0,40,55,0.55) 100%);
-    box-shadow: 0 0 14px rgba(139,111,192,0.35), 0 0 8px rgba(0,255,213,0.18), inset 0 0 12px rgba(0,255,213,0.10);
+        radial-gradient(circle at 50% 50%, rgba(139,111,192,0.18) 0%, rgba(0,20,50,0.85) 60%, rgba(0,28,60,0.55) 100%);
+    box-shadow: 0 0 14px rgba(139,111,192,0.35), 0 0 8px rgba(58,169,255,0.18), inset 0 0 12px rgba(58,169,255,0.10);
 }
 
 .satellite-3 .satellite-icon {
     background:
-        radial-gradient(circle at 50% 50%, rgba(77,158,126,0.18) 0%, rgba(0,30,40,0.85) 60%, rgba(0,40,55,0.55) 100%);
-    box-shadow: 0 0 14px rgba(77,158,126,0.35), 0 0 8px rgba(0,255,213,0.18), inset 0 0 12px rgba(0,255,213,0.10);
+        radial-gradient(circle at 50% 50%, rgba(77,158,126,0.18) 0%, rgba(0,20,50,0.85) 60%, rgba(0,28,60,0.55) 100%);
+    box-shadow: 0 0 14px rgba(77,158,126,0.35), 0 0 8px rgba(58,169,255,0.18), inset 0 0 12px rgba(58,169,255,0.10);
 }
 
 .satellite-4 .satellite-icon {
     background:
-        radial-gradient(circle at 50% 50%, rgba(196,121,58,0.18) 0%, rgba(0,30,40,0.85) 60%, rgba(0,40,55,0.55) 100%);
-    box-shadow: 0 0 14px rgba(196,121,58,0.35), 0 0 8px rgba(0,255,213,0.18), inset 0 0 12px rgba(0,255,213,0.10);
+        radial-gradient(circle at 50% 50%, rgba(196,121,58,0.18) 0%, rgba(0,20,50,0.85) 60%, rgba(0,28,60,0.55) 100%);
+    box-shadow: 0 0 14px rgba(196,121,58,0.35), 0 0 8px rgba(58,169,255,0.18), inset 0 0 12px rgba(58,169,255,0.10);
 }
 
 .satellite-5 .satellite-icon {
     background:
-        radial-gradient(circle at 50% 50%, rgba(58,158,143,0.18) 0%, rgba(0,30,40,0.85) 60%, rgba(0,40,55,0.55) 100%);
-    box-shadow: 0 0 14px rgba(58,158,143,0.35), 0 0 8px rgba(0,255,213,0.18), inset 0 0 12px rgba(0,255,213,0.10);
+        radial-gradient(circle at 50% 50%, rgba(58,158,143,0.18) 0%, rgba(0,20,50,0.85) 60%, rgba(0,28,60,0.55) 100%);
+    box-shadow: 0 0 14px rgba(58,158,143,0.35), 0 0 8px rgba(58,169,255,0.18), inset 0 0 12px rgba(58,169,255,0.10);
 }
 
 /* Hover glow enhancement — 学科色 + 青绿双重辉光 */
-.satellite-1:hover .satellite-icon { box-shadow: 0 0 32px rgba(91,141,206,0.6),  0 0 18px rgba(0,255,213,0.45), inset 0 0 16px rgba(0,255,213,0.18); }
-.satellite-2:hover .satellite-icon { box-shadow: 0 0 32px rgba(139,111,192,0.6), 0 0 18px rgba(0,255,213,0.45), inset 0 0 16px rgba(0,255,213,0.18); }
-.satellite-3:hover .satellite-icon { box-shadow: 0 0 32px rgba(77,158,126,0.6),  0 0 18px rgba(0,255,213,0.45), inset 0 0 16px rgba(0,255,213,0.18); }
-.satellite-4:hover .satellite-icon { box-shadow: 0 0 32px rgba(196,121,58,0.6),  0 0 18px rgba(0,255,213,0.45), inset 0 0 16px rgba(0,255,213,0.18); }
-.satellite-5:hover .satellite-icon { box-shadow: 0 0 32px rgba(58,158,143,0.6),  0 0 18px rgba(0,255,213,0.45), inset 0 0 16px rgba(0,255,213,0.18); }
+.satellite-1:hover .satellite-icon { box-shadow: 0 0 32px rgba(91,141,206,0.6),  0 0 18px rgba(58,169,255,0.45), inset 0 0 16px rgba(58,169,255,0.18); }
+.satellite-2:hover .satellite-icon { box-shadow: 0 0 32px rgba(139,111,192,0.6), 0 0 18px rgba(58,169,255,0.45), inset 0 0 16px rgba(58,169,255,0.18); }
+.satellite-3:hover .satellite-icon { box-shadow: 0 0 32px rgba(77,158,126,0.6),  0 0 18px rgba(58,169,255,0.45), inset 0 0 16px rgba(58,169,255,0.18); }
+.satellite-4:hover .satellite-icon { box-shadow: 0 0 32px rgba(196,121,58,0.6),  0 0 18px rgba(58,169,255,0.45), inset 0 0 16px rgba(58,169,255,0.18); }
+.satellite-5:hover .satellite-icon { box-shadow: 0 0 32px rgba(58,158,143,0.6),  0 0 18px rgba(58,169,255,0.45), inset 0 0 16px rgba(58,169,255,0.18); }
 
 /* Saturn-style ring */
 .satellite-ring {

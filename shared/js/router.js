@@ -90,10 +90,10 @@ const Router = {
         // Update nav
         this.updateNav(page);
 
-        // Update navbar transparency
+        // Update navbar transparency（v4.3：planets 大屏与 home 一致透明化）
         const navbar = document.getElementById('navbar');
         if (navbar) {
-            if (page === 'home') {
+            if (page === 'home' || page === 'planets') {
                 navbar.classList.add('navbar--transparent');
             } else {
                 navbar.classList.remove('navbar--transparent');

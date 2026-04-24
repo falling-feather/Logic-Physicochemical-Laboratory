@@ -30,11 +30,11 @@
     position: fixed;
     z-index: 5;
     pointer-events: none;
-    color: #00ffd5;
+    color: #3aa9ff;
     font-family: var(--font-mono, 'JetBrains Mono', monospace);
     font-size: 0.72rem;
     letter-spacing: 0.12em;
-    text-shadow: 0 0 8px rgba(0,255,213,0.5);
+    text-shadow: 0 0 8px rgba(58,169,255,0.5);
     line-height: 1.6;
     opacity: 0.7;
 }
@@ -61,11 +61,11 @@
     transform: translateX(-50%);
     z-index: 5;
     text-align: center;
-    color: #d4fff3;
+    color: #d4ecff;
     font-family: var(--font-display);
     font-size: 1.6rem;
     letter-spacing: 0.4em;
-    text-shadow: 0 0 12px rgba(0,255,213,0.6);
+    text-shadow: 0 0 12px rgba(58,169,255,0.6);
     pointer-events: none;
 }
 
@@ -73,7 +73,7 @@
     margin-top: 6px;
     font-size: 0.7rem;
     letter-spacing: 0.3em;
-    color: #00ffd5;
+    color: #3aa9ff;
     opacity: 0.6;
 }
 
@@ -84,22 +84,22 @@
     left: 24px;
     z-index: 10;
     padding: 8px 16px;
-    background: rgba(0,30,30,0.6);
-    border: 1px solid rgba(0,255,213,0.4);
+    background: rgba(0,18,40,0.6);
+    border: 1px solid rgba(58,169,255,0.4);
     border-radius: 6px;
-    color: #00ffd5;
+    color: #3aa9ff;
     font-family: var(--font-mono, monospace);
     font-size: 0.8rem;
     letter-spacing: 0.15em;
     cursor: pointer;
     text-decoration: none;
     transition: all 0.2s ease;
-    box-shadow: 0 0 12px rgba(0,255,213,0.2);
+    box-shadow: 0 0 12px rgba(58,169,255,0.2);
 }
 
 #page-planets .planets-back:hover {
-    background: rgba(0,80,80,0.7);
-    box-shadow: 0 0 24px rgba(0,255,213,0.5);
+    background: rgba(0,40,90,0.7);
+    box-shadow: 0 0 24px rgba(58,169,255,0.5);
     transform: translateY(-1px);
 }
 
@@ -111,13 +111,13 @@
     z-index: 5;
     min-width: 240px;
     padding: 16px 20px;
-    background: rgba(0,30,30,0.85);
-    border: 1px solid rgba(0,255,213,0.4);
-    border-left: 3px solid #00ffd5;
+    background: rgba(0,18,40,0.85);
+    border: 1px solid rgba(58,169,255,0.4);
+    border-left: 3px solid #3aa9ff;
     border-radius: 8px;
-    color: #d4fff3;
+    color: #d4ecff;
     font-family: var(--font-mono, monospace);
-    box-shadow: 0 0 24px rgba(0,255,213,0.25);
+    box-shadow: 0 0 24px rgba(58,169,255,0.25);
     opacity: 0;
     transform: translateX(20px);
     pointer-events: none;
@@ -132,7 +132,7 @@
 #page-planets .planets-info__label {
     font-size: 0.65rem;
     letter-spacing: 0.3em;
-    color: #00ffd5;
+    color: #3aa9ff;
     margin-bottom: 4px;
     opacity: 0.7;
 }
@@ -141,20 +141,20 @@
     font-size: 1.4rem;
     font-weight: 700;
     margin-bottom: 8px;
-    text-shadow: 0 0 8px rgba(0,255,213,0.4);
+    text-shadow: 0 0 8px rgba(58,169,255,0.4);
 }
 
 #page-planets .planets-info__desc {
     font-size: 0.78rem;
     line-height: 1.5;
-    color: #a8d4cc;
+    color: #a8c5e8;
     margin-bottom: 8px;
 }
 
 #page-planets .planets-info__hint {
     font-size: 0.65rem;
     letter-spacing: 0.2em;
-    color: #00ffd5;
+    color: #3aa9ff;
     opacity: 0.6;
 }
 
@@ -165,27 +165,27 @@
     bottom: 80px;
     right: 32px;
     padding: 10px 18px;
-    background: rgba(0,30,30,0.7);
-    border: 1px solid rgba(0,255,213,0.4);
+    background: rgba(0,18,40,0.7);
+    border: 1px solid rgba(58,169,255,0.4);
     border-radius: 6px;
-    color: #00ffd5;
+    color: #3aa9ff;
     font-family: var(--font-mono, monospace);
     font-size: 0.78rem;
     letter-spacing: 0.18em;
     cursor: pointer;
     text-decoration: none;
     transition: all 0.25s ease;
-    box-shadow: 0 0 12px rgba(0,255,213,0.2);
+    box-shadow: 0 0 12px rgba(58,169,255,0.2);
     display: inline-flex;
     align-items: center;
     gap: 8px;
 }
 
 .planets-entry:hover {
-    background: rgba(0,80,80,0.75);
-    box-shadow: 0 0 24px rgba(0,255,213,0.5);
+    background: rgba(0,40,90,0.75);
+    box-shadow: 0 0 24px rgba(58,169,255,0.5);
     transform: translateY(-2px);
-    border-color: #00ffd5;
+    border-color: #3aa9ff;
 }
 
 .planets-entry::before {
