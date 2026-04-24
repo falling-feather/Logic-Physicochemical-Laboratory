@@ -188,47 +188,47 @@ const ChemReaction = {
             ]
         },
         neutralization: {
-            name: '酸碱中和',
-            equation: 'HCl + NaOH → NaCl + H₂O',
-            desc: '离子键重组：H⁺与OH⁻结合生成水，Na⁺与Cl⁻形成离子键',
+            // v4.5.0-α6 重做：强酸强碱中和的本质是 H⁺ + OH⁻ → H₂O，
+            // Na⁺/Cl⁻ 在水中始终以水合离子形式存在，是「旁观离子」
+            name: '强酸强碱中和（离子方程式）',
+            equation: 'H⁺ + OH⁻ → H₂O　|　Na⁺、Cl⁻ 旁观',
+            fullEquation: '总式：HCl + NaOH → NaCl + H₂O',
+            desc: '强酸 HCl、强碱 NaOH、强电解质 NaCl 在水中均完全电离 → 溶液中实际存在 4 种自由水合离子（H⁺、OH⁻、Na⁺、Cl⁻）；只有 H⁺ 与 OH⁻ 通过静电吸引结合成水分子，Na⁺/Cl⁻ 不参与反应（旁观离子）。蒸发后才得到 NaCl 晶体。',
             type: '放热',
-            energy: -57,
+            energy: -57.3,
             unit: 'kJ/mol',
             activationEnergy: 20,
-            mechanism: 'H-Cl键断裂 → Na-O离子键断裂 → H-O键形成 + Na-Cl离子键形成',
+            mechanism: '4 种自由水合离子游动 → H⁺ 与 OH⁻ 静电吸引 → 形成 O—H 共价键 → H₂O 分子；Na⁺、Cl⁻ 始终游离',
             reactantMols: [
                 {
-                    formula: 'HCl', cx: 0.20, cy: 0.38,
-                    atoms: [
-                        { el: 'H', lx: -0.5, ly: 0 },
-                        { el: 'Cl', lx: 0.5, ly: 0 }
-                    ],
-                    bonds: [ { a: 0, b: 1, type: 1 } ]
+                    formula: 'H⁺', cx: 0.15, cy: 0.30,
+                    atoms: [{ el: 'H', lx: 0, ly: 0, charge: '+' }],
+                    bonds: []
                 },
                 {
-                    formula: 'NaOH', cx: 0.22, cy: 0.62,
+                    formula: 'OH⁻', cx: 0.15, cy: 0.65,
                     atoms: [
-                        { el: 'Na', lx: -0.7, ly: 0 },
-                        { el: 'O', lx: 0, ly: 0 },
-                        { el: 'H', lx: 0.5, ly: 0.35 }
+                        { el: 'O', lx: 0, ly: 0, charge: '-' },
+                        { el: 'H', lx: 0.6, ly: 0.32 }
                     ],
-                    bonds: [
-                        { a: 0, b: 1, type: 4 },
-                        { a: 1, b: 2, type: 1 }
-                    ]
+                    bonds: [{ a: 0, b: 1, type: 1 }]
+                },
+                {
+                    formula: 'Na⁺', cx: 0.34, cy: 0.30,
+                    atoms: [{ el: 'Na', lx: 0, ly: 0, charge: '+' }],
+                    bonds: [],
+                    spectator: true
+                },
+                {
+                    formula: 'Cl⁻', cx: 0.34, cy: 0.65,
+                    atoms: [{ el: 'Cl', lx: 0, ly: 0, charge: '-' }],
+                    bonds: [],
+                    spectator: true
                 }
             ],
             productMols: [
                 {
-                    formula: 'NaCl', cx: 0.72, cy: 0.38,
-                    atoms: [
-                        { el: 'Na', lx: -0.5, ly: 0 },
-                        { el: 'Cl', lx: 0.5, ly: 0 }
-                    ],
-                    bonds: [ { a: 0, b: 1, type: 4 } ]
-                },
-                {
-                    formula: 'H₂O', cx: 0.72, cy: 0.62,
+                    formula: 'H₂O', cx: 0.72, cy: 0.32,
                     atoms: [
                         { el: 'H', lx: -0.6, ly: 0.35 },
                         { el: 'O', lx: 0, ly: 0 },
@@ -238,6 +238,18 @@ const ChemReaction = {
                         { a: 0, b: 1, type: 1 },
                         { a: 1, b: 2, type: 1 }
                     ]
+                },
+                {
+                    formula: 'Na⁺', cx: 0.66, cy: 0.65,
+                    atoms: [{ el: 'Na', lx: 0, ly: 0, charge: '+' }],
+                    bonds: [],
+                    spectator: true
+                },
+                {
+                    formula: 'Cl⁻', cx: 0.82, cy: 0.65,
+                    atoms: [{ el: 'Cl', lx: 0, ly: 0, charge: '-' }],
+                    bonds: [],
+                    spectator: true
                 }
             ]
         },
@@ -433,7 +445,9 @@ const ChemReaction = {
                     el: a.el,
                     x: cx + a.lx * scale,
                     y: cy + a.ly * scale,
-                    formula: mol.formula
+                    formula: mol.formula,
+                    charge: a.charge || null,
+                    spectator: !!mol.spectator
                 });
             });
             mol.bonds.forEach(b => {
@@ -455,7 +469,9 @@ const ChemReaction = {
                     el: a.el,
                     x: cx + a.lx * scale,
                     y: cy + a.ly * scale,
-                    formula: mol.formula
+                    formula: mol.formula,
+                    charge: a.charge || null,
+                    spectator: !!mol.spectator
                 });
             });
             mol.bonds.forEach(b => {
@@ -591,7 +607,14 @@ const ChemReaction = {
         ctx.fillStyle = 'rgba(255,255,255,0.55)';
         ctx.font = '18px ' + CF.mono;
         ctx.textAlign = 'center';
-        ctx.fillText(this.currentReaction.equation, W / 2, H - 14);
+        const hasFull = !!this.currentReaction.fullEquation;
+        ctx.fillText(this.currentReaction.equation, W / 2, hasFull ? H - 28 : H - 14);
+        // 总式（v4.5.0-α6：离子方程式之外可补充总式）
+        if (hasFull) {
+            ctx.fillStyle = 'rgba(255,255,255,0.32)';
+            ctx.font = '12px ' + CF.mono;
+            ctx.fillText(this.currentReaction.fullEquation, W / 2, H - 10);
+        }
 
         // Mechanism text during breaking/forming phases
         if (t > 0.20 && t < 0.80) {
@@ -599,7 +622,7 @@ const ChemReaction = {
             ctx.fillStyle = `rgba(255,200,100,${mechOpacity * 0.7})`;
             ctx.font = '16px ' + CF.sans;
             ctx.textAlign = 'center';
-            ctx.fillText(this.currentReaction.mechanism, W / 2, H - 34);
+            ctx.fillText(this.currentReaction.mechanism, W / 2, hasFull ? H - 48 : H - 34);
         }
 
         // Energy diagram (mini, top-right)
@@ -674,8 +697,43 @@ const ChemReaction = {
             const [sx, sy] = shakeXY(i);
             const ax = a.x + offsetX + sx;
             const ay = a.y + sy;
+            // 旁观离子用虚线圈包裹（v4.5.0-α6）
+            if (a.spectator) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(180,180,180,0.45)';
+                ctx.lineWidth = 1.2;
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.arc(ax, ay, style.r + 6, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
             this._drawAtom(ctx, ax, ay, style.r, style.color, a.el, style.textColor);
+            // 电荷徽章（v4.5.0-α6）
+            if (a.charge) {
+                this._drawChargeBadge(ctx, ax + style.r * 0.75, ay - style.r * 0.75, a.charge);
+            }
         });
+    },
+
+    // 电荷徽章：右上角小圆，红色 = 正、蓝色 = 负
+    _drawChargeBadge(ctx, x, y, charge) {
+        const isPos = charge.indexOf('+') !== -1;
+        const r = 7;
+        ctx.save();
+        ctx.shadowColor = isPos ? '#ff5566' : '#5588ff';
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = isPos ? 'rgba(255, 90, 110, 0.95)' : 'rgba(100, 150, 255, 0.95)';
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 11px ' + CF.mono;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(charge, x, y + 0.5);
+        ctx.restore();
     },
 
     _drawFreeAtoms(ctx, localT) {
