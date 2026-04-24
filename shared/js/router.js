@@ -90,14 +90,12 @@ const Router = {
         // Update nav
         this.updateNav(page);
 
-        // Update navbar transparency（v4.3：planets 大屏与 home 一致透明化）
+        // Update navbar visibility/transparency
+        // v4.3：home 透明化；v4.4：planets 大屏完全隐藏顶栏（作为目录承载更沉浸）
         const navbar = document.getElementById('navbar');
         if (navbar) {
-            if (page === 'home' || page === 'planets') {
-                navbar.classList.add('navbar--transparent');
-            } else {
-                navbar.classList.remove('navbar--transparent');
-            }
+            navbar.classList.toggle('navbar--transparent', page === 'home');
+            navbar.classList.toggle('navbar--hidden', page === 'planets');
         }
 
         // Toggle running time footer
