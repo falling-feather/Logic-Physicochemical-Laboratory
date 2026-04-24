@@ -3,7 +3,7 @@
 
 const FluidSim = {
     canvas: null, ctx: null, W: 0, H: 0,
-    mode: 'potential',   // 'potential' | 'cylinder' | 'bernoulli'
+    mode: 'potential',   // 'potential' | 'cylinder' | 'bernoulli' | 'airfoil' (v4.6.0-α5)
     paused: false,
 
     // 势流元素 [{type:'source'|'sink'|'vortex', x, y, m}]
@@ -28,6 +28,15 @@ const FluidSim = {
     _bernoulliParticles: [],
     _bernoulliConstrict: 0.4, // 0~1 收窄程度
 
+    // v4.6.0-α5：机翼升力模式
+    _airfoilT: 0,
+    _airfoilLastTime: 0,
+    _airfoilRunning: false,
+    _airfoilAnimId: null,
+    _airfoilParticles: [],
+    _airfoilAttack: 8,        // 迎角 ° (-15~+25)
+    _airfoilThickness: 0.18,  // 相对厚度 0.05~0.30
+
     // 通用
     _lastTime: 0,
 
@@ -41,6 +50,7 @@ const FluidSim = {
         this._injectPotentialPanel();
         this._injectCylinderPanel();
         this._injectBernoulliPanel();
+        this._injectAirfoilPanel();
         this._injectGlobalActions();
         this.bindCanvas();
         this.setMode('potential');
@@ -57,6 +67,7 @@ const FluidSim = {
 
     destroy() {
         if (this._bernoulliAnimId) { cancelAnimationFrame(this._bernoulliAnimId); this._bernoulliAnimId = null; }
+        if (this._airfoilAnimId) { cancelAnimationFrame(this._airfoilAnimId); this._airfoilAnimId = null; }
         if (this._ro) { this._ro.disconnect(); this._ro = null; }
     },
 
@@ -85,7 +96,7 @@ const FluidSim = {
         if (!wrap) return;
         const bar = document.createElement('div');
         bar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;';
-        [['potential', '势流叠加'], ['cylinder', '圆柱绕流'], ['bernoulli', '伯努利管']].forEach(([key, label]) => {
+        [['potential', '势流叠加'], ['cylinder', '圆柱绕流'], ['bernoulli', '伯努利管'], ['airfoil', '✈️ 机翼升力']].forEach(([key, label]) => {
             const btn = document.createElement('button');
             btn.className = 'btn btn--ghost fluid-mode-btn';
             btn.dataset.mode = key;
@@ -364,14 +375,21 @@ const FluidSim = {
         const pp = document.getElementById('fluid-potential-panel');
         const cp = document.getElementById('fluid-cylinder-panel');
         const bp = document.getElementById('fluid-bernoulli-panel');
+        const ap = document.getElementById('fluid-airfoil-panel');
         if (pp) pp.style.display = mode === 'potential' ? '' : 'none';
         if (cp) cp.style.display = mode === 'cylinder' ? '' : 'none';
         if (bp) bp.style.display = mode === 'bernoulli' ? '' : 'none';
+        if (ap) ap.style.display = mode === 'airfoil' ? '' : 'none';
 
         // 停止伯努利动画
         if (mode !== 'bernoulli') {
             this._bernoulliRunning = false;
             if (this._bernoulliAnimId) { cancelAnimationFrame(this._bernoulliAnimId); this._bernoulliAnimId = null; }
+        }
+        // v4.6.0-α5：停止机翼动画
+        if (mode !== 'airfoil') {
+            this._airfoilRunning = false;
+            if (this._airfoilAnimId) { cancelAnimationFrame(this._airfoilAnimId); this._airfoilAnimId = null; }
         }
 
         this.render();
@@ -534,6 +552,7 @@ const FluidSim = {
             case 'potential': this.drawPotentialFlow(); break;
             case 'cylinder': this.drawCylinderFlow(); break;
             case 'bernoulli': this.drawBernoulli(); break;
+            case 'airfoil': this.drawAirfoil(); break;  // v4.6.0-α5
         }
     },
 
@@ -1051,6 +1070,270 @@ const FluidSim = {
 
         this.render();
         this._bernoulliAnimId = requestAnimationFrame(t => this._startBernoulliLoop());
+    },
+
+    // ═══════════════════════════════════════════
+    // v4.6.0-α5：机翼升力（NACA 4 位翼型简化 + 上下流速对比 + 升力箭头）
+    // ═══════════════════════════════════════════
+    _injectAirfoilPanel() {
+        const wrap = document.getElementById('fluid-controls');
+        if (!wrap || document.getElementById('fluid-airfoil-panel')) return;
+        const panel = document.createElement('div');
+        panel.id = 'fluid-airfoil-panel';
+        panel.style.cssText = 'display:none;padding:8px 12px;background:rgba(30,41,59,.55);border-radius:8px;font-size:13px;color:#e2e8f0;';
+        panel.innerHTML = `
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+                <div>
+                    <label style="font-size:12px;color:#94a3b8">迎角 α</label>
+                    <input type="range" id="fluid-attack" min="-15" max="25" step="1" value="8" style="width:110px;vertical-align:middle">
+                    <span id="fluid-attack-val" style="font-size:12px;color:#cbd5e1">8°</span>
+                </div>
+                <div>
+                    <label style="font-size:12px;color:#94a3b8">翼型厚度</label>
+                    <input type="range" id="fluid-thick" min="0.05" max="0.30" step="0.01" value="0.18" style="width:90px;vertical-align:middle">
+                    <span id="fluid-thick-val" style="font-size:12px;color:#cbd5e1">0.18</span>
+                </div>
+                <button id="fluid-air-toggle" class="btn btn--ghost" style="font-size:12px;padding:2px 12px">开始</button>
+                <button id="fluid-air-reset" class="btn btn--ghost" style="font-size:12px;padding:2px 12px">重置</button>
+            </div>
+            <div style="margin-top:6px;color:#94a3b8;font-size:12px">上表面流速更快 → 压强更小 → 净压差产生升力 L = ½·ρ·v²·S·C_L</div>
+        `;
+        wrap.appendChild(panel);
+        document.getElementById('fluid-attack').addEventListener('input', e => {
+            this._airfoilAttack = parseFloat(e.target.value);
+            document.getElementById('fluid-attack-val').textContent = this._airfoilAttack.toFixed(0) + '°';
+            this.render();
+        });
+        document.getElementById('fluid-thick').addEventListener('input', e => {
+            this._airfoilThickness = parseFloat(e.target.value);
+            document.getElementById('fluid-thick-val').textContent = this._airfoilThickness.toFixed(2);
+            this.render();
+        });
+        document.getElementById('fluid-air-toggle').addEventListener('click', () => {
+            if (this._airfoilRunning) {
+                this._airfoilRunning = false;
+                document.getElementById('fluid-air-toggle').textContent = '开始';
+            } else {
+                this._airfoilRunning = true;
+                document.getElementById('fluid-air-toggle').textContent = '暂停';
+                this._airfoilLastTime = 0;
+                this._startAirfoilLoop();
+            }
+        });
+        document.getElementById('fluid-air-reset').addEventListener('click', () => {
+            this._airfoilRunning = false;
+            this._airfoilParticles = [];
+            this._airfoilT = 0;
+            document.getElementById('fluid-air-toggle').textContent = '开始';
+            this.render();
+        });
+    },
+
+    // 翼型上下表面 y 坐标（chord = 1，翼型在 [0,1] 区间，使用 NACA 00xx 简化对称型）
+    // 返回相对厚度（半厚），最终绘制时按弦长缩放并旋转迎角
+    _airfoilY(xRel, t) {
+        // NACA 4-digit 厚度分布：5t·(0.2969√x − 0.1260x − 0.3516x² + 0.2843x³ − 0.1015x⁴)
+        const x = Math.max(0, Math.min(1, xRel));
+        return 5 * t * (0.2969 * Math.sqrt(x) - 0.1260 * x - 0.3516 * x * x + 0.2843 * x * x * x - 0.1015 * x * x * x * x);
+    },
+
+    drawAirfoil() {
+        const { ctx, W, H } = this;
+        const cx = W / 2, cy = H / 2;
+        const chord = Math.min(W, H) * 0.55;       // 弦长
+        const t = this._airfoilThickness;
+        const alpha = this._airfoilAttack * Math.PI / 180;
+
+        // 翼型局部坐标 → 屏幕坐标（绕翼型中点旋转 −α，使来流水平 = 翼下偏 α）
+        const toScreen = (xLocal, yLocal) => {
+            // xLocal ∈ [0,1] 弦向；yLocal 厚度方向
+            const x0 = (xLocal - 0.5) * chord;
+            const y0 = yLocal * chord;
+            const xr = x0 * Math.cos(-alpha) - y0 * Math.sin(-alpha);
+            const yr = x0 * Math.sin(-alpha) + y0 * Math.cos(-alpha);
+            return { x: cx + xr, y: cy + yr };
+        };
+
+        // 流线（条带）：上下表面附近的流线 + 远场流线
+        const strands = [];
+        const yLevels = [-0.45, -0.32, -0.22, -0.14, -0.08, 0.08, 0.14, 0.22, 0.32, 0.45];
+        for (const yL of yLevels) strands.push(yL);
+
+        // 简化流线：来流从左 → 在翼附近上方加速、下方减速
+        // 用 sin 包络模拟翼周围速度场，仅用于视觉
+        ctx.lineWidth = 1.2;
+        for (const yLevel of strands) {
+            ctx.beginPath();
+            const samples = 80;
+            for (let i = 0; i <= samples; i++) {
+                const xRel = i / samples;          // 0..1 屏幕水平比
+                const xLocal = xRel * 1.6 - 0.3;   // 翼弦扩展坐标 [-0.3, 1.3]
+                // 距离翼影响因子：在 0..1 范围内最大
+                const inWing = xLocal >= 0 && xLocal <= 1 ? 1 : Math.max(0, 1 - Math.min(Math.abs(xLocal), Math.abs(xLocal - 1)) * 3);
+                // 上下偏转
+                const sign = yLevel > 0 ? 1 : -1;
+                const upperBoost = yLevel < 0 ? 0.18 : -0.10; // 上方流线被向上推 + 加速；下方略下推
+                const yOff = yLevel + sign * inWing * 0.04 * Math.sin(Math.PI * Math.max(0, Math.min(1, xLocal))) * (1 + alpha * 2);
+                const sp = toScreen(xLocal, yOff);
+                if (i === 0) ctx.moveTo(sp.x, sp.y);
+                else ctx.lineTo(sp.x, sp.y);
+            }
+            // 上方流线偏蓝（高速低压），下方偏琥珀（低速高压）
+            ctx.strokeStyle = yLevel < 0 ? 'rgba(91,141,206,0.55)' : 'rgba(229,192,123,0.45)';
+            ctx.stroke();
+        }
+
+        // 翼型轮廓
+        ctx.beginPath();
+        const N = 60;
+        for (let i = 0; i <= N; i++) {
+            const xL = i / N;
+            const yT = this._airfoilY(xL, t);
+            const sp = toScreen(xL, -yT);
+            if (i === 0) ctx.moveTo(sp.x, sp.y); else ctx.lineTo(sp.x, sp.y);
+        }
+        for (let i = N; i >= 0; i--) {
+            const xL = i / N;
+            const yT = this._airfoilY(xL, t);
+            const sp = toScreen(xL, yT);
+            ctx.lineTo(sp.x, sp.y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(155,141,206,0.30)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(155,141,206,0.90)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 弦线（虚线）
+        ctx.save();
+        ctx.setLineDash([6, 5]);
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        const p1 = toScreen(0, 0), p2 = toScreen(1, 0);
+        ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+        ctx.restore();
+
+        // 上下流速 / 压强标签
+        const upperPt = toScreen(0.4, -t - 0.05);
+        const lowerPt = toScreen(0.4, t + 0.05);
+        ctx.font = '13px ' + CF.mono;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(91,141,206,0.95)';
+        ctx.fillText('v\u2191 \u00b7 P\u2193 (\u4e0a\u8868\u9762)', upperPt.x, upperPt.y);
+        ctx.fillStyle = 'rgba(229,192,123,0.95)';
+        ctx.fillText('v\u2193 \u00b7 P\u2191 (\u4e0b\u8868\u9762)', lowerPt.x, lowerPt.y + 12);
+
+        // 升力箭头：从翼面中点向上（垂直来流方向）
+        const liftBase = toScreen(0.4, 0);
+        const liftMag = 60 + alpha * 80 + t * 100;   // 视觉化量
+        const liftDirX = -Math.sin(alpha);
+        const liftDirY = -Math.cos(alpha);  // 垂直弦线，指向"升力面"
+        const liftEnd = { x: liftBase.x + liftDirX * liftMag, y: liftBase.y + liftDirY * liftMag };
+        ctx.strokeStyle = '#5b8dce';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(liftBase.x, liftBase.y); ctx.lineTo(liftEnd.x, liftEnd.y); ctx.stroke();
+        const ang = Math.atan2(liftDirY, liftDirX);
+        ctx.fillStyle = '#5b8dce';
+        ctx.beginPath();
+        ctx.moveTo(liftEnd.x, liftEnd.y);
+        ctx.lineTo(liftEnd.x - 10 * Math.cos(ang - 0.4), liftEnd.y - 10 * Math.sin(ang - 0.4));
+        ctx.lineTo(liftEnd.x - 10 * Math.cos(ang + 0.4), liftEnd.y - 10 * Math.sin(ang + 0.4));
+        ctx.closePath(); ctx.fill();
+        ctx.font = 'bold 14px ' + CF.sans;
+        ctx.fillStyle = '#5b8dce';
+        ctx.textAlign = 'left';
+        ctx.fillText('L \u5347\u529b', liftEnd.x + 6, liftEnd.y);
+
+        // 来流箭头（左侧）
+        const arrY = [cy - 70, cy, cy + 70];
+        ctx.strokeStyle = 'rgba(148,163,184,0.6)';
+        ctx.lineWidth = 1.5;
+        arrY.forEach(y => {
+            ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(80, y); ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(80, y); ctx.lineTo(74, y - 4); ctx.lineTo(74, y + 4); ctx.closePath();
+            ctx.fillStyle = 'rgba(148,163,184,0.6)'; ctx.fill();
+        });
+        ctx.fillStyle = 'rgba(148,163,184,0.85)';
+        ctx.font = '13px ' + CF.sans;
+        ctx.textAlign = 'left';
+        ctx.fillText('\u6765\u6d41 V\u221e', 22, cy - 78);
+
+        // 烟流粒子
+        for (const p of this._airfoilParticles) {
+            const a = Math.max(0.3, 1 - p.age * 0.6);
+            ctx.fillStyle = p.upper ? `rgba(91,141,206,${a})` : `rgba(229,192,123,${a * 0.85})`;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 1.8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 信息面板（右上）
+        ctx.save();
+        ctx.font = 'bold 15px ' + CF.sans;
+        ctx.textAlign = 'right';
+        ctx.fillStyle = 'rgba(155,141,206,0.95)';
+        ctx.fillText('\u2708\ufe0f \u673a\u7ffc\u5347\u529b', W - 14, 22);
+        ctx.font = '12px ' + CF.mono;
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        const liftCoef = 2 * Math.PI * alpha;   // 薄翼理论 C_L = 2πα
+        const lines = [
+            `\u8fce\u89d2 \u03b1 = ${this._airfoilAttack.toFixed(0)}\u00b0`,
+            `\u539a\u5ea6 t/c = ${t.toFixed(2)}`,
+            `C_L \u2248 2\u03c0\u03b1 = ${liftCoef.toFixed(2)}`,
+            `L = \u00bd\u03c1V\u00b2\u00b7S\u00b7C_L`,
+            ``,
+            `\u4e0a\u8868\u9762\u8def\u957f > \u4e0b\u8868\u9762`,
+            `\u2192 v\u4e0a > v\u4e0b`,
+            `\u2192 P\u4e0a < P\u4e0b (\u4f2f\u52aa\u5229)`,
+            `\u2192 \u51c0\u538b\u5dee\u4ea7\u751f\u5347\u529b`
+        ];
+        lines.forEach((ln, i) => ctx.fillText(ln, W - 14, 44 + i * 16));
+        if (alpha > 18 * Math.PI / 180) {
+            ctx.fillStyle = 'rgba(231,76,60,0.95)';
+            ctx.fillText('\u26a0 \u8fce\u89d2\u8fc7\u5927 \u00b7 \u53ef\u80fd\u5931\u901f', W - 14, 44 + lines.length * 16 + 4);
+        }
+        ctx.restore();
+    },
+
+    _startAirfoilLoop() {
+        if (!this._airfoilRunning) return;
+        if (this.paused) {
+            this._airfoilAnimId = requestAnimationFrame(() => this._startAirfoilLoop());
+            return;
+        }
+        const now = performance.now();
+        if (!this._airfoilLastTime) this._airfoilLastTime = now;
+        const rawDt = (now - this._airfoilLastTime) / 1000;
+        this._airfoilLastTime = now;
+        const dt = Math.min(rawDt, 0.1);
+        this._airfoilT += dt;
+
+        const { W, H } = this;
+        const cy = H / 2;
+
+        // 生成粒子（左侧 entry）
+        if (this._airfoilT > 0.04) {
+            this._airfoilT -= 0.04;
+            for (let i = 0; i < 4; i++) {
+                const yOff = (Math.random() - 0.5) * H * 0.7;
+                this._airfoilParticles.push({ x: 0, y: cy + yOff, age: 0, upper: yOff < 0 });
+            }
+        }
+        // 移动 — 上方更快（×1.35），下方略慢（×0.92）
+        for (const p of this._airfoilParticles) {
+            const baseV = 90;
+            const vx = p.upper ? baseV * 1.35 : baseV * 0.92;
+            p.x += vx * dt;
+            p.age += dt;
+        }
+        this._airfoilParticles = this._airfoilParticles.filter(p => p.x < W + 10 && p.age < 4);
+
+        this.render();
+        this._airfoilAnimId = requestAnimationFrame(() => this._startAirfoilLoop());
     },
 };
 
