@@ -36,6 +36,8 @@ window.PlanetsView = {
     launchingSat: null,   // v4.4-α5：正在 zoom 跳转的卫星
     tLaunch: 0,           // 0→1，控制跳转动画进度
     tLaunchTarget: 0,
+    exiting: false,       // v4.4-α8：是否正在退出子星系（zoom-out）
+    tOut: 0,              // 0→1 zoom-out 动画进度
 
     subjects: [
         { id: 'mathematics', label: '数学', desc: '函数·几何·概率·向量·圆锥曲线 (15 实验)', color: '#5b8dce', angle: 0 },
@@ -98,6 +100,8 @@ window.PlanetsView = {
         this.tIn = 0; this.tInTarget = 0;
         this.launchingSat = null;
         this.tLaunch = 0; this.tLaunchTarget = 0;
+        this.exiting = false;
+        this.tOut = 0;
         clearTimeout(this._navTimer);
         this._updateChrome();
     },
@@ -223,10 +227,26 @@ window.PlanetsView = {
     },
 
     _exitSubject() {
+        if (this.mode !== 'subject') return;
+        if (this.exiting) return;
+        if (this.launchingSat) return; // 跳转中不允许退出
+        // 启动 zoom-out 动画：中央恒星爆发手发散，卫星被推到边缘
+        this.exiting = true;
+        this.tOut = 0;
+        this.hovered = null;
+        this._updateInfo();
+        // tIn 仍保持 1，让子星系层继续可见以呈现动画
+    },
+
+    _finalizeExitSubject() {
+        // 动画结束：真正切回 galaxy 模式
         this.mode = 'galaxy';
         this.currentSubject = null;
         this.satellites = [];
         this.tInTarget = 0;
+        this.tIn = 0;            // 仅这一屏直接跳到 galaxy（主星系从隐 →显 由 _draw 控制）
+        this.exiting = false;
+        this.tOut = 0;
         this.hovered = null;
         this._updateChrome();
         this._updateInfo();
@@ -460,6 +480,11 @@ window.PlanetsView = {
         if (this.launchingSat) {
             this.tLaunch = Math.min(1, this.tLaunch + dt / 480);
         }
+        // v4.4-α8：zoom-out 退出子星系动画（380ms）
+        if (this.exiting) {
+            this.tOut = Math.min(1, this.tOut + dt / 380);
+            if (this.tOut >= 1) this._finalizeExitSubject();
+        }
         // 子星系时间坑（仅 subject 状态下推进）
         if (this.mode === 'subject' || this.tIn > 0) this.subjTime += dt;
 
@@ -541,8 +566,8 @@ window.PlanetsView = {
         // ── 子星系层（subject）──────────────────────
         if (aSubject > 0.02 && this.currentSubject) {
             ctx.save();
-            // launch 时其他元素逐渐淡出
-            const subAlpha = aSubject * (1 - this.tLaunch * 0.85);
+            // launch 时其他元素逐渐淡出；zoom-out 退出时同样逐渐透明
+            const subAlpha = aSubject * (1 - this.tLaunch * 0.85) * (1 - this.tOut * 0.65);
             ctx.globalAlpha = subAlpha;
 
             const s = this.currentSubject;
@@ -604,7 +629,14 @@ window.PlanetsView = {
 
             for (const { sat, proj } of satItems) {
                 if (sat === this.launchingSat) continue;   // launch 中的卫星单独绘制
-                this._drawSatellite(ctx, sat, proj, this.hovered === sat, s.color);
+                let p = proj;
+                if (this.exiting) {
+                    const ease = 1 - Math.pow(1 - this.tOut, 3); // ease-out cubic
+                    const dx = proj.x - cx, dy = proj.y - cy;
+                    const k = 1 + ease * 2.6;
+                    p = { x: cx + dx * k, y: cy + dy * k, z: proj.z, scale: proj.scale * (1 - ease * 0.4) };
+                }
+                this._drawSatellite(ctx, sat, p, this.hovered === sat, s.color);
             }
 
             ctx.restore();
@@ -658,6 +690,35 @@ window.PlanetsView = {
                     ctx.fillStyle = overlay;
                     ctx.fillRect(0, 0, this.W, this.H);
                 }
+            }
+
+            // ── v4.4-α8：zoom-out 中央外扩闪光（退出子星系动画）──
+            if (this.exiting && this.currentSubject) {
+                const e = this.tOut;
+                const eEase = 1 - Math.pow(1 - e, 2); // ease-out quadratic
+                const sunR = Math.min(this.W, this.H) * 0.085;
+                // 中央实心爆发：越来越大、但 alpha 逐渐衰减
+                const burstR = sunR * (1 + eEase * 6);
+                const burstA = (1 - e) * 0.6;
+                ctx.fillStyle = this._hexA(s.color, burstA);
+                ctx.beginPath();
+                ctx.arc(cx, cy, burstR, 0, Math.PI * 2);
+                ctx.fill();
+                // 环状冲击波：从中央向外扩散的光环
+                const ringR = sunR + (Math.hypot(this.W, this.H) * 0.55) * eEase;
+                const ringW = Math.max(2, 30 * (1 - e));
+                ctx.strokeStyle = this._hexA(s.color, 0.55 * (1 - e));
+                ctx.lineWidth = ringW;
+                ctx.beginPath();
+                ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+                ctx.stroke();
+                // 软光蒃染：填充整个屏幕的弱彩调
+                const veil = ctx.createRadialGradient(cx, cy, sunR * 0.3, cx, cy, Math.hypot(this.W, this.H));
+                veil.addColorStop(0, this._hexA(s.color, 0.18 * (1 - e)));
+                veil.addColorStop(0.6, this._hexA(s.color, 0.05 * (1 - e)));
+                veil.addColorStop(1, 'rgba(0,5,8,0)');
+                ctx.fillStyle = veil;
+                ctx.fillRect(0, 0, this.W, this.H);
             }
         }
     },
