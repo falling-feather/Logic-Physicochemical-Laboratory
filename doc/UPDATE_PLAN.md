@@ -49,16 +49,13 @@
 
 | 版本 | commit | 内容 |
 |------|--------|------|
-| **v4.6.0-α1** | **本轮** | **物理 8-1 force-composition 升级为多力合成（2-6 力）：(i) 数据结构由 f1/f2 重构为 forces 数组 + 颜色调色板 6 色；(ii) 新增 ➕ 添加力 / ➖ 删除力（边界禁用）+ 法则切换按钮 ⛓ 多边形法（默认） / ▱ 平行四边形（仅 2 力可用）；(iii) `_drawComposition` 重写：多边形法首尾相接画虚线链 + 中间节点小圆点；平行四边形法保留双邻边对角线；每个分力从原点画箭头 + 颜色对应拖拽端点 + 角度弧（前 4 个）；合力 R = ΣF 用绿色粗箭头；R≈0 时画绿色平衡环显示"平衡"；右上角法则文字提示；(iv) `_bindMouse` 拖拽改为遍历 forces 找最近端点；(v) `_updateInfo` 加多力循环；(vi) 新增 `_addForce`/`_removeForce`/`_setCompMethod`，加力时自动找最大角度间隙避免重叠；(vii) 教学面板更新：多边形法 + 闭合多边形 = 共点力平衡 几何意义；(viii) physics.css 新增 `.fc-multiforce-toolbar/.fc-mini-btn/.fc-color-dot/.fc-force-row` 等样式；缓存 v45i→v46a** |
+| **v4.6.0-α1** | `2a70a1b` | **物理 8-1 force-composition 升级为多力合成（2-6 力）：(i) 数据结构由 f1/f2 重构为 forces 数组 + 颜色调色板 6 色；(ii) 新增 ➕ 添加力 / ➖ 删除力（边界禁用）+ 法则切换按钮 ⛓ 多边形法（默认） / ▱ 平行四边形（仅 2 力可用）；(iii) `_drawComposition` 重写：多边形法首尾相接画虚线链 + 中间节点小圆点；平行四边形法保留双邻边对角线；每个分力从原点画箭头 + 颜色对应拖拽端点 + 角度弧（前 4 个）；合力 R = ΣF 用绿色粗箭头；R≈0 时画绿色平衡环显示"平衡"；右上角法则文字提示；(iv) `_bindMouse` 拖拽改为遍历 forces 找最近端点；(v) `_updateInfo` 加多力循环；(vi) 新增 `_addForce`/`_removeForce`/`_setCompMethod`，加力时自动找最大角度间隙避免重叠；(vii) 教学面板更新：多边形法 + 闭合多边形 = 共点力平衡 几何意义；(viii) physics.css 新增 `.fc-multiforce-toolbar/.fc-mini-btn/.fc-color-dot/.fc-force-row` 等样式；缓存 v45i→v46a** |
+| **v4.6.0-α2** | **本轮** | **物理 8-2 energy-conservation 升级为「能量总量守恒」：(i) state 新增 `internalEnergy`/`initialE`/`_peakKE`/`_peakPE` + 颜色加 `internal:#f39c12`（橙=热）；(ii) loop 中累积摩擦耗散功 Q += μmg·\|v_mid\|·dt；首帧记录初始机械能 E₀ = mgh₀ 作为守恒基准；实时记录 KE/PE 峰值；(iii) `drawEnergyBars` 重写：3 列 (PE/KE/E) → 4 列 (E_k/E_p/Q/Σ)，柱顶横线显示 KE/PE 峰值印记；横跨虚线显示守恒基准 E₀（黄色虚线）；右下角实时显示 \|ΔE/E₀\| 守恒检验（<3% 绿/否则红）+ "Σ = E_k+E_p+Q (守恒/不变)" 文字；(iv) reset 同时清零内能、初始基准、峰值；(v) 摩擦改变即时刷新教学面板；(vi) `updateInfo` 重写：μ=0 守恒系统 vs μ>0 非守恒系统对比文案；新增内能 Q 标签条 + 能量总量行（Σ=E_k+E_p+Q 始终等于 E₀）；缓存 v46a→v46b** |
 
-**v4.6.0-α1 修改文件**：
-- `pages/physics/force-composition.js`：composition 模式从双力 → 多力（2-6）；保留 decomposition / incline 两模式不变
-- `pages/physics/physics.css`：新增多力工具栏与按钮样式
-- `index.html`：force-composition.js + physics.css 缓存 → v46a
-- `sw.js`：CACHE_NAME → `v20260424v46a`
+**v4.6.0-α1 修改文件**：force-composition.js / physics.css / index.html / sw.js（v46a）
+**v4.6.0-α2 修改文件**：energy-conservation.js / index.html / sw.js（v46b，physics.css 未改）
 
 **待办（v4.6 剩余）**：
-- 8-2 energy-conservation 加摩擦耗散 + 实时能量条/饼图
 - 8-3 momentum-conservation 二维碰撞 + 三种碰撞型式对比
 - 8-4 gravitation 开普勒三定律 + 三宇宙速度临界轨迹
 - 8-5 fluid-dynamics 伯努利原理可视化
