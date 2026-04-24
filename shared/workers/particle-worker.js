@@ -141,7 +141,7 @@ function loop() {
     ctx.clearRect(0, 0, W, H);
 
     // 更新 & 绘制粒子
-    ctx.fillStyle = 'rgba(0,255,213,0.42)';
+    ctx.fillStyle = 'rgba(58,169,255,0.42)';
     ctx.beginPath();
     for (const p of particles) {
         p.x += p.vx;
@@ -210,7 +210,7 @@ function loop() {
     for (let b = 0; b < 4; b++) {
         const arr = bins[b];
         if (!arr.length) continue;
-        ctx.strokeStyle = `rgba(0,255,213,${alphas[b]})`;
+        ctx.strokeStyle = `rgba(58,169,255,${alphas[b]})`;
         ctx.beginPath();
         for (let k = 0; k < arr.length; k += 2) {
             const pi = arr[k], pj = arr[k + 1];

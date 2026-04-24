@@ -27,12 +27,42 @@
     color: var(--accent-green, #4ade80);
 }
 
+/* v4.3.0：tooltip 气泡（与其他 FAB 风格统一，默认隐藏，由 fab-trigger.css 在展开态显示） */
+.experiment-export-btn[data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    right: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%) translateX(6px);
+    padding: 5px 10px;
+    background: rgba(20, 23, 35, 0.95);
+    color: rgba(212, 232, 255, 0.95);
+    border: 1px solid rgba(58, 169, 255, 0.55);
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    z-index: 9101;
+}
+.experiment-export-btn[data-tip]:hover::after {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+}
+@media (max-width: 768px) {
+    .experiment-export-btn[data-tip]::after { display: none; }
+}
+
 /* ── Export Menu (popup) ── */
 .experiment-export-menu {
     position: fixed;
-    bottom: 124px;
+    /* v4.3.0：与新的垂直堆叠中 export 按钮位置对齐（bottom 76px / right 24px + 36 + 8 = 68px） */
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
     right: 68px;
-    z-index: 9001;
+    z-index: 9070;
     background: var(--surface-3, #1c1f2e);
     border: 1px solid var(--border-default, rgba(255,255,255,0.1));
     border-radius: 10px;
@@ -111,7 +141,7 @@
     }
 
     .experiment-export-menu {
-        bottom: 114px;
+        bottom: calc(72px + env(safe-area-inset-bottom, 0px));
         right: 56px;
     }
 }
