@@ -51,14 +51,15 @@
 |------|--------|------|
 | **v4.6.0-α1** | `2a70a1b` | **物理 8-1 force-composition 升级为多力合成（2-6 力）：(i) 数据结构由 f1/f2 重构为 forces 数组 + 颜色调色板 6 色；(ii) 新增 ➕ 添加力 / ➖ 删除力（边界禁用）+ 法则切换按钮 ⛓ 多边形法（默认） / ▱ 平行四边形（仅 2 力可用）；(iii) `_drawComposition` 重写：多边形法首尾相接画虚线链 + 中间节点小圆点；平行四边形法保留双邻边对角线；每个分力从原点画箭头 + 颜色对应拖拽端点 + 角度弧（前 4 个）；合力 R = ΣF 用绿色粗箭头；R≈0 时画绿色平衡环显示"平衡"；右上角法则文字提示；(iv) `_bindMouse` 拖拽改为遍历 forces 找最近端点；(v) `_updateInfo` 加多力循环；(vi) 新增 `_addForce`/`_removeForce`/`_setCompMethod`，加力时自动找最大角度间隙避免重叠；(vii) 教学面板更新：多边形法 + 闭合多边形 = 共点力平衡 几何意义；(viii) physics.css 新增 `.fc-multiforce-toolbar/.fc-mini-btn/.fc-color-dot/.fc-force-row` 等样式；缓存 v45i→v46a** |
 | **v4.6.0-α2** | `6d5f796` | **物理 8-2 energy-conservation 升级为「能量总量守恒」：(i) state 新增 `internalEnergy`/`initialE`/`_peakKE`/`_peakPE` + 颜色加 `internal:#f39c12`（橙=热）；(ii) loop 中累积摩擦耗散功 Q += μmg·\|v_mid\|·dt；首帧记录初始机械能 E₀ = mgh₀ 作为守恒基准；实时记录 KE/PE 峰值；(iii) `drawEnergyBars` 重写：3 列 (PE/KE/E) → 4 列 (E_k/E_p/Q/Σ)，柱顶横线显示 KE/PE 峰值印记；横跨虚线显示守恒基准 E₀（黄色虚线）；右下角实时显示 \|ΔE/E₀\| 守恒检验（<3% 绿/否则红）+ "Σ = E_k+E_p+Q (守恒/不变)" 文字；(iv) reset 同时清零内能、初始基准、峰值；(v) 摩擦改变即时刷新教学面板；(vi) `updateInfo` 重写：μ=0 守恒系统 vs μ>0 非守恒系统对比文案；新增内能 Q 标签条 + 能量总量行（Σ=E_k+E_p+Q 始终等于 E₀）；缓存 v46a→v46b** |
-| **v4.6.0-α3** | **本轮** | **物理 8-3 momentum-conservation 升级为二维碰撞 + 三型式：(i) state 加 `dimension:'1D'\|'2D'` + `v1x/v1y/v2x/v2y` + `_2d` 子状态对象（位置/速度/半径/碰前后总动量分量/轨迹/拖拽 idx）；(ii) 控件加维度按钮组 📏一维/🎯二维（虚线琥珀色风格区分），2D 模式显示四个分量速度滑块 + "可拖动小球" 提示；(iii) 新增 `_modeE()` 抽取恢复系数 + `_collide2D()` 沿连心线方向应用 1D 公式（切向动量不变）；(iv) `_reset` 分流 1D/2D（2D 自动按质量算半径 r=0.25+0.06m）；(v) `_tick` 加 2D 分支（圆球距离碰撞 + 80 点轨迹环 + 出界结束）；(vi) `_draw` 加 `_drawArena2D` 边框+网格 / `_drawBalls2D` 球+轨迹+速度箭头+拖拽提示；(vii) 新增 `_bindCanvasDrag` 鼠标+触屏拖拽（仅 ready 阶段，自动夹紧到边框内）；(viii) `_updateInfo` 加 2D 分支显示 Σpₓ/Σpᵧ 分量守恒检验；(ix) physics.css 新增 `.mc-dim-btns/.mc-dim-btn/.mc-vel-group/.mc-2d-tip`；缓存 v46b→v46c** |
+| **v4.6.0-α3** | `5561134` | **物理 8-3 momentum-conservation 升级为二维碰撞 + 三型式：(i) state 加 `dimension:'1D'\|'2D'` + `v1x/v1y/v2x/v2y` + `_2d` 子状态对象（位置/速度/半径/碰前后总动量分量/轨迹/拖拽 idx）；(ii) 控件加维度按钮组 📏一维/🎯二维（虚线琥珀色风格区分），2D 模式显示四个分量速度滑块 + "可拖动小球" 提示；(iii) 新增 `_modeE()` 抽取恢复系数 + `_collide2D()` 沿连心线方向应用 1D 公式（切向动量不变）；(iv) `_reset` 分流 1D/2D（2D 自动按质量算半径 r=0.25+0.06m）；(v) `_tick` 加 2D 分支（圆球距离碰撞 + 80 点轨迹环 + 出界结束）；(vi) `_draw` 加 `_drawArena2D` 边框+网格 / `_drawBalls2D` 球+轨迹+速度箭头+拖拽提示；(vii) 新增 `_bindCanvasDrag` 鼠标+触屏拖拽（仅 ready 阶段，自动夹紧到边框内）；(viii) `_updateInfo` 加 2D 分支显示 Σpₓ/Σpᵧ 分量守恒检验；(ix) physics.css 新增 `.mc-dim-btns/.mc-dim-btn/.mc-vel-group/.mc-2d-tip`；缓存 v46b→v46c** |
+| **v4.6.0-α4** | **本轮** | **物理 8-4 gravitation 新增「✨ 开普勒」+「🚀 三宇宙速度」两模式（原 orbit/field 保留，按钮组扩到 4 个）：(i) 开普勒模式：单椭圆轨道 + 蓝色扇形面积扫描可视化第二定律 + 自动标近日点/远日点 + 实时面板显示 r₍p₎/r₍a₎/a/b/e/T 与 T²/a³ 常数；(ii) 三宇宙速度模式：三颗卫星同点同向发射，初速度分别 v₁(圆) / v₂=√2v₁(抛物线) / v₃≈1.32v₂(双曲线)，蓝/琥珀/紫三色对照 + 7.9/11.2/16.7 km/s 数值标注；(iii) `_stepPhysics` 重构：kepler 模式 3 倍子步长稳定积分 + 累计角度估周期 + 半径极值更新近/远日点 + dA/dt = 0.5\|r×v\|；(iv) reset 按 mode 分流；(v) updateInfo 加 kepler/cosmic 两段教学文案（含开普勒三定律 + 三个宇宙速度的物理含义 + 能量判据 E&lt;0/=0/&gt;0）；缓存 v46c→v46d** |
 
 **v4.6.0-α1 修改文件**：force-composition.js / physics.css / index.html / sw.js（v46a）
 **v4.6.0-α2 修改文件**：energy-conservation.js / index.html / sw.js（v46b，physics.css 未改）
 **v4.6.0-α3 修改文件**：momentum-conservation.js / physics.css / index.html / sw.js（v46c）
+**v4.6.0-α4 修改文件**：gravitation.js / index.html / sw.js（v46d，physics.css 未改）
 
 **待办（v4.6 剩余）**：
-- 8-4 gravitation 开普勒三定律 + 三宇宙速度临界轨迹
 - 8-5 fluid-dynamics 伯努利原理可视化
 
 **待办（v4.5 收尾）**：
