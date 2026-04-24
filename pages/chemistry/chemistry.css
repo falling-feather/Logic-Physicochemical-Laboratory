@@ -504,6 +504,67 @@
     line-height: 1.5;
 }
 
+/* ===== 同族对比表（v4.5.0-α5：H₂S vs H₂O 等） ===== */
+.mol-compare {
+    margin-top: 10px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md, 8px);
+    background: rgba(229, 192, 123, 0.06);
+    border: 1px solid rgba(229, 192, 123, 0.18);
+}
+.mol-compare__title {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+    margin-bottom: 6px;
+}
+.mol-compare__title b {
+    color: rgba(229, 192, 123, 0.95);
+    font-weight: 700;
+}
+.mol-compare__sub {
+    font-size: 0.74rem;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.4);
+}
+.mol-compare__tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.82);
+}
+.mol-compare__tbl th,
+.mol-compare__tbl td {
+    padding: 4px 8px;
+    text-align: left;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+}
+.mol-compare__tbl th {
+    font-weight: 600;
+    color: rgba(229, 192, 123, 0.85);
+    font-size: 0.78rem;
+}
+.mol-compare__tbl td:first-child {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 0.78rem;
+    width: 32%;
+}
+.mol-compare__tbl tr:last-child td { border-bottom: none; }
+.mol-compare__hint {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(229, 192, 123, 0.15);
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.76rem;
+    line-height: 1.5;
+}
+@media (max-width: 768px) {
+    .mol-compare { padding: 8px 10px; }
+    .mol-compare__tbl { font-size: 0.74rem; }
+    .mol-compare__tbl th,
+    .mol-compare__tbl td { padding: 3px 5px; }
+}
+
 @media (max-width: 768px) {
     .mol-bondparams { padding: 8px 10px; }
     .mol-bondparams__tbl { font-size: 0.74rem; }
