@@ -33,6 +33,9 @@ window.PlanetsView = {
     tIn: 0,               // 进入 subject 的过渡进度 0→1
     tInTarget: 0,
     subjTime: 0,          // 卫星轨道独立时间累加（ms）
+    launchingSat: null,   // v4.4-α5：正在 zoom 跳转的卫星
+    tLaunch: 0,           // 0→1，控制跳转动画进度
+    tLaunchTarget: 0,
 
     subjects: [
         { id: 'mathematics', label: '数学', desc: '函数·几何·概率·向量·圆锥曲线 (15 实验)', color: '#5b8dce', angle: 0 },
@@ -93,6 +96,9 @@ window.PlanetsView = {
         this.currentSubject = null;
         this.satellites = [];
         this.tIn = 0; this.tInTarget = 0;
+        this.launchingSat = null;
+        this.tLaunch = 0; this.tLaunchTarget = 0;
+        clearTimeout(this._navTimer);
         this._updateChrome();
     },
 
@@ -228,16 +234,30 @@ window.PlanetsView = {
 
     _enterExperiment(sat) {
         if (!sat || !this.currentSubject) return;
+        if (this.launchingSat) return; // 防重点
         const subjectId = this.currentSubject.id;
         const expId = sat.id;
-        // 1) 先切到该学科页面（hash），避免空白闪烁
-        window.location.hash = '#' + subjectId;
-        // 2) 等 router 完成转场后调用 ModuleSelector 直达指定实验
-        setTimeout(() => {
-            if (typeof ModuleSelector !== 'undefined' && typeof ModuleSelector.openModule === 'function') {
-                try { ModuleSelector.openModule(subjectId, expId); } catch (err) { /* noop */ }
-            }
-        }, 700);
+        // 启动 zoom-into-satellite 动画
+        this.launchingSat = sat;
+        this.tLaunch = 0;
+        this.tLaunchTarget = 1;
+        this.autoRotate = false;
+        // 锁定靠近相机的 yaw：让该卫星转到正面（z = +radius）以便冲出画面
+        const a = sat.angle + this.subjTime * (sat.ring === 0 ? 0.00018 : 0.00012);
+        // 在 _planetPos 的坐标系： x=r·cosα, z=r·sinα；投影经 yaw 旋转。要让 z 坐标走到正面，
+        // 调整 targetYaw 使该点靠近中姮平面。简单起见：允许位置保持，动画同时起作。
+        // 1) 等动画推进到 0.85 后跳转（~480ms）
+        const navDelay = 480;
+        clearTimeout(this._navTimer);
+        this._navTimer = setTimeout(() => {
+            window.location.hash = '#' + subjectId;
+            // 2) 再等 router 转场完成调 ModuleSelector
+            setTimeout(() => {
+                if (typeof ModuleSelector !== 'undefined' && typeof ModuleSelector.openModule === 'function') {
+                    try { ModuleSelector.openModule(subjectId, expId); } catch (err) { /* noop */ }
+                }
+            }, 600);
+        }, navDelay);
     },
 
     _buildSatellites(subjectId) {
@@ -413,6 +433,10 @@ window.PlanetsView = {
         // 过渡动画：tIn 以缓动靠近 tInTarget（v44c：节奏略快）
         this.tIn += (this.tInTarget - this.tIn) * 0.15;
         if (Math.abs(this.tIn - this.tInTarget) < 0.001) this.tIn = this.tInTarget;
+        // v4.4-α5：zoom-into-satellite 动画推进（线性以保证可预测的 480ms）
+        if (this.launchingSat) {
+            this.tLaunch = Math.min(1, this.tLaunch + dt / 480);
+        }
         // 子星系时间坑（仅 subject 状态下推进）
         if (this.mode === 'subject' || this.tIn > 0) this.subjTime += dt;
 
@@ -494,7 +518,9 @@ window.PlanetsView = {
         // ── 子星系层（subject）──────────────────────
         if (aSubject > 0.02 && this.currentSubject) {
             ctx.save();
-            ctx.globalAlpha = aSubject;
+            // launch 时其他元素逐渐淡出
+            const subAlpha = aSubject * (1 - this.tLaunch * 0.85);
+            ctx.globalAlpha = subAlpha;
 
             const s = this.currentSubject;
             // 中央放大的"恒星"——当前学科
@@ -554,10 +580,62 @@ window.PlanetsView = {
             }).sort((a, b) => a.proj.z - b.proj.z);
 
             for (const { sat, proj } of satItems) {
+                if (sat === this.launchingSat) continue;   // launch 中的卫星单独绘制
                 this._drawSatellite(ctx, sat, proj, this.hovered === sat, s.color);
             }
 
             ctx.restore();
+
+            // ── v4.4-α5：launch 卫星单独画在最上层，不受 subAlpha 影响 ──
+            if (this.launchingSat && this.satellites.includes(this.launchingSat)) {
+                const sat = this.launchingSat;
+                const t = this.tLaunch;            // 0~1
+                const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
+                // 起点：原投影位置；终点：屏幕中心、放大 ~10x
+                const pos = this._satellitePos(sat);
+                const projStart = this._project(pos.x, pos.y, pos.z);
+                const startX = projStart.x, startY = projStart.y;
+                const endX = cx, endY = cy;
+                const px = startX + (endX - startX) * ease;
+                const py = startY + (endY - startY) * ease;
+                const baseR = Math.max(18, 34 * projStart.scale / 200);
+                const radius = baseR * (1 + ease * 9);
+
+                // 强光晕扩散
+                const flashR = radius * (1.4 + ease * 1.5);
+                const flash = ctx.createRadialGradient(px, py, 0, px, py, flashR);
+                flash.addColorStop(0, this._hexA(s.color, 0.85 * (1 - ease * 0.3)));
+                flash.addColorStop(0.4, this._hexA(s.color, 0.3));
+                flash.addColorStop(1, this._hexA(s.color, 0));
+                ctx.fillStyle = flash;
+                ctx.beginPath();
+                ctx.arc(px, py, flashR, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 本体（淡出到接近全白）
+                const bodyAlpha = 0.85 - ease * 0.4;
+                ctx.fillStyle = `rgba(0,12,28,${bodyAlpha})`;
+                ctx.beginPath();
+                ctx.arc(px, py, radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#3aa9ff';
+                ctx.lineWidth = 2 + ease * 2;
+                ctx.beginPath();
+                ctx.arc(px, py, radius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // 中心高亮点（几乎填满屏幕的暖色光环）
+                if (ease > 0.5) {
+                    const overlay = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.hypot(this.W, this.H));
+                    const a2 = (ease - 0.5) * 2;          // 0.5→1 映射 0→1
+                    overlay.addColorStop(0, this._hexA(s.color, 0.35 * a2));
+                    overlay.addColorStop(0.6, 'rgba(0,5,8,0)');
+                    overlay.addColorStop(1, 'rgba(0,5,8,0)');
+                    ctx.fillStyle = overlay;
+                    ctx.fillRect(0, 0, this.W, this.H);
+                }
+            }
         }
     },
 
