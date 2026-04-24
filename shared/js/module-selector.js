@@ -208,6 +208,12 @@ const ModuleSelector = {
         // E-04: Focus first interactive control for keyboard users
         this._focusExperiment(page, moduleId);
 
+        // v4.5-α3: Render related experiments panel at the bottom
+        if (typeof RelatedExperiments !== 'undefined') {
+            // 等模块 DOM 渲染完毕（_initModule 是同步的，但部分模块在 microtask 内才挂 DOM）
+            setTimeout(() => RelatedExperiments.show(page, moduleId), 80);
+        }
+
         // Enable swipe-back from left edge (touch devices)
         if (typeof TouchGestures !== 'undefined' && !this._swipeBackCtrls[page]) {
             this._swipeBackCtrls[page] = TouchGestures.enableSwipeBack(
@@ -239,6 +245,9 @@ const ModuleSelector = {
         pageEl.querySelectorAll('[data-module].module-active').forEach(s => {
             s.classList.remove('module-active');
         });
+
+        // v4.5-α3: 移除相关实验推荐面板
+        pageEl.querySelectorAll('.related-experiments').forEach(el => el.remove());
 
         // Show gallery
         const gallery = document.getElementById(`gallery-${page}`);
