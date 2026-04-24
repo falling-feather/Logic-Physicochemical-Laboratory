@@ -23,8 +23,16 @@ window.PlanetsView = {
     dragStartYaw: 0, dragStartPitch: 0,
     moved: false,
 
-    hovered: null,
+    hovered: null,        // 当前 hover 的对象（galaxy: subject; subject: satellite 或 'center'）
     stars: [],
+
+    // ── v4.4：星系作为目录 — 双层星系状态 ──
+    mode: 'galaxy',       // 'galaxy' | 'subject'
+    currentSubject: null, // 进入子星系后保存当前 subject 对象
+    satellites: [],       // 当前子星系的卫星列表
+    tIn: 0,               // 进入 subject 的过渡进度 0→1
+    tInTarget: 0,
+    subjTime: 0,          // 卫星轨道独立时间累加（ms）
 
     subjects: [
         { id: 'mathematics', label: '数学', desc: '函数·几何·概率·向量·圆锥曲线 (15 实验)', color: '#5b8dce', angle: 0 },
@@ -49,6 +57,7 @@ window.PlanetsView = {
         this._onTouchStart = this._onTouchStart.bind(this);
         this._onTouchMove = this._onTouchMove.bind(this);
         this._onTouchEnd = this._onTouchEnd.bind(this);
+        this._onKeyDown = this._onKeyDown.bind(this);
 
         this._resize();
         window.addEventListener('resize', this._resize);
@@ -59,6 +68,7 @@ window.PlanetsView = {
         this.canvas.addEventListener('touchstart', this._onTouchStart, { passive: false });
         this.canvas.addEventListener('touchmove', this._onTouchMove, { passive: false });
         this.canvas.addEventListener('touchend', this._onTouchEnd);
+        window.addEventListener('keydown', this._onKeyDown);
 
         this._initStars();
         this.lastT = performance.now();
@@ -77,6 +87,13 @@ window.PlanetsView = {
         this.canvas.removeEventListener('touchstart', this._onTouchStart);
         this.canvas.removeEventListener('touchmove', this._onTouchMove);
         this.canvas.removeEventListener('touchend', this._onTouchEnd);
+        window.removeEventListener('keydown', this._onKeyDown);
+        // 离开页面时复位为 galaxy 模式，避免下次回来仍在 subject 状态
+        this.mode = 'galaxy';
+        this.currentSubject = null;
+        this.satellites = [];
+        this.tIn = 0; this.tInTarget = 0;
+        this._updateChrome();
     },
 
     _resize() {
@@ -136,9 +153,7 @@ window.PlanetsView = {
 
     _onClick(e) {
         if (this.moved) return;
-        if (this.hovered) {
-            window.location.hash = '#' + this.hovered.id;
-        }
+        this._handleTap();
     },
 
     _onTouchStart(e) {
@@ -159,12 +174,126 @@ window.PlanetsView = {
 
     _onTouchEnd() {
         // tap (no drag) → click
-        if (!this.moved && this.hovered) {
-            window.location.hash = '#' + this.hovered.id;
-        }
+        if (!this.moved) this._handleTap();
         this.isDragging = false;
         clearTimeout(this._autoTimer);
         this._autoTimer = setTimeout(() => { this.autoRotate = true; this.hovered = null; this._updateInfo(); }, 4000);
+    },
+
+    _onKeyDown(e) {
+        if (e.key === 'Escape' && this.mode === 'subject') {
+            this._exitSubject();
+        }
+    },
+
+    _handleTap() {
+        if (!this.hovered) return;
+        if (this.mode === 'galaxy') {
+            // 进入学科子星系
+            this._enterSubject(this.hovered);
+        } else {
+            // subject 模式
+            if (this.hovered === '__center') {
+                this._exitSubject();
+            } else {
+                this._enterExperiment(this.hovered);
+            }
+        }
+    },
+
+    // ── v4.4 子星系：进入学科 ──
+    _enterSubject(subject) {
+        if (!subject) return;
+        this.currentSubject = subject;
+        this._buildSatellites(subject.id);
+        this.mode = 'subject';
+        this.tInTarget = 1;
+        this.autoRotate = true;          // 缓慢自转保持沉浸
+        this.targetPitch = -0.05;        // 略平视
+        this.hovered = null;
+        this.subjTime = 0;
+        this._updateChrome();
+        this._updateInfo();
+    },
+
+    _exitSubject() {
+        this.mode = 'galaxy';
+        this.currentSubject = null;
+        this.satellites = [];
+        this.tInTarget = 0;
+        this.hovered = null;
+        this._updateChrome();
+        this._updateInfo();
+    },
+
+    _enterExperiment(sat) {
+        if (!sat || !this.currentSubject) return;
+        const subjectId = this.currentSubject.id;
+        const expId = sat.id;
+        // 1) 先切到该学科页面（hash），避免空白闪烁
+        window.location.hash = '#' + subjectId;
+        // 2) 等 router 完成转场后调用 ModuleSelector 直达指定实验
+        setTimeout(() => {
+            if (typeof ModuleSelector !== 'undefined' && typeof ModuleSelector.openModule === 'function') {
+                try { ModuleSelector.openModule(subjectId, expId); } catch (err) { /* noop */ }
+            }
+        }, 700);
+    },
+
+    _buildSatellites(subjectId) {
+        const exps = (typeof CONFIG !== 'undefined' && CONFIG.experiments && CONFIG.experiments[subjectId]) || [];
+        const list = exps.filter(e => e.variant !== 'upcoming');
+        const N = list.length || 1;
+        // 双环分布：偶数索引内环，奇数索引外环，避免拥挤
+        this.satellites = list.map((e, i) => {
+            const ring = i % 2 === 0 ? 0 : 1;
+            const radius = ring === 0 ? 1.0 : 1.45;
+            // 同一环内均匀分布
+            const sameRingItems = list.filter((_, j) => (j % 2) === ring).length || 1;
+            const idxInRing = Math.floor(i / 2);
+            const angle = (idxInRing / sameRingItems) * Math.PI * 2 + (ring === 1 ? Math.PI / sameRingItems : 0);
+            return {
+                id: e.id,
+                title: e.title || e.id,
+                desc: e.description || '',
+                icon: e.icon || 'box',
+                radius,
+                angle,
+                yJitter: ((i % 5) - 2) * 0.06,
+                ring
+            };
+        });
+    },
+
+    _satellitePos(sat) {
+        // 卫星按自身轨道时间缓慢公转；外环慢一些
+        const speed = sat.ring === 0 ? 0.00018 : 0.00012;
+        const a = sat.angle + this.subjTime * speed;
+        return {
+            x: sat.radius * Math.cos(a),
+            y: sat.yJitter,
+            z: sat.radius * Math.sin(a)
+        };
+    },
+
+    _updateChrome() {
+        // 切换 HUD 中的标题/提示文案
+        const title = document.querySelector('#page-planets .planets-title');
+        const subtitle = document.querySelector('#page-planets .planets-subtitle');
+        const hudBL = document.querySelector('#page-planets .planets-hud--bl');
+        const hudTL = document.querySelector('#page-planets .planets-hud--tl');
+        if (this.mode === 'subject' && this.currentSubject) {
+            const s = this.currentSubject;
+            if (title) title.firstChild && (title.firstChild.nodeValue = `${s.label} · 实验集`);
+            if (subtitle) subtitle.textContent = 'TAP SATELLITE TO ENTER · ESC RETURN';
+            if (hudBL) hudBL.innerHTML = '<div>← DRAG TO ROTATE</div><div>TAP SATELLITE / ESC RETURN</div>';
+            if (hudTL) hudTL.innerHTML = `<div><span class="blink">●</span> ${s.id.toUpperCase()}.SCAN</div><div>MODE: SUB-ORBIT</div><div>NODES: ${this.satellites.length}</div>`;
+        } else {
+            if (title) title.firstChild && (title.firstChild.nodeValue = '星 系 导 航');
+            if (subtitle) subtitle.textContent = 'SUBJECT · GALAXY · MAP';
+            if (hudBL) hudBL.innerHTML = '<div>← DRAG TO ROTATE</div><div>TAP PLANET TO ENTER</div>';
+            if (hudTL) hudTL.innerHTML = '<div><span class="blink">●</span> SYS.SCAN</div><div>MODE: ORBIT</div><div>NODES: 5</div>';
+        }
     },
 
     _project(x, y, z) {
@@ -197,19 +326,37 @@ window.PlanetsView = {
     },
 
     _updateHover(mx, my) {
-        const projected = this.subjects.map(s => {
-            const p = this._planetPos(s);
-            const proj = this._project(p.x, p.y, p.z);
-            return { s, proj };
-        }).sort((a, b) => b.proj.z - a.proj.z); // closer first
-
         this.hovered = null;
-        for (const { s, proj } of projected) {
-            const radius = Math.max(28, 60 * proj.scale / 200);
-            const dx = mx - proj.x, dy = my - proj.y;
-            if (dx * dx + dy * dy <= radius * radius) {
-                this.hovered = s;
-                break;
+        if (this.mode === 'galaxy' || this.tIn < 0.5) {
+            // 主星系：测试学科行星
+            const projected = this.subjects.map(s => {
+                const p = this._planetPos(s);
+                const proj = this._project(p.x, p.y, p.z);
+                return { s, proj };
+            }).sort((a, b) => b.proj.z - a.proj.z);
+            for (const { s, proj } of projected) {
+                const radius = Math.max(28, 60 * proj.scale / 200);
+                const dx = mx - proj.x, dy = my - proj.y;
+                if (dx * dx + dy * dy <= radius * radius) { this.hovered = s; break; }
+            }
+        } else {
+            // 子星系：先测试中央返回区，再测试卫星
+            const cx = this.W / 2, cy = this.H / 2;
+            const centerR = Math.min(this.W, this.H) * 0.085;
+            const dxc = mx - cx, dyc = my - cy;
+            if (dxc * dxc + dyc * dyc <= centerR * centerR) {
+                this.hovered = '__center';
+            } else {
+                const projected = this.satellites.map(sat => {
+                    const p = this._satellitePos(sat);
+                    const proj = this._project(p.x, p.y, p.z);
+                    return { sat, proj };
+                }).sort((a, b) => b.proj.z - a.proj.z);
+                for (const { sat, proj } of projected) {
+                    const radius = Math.max(20, 36 * proj.scale / 200);
+                    const dx = mx - proj.x, dy = my - proj.y;
+                    if (dx * dx + dy * dy <= radius * radius) { this.hovered = sat; break; }
+                }
             }
         }
         this.canvas.style.cursor = this.hovered ? 'pointer' : (this.isDragging ? 'grabbing' : 'grab');
@@ -218,13 +365,36 @@ window.PlanetsView = {
 
     _updateInfo() {
         if (!this.info) return;
-        if (this.hovered) {
-            this.info.classList.add('planets-info--visible');
-            this.info.querySelector('.planets-info__name').textContent = this.hovered.label;
-            this.info.querySelector('.planets-info__desc').textContent = this.hovered.desc;
-            this.info.style.borderLeftColor = this.hovered.color;
-        } else {
+        const labelEl = this.info.querySelector('.planets-info__label');
+        const nameEl = this.info.querySelector('.planets-info__name');
+        const descEl = this.info.querySelector('.planets-info__desc');
+        const hintEl = this.info.querySelector('.planets-info__hint');
+        if (!this.hovered) {
             this.info.classList.remove('planets-info--visible');
+            return;
+        }
+        this.info.classList.add('planets-info--visible');
+        if (this.mode === 'galaxy' && this.hovered && this.hovered.id) {
+            // 学科
+            if (labelEl) labelEl.textContent = 'SUBJECT';
+            if (nameEl) nameEl.textContent = this.hovered.label;
+            if (descEl) descEl.textContent = this.hovered.desc;
+            if (hintEl) hintEl.textContent = 'CLICK TO ENTER →';
+            this.info.style.borderLeftColor = this.hovered.color;
+        } else if (this.mode === 'subject' && this.hovered === '__center') {
+            // 中央返回区
+            if (labelEl) labelEl.textContent = 'NAVIGATION';
+            if (nameEl) nameEl.textContent = '返回星系';
+            if (descEl) descEl.textContent = '点击中央或 ESC 返回主星系';
+            if (hintEl) hintEl.textContent = '← BACK TO GALAXY';
+            this.info.style.borderLeftColor = (this.currentSubject && this.currentSubject.color) || '#3aa9ff';
+        } else if (this.mode === 'subject' && this.hovered && this.hovered.id) {
+            // 卫星实验
+            if (labelEl) labelEl.textContent = 'EXPERIMENT';
+            if (nameEl) nameEl.textContent = this.hovered.title;
+            if (descEl) descEl.textContent = this.hovered.desc || '';
+            if (hintEl) hintEl.textContent = 'CLICK TO LAUNCH →';
+            this.info.style.borderLeftColor = (this.currentSubject && this.currentSubject.color) || '#3aa9ff';
         }
     },
 
@@ -240,17 +410,23 @@ window.PlanetsView = {
         this.yaw += (this.targetYaw - this.yaw) * 0.12;
         this.pitch += (this.targetPitch - this.pitch) * 0.12;
 
+        // 过渡动画：tIn 以缓动靠近 tInTarget
+        this.tIn += (this.tInTarget - this.tIn) * 0.10;
+        if (Math.abs(this.tIn - this.tInTarget) < 0.001) this.tIn = this.tInTarget;
+        // 子星系时间坑（仅 subject 状态下推进）
+        if (this.mode === 'subject' || this.tIn > 0) this.subjTime += dt;
+
         this._draw();
         this.rafId = requestAnimationFrame(this._loop);
     },
 
     _draw() {
         const ctx = this.ctx;
-        // backdrop
-        ctx.fillStyle = 'rgba(0,5,8,0.4)'; // partial trail
+        // backdrop (拖尾叠加)
+        ctx.fillStyle = 'rgba(0,5,8,0.4)';
         ctx.fillRect(0, 0, this.W, this.H);
 
-        // background stars (simple parallax dots)
+        // background stars
         for (const star of this.stars) {
             const p = this._project(star.x * 4, star.y * 4, star.z * 4 - 1);
             const sz = Math.max(0.3, 1.4 * p.scale / 200);
@@ -260,98 +436,218 @@ window.PlanetsView = {
         }
         ctx.globalAlpha = 1;
 
-        // central core
         const cx = this.W / 2, cy = this.H / 2;
-        const coreR = Math.min(this.W, this.H) * 0.06;
-        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 2);
-        grad.addColorStop(0, 'rgba(58,169,255,0.4)');
-        grad.addColorStop(0.5, 'rgba(58,169,255,0.1)');
-        grad.addColorStop(1, 'rgba(58,169,255,0)');
-        ctx.fillStyle = grad;
+        const aGalaxy = 1 - this.tIn;     // 主星系层不透明度
+        const aSubject = this.tIn;        // 子星系层不透明度
+
+        // ── 主星系层（galaxy）────────────────────────
+        if (aGalaxy > 0.02) {
+            ctx.save();
+            ctx.globalAlpha = aGalaxy;
+
+            // central core
+            const coreR = Math.min(this.W, this.H) * 0.06;
+            const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 2);
+            grad.addColorStop(0, 'rgba(58,169,255,0.4)');
+            grad.addColorStop(0.5, 'rgba(58,169,255,0.1)');
+            grad.addColorStop(1, 'rgba(58,169,255,0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(cx, cy, coreR * 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = 'rgba(58,169,255,0.6)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 主轨道环
+            ctx.strokeStyle = 'rgba(58,169,255,0.18)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 6]);
+            ctx.beginPath();
+            const r = 1.4;
+            const seg = 80;
+            for (let i = 0; i <= seg; i++) {
+                const a = (i / seg) * Math.PI * 2;
+                const p = this._project(r * Math.cos(a), 0, r * Math.sin(a));
+                if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // planets
+            const items = this.subjects.map(s => {
+                const pos = this._planetPos(s);
+                const proj = this._project(pos.x, pos.y, pos.z);
+                return { s, proj };
+            }).sort((a, b) => a.proj.z - b.proj.z);
+
+            for (const { s, proj } of items) {
+                this._drawPlanet(ctx, s, proj, this.mode === 'galaxy' && this.hovered === s);
+            }
+
+            ctx.restore();
+        }
+
+        // ── 子星系层（subject）──────────────────────
+        if (aSubject > 0.02 && this.currentSubject) {
+            ctx.save();
+            ctx.globalAlpha = aSubject;
+
+            const s = this.currentSubject;
+            // 中央放大的"恒星"——当前学科
+            const sunR = Math.min(this.W, this.H) * 0.085;
+            const sunGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, sunR * 2.4);
+            const isCenterHover = this.hovered === '__center';
+            sunGlow.addColorStop(0, this._hexA(s.color, isCenterHover ? 0.55 : 0.40));
+            sunGlow.addColorStop(0.5, this._hexA(s.color, 0.15));
+            sunGlow.addColorStop(1, this._hexA(s.color, 0));
+            ctx.fillStyle = sunGlow;
+            ctx.beginPath();
+            ctx.arc(cx, cy, sunR * 2.4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = 'rgba(0,18,40,0.85)';
+            ctx.beginPath();
+            ctx.arc(cx, cy, sunR, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = isCenterHover ? '#3aa9ff' : this._hexA(s.color, 0.85);
+            ctx.lineWidth = isCenterHover ? 2.4 : 1.8;
+            ctx.beginPath();
+            ctx.arc(cx, cy, sunR, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 中央学科名字
+            ctx.fillStyle = isCenterHover ? '#3aa9ff' : 'rgba(212,232,255,0.95)';
+            ctx.font = `bold ${Math.max(14, sunR * 0.32)}px var(--font-display, system-ui)`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(s.label, cx, cy - 2);
+            ctx.font = `${Math.max(9, sunR * 0.16)}px var(--font-mono, monospace)`;
+            ctx.fillStyle = 'rgba(58,169,255,0.7)';
+            ctx.fillText('BACK · ESC', cx, cy + sunR * 0.42);
+
+            // 卫星轨道环（双环）
+            for (const ringR of [1.0, 1.45]) {
+                ctx.strokeStyle = 'rgba(58,169,255,0.12)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([3, 6]);
+                ctx.beginPath();
+                const seg = 72;
+                for (let i = 0; i <= seg; i++) {
+                    const a = (i / seg) * Math.PI * 2;
+                    const p = this._project(ringR * Math.cos(a), 0, ringR * Math.sin(a));
+                    if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // 卫星 — 按深度排序
+            const satItems = this.satellites.map(sat => {
+                const pos = this._satellitePos(sat);
+                const proj = this._project(pos.x, pos.y, pos.z);
+                return { sat, proj };
+            }).sort((a, b) => a.proj.z - b.proj.z);
+
+            for (const { sat, proj } of satItems) {
+                this._drawSatellite(ctx, sat, proj, this.hovered === sat, s.color);
+            }
+
+            ctx.restore();
+        }
+    },
+
+    _drawPlanet(ctx, s, proj, isHover) {
+        const planetR = Math.max(20, 42 * proj.scale / 200);
+        const depthFactor = (proj.z + 2) / 4;
+        const alpha = 0.5 + 0.5 * Math.max(0.2, depthFactor);
+
+        const glow = ctx.createRadialGradient(proj.x, proj.y, 0, proj.x, proj.y, planetR * 2.6);
+        glow.addColorStop(0, this._hexA(s.color, isHover ? 0.45 : 0.22 * alpha));
+        glow.addColorStop(1, this._hexA(s.color, 0));
+        ctx.fillStyle = glow;
         ctx.beginPath();
-        ctx.arc(cx, cy, coreR * 2, 0, Math.PI * 2);
+        ctx.arc(proj.x, proj.y, planetR * 2.6, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.strokeStyle = 'rgba(58,169,255,0.6)';
-        ctx.lineWidth = 1.5;
+        ctx.fillStyle = `rgba(0,18,40,${0.65 * alpha})`;
         ctx.beginPath();
-        ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
+        ctx.arc(proj.x, proj.y, planetR, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = isHover ? '#3aa9ff' : `rgba(58,169,255,${0.55 * alpha})`;
+        ctx.lineWidth = isHover ? 2 : 1.2;
+        ctx.beginPath();
+        ctx.arc(proj.x, proj.y, planetR, 0, Math.PI * 2);
         ctx.stroke();
 
-        // orbit ring (project a circle in xz plane at y=0)
-        ctx.strokeStyle = 'rgba(58,169,255,0.18)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 6]);
+        ctx.strokeStyle = `rgba(58,169,255,${0.35 * alpha})`;
+        ctx.lineWidth = 0.8;
         ctx.beginPath();
-        const r = 1.4;
-        const seg = 80;
-        for (let i = 0; i <= seg; i++) {
-            const a = (i / seg) * Math.PI * 2;
-            const p = this._project(r * Math.cos(a), 0, r * Math.sin(a));
-            if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
-        }
+        ctx.ellipse(proj.x, proj.y, planetR * 0.85, planetR * 0.25, 0, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(proj.x - planetR * 0.85, proj.y);
+        ctx.lineTo(proj.x + planetR * 0.85, proj.y);
+        ctx.moveTo(proj.x, proj.y - planetR * 0.85);
+        ctx.lineTo(proj.x, proj.y + planetR * 0.85);
+        ctx.stroke();
 
-        // planets — project, sort by depth, draw far→near
-        const items = this.subjects.map(s => {
-            const pos = this._planetPos(s);
-            const proj = this._project(pos.x, pos.y, pos.z);
-            return { s, proj };
-        }).sort((a, b) => a.proj.z - b.proj.z);
+        ctx.fillStyle = this._hexA(s.color, alpha);
+        ctx.beginPath();
+        ctx.arc(proj.x, proj.y, planetR * 0.18, 0, Math.PI * 2);
+        ctx.fill();
 
-        for (const { s, proj } of items) {
-            const planetR = Math.max(20, 42 * proj.scale / 200);
-            const isHover = this.hovered === s;
-            const depthFactor = (proj.z + 2) / 4; // 0~1
-            const alpha = 0.5 + 0.5 * Math.max(0.2, depthFactor);
+        ctx.fillStyle = isHover ? '#3aa9ff' : `rgba(212,232,255,${0.85 * alpha})`;
+        ctx.font = `${isHover ? 'bold ' : ''}${Math.max(11, 14 * proj.scale / 200)}px var(--font-display, system-ui)`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText(s.label, proj.x, proj.y + planetR + 10);
+    },
 
-            // outer glow
-            const glow = ctx.createRadialGradient(proj.x, proj.y, 0, proj.x, proj.y, planetR * 2.6);
-            glow.addColorStop(0, this._hexA(s.color, isHover ? 0.45 : 0.22 * alpha));
-            glow.addColorStop(1, this._hexA(s.color, 0));
-            ctx.fillStyle = glow;
-            ctx.beginPath();
-            ctx.arc(proj.x, proj.y, planetR * 2.6, 0, Math.PI * 2);
-            ctx.fill();
+    _drawSatellite(ctx, sat, proj, isHover, accent) {
+        const satR = Math.max(14, 28 * proj.scale / 200);
+        const depthFactor = (proj.z + 2) / 4;
+        const alpha = 0.5 + 0.5 * Math.max(0.25, depthFactor);
 
-            // body — translucent dark + cyan ring
-            ctx.fillStyle = `rgba(0,18,40,${0.65 * alpha})`;
-            ctx.beginPath();
-            ctx.arc(proj.x, proj.y, planetR, 0, Math.PI * 2);
-            ctx.fill();
+        // 微弱光晕
+        const glow = ctx.createRadialGradient(proj.x, proj.y, 0, proj.x, proj.y, satR * 2.2);
+        glow.addColorStop(0, this._hexA(accent, isHover ? 0.35 : 0.15 * alpha));
+        glow.addColorStop(1, this._hexA(accent, 0));
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(proj.x, proj.y, satR * 2.2, 0, Math.PI * 2);
+        ctx.fill();
 
-            ctx.strokeStyle = isHover ? '#3aa9ff' : `rgba(58,169,255,${0.55 * alpha})`;
-            ctx.lineWidth = isHover ? 2 : 1.2;
-            ctx.beginPath();
-            ctx.arc(proj.x, proj.y, planetR, 0, Math.PI * 2);
-            ctx.stroke();
+        // 卫星本体
+        ctx.fillStyle = `rgba(0,12,28,${0.78 * alpha})`;
+        ctx.beginPath();
+        ctx.arc(proj.x, proj.y, satR, 0, Math.PI * 2);
+        ctx.fill();
 
-            // inner crosshair / equator ring
-            ctx.strokeStyle = `rgba(58,169,255,${0.35 * alpha})`;
-            ctx.lineWidth = 0.8;
-            ctx.beginPath();
-            ctx.ellipse(proj.x, proj.y, planetR * 0.85, planetR * 0.25, 0, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(proj.x - planetR * 0.85, proj.y);
-            ctx.lineTo(proj.x + planetR * 0.85, proj.y);
-            ctx.moveTo(proj.x, proj.y - planetR * 0.85);
-            ctx.lineTo(proj.x, proj.y + planetR * 0.85);
-            ctx.stroke();
+        ctx.strokeStyle = isHover ? '#3aa9ff' : `rgba(58,169,255,${0.55 * alpha})`;
+        ctx.lineWidth = isHover ? 1.8 : 1;
+        ctx.beginPath();
+        ctx.arc(proj.x, proj.y, satR, 0, Math.PI * 2);
+        ctx.stroke();
 
-            // subject color dot at center
-            ctx.fillStyle = this._hexA(s.color, alpha);
-            ctx.beginPath();
-            ctx.arc(proj.x, proj.y, planetR * 0.18, 0, Math.PI * 2);
-            ctx.fill();
+        // 中心点
+        ctx.fillStyle = this._hexA(accent, alpha * 0.95);
+        ctx.beginPath();
+        ctx.arc(proj.x, proj.y, satR * 0.22, 0, Math.PI * 2);
+        ctx.fill();
 
-            // label
-            ctx.fillStyle = isHover ? '#3aa9ff' : `rgba(212,232,255,${0.85 * alpha})`;
-            ctx.font = `${isHover ? 'bold ' : ''}${Math.max(11, 14 * proj.scale / 200)}px var(--font-display, system-ui)`;
+        // 标签（仅 hover 或正面深度时显示，避免拥挤）
+        if (isHover || depthFactor > 0.5) {
+            ctx.fillStyle = isHover ? '#3aa9ff' : `rgba(212,232,255,${0.78 * alpha})`;
+            ctx.font = `${isHover ? 'bold ' : ''}${Math.max(10, 12 * proj.scale / 200)}px var(--font-display, system-ui)`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
-            ctx.fillText(s.label, proj.x, proj.y + planetR + 10);
+            ctx.fillText(sat.title, proj.x, proj.y + satR + 6);
         }
     },
 
