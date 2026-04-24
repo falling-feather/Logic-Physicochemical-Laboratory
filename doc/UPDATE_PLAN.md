@@ -16,22 +16,23 @@
 | v4.5.0-α4 | `dfc02dc` | 化学优化 7-1：molecular-structure 移除 NaCl 条目（NaCl 是离子化合物，不是分子）+ 新增键参数表（O—H/C—H/C=O/C—C/C≡C 等 11 类，含键长 Å、键能 kJ·mol⁻¹、键类型 σ/π 标注）+ 苯环/CO₂ 专属覆盖；缓存 v45d |
 | v4.5.0-α5 | `036641c` | 化学优化 7-2：molecular-structure 新增 3 个分子 — HCHO（甲醛）/H₂S（V 形，附"与 H₂O 同族对比表"）/CH₃COOH（乙酸，sp³+sp² 混合杂化）；bondData 增 H-S 键项；updateInfo 新增 hybNote/compareWith 渲染逻辑（三色分层）；缓存 v45e |
 | **v4.5.0-α6** | `3f69601` | 化学优化 7-3a：chemical-reactions 中和反应重做 — 由"HCl + NaOH → NaCl + H₂O 共价/离子键重组"改为"H⁺ + OH⁻ → H₂O 离子方程式 + Na⁺/Cl⁻ 旁观"；reactantMols 拆为 4 个独立水合离子，atom 加 `charge` 字段、mol 加 `spectator` 字段；新增 `_drawChargeBadge`（红正/蓝负圆形徽章）+ 旁观离子虚线圈包裹；reaction 加 `fullEquation` 字段（同时显示离子方程式与总式，主式上移让位）；缓存 v45f |
-| **v4.5.0-α7** | **本轮** | **化学优化 7-3b：(i) chemical-reactions redox 重做 — 由"Fe + CuSO₄ → FeSO₄ + Cu"改为"Fe + Cu²⁺ → Fe²⁺ + Cu，SO₄²⁻ 旁观"，新增 `electronTransfer` 字段（fromMol/toMol/count/label）+ `_drawElectronTransfer` 渲染（黄色发光电子沿弧形轨迹从 Fe 飞向 Cu²⁺，显示 "2e⁻" 标签，phase 2-3 期间）；(ii) 新增 `dissolution` 反应 — NaCl(s) → Na⁺(aq) + Cl⁻(aq)，强调"仅 Na—Cl 离子键断裂、H₂O 中 O—H 共价键完整保留"，溶质周围放 4 个 H₂O 分子，溶解后 4 个 H₂O 分散在水合离子周围；buildScene 新增 atom 级 `molIdx` 字段；HTML 加"NaCl 溶解"按钮（5→6 个反应）；缓存 v45g** |
+| v4.5.0-α7 | `8f2e909` | 化学优化 7-3b：(i) chemical-reactions redox 重做 — 由"Fe + CuSO₄ → FeSO₄ + Cu"改为"Fe + Cu²⁺ → Fe²⁺ + Cu，SO₄²⁻ 旁观"，新增 `electronTransfer` 字段 + `_drawElectronTransfer` 渲染（黄色发光电子沿弧形轨迹从 Fe 飞向 Cu²⁺，显示 "2e⁻" 标签）；(ii) 新增 `dissolution` 反应 — NaCl(s) → Na⁺(aq) + Cl⁻(aq)，强调"仅 Na—Cl 离子键断裂、O—H 共价键完整保留"；buildScene 新增 atom 级 `molIdx`；HTML 加"NaCl 溶解"按钮（5→6 反应）；缓存 v45g |
+| **v4.5.0-α8** | **本轮** | **化学优化 7-4：chemical-bond 强调"微粒 + 静电引力/斥力"本质 — (i) 三种键 updateInfo 全面重写，新增「构成微粒」+「本质静电作用」两行，明确列出每种键的微粒清单（如离子键 = 阳离子 + 阴离子；共价键 = 原子 + 共用电子对；金属键 = 阳离子 + 自由电子海）+ 蓝色吸引/红色排斥的两类静电力分类；(ii) 新增 `_drawForceArrow(x1,y1,x2,y2,type)` 方法（蓝实箭头=吸引、红虚箭头=排斥，双向箭头头部）+ `_drawChargeBadge` 红正/蓝负圆形电荷徽章；(iii) drawIonic 加 +/− 电荷徽章 + F引/F排 双箭头 + "键长 = 平衡距离"标注；(iv) drawCovalent 加 H 核↔共用电子对、O 核↔共用电子对 4 条吸引箭头 + 右下力图例 + 共用电子对显式标签；(v) drawMetallic 加电子海径向渐变底色 + 焦点 M⁺ 呼吸光环 + 4 方向 M⁺↔e⁻ 海吸引箭头；缓存 v45h** |
 
-**v4.5.0-α7 修改文件**：
-- `pages/chemistry/chemical-reactions.js`：
-  - `reactions.redox` 完全重写：name/equation/fullEquation/desc/mechanism 改为离子方程式视角，加 `electronTransfer: { fromMol: 0, toMol: 1, count: 2, label: '2e⁻' }`
-  - reactantMols：Fe / Cu²⁺ / SO₄²⁻（旁观），productMols：Fe²⁺ / Cu / SO₄²⁻（仍旁观）
-  - 新增 `reactions.dissolution`：reactant = NaCl(s) + 4×H₂O，product = Na⁺(aq) + Cl⁻(aq) + 4×H₂O
-  - `buildScene()`：reactant 循环加 `molIdx` 参数，每个 atom 记录所属 mol 索引
-  - 主绘制流程在 phase 5 后新增 `_drawElectronTransfer` 调用（仅当 `electronTransfer` 字段存在）
-  - 新增 `_drawElectronTransfer()`：从 fromMol 中心 → toMol 中心，沿 arc 弧形轨迹，黄色发光电子（带白色内核 + 呼吸抖动）+ "2e⁻" 中段标签
-- `index.html`：rxn-select-btn 新增 "NaCl 溶解" 按钮（5→6 个反应）+ chemical-reactions.js 缓存 → v45g
-- `sw.js`：CACHE_NAME → `v20260424v45g`
+**v4.5.0-α8 修改文件**：
+- `pages/chemistry/chemical-bond.js`：
+  - `updateInfo()`：三种模式 HTML 全面重写，加「构成微粒」「本质静电作用」两行（蓝色吸引 / 红色排斥分色文本）
+  - 新增 `_drawForceArrow(x1, y1, x2, y2, type)`：双向箭头辅助（attract = 蓝色实线 + 箭头朝中心；repel = 红色虚线 + 箭头朝外）
+  - 新增 `_drawChargeBadge(x, y, charge)`：红正/蓝负圆形徽章（与 chemical-reactions 一致）
+  - `drawIonic()`：加 Na⁺/Cl⁻ 电荷徽章 + F引/F排 双箭头 + "键长 = F引≡F排 平衡距离"标注；晶体预览微调位置避让
+  - `drawCovalent()`：保留原 H₂O 主图，新增 H 核↔共用电子对、O 核↔共用电子对 4 条吸引箭头 + 右下小图例（蓝吸/红斥）+ "共用 e⁻ 对"显式标签
+  - `drawMetallic()`：加自由电子海径向渐变底色 + 焦点 M⁺ 周围呼吸光环 + 4 方向 M⁺↔e⁻ 海吸引箭头 + 焦点电荷徽章 + "F引: 阳离子↔e⁻海 → 金属键本质"副标题
+- `index.html`：chemical-bond.js 加缓存 `?v=20260424v45h`
+- `sw.js`：CACHE_NAME → `v20260424v45h`
 
 **待办（化学 7 系列剩余子任务）**：
-- 7-4 chemical-bond 强调微粒+静电引力/斥力构成
 - 7-5 organic-chemistry 去与 molecular-structure 重复 + 加乙烯/苯共面 + 乙炔共线 + 单键旋转交互
+- v4.5 系列合并：累计 8 个 alpha (α1~α8) → squash-merge 到 main 打 v4.5.0 tag，详细历史保留 `legacy/v4.5-detail` 分支
 
 **v4.5 系列尾声待办**：
 - 合并 `feature/v4.5` 当前 7 个 alpha 到 main 打 `v4.5.0` tag（按 git-workflow.md）
