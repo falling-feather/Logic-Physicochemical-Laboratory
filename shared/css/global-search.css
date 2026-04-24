@@ -237,3 +237,32 @@
     .gsearch-overlay,
     .gsearch-panel { transition: none; }
 }
+
+
+/* ===== Keyboard Shortcut Toast (v4.5-α2) ===== */
+.kbsc-toast {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.92);
+    padding: 14px 28px;
+    background: linear-gradient(180deg, rgba(8, 18, 36, 0.92), rgba(0, 8, 22, 0.92));
+    border: 1px solid rgba(58, 169, 255, 0.55);
+    border-radius: 8px;
+    color: #d4ecff;
+    font-family: var(--font-display, sans-serif);
+    font-size: 1.05rem;
+    letter-spacing: 0.18em;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 18px rgba(58, 169, 255, 0.35);
+    pointer-events: none;
+    opacity: 0;
+    z-index: 9500;
+    transition: opacity 180ms ease, transform 180ms cubic-bezier(.2,.9,.2,1);
+}
+.kbsc-toast.kbsc-toast--visible {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+@media (prefers-reduced-motion: reduce) {
+    .kbsc-toast { transition: opacity 120ms ease; }
+}

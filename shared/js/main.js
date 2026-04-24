@@ -33,6 +33,9 @@ function initApp() {
     // 1g. Initialize global search (v4.5-α1)
     if (typeof GlobalSearch !== 'undefined') GlobalSearch.init();
 
+    // 1h. Initialize keyboard shortcuts (v4.5-α2)
+    if (typeof KeyboardShortcuts !== 'undefined') KeyboardShortcuts.init();
+
     // 2. Homepage init moved to Router.onPageEnter('home') for lazy loading
 
     // 3. All experiment module inits moved to Router.onPageEnter() for lazy loading
