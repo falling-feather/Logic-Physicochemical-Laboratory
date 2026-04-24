@@ -6,7 +6,34 @@
 
 ---
 
-## 〇、近期已完成增量（v4.4 系列，feature/v4.4 分支）
+## 〇、近期已完成增量（v4.5 系列，feature/v4.5 分支）
+
+| 微版本 | 提交 | 内容 |
+| ------ | ---- | ---- |
+| v4.5.0-α1 | `eb2c9e2` | 全局搜索（Ctrl+K，63 实验跨学科模糊匹配，键盘 ↑↓ Enter ESC，关键词高亮，700ms 深链跳转）|
+| v4.5.0-α2 | `a357225` | 快捷键系统（Ctrl/Alt+1~5 切学科、Ctrl+0 首页、Ctrl+\` 星系、`/` 打开搜索）+ 中央 toast 反馈 |
+| v4.5.0-α3 | `48618c7` | 实验底部跨学科推荐（4 张卡片，bigram 重合度+同学科加权+相邻学科加权评分）|
+| **v4.5.0-α4** | **本轮** | **化学优化 7-1：molecular-structure 移除 NaCl 条目（NaCl 是离子化合物，不是分子）+ 新增键参数表（O—H/C—H/C=O/C—C/C≡C 等 11 类，含键长 Å、键能 kJ·mol⁻¹、键类型 σ/π 标注）+ 苯环/CO₂ 专属覆盖；缓存 v45d** |
+
+**v4.5.0-α4 修改文件**：
+- `pages/chemistry/molecular-structure.js`：删除 NaCl 分子条目；新增 `bondData` 表（11 项）+ `_lookupBond()` / `_collectBondParams()` 方法 + `updateInfo()` 中渲染键参数表
+- `pages/chemistry/chemistry.css`：新增 `.mol-bondparams*` 系列样式（青色配色，与教育面板的绿色区分）+ 移动端断点适配
+- `index.html`：删除 NaCl 按钮（10→9 个分子）+ chemistry.css/molecular-structure.js 版本 → v45d
+- `sw.js`：CACHE_NAME → `v20260424v45d`
+
+**未完成的化学 7 系列子任务**（user 在本轮明确选择只做 7-1，其余按需另开微版本）：
+- 7-2 molecular-structure 新增 HCHO / H₂S（与 H₂O 键参对比）/ CH₃COOH
+- 7-3 chemical-reactions 重做（NaOH+HCl 四离子自由组合 + 溶解只断离子键不断 O-H + 铁铜置换离子式）
+- 7-4 chemical-bond 强调微粒+静电引力/斥力构成
+- 7-5 organic-chemistry 去与 molecular-structure 重复 + 加乙烯/苯共面 + 乙炔共线 + 单键旋转交互
+
+**待办**：
+- 合并 `feature/v4.5` 当前 4 个 alpha 到 main 打 `v4.5.0` tag（按 git-workflow.md）
+- 历史细节保留在 `legacy/v4.5-detail`
+
+---
+
+## 〇·一、历史增量（v4.4 系列，已合并 main 打 v4.4.0 tag）
 
 > v4.4 主线：**「星系导航」从纯视觉装饰升级为正式的「目录入口」**。八个微版本闭环了 进入 → 浏览 → 跳转 → 返回 的完整导航动画体系。
 

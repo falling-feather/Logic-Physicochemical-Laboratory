@@ -445,6 +445,73 @@
     font-size: 0.78rem;
     font-weight: 600;
 }
+
+/* ===== 键参数表（v4.5.0-α4） ===== */
+.mol-bondparams {
+    margin-top: 10px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md, 8px);
+    background: rgba(100, 200, 255, 0.05);
+    border: 1px solid rgba(100, 200, 255, 0.14);
+}
+.mol-bondparams__title {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+.mol-bondparams__sub {
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.4);
+}
+.mol-bondparams__tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.78);
+}
+.mol-bondparams__tbl th,
+.mol-bondparams__tbl td {
+    padding: 4px 6px;
+    text-align: left;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+}
+.mol-bondparams__tbl th {
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.74rem;
+}
+.mol-bondparams__tbl tr:last-child td { border-bottom: none; }
+.mol-bondparams__bond {
+    font-family: 'JetBrains Mono', var(--font-mono, monospace);
+    font-weight: 600;
+    color: rgba(100, 200, 255, 0.95);
+}
+.mol-bondparams__type {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 0.74rem;
+}
+.mol-bondparams__hint {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(100, 200, 255, 0.1);
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 0.76rem;
+    line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+    .mol-bondparams { padding: 8px 10px; }
+    .mol-bondparams__tbl { font-size: 0.74rem; }
+    .mol-bondparams__tbl th,
+    .mol-bondparams__tbl td { padding: 3px 4px; }
+    .mol-bondparams__type { font-size: 0.7rem; }
+}
+
 .mol-edu { margin-top:10px; padding:12px 16px; border-radius:var(--radius-md,8px); background:rgba(77,158,126,.06); border:1px solid rgba(77,158,126,.12); font-size:.85rem; line-height:1.65; }
 .mol-edu .chem-hd { font-size:1.05rem; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
 .mol-edu .chem-tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; background:rgba(77,158,126,.18); color:rgba(77,158,126,.9); }

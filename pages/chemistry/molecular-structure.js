@@ -32,6 +32,26 @@ const MoleculeVis = {
         I:  { color: '#940094', r: 1.33, name: '\u7898', en: 2.66 }
     },
 
+    // ============ 键参数表（v4.5.0-α4 新增） ============
+    // 键长单位 Å (10⁻¹⁰ m)，键能单位 kJ/mol
+    // 数据来源：CRC Handbook + 人教版选必二（部分取代表性数值）
+    // key 规则：将两端元素按字母升序排列后用 '-' 拼接 + '|' + 键级
+    bondData: {
+        'H-O|1':  { length: 0.96, energy: 463, type: '极性共价键 σ' },
+        'C-H|1':  { length: 1.09, energy: 413, type: '弱极性共价键 σ' },
+        'C-C|1':  { length: 1.54, energy: 348, type: '非极性共价键 σ' },
+        'C-C|2':  { length: 1.34, energy: 614, type: '非极性共价键 σ+π' },
+        'C-C|3':  { length: 1.20, energy: 839, type: '非极性共价键 σ+2π' },
+        'C-O|1':  { length: 1.43, energy: 358, type: '极性共价键 σ' },
+        'C-O|2':  { length: 1.20, energy: 745, type: '极性共价键 σ+π' },
+        'C-O|2-co2': { length: 1.16, energy: 799, type: '极性共价键 σ+π（CO₂ 累积式）' },
+        'H-N|1':  { length: 1.01, energy: 391, type: '极性共价键 σ' },
+        'Cl-H|1': { length: 1.27, energy: 432, type: '极性共价键 σ' },
+        'Cl-C|1': { length: 1.77, energy: 328, type: '极性共价键 σ' },
+        // 苯环 C-C 键长居于单键(1.54)与双键(1.34)之间，能量高于单键
+        'C-C|aromatic': { length: 1.40, energy: 519, type: '芳香键（离域 π，键级≈1.5）' }
+    },
+
     molecules: {
         H2O: {
             name: '\u6c34 H\u2082O',
@@ -159,20 +179,8 @@ const MoleculeVis = {
             })(),
             lonePairs: []
         },
-        NaCl: {
-            name: '\u6c2f\u5316\u94a0 NaCl',
-            formula: 'NaCl',
-            desc: '\u79bb\u5b50\u952e\uff0c\u6676\u683c\u5355\u5143',
-            hybridization: '\u79bb\u5b50\u952e',
-            polarity: '\u79bb\u5b50\u5316\u5408\u7269',
-            shape: '\u7acb\u65b9\u6676\u7cfb',
-            atoms: [
-                { el: 'Na', x: -1.2, y: 0, z: 0 },
-                { el: 'Cl', x: 1.2, y: 0, z: 0 }
-            ],
-            bonds: [[0,1,1]],
-            lonePairs: []
-        },
+        // NOTE (v4.5.0-α4)：移除原 NaCl 条目 —— NaCl 是离子化合物晶体而非分子，
+        // 没有独立的"NaCl 分子"在常温下存在；离子键演示请查看"化学键"实验
         C2H5OH: {
             name: '\u4e59\u9187 C\u2082H\u2085OH',
             formula: 'C\u2082H\u2085OH',
@@ -704,6 +712,43 @@ const MoleculeVis = {
 
     /* ============ Info Panel ============ */
 
+    // 根据原子对 + 键级查键参数表（v4.5.0-α4）。返回 {label, length, energy, type} 或 null
+    _lookupBond(el1, el2, order, mol) {
+        const a = el1 < el2 ? el1 : el2;
+        const b = el1 < el2 ? el2 : el1;
+        // 特殊情况覆盖
+        if (mol && mol.formula === 'C\u2086H\u2086' && a === 'C' && b === 'C') {
+            // 苯环 C-C 不论 order=1/2 都按芳香键
+            return { label: 'C\u2014C(\u82ef)', ...this.bondData['C-C|aromatic'] };
+        }
+        if (mol && mol.formula === 'CO\u2082' && order === 2 && ((a === 'C' && b === 'O') || (a === 'O' && b === 'C'))) {
+            return { label: 'C=O(CO\u2082)', ...this.bondData['C-O|2-co2'] };
+        }
+        const key = a + '-' + b + '|' + order;
+        const data = this.bondData[key];
+        if (!data) return null;
+        const orderSym = order === 1 ? '\u2014' : (order === 2 ? '=' : '\u2261');
+        return { label: a + orderSym + b, ...data };
+    },
+
+    // 收集分子内所有不重复键，附加平均实际键长（用于与表值对比）
+    _collectBondParams(mol) {
+        const groups = new Map();
+        mol.bonds.forEach(([i, j, order]) => {
+            const a = mol.atoms[i], b = mol.atoms[j];
+            const info = this._lookupBond(a.el, b.el, order, mol);
+            if (!info) return;
+            const dist = Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2);
+            const k = info.label;
+            if (!groups.has(k)) groups.set(k, { info, count: 0, sumDist: 0 });
+            const g = groups.get(k);
+            g.count++; g.sumDist += dist;
+        });
+        return Array.from(groups.values()).map(g => ({
+            ...g.info, count: g.count, modelDist: g.sumDist / g.count
+        }));
+    },
+
     updateInfo() {
         const el = document.getElementById('mol-info');
         if (!el || !this.molecule) return;
@@ -730,6 +775,27 @@ const MoleculeVis = {
         if (mol.hybridization) html += '<div class="mol-info-row"><span class="mol-info-label">\u6742\u5316</span><span>' + mol.hybridization + '</span></div>';
         html += '<div class="mol-info-row"><span class="mol-info-label">\u6781\u6027</span><span>' + (mol.polarity || '-') + '</span></div>';
         html += '<div class="mol-info-row"><span class="mol-info-label">\u5206\u5b50\u6784\u578b</span><span>' + (mol.shape || '-') + '</span></div>';
+
+        // 键参数表（v4.5.0-α4 新增）
+        const bondParams = this._collectBondParams(mol);
+        if (bondParams.length > 0) {
+            html += '<div class="mol-bondparams">';
+            html += '<div class="mol-bondparams__title">\u952e\u53c2\u6570 <span class="mol-bondparams__sub">\u952e\u957f\u00a0\u00b7\u00a0\u952e\u80fd\u00a0\u00b7\u00a0\u7c7b\u578b</span></div>';
+            html += '<table class="mol-bondparams__tbl">';
+            html += '<thead><tr><th>\u952e</th><th>\u00d7</th><th>\u952e\u957f / \u00c5</th><th>\u952e\u80fd / kJ\u00b7mol\u207b\u00b9</th><th>\u7c7b\u578b</th></tr></thead><tbody>';
+            bondParams.forEach(p => {
+                html += '<tr>'
+                    + '<td class="mol-bondparams__bond">' + p.label + '</td>'
+                    + '<td>' + p.count + '</td>'
+                    + '<td>' + p.length.toFixed(2) + '</td>'
+                    + '<td>' + p.energy + '</td>'
+                    + '<td class="mol-bondparams__type">' + p.type + '</td>'
+                    + '</tr>';
+            });
+            html += '</tbody></table>';
+            html += '<div class="mol-bondparams__hint">\u{1F4A1} \u952e\u957f\u8d8a\u77ed\u00a0\u00b7\u00a0\u952e\u80fd\u8d8a\u5927 \u2192 \u952e\u8d8a\u7a33\u5b9a\u3002\u540c\u5143\u7d20\u4e0d\u540c\u952e\u7ea7\uff1a\u4e09\u952e>\u53cc\u952e>\u5355\u952e</div>';
+            html += '</div>';
+        }
 
         // Educational panel
         const hybMap = {
