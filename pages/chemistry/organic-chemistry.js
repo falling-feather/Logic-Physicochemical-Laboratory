@@ -4,31 +4,88 @@
 const OrganicChem = {
     canvas: null, ctx: null, W: 0, H: 0,
     _listeners: [], _resizeObs: null, _raf: null, _lastT: 0,
-    molecule: 'methane', time: 0, running: true, paused: false,
+    molecule: 'ethylene', time: 0, running: true, paused: false,
     rotX: -0.3, rotY: 0.5, autoRot: true,
     _drag: false, _dx0: 0, _dy0: 0, _rx0: 0, _ry0: 0,
     _mx: -999, _my: -999, _hitIdx: -1,
+    // v4.5.0-α9：σ 单键自由旋转交互（仅 ethane 启用）
+    bondRotating: false, bondRotAngle: 0,
 
-    /* ── Molecule database (3-D coordinates) ── */
+    /* ── Molecule database (3-D coordinates)
+       v4.5.0-α9：移除 methane（与 molecular-structure 完全重叠），新增 ethylene/acetylene/ethane
+       新字段：
+         geom: 'planar'|'linear'|'tetrahedral'|'mixed'  几何分类（用于 updateInfo + 几何提示绘制）
+         planarAtoms: [...]    共面原子索引（用于绘制半透明分子平面）
+         linearAxis: [a, b]    共线轴两端原子索引（用于绘制贯穿虚线）
+         rotatableBond: [a, b] 可旋转的 σ 单键（C-C 单键），bondSide=1 的原子绕该轴旋转
+    */
     molecules: {
-        methane: {
-            name: '甲烷 CH₄', formula: 'CH₄', mw: 16.04, iupac: 'Methane',
-            desc: '最简单的烷烃，正四面体构型，键角 109.5°',
-            fg: '—（烷烃）', angle: '正四面体 109.5°',
-            rxns: ['取代：CH₄ + Cl₂ →(光照) CH₃Cl + HCl', '燃烧：CH₄ + 2O₂ → CO₂ + 2H₂O'],
-            atoms: [
-                { el: 'C', x: 0, y: 0, z: 0, r: 22, c: '#555' },
-                { el: 'H', x: 42, y: 42, z: 42, r: 14, c: '#5b8dce' },
-                { el: 'H', x: 42, y: -42, z: -42, r: 14, c: '#5b8dce' },
-                { el: 'H', x: -42, y: 42, z: -42, r: 14, c: '#5b8dce' },
-                { el: 'H', x: -42, y: -42, z: 42, r: 14, c: '#5b8dce' }
+        ethylene: {
+            name: '乙烯 CH₂=CH₂', formula: 'C₂H₄', mw: 28.05, iupac: 'Ethene',
+            desc: '最简单的烯烃，C=C 双键 + 4 个 H，全部 6 个原子<b>共面</b>（sp² 杂化）',
+            fg: '碳碳双键 C=C', angle: 'C=C ~120°，全分子平面',
+            geom: 'planar', planarAtoms: [0, 1, 2, 3, 4, 5],
+            rxns: [
+                '加成：CH₂=CH₂ + Br₂ → CH₂BrCH₂Br（溴水褪色）',
+                '加聚：n CH₂=CH₂ → [—CH₂—CH₂—]ₙ（聚乙烯）',
+                '与 H₂O 加成：CH₂=CH₂ + H₂O →(催化) C₂H₅OH'
             ],
-            bonds: [[0,1,1],[0,2,1],[0,3,1],[0,4,1]]
+            atoms: [
+                { el: 'C', x: -33, y: 0, z: 0, r: 22, c: '#555', g: 'C=C' },
+                { el: 'C', x: 33, y: 0, z: 0, r: 22, c: '#555', g: 'C=C' },
+                { el: 'H', x: -65, y: -30, z: 0, r: 12, c: '#5b8dce' },
+                { el: 'H', x: -65, y: 30, z: 0, r: 12, c: '#5b8dce' },
+                { el: 'H', x: 65, y: -30, z: 0, r: 12, c: '#5b8dce' },
+                { el: 'H', x: 65, y: 30, z: 0, r: 12, c: '#5b8dce' }
+            ],
+            bonds: [[0, 1, 2], [0, 2, 1], [0, 3, 1], [1, 4, 1], [1, 5, 1]]
+        },
+        acetylene: {
+            name: '乙炔 CH≡CH', formula: 'C₂H₂', mw: 26.04, iupac: 'Ethyne',
+            desc: '最简单的炔烃，C≡C 三键 + 2 个 H，全部 4 个原子<b>共线</b>（sp 杂化）',
+            fg: '碳碳三键 C≡C', angle: 'C≡C ~180°（直线分子）',
+            geom: 'linear', linearAxis: [2, 0, 1, 3],
+            rxns: [
+                '加成：CH≡CH + 2Br₂ → CHBr₂CHBr₂',
+                '加成：CH≡CH + HCl →(催化) CH₂=CHCl（氯乙烯，PVC 单体）',
+                '燃烧：2CH≡CH + 5O₂ → 4CO₂ + 2H₂O（氧炔焰高温）'
+            ],
+            atoms: [
+                { el: 'C', x: -25, y: 0, z: 0, r: 22, c: '#555', g: 'C≡C' },
+                { el: 'C', x: 25, y: 0, z: 0, r: 22, c: '#555', g: 'C≡C' },
+                { el: 'H', x: -65, y: 0, z: 0, r: 12, c: '#5b8dce' },
+                { el: 'H', x: 65, y: 0, z: 0, r: 12, c: '#5b8dce' }
+            ],
+            bonds: [[0, 1, 3], [0, 2, 1], [1, 3, 1]]
+        },
+        ethane: {
+            name: '乙烷 CH₃—CH₃', formula: 'C₂H₆', mw: 30.07, iupac: 'Ethane',
+            desc: '最简单的烷烃 C-C 单键示例，<b>σ 单键可绕轴自由旋转</b>（sp³ 杂化）',
+            fg: '碳碳单键 C—C', angle: 'C—C 109.5°（sp³ 四面体）',
+            geom: 'tetrahedral', rotatableBond: [0, 1], bondSide: [0, 0, 0, 0, 0, 1, 1, 1],
+            // bondSide: 0 = 与原子 0 同侧不动；1 = 与原子 1 同侧绕轴旋转
+            rxns: [
+                '取代：CH₃CH₃ + Cl₂ →(光照) CH₃CH₂Cl + HCl',
+                '裂化：C₂H₆ →(高温) C₂H₄ + H₂',
+                '燃烧：2C₂H₆ + 7O₂ → 4CO₂ + 6H₂O'
+            ],
+            atoms: [
+                { el: 'C', x: -38, y: 0, z: 0, r: 22, c: '#555' },     // 0 固定 C
+                { el: 'C', x: 38, y: 0, z: 0, r: 22, c: '#555' },      // 1 旋转 C
+                { el: 'H', x: -38, y: -36, z: -22, r: 12, c: '#5b8dce' }, // 2 固定
+                { el: 'H', x: -75, y: 5, z: 12, r: 12, c: '#5b8dce' },    // 3 固定
+                { el: 'H', x: -38, y: 36, z: 22, r: 12, c: '#5b8dce' },   // 4 固定
+                { el: 'H', x: 38, y: -36, z: 22, r: 12, c: '#5b8dce' },   // 5 旋转
+                { el: 'H', x: 75, y: 5, z: -12, r: 12, c: '#5b8dce' },    // 6 旋转
+                { el: 'H', x: 38, y: 36, z: -22, r: 12, c: '#5b8dce' }    // 7 旋转
+            ],
+            bonds: [[0, 1, 1], [0, 2, 1], [0, 3, 1], [0, 4, 1], [1, 5, 1], [1, 6, 1], [1, 7, 1]]
         },
         ethanol: {
             name: '乙醇 C₂H₅OH', formula: 'C₂H₅OH', mw: 46.07, iupac: 'Ethanol',
             desc: '含羟基(-OH)的醇类化合物，可与钠反应放出 H₂',
             fg: '羟基 -OH', angle: '碳链 ~109.5°(sp³)',
+            geom: 'tetrahedral',
             rxns: [
                 '与Na：2C₂H₅OH + 2Na → 2C₂H₅ONa + H₂↑',
                 '催化氧化：2C₂H₅OH + O₂ →(Cu/△) 2CH₃CHO + 2H₂O',
@@ -49,8 +106,9 @@ const OrganicChem = {
         },
         'acetic-acid': {
             name: '乙酸 CH₃COOH', formula: 'CH₃COOH', mw: 60.05, iupac: 'Acetic acid',
-            desc: '含羧基(-COOH)的羧酸类化合物，弱酸',
+            desc: '含羧基(-COOH)的羧酸类化合物，弱酸；羧基平面 sp²，甲基 sp³（<b>混合杂化</b>）',
             fg: '羧基 -COOH', angle: '羰基 C=O ~120°(sp²)',
+            geom: 'mixed', planarAtoms: [1, 2, 3, 4],
             rxns: [
                 '电离：CH₃COOH ⇌ CH₃COO⁻ + H⁺',
                 '酯化：CH₃COOH + C₂H₅OH ⇌ CH₃COOC₂H₅ + H₂O',
@@ -70,8 +128,9 @@ const OrganicChem = {
         },
         benzene: {
             name: '苯 C₆H₆', formula: 'C₆H₆', mw: 78.11, iupac: 'Benzene',
-            desc: '典型芳香族化合物，六元环离域共轭，π 电子离域',
+            desc: '典型芳香族化合物，六元环离域共轭，π 电子离域；12 个原子全部<b>共面</b>',
             fg: '苯环（芳香环）', angle: '平面正六边形 120°',
+            geom: 'planar', planarAtoms: [0, 1, 2, 3, 4, 5],
             rxns: [
                 '取代：C₆H₆ + Br₂ →(FeBr₃) C₆H₅Br + HBr',
                 '硝化：C₆H₆ + HNO₃ →(浓H₂SO₄/△) C₆H₅NO₂ + H₂O',
@@ -81,8 +140,9 @@ const OrganicChem = {
         },
         propene: {
             name: '丙烯 CH₂=CH–CH₃', formula: 'C₃H₆', mw: 42.08, iupac: 'Propene',
-            desc: '含碳碳双键(C=C)的烯烃，可发生加成反应',
+            desc: '含 C=C 的烯烃；C=C 端 5 个原子（C₀C₁H₃H₄H₅）<b>共面</b>，CH₃ 端 sp³ 四面体',
             fg: '碳碳双键 C=C', angle: 'C=C ~120°(sp²)，C–C ~109.5°(sp³)',
+            geom: 'mixed', planarAtoms: [0, 1, 3, 4, 5],
             rxns: [
                 '加成：CH₃CH=CH₂ + HBr → CH₃CHBrCH₃（马氏规则）',
                 '加聚：nCH₃CH=CH₂ → [–CH(CH₃)–CH₂–]ₙ',
@@ -92,9 +152,9 @@ const OrganicChem = {
                 { el: 'C', x: -56, y: 0, z: 0, r: 22, c: '#555', g: 'C=C' },
                 { el: 'C', x: 0, y: 0, z: 0, r: 22, c: '#555', g: 'C=C' },
                 { el: 'C', x: 62, y: 0, z: 0, r: 22, c: '#555' },
-                { el: 'H', x: -56, y: -40, z: 10, r: 12, c: '#5b8dce' },
-                { el: 'H', x: -92, y: 15, z: -10, r: 12, c: '#5b8dce' },
-                { el: 'H', x: 0, y: -40, z: -12, r: 12, c: '#5b8dce' },
+                { el: 'H', x: -56, y: -40, z: 0, r: 12, c: '#5b8dce' },
+                { el: 'H', x: -92, y: 15, z: 0, r: 12, c: '#5b8dce' },
+                { el: 'H', x: 0, y: -40, z: 0, r: 12, c: '#5b8dce' },
                 { el: 'H', x: 62, y: -32, z: -26, r: 12, c: '#5b8dce' },
                 { el: 'H', x: 98, y: 5, z: 10, r: 12, c: '#5b8dce' },
                 { el: 'H', x: 62, y: 32, z: 26, r: 12, c: '#5b8dce' }
@@ -103,8 +163,9 @@ const OrganicChem = {
         },
         acetone: {
             name: '丙酮 CH₃COCH₃', formula: 'C₃H₆O', mw: 58.08, iupac: 'Propan-2-one',
-            desc: '含羰基(C=O)的酮类化合物，重要有机溶剂',
+            desc: '含羰基(C=O)的酮类化合物；羰基 C 与三个相邻原子共面 sp²（混合杂化）',
             fg: '羰基 C=O', angle: '羰基 C=O ~120°(sp²)',
+            geom: 'mixed', planarAtoms: [0, 1, 2, 3],
             rxns: [
                 '亲核加成：CH₃COCH₃ + HCN → (CH₃)₂C(OH)CN',
                 '还原：CH₃COCH₃ + H₂ →(Ni/△) CH₃CH(OH)CH₃',
@@ -216,6 +277,10 @@ const OrganicChem = {
                 btn.classList.add('active');
                 this.molecule = btn.dataset.mol;
                 this.time = 0; this.rotX = -0.3; this.rotY = 0.5; this.autoRot = true;
+                // v4.5.0-α9：切换分子时重置 σ 键旋转状态
+                this.bondRotating = false; this.bondRotAngle = 0;
+                const rb = document.getElementById('organic-rotate-bond');
+                if (rb) { rb.textContent = '🔄 旋转 σ 键'; rb.setAttribute('aria-pressed', 'false'); }
                 this.updateInfo();
             });
         });
@@ -225,6 +290,21 @@ const OrganicChem = {
                 this.paused = !this.paused;
                 pauseBtn.textContent = this.paused ? '▶ 继续' : '⏸ 暂停';
                 pauseBtn.setAttribute('aria-pressed', String(this.paused));
+            });
+        }
+        // v4.5.0-α9：σ 单键旋转按钮（仅 ethane / 含 rotatableBond 的分子有效）
+        const rotBondBtn = document.getElementById('organic-rotate-bond');
+        if (rotBondBtn) {
+            this._on(rotBondBtn, 'click', () => {
+                const m = this.molecules[this.molecule];
+                if (!m || !m.rotatableBond) {
+                    rotBondBtn.classList.add('organic-disabled-flash');
+                    setTimeout(() => rotBondBtn.classList.remove('organic-disabled-flash'), 600);
+                    return;
+                }
+                this.bondRotating = !this.bondRotating;
+                rotBondBtn.textContent = this.bondRotating ? '⏹ 停止旋转' : '🔄 旋转 σ 键';
+                rotBondBtn.setAttribute('aria-pressed', String(this.bondRotating));
             });
         }
         // Mouse drag rotation
@@ -273,6 +353,16 @@ const OrganicChem = {
         const m = this.molecules[this.molecule];
         const el = document.getElementById('organic-info');
         if (!el) return;
+        // v4.5.0-α9：几何特征行
+        const geomMap = {
+            planar: '<b style="color:#5b8dce">共面</b> — 所有重原子在同一平面（sp²）',
+            linear: '<b style="color:#e5c07b">共线</b> — 所有原子在同一直线（sp）',
+            tetrahedral: '<b style="color:#9b8dce">立体四面体</b> — sp³ 杂化，σ 单键可绕轴旋转',
+            mixed: '<b style="color:#c08bcb">混合杂化</b> — sp² 平面段 + sp³ 立体段'
+        };
+        const geomDesc = m.geom ? (geomMap[m.geom] || m.geom) : '';
+        const geomRow = geomDesc ? '<div class="oc-row"><span class="oc-tag oc-tag--purple">几何</span>' + geomDesc + '</div>' : '';
+        const rotHint = m.rotatableBond ? '<div class="oc-row"><span class="oc-tag oc-tag--green">交互</span>支持「🔄 旋转 σ 键」 — 演示乙烷 C—C 单键自由旋转构象</div>' : '';
         el.innerHTML =
             '<div class="oc-hd">' +
                 '<span class="oc-name">' + m.name + '</span>' +
@@ -280,8 +370,10 @@ const OrganicChem = {
                 '<span class="oc-badge oc-badge--mw">M = ' + m.mw + '</span>' +
             '</div>' +
             '<div class="oc-row"><span class="oc-tag">官能团</span>' + m.fg + '</div>' +
+            geomRow +
             '<div class="oc-row"><span class="oc-tag oc-tag--blue">键角</span>' + m.angle + '</div>' +
             '<div class="oc-row"><span class="oc-tag oc-tag--amber">描述</span>' + m.desc + '</div>' +
+            rotHint +
             '<div class="oc-rxns"><span class="oc-tag oc-tag--red">反应</span><ul>' +
                 m.rxns.map(r => '<li>' + r + '</li>').join('') +
             '</ul></div>';
@@ -296,6 +388,8 @@ const OrganicChem = {
         if (!this.paused) {
             this.time += dt;
             if (this.autoRot) this.rotY += dt * 0.3;
+            // v4.5.0-α9：σ 键旋转推进
+            if (this.bondRotating) this.bondRotAngle += dt * 1.6;
         }
         this.draw();
         this._raf = requestAnimationFrame(() => this.loop());
@@ -309,8 +403,20 @@ const OrganicChem = {
         if (!mol) return;
         const cx = W / 2, cy = H / 2;
 
+        // v4.5.0-α9：若分子含 rotatableBond + bondSide，对 bondSide=1 的原子绕 X 轴（C-C 键轴）旋转
+        // 假设 rotatableBond 是 X 轴方向（ethane 即如此）
+        const useRot = mol.rotatableBond && mol.bondSide;
+        const cosA = useRot ? Math.cos(this.bondRotAngle) : 1;
+        const sinA = useRot ? Math.sin(this.bondRotAngle) : 0;
+        const effAtoms = mol.atoms.map((a, i) => {
+            if (useRot && mol.bondSide[i] === 1) {
+                return { ...a, y: a.y * cosA - a.z * sinA, z: a.y * sinA + a.z * cosA };
+            }
+            return a;
+        });
+
         // Project all atoms
-        const proj = mol.atoms.map((a, i) => {
+        const proj = effAtoms.map((a, i) => {
             const p = this.proj(a.x, a.y, a.z);
             return { ...a, px: cx + p.x, py: cy + p.y, pz: p.z, ps: p.s, idx: i };
         });
@@ -328,6 +434,9 @@ const OrganicChem = {
         const hl = new Set();
         if (hitGroup) proj.forEach(a => { if (a.g === hitGroup) hl.add(a.idx); });
         else if (this._hitIdx >= 0) hl.add(this._hitIdx);
+
+        // v4.5.0-α9：几何提示（共面/共线 / 旋转弧线）— 在 bond/atom 之前绘制（最底层）
+        this._drawGeomHint(mol, proj, cx, cy);
 
         // Bonds sorted by depth
         const bonds = mol.bonds.map(([i, j, o]) => ({ i, j, o, z: (proj[i].pz + proj[j].pz) / 2 }));
@@ -362,6 +471,105 @@ const OrganicChem = {
             ctx.fillStyle = 'rgba(255,255,255,0.13)';
             ctx.font = '16px ' + CF.sans; ctx.textAlign = 'center';
             ctx.fillText('🖱 拖拽旋转分子 · 悬停查看原子', cx, H - 10);
+        }
+
+        // v4.5.0-α9：σ 键旋转角度显示
+        if (useRot && this.bondRotating) {
+            ctx.fillStyle = 'rgba(155, 141, 206, 0.85)';
+            ctx.font = 'bold 13px ' + CF.mono;
+            ctx.textAlign = 'right';
+            const deg = ((this.bondRotAngle * 180 / Math.PI) % 360 + 360) % 360;
+            ctx.fillText('σ 键扭转角 = ' + deg.toFixed(0) + '°', W - 12, 22);
+        }
+    },
+
+    // v4.5.0-α9：几何提示绘制（共面半透明面 / 共线虚线轴 / 可旋转弧形箭头）
+    _drawGeomHint(mol, proj, cx, cy) {
+        const ctx = this.ctx;
+        // 共面：用 planarAtoms 围成多边形，半透明蓝色
+        if ((mol.geom === 'planar' || mol.geom === 'mixed') && mol.planarAtoms && mol.planarAtoms.length >= 3) {
+            ctx.save();
+            ctx.fillStyle = mol.geom === 'planar' ? 'rgba(91,141,206,0.10)' : 'rgba(192,139,203,0.09)';
+            ctx.strokeStyle = mol.geom === 'planar' ? 'rgba(91,141,206,0.40)' : 'rgba(192,139,203,0.36)';
+            ctx.lineWidth = 1.2;
+            ctx.setLineDash([4, 3]);
+            ctx.beginPath();
+            mol.planarAtoms.forEach((idx, i) => {
+                const p = proj[idx];
+                if (!p) return;
+                if (i === 0) ctx.moveTo(p.px, p.py);
+                else ctx.lineTo(p.px, p.py);
+            });
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.setLineDash([]);
+            // 标签
+            const first = proj[mol.planarAtoms[0]];
+            if (first) {
+                ctx.fillStyle = mol.geom === 'planar' ? 'rgba(91,141,206,0.75)' : 'rgba(192,139,203,0.7)';
+                ctx.font = '11px ' + CF.mono;
+                ctx.textAlign = 'left';
+                ctx.fillText(mol.geom === 'planar' ? '共面 (sp²)' : 'sp² 平面段', first.px + 14, first.py - 14);
+            }
+            ctx.restore();
+        }
+        // 共线：用 linearAxis 画贯穿虚线 + "共线" 标签
+        if (mol.geom === 'linear' && mol.linearAxis && mol.linearAxis.length >= 2) {
+            ctx.save();
+            const first = proj[mol.linearAxis[0]];
+            const last = proj[mol.linearAxis[mol.linearAxis.length - 1]];
+            if (first && last) {
+                const dx = last.px - first.px, dy = last.py - first.py;
+                const len = Math.hypot(dx, dy) || 1;
+                const ext = 28;
+                const ux = dx / len, uy = dy / len;
+                ctx.strokeStyle = 'rgba(229,192,123,0.55)';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([6, 4]);
+                ctx.beginPath();
+                ctx.moveTo(first.px - ux * ext, first.py - uy * ext);
+                ctx.lineTo(last.px + ux * ext, last.py + uy * ext);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = 'rgba(229,192,123,0.85)';
+                ctx.font = '12px ' + CF.mono;
+                ctx.textAlign = 'center';
+                ctx.fillText('共线 (sp · 180°)', (first.px + last.px) / 2, Math.min(first.py, last.py) - 18);
+            }
+            ctx.restore();
+        }
+        // 可旋转 σ 键：在 rotatableBond 的中点画弧形旋转箭头
+        if (mol.rotatableBond) {
+            const a1 = proj[mol.rotatableBond[0]];
+            const a2 = proj[mol.rotatableBond[1]];
+            if (a1 && a2) {
+                const mx = (a1.px + a2.px) / 2;
+                const my = (a1.py + a2.py) / 2;
+                const r = 18;
+                ctx.save();
+                ctx.strokeStyle = this.bondRotating ? 'rgba(155,141,206,0.85)' : 'rgba(155,141,206,0.45)';
+                ctx.lineWidth = 1.8;
+                if (!this.bondRotating) ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.arc(mx, my, r, -Math.PI * 0.7, Math.PI * 0.7);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                // 箭头头部
+                const ah = (cxx, cyy, dirX, dirY) => {
+                    const sz = 5;
+                    ctx.fillStyle = ctx.strokeStyle;
+                    ctx.beginPath();
+                    ctx.moveTo(cxx, cyy);
+                    ctx.lineTo(cxx - dirX * sz - dirY * sz * 0.5, cyy - dirY * sz + dirX * sz * 0.5);
+                    ctx.lineTo(cxx - dirX * sz + dirY * sz * 0.5, cyy - dirY * sz - dirX * sz * 0.5);
+                    ctx.closePath();
+                    ctx.fill();
+                };
+                const ang = Math.PI * 0.7;
+                ah(mx + r * Math.cos(ang), my + r * Math.sin(ang), Math.sin(ang), -Math.cos(ang));
+                ctx.restore();
+            }
         }
     },
 

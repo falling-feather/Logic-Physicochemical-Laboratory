@@ -985,6 +985,14 @@
 .oc-tag--blue { background: rgba(91,141,206,.15); color: #7eb8f0; }
 .oc-tag--amber { background: rgba(229,192,123,.12); color: #e5c07b; }
 .oc-tag--red { background: rgba(224,108,117,.12); color: #e06c75; }
+.oc-tag--purple { background: rgba(155,141,206,.16); color: #b29bdc; }      /* v4.5.0-α9 几何标签 */
+.oc-tag--green { background: rgba(140,200,140,.16); color: #95d495; }       /* v4.5.0-α9 交互标签 */
+.organic-disabled-flash { animation: organicDisabledFlash .55s ease; }      /* v4.5.0-α9 σ 键按钮无效反馈 */
+@keyframes organicDisabledFlash {
+    0% { background: rgba(224,108,117,.0); }
+    40% { background: rgba(224,108,117,.35); }
+    100% { background: rgba(224,108,117,.0); }
+}
 .oc-rxns ul { margin: .3rem 0 0 1.2rem; padding: 0; }
 .oc-rxns li { margin-bottom: .2rem; font-family: var(--font-mono, monospace); font-size: .78rem; }
 @media (max-width: 768px) {

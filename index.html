@@ -46,7 +46,7 @@
     <link rel="stylesheet" href="pages/planets/planets.css?v=20260424v44f">
     <link rel="stylesheet" href="pages/mathematics/mathematics.css?v=20260417d">
     <link rel="stylesheet" href="pages/physics/physics.css?v=20260417d">
-    <link rel="stylesheet" href="pages/chemistry/chemistry.css?v=20260424v45e">
+    <link rel="stylesheet" href="pages/chemistry/chemistry.css?v=20260424v45i">
     <link rel="stylesheet" href="pages/algorithms/algorithms.css?v=20260417d">
     <link rel="stylesheet" href="pages/biology/biology.css?v=20260417d">
     <!-- v4.5-α1 全局搜索 -->
@@ -1745,13 +1745,16 @@
                 </div>
                 <div class="organic-controls">
                     <div class="organic-mol-btns">
-                        <button class="organic-mol-btn active" data-mol="methane" aria-label="甲烷 CH₄">甲烷</button>
+                        <button class="organic-mol-btn active" data-mol="ethylene" aria-label="乙烯 C₂H₄">乙烯</button>
+                        <button class="organic-mol-btn" data-mol="acetylene" aria-label="乙炔 C₂H₂">乙炔</button>
+                        <button class="organic-mol-btn" data-mol="ethane" aria-label="乙烷 C₂H₆">乙烷</button>
                         <button class="organic-mol-btn" data-mol="ethanol" aria-label="乙醇 C₂H₅OH">乙醇</button>
                         <button class="organic-mol-btn" data-mol="acetic-acid" aria-label="乙酸 CH₃COOH">乙酸</button>
                         <button class="organic-mol-btn" data-mol="benzene" aria-label="苯 C₆H₆">苯</button>
                         <button class="organic-mol-btn" data-mol="propene" aria-label="丙烯 C₃H₆">丙烯</button>
                         <button class="organic-mol-btn" data-mol="acetone" aria-label="丙酮 C₃H₆O">丙酮</button>
                     </div>
+                    <button id="organic-rotate-bond" class="organic-mol-btn" aria-pressed="false" title="演示乙烷 C—C 单键自由旋转构象">🔄 旋转 σ 键</button>
                     <button id="organic-pause" class="organic-mol-btn" aria-pressed="false">⏸ 暂停</button>
                 </div>
                 <div class="canvas-wrapper">
@@ -2869,7 +2872,7 @@
     <script defer src="pages/chemistry/chemical-equilibrium.js"></script>
     <script defer src="pages/chemistry/electrochemistry.js"></script>
     <script defer src="pages/chemistry/chemical-bond.js?v=20260424v45h"></script>
-    <script defer src="pages/chemistry/organic-chemistry.js"></script>
+    <script defer src="pages/chemistry/organic-chemistry.js?v=20260424v45i"></script>
     <script defer src="pages/chemistry/reaction-rate.js"></script>
     <script defer src="pages/chemistry/solution-ionization.js"></script>
     <script defer src="pages/chemistry/ionic-reaction.js"></script>

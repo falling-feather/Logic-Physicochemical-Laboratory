@@ -17,22 +17,31 @@
 | v4.5.0-α5 | `036641c` | 化学优化 7-2：molecular-structure 新增 3 个分子 — HCHO（甲醛）/H₂S（V 形，附"与 H₂O 同族对比表"）/CH₃COOH（乙酸，sp³+sp² 混合杂化）；bondData 增 H-S 键项；updateInfo 新增 hybNote/compareWith 渲染逻辑（三色分层）；缓存 v45e |
 | **v4.5.0-α6** | `3f69601` | 化学优化 7-3a：chemical-reactions 中和反应重做 — 由"HCl + NaOH → NaCl + H₂O 共价/离子键重组"改为"H⁺ + OH⁻ → H₂O 离子方程式 + Na⁺/Cl⁻ 旁观"；reactantMols 拆为 4 个独立水合离子，atom 加 `charge` 字段、mol 加 `spectator` 字段；新增 `_drawChargeBadge`（红正/蓝负圆形徽章）+ 旁观离子虚线圈包裹；reaction 加 `fullEquation` 字段（同时显示离子方程式与总式，主式上移让位）；缓存 v45f |
 | v4.5.0-α7 | `8f2e909` | 化学优化 7-3b：(i) chemical-reactions redox 重做 — 由"Fe + CuSO₄ → FeSO₄ + Cu"改为"Fe + Cu²⁺ → Fe²⁺ + Cu，SO₄²⁻ 旁观"，新增 `electronTransfer` 字段 + `_drawElectronTransfer` 渲染（黄色发光电子沿弧形轨迹从 Fe 飞向 Cu²⁺，显示 "2e⁻" 标签）；(ii) 新增 `dissolution` 反应 — NaCl(s) → Na⁺(aq) + Cl⁻(aq)，强调"仅 Na—Cl 离子键断裂、O—H 共价键完整保留"；buildScene 新增 atom 级 `molIdx`；HTML 加"NaCl 溶解"按钮（5→6 反应）；缓存 v45g |
-| **v4.5.0-α8** | **本轮** | **化学优化 7-4：chemical-bond 强调"微粒 + 静电引力/斥力"本质 — (i) 三种键 updateInfo 全面重写，新增「构成微粒」+「本质静电作用」两行，明确列出每种键的微粒清单（如离子键 = 阳离子 + 阴离子；共价键 = 原子 + 共用电子对；金属键 = 阳离子 + 自由电子海）+ 蓝色吸引/红色排斥的两类静电力分类；(ii) 新增 `_drawForceArrow(x1,y1,x2,y2,type)` 方法（蓝实箭头=吸引、红虚箭头=排斥，双向箭头头部）+ `_drawChargeBadge` 红正/蓝负圆形电荷徽章；(iii) drawIonic 加 +/− 电荷徽章 + F引/F排 双箭头 + "键长 = 平衡距离"标注；(iv) drawCovalent 加 H 核↔共用电子对、O 核↔共用电子对 4 条吸引箭头 + 右下力图例 + 共用电子对显式标签；(v) drawMetallic 加电子海径向渐变底色 + 焦点 M⁺ 呼吸光环 + 4 方向 M⁺↔e⁻ 海吸引箭头；缓存 v45h** |
+| v4.5.0-α8 | `30a9091` | 化学优化 7-4：chemical-bond 强调"微粒+静电引力/斥力"本质；三模式 updateInfo 加「构成微粒」「本质静电作用」蓝吸/红斥分色；新增 `_drawForceArrow`（蓝实=吸引、红虚=排斥双向箭头）+ `_drawChargeBadge`；drawIonic 加电荷徽章和 F引/F排 双箭头；drawCovalent 加 H/O 核↔共用电子对吸引箭头和右下力图例；drawMetallic 加电子海径向渐变和焦点 M⁺ 4 方向吸引箭头；缓存 v45h |
+| **v4.5.0-α9** | **本轮** | **化学优化 7-5：organic-chemistry 大改 — (i) 移除 methane（与 molecular-structure 重复）；(ii) 新增 ethylene（C₂H₄，sp² 6 原子全平面）/acetylene（C₂H₂，sp 4 原子全直线）/ethane（C₂H₆，sp³ 单键自由旋转交互）；(iii) 各分子新增 `geom`/`planarAtoms`/`linearAxis`/`rotatableBond`/`bondSide` 字段；(iv) 新增 `_drawGeomHint`（共面半透明蓝色多边形 + 共线琥珀色贯穿虚线 + 可旋转 σ 键紫色弧形箭头）；(v) σ 键旋转交互 — 新增 `bondRotating`/`bondRotAngle` 状态 + UI 按钮 `organic-rotate-bond`，旋转时 bondSide=1 的原子绕 X 轴（C-C 键轴）旋转；(vi) updateInfo 加「几何特征」「交互」两行；缓存 v45i** |
 
-**v4.5.0-α8 修改文件**：
-- `pages/chemistry/chemical-bond.js`：
-  - `updateInfo()`：三种模式 HTML 全面重写，加「构成微粒」「本质静电作用」两行（蓝色吸引 / 红色排斥分色文本）
-  - 新增 `_drawForceArrow(x1, y1, x2, y2, type)`：双向箭头辅助（attract = 蓝色实线 + 箭头朝中心；repel = 红色虚线 + 箭头朝外）
-  - 新增 `_drawChargeBadge(x, y, charge)`：红正/蓝负圆形徽章（与 chemical-reactions 一致）
-  - `drawIonic()`：加 Na⁺/Cl⁻ 电荷徽章 + F引/F排 双箭头 + "键长 = F引≡F排 平衡距离"标注；晶体预览微调位置避让
-  - `drawCovalent()`：保留原 H₂O 主图，新增 H 核↔共用电子对、O 核↔共用电子对 4 条吸引箭头 + 右下小图例（蓝吸/红斥）+ "共用 e⁻ 对"显式标签
-  - `drawMetallic()`：加自由电子海径向渐变底色 + 焦点 M⁺ 周围呼吸光环 + 4 方向 M⁺↔e⁻ 海吸引箭头 + 焦点电荷徽章 + "F引: 阳离子↔e⁻海 → 金属键本质"副标题
-- `index.html`：chemical-bond.js 加缓存 `?v=20260424v45h`
-- `sw.js`：CACHE_NAME → `v20260424v45h`
+**v4.5.0-α9 修改文件**：
+- `pages/chemistry/organic-chemistry.js`：
+  - molecules 字段重构：删除 `methane`；按教学顺序排列 ethylene/acetylene/ethane（新增）/ethanol/acetic-acid/benzene/propene/acetone
+  - 各分子统一加 `geom: 'planar'|'linear'|'tetrahedral'|'mixed'` + 几何索引字段
+  - ethylene/acetylene 平面坐标修正：z 全部置 0 确保严格共面/共线
+  - ethane 加 `bondSide: [0,0,0,0,0,1,1,1]`（前 5 原子固定，后 3 个 H 跟随原子 1 旋转）
+  - 默认分子 `methane` → `ethylene`
+  - 新增状态 `bondRotating: false, bondRotAngle: 0`
+  - bindEvents：σ 键旋转按钮逻辑（无 rotatableBond 时按钮闪红反馈）；切换分子时重置旋转状态
+  - loop：`bondRotating` 时按 dt*1.6 推进 `bondRotAngle`
+  - draw：在投影前对 `bondSide=1` 原子绕 X 轴做 (y, z) 旋转变换；调用 `_drawGeomHint`；右上角显示 σ 键扭转角度
+  - 新增 `_drawGeomHint(mol, proj, cx, cy)`：根据 geom 绘制共面多边形 / 共线虚线 / 可旋转弧形箭头（mixed 用紫色标记 sp² 平面段）
+  - updateInfo：新增「几何」「交互」两行
+- `index.html`：移除 methane 按钮，新增 ethylene（默认 active）/ acetylene / ethane 按钮 + `🔄 旋转 σ 键` 按钮；organic-chemistry.js 缓存 → v45i；chemistry.css 缓存 → v45i
+- `pages/chemistry/chemistry.css`：新增 `.oc-tag--purple`（紫色几何标签）+ `.oc-tag--green`（绿色交互标签）+ `.organic-disabled-flash` 闪红动画
+- `sw.js`：CACHE_NAME → `v20260424v45i`
 
-**待办（化学 7 系列剩余子任务）**：
-- 7-5 organic-chemistry 去与 molecular-structure 重复 + 加乙烯/苯共面 + 乙炔共线 + 单键旋转交互
-- v4.5 系列合并：累计 8 个 alpha (α1~α8) → squash-merge 到 main 打 v4.5.0 tag，详细历史保留 `legacy/v4.5-detail` 分支
+**v4.5 系列累计**：α1 全局搜索 / α2 快捷键 / α3 推荐 / α4 7-1 / α5 7-2 / α6 7-3a / α7 7-3b / α8 7-4 / α9 7-5 — **化学 5 项优化（7-1 ~ 7-5）全部完成 ✅**
+
+**待办（v4.5 收尾）**：
+- 合并 feature/v4.5 的 9 个 alpha 到 main，打 v4.5.0 annotated tag
+- 详细历史保留 `legacy/v4.5-detail` 分支
 
 **v4.5 系列尾声待办**：
 - 合并 `feature/v4.5` 当前 7 个 alpha 到 main 打 `v4.5.0` tag（按 git-workflow.md）
