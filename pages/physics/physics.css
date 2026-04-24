@@ -1039,6 +1039,28 @@
 
 /* ═══ 动量守恒 ═══ */
 .mc-controls { margin-bottom: 12px; }
+/* v4.6.0-α3：维度切换按钮 */
+.mc-dim-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.mc-dim-btn {
+    padding: 5px 14px;
+    border: 1px dashed rgba(229,192,123,0.4);
+    border-radius: 8px;
+    background: transparent;
+    color: rgba(229,192,123,0.7);
+    cursor: pointer; font-size: 12px;
+    transition: all .2s;
+}
+.mc-dim-btn.active, .mc-dim-btn:hover {
+    background: rgba(229,192,123,0.18); color: #e5c07b;
+    border-color: #e5c07b; border-style: solid;
+}
+.mc-vel-group { display: contents; }   /* 不破坏父级 flex */
+.mc-2d-tip {
+    font-size: 11px; color: rgba(229,192,123,0.7);
+    padding: 4px 6px; margin: 4px 0 6px;
+    border-left: 2px solid rgba(229,192,123,0.4);
+    background: rgba(229,192,123,0.06); border-radius: 0 4px 4px 0;
+}
 .mc-mode-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .mc-mode-btn {
     padding: 6px 16px;
