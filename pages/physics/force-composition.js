@@ -8,10 +8,17 @@ const ForceComposition = {
     _listeners: [],
     _resizeObs: null,
 
-    // ── 力的合成 ──
-    f1: { mag: 100, angle: 30 },   // N, degrees
-    f2: { mag: 80, angle: 120 },
-    _dragTarget: null,              // 'f1' | 'f2' | null
+    // ── 力的合成（v4.6.0-α1：升级为多力合成，2-6 个力） ──
+    // 颜色调色板（按 force 索引取色）
+    _forceColors: ['#e74c3c', '#3498db', '#9b59b6', '#e67e22', '#1abc9c', '#f1c40f'],
+    _forceLabels: ['F₁', 'F₂', 'F₃', 'F₄', 'F₅', 'F₆'],
+    forces: [
+        { mag: 100, angle: 30 },
+        { mag: 80, angle: 120 },
+        { mag: 60, angle: 220 }
+    ],
+    compMethod: 'polygon',          // 'parallelogram'（仅 2 力可用）| 'polygon'（首尾相接，任意力数）
+    _dragForceIdx: -1,              // 当前拖拽的 force 索引；-1 表示无
 
     // ── 正交分解 ──
     fd: { mag: 120, angle: 50 },
@@ -142,17 +149,43 @@ const ForceComposition = {
         wrap.innerHTML = '';
 
         if (this.mode === 'composition') {
-            wrap.innerHTML = `
-                <div class="fc-hint">拖拽箭头端点改变力的大小和方向</div>
-                <div class="fc-row">
-                    <span class="fc-label" style="color:#e74c3c">F₁ = <b id="fc-f1-mag">${this.f1.mag.toFixed(0)}</b> N，θ₁ = <b id="fc-f1-ang">${this.f1.angle.toFixed(0)}</b>°</span>
-                </div>
-                <div class="fc-row">
-                    <span class="fc-label" style="color:#3498db">F₂ = <b id="fc-f2-mag">${this.f2.mag.toFixed(0)}</b> N，θ₂ = <b id="fc-f2-ang">${this.f2.angle.toFixed(0)}</b>°</span>
-                </div>
-                <div class="fc-row">
+            // v4.6.0-α1：多力合成 — 顶部行：➕ ➖ 力数量 + 法则切换；下方：每个力一行；末尾：合力
+            const n = this.forces.length;
+            const canPara = (n === 2);
+            const isPara = (this.compMethod === 'parallelogram' && canPara);
+            let html = `
+                <div class="fc-hint">拖拽端点改大小/方向，🖋 ➕➖ 增减力的个数（2~6），切换合成法则</div>
+                <div class="fc-multiforce-toolbar">
+                    <button id="fc-add-force" class="fc-mini-btn" title="添加一个力" ${n >= 6 ? 'disabled' : ''}>➕ 添加力</button>
+                    <button id="fc-rm-force"  class="fc-mini-btn" title="删除最后一个力" ${n <= 2 ? 'disabled' : ''}>➖ 删除力</button>
+                    <span class="fc-force-count">当前力数：<b>${n}</b></span>
+                    <span class="fc-method-sep">|</span>
+                    <button id="fc-method-poly" class="fc-mini-btn ${isPara ? '' : 'active'}" title="首尾相接：F₁→F₂→…→Fn 顺次相接，合力 = 起点→终点">⛓ 多边形法</button>
+                    <button id="fc-method-para" class="fc-mini-btn ${isPara ? 'active' : ''}" title="平行四边形定则（仅 2 个力时可用）" ${canPara ? '' : 'disabled'}>▱ 平行四边形</button>
+                </div>`;
+            this.forces.forEach((f, i) => {
+                const c = this._forceColors[i];
+                const lab = this._forceLabels[i];
+                html += `
+                <div class="fc-row fc-force-row">
+                    <span class="fc-color-dot" style="background:${c}"></span>
+                    <span class="fc-label" style="color:${c}">${lab} = <b id="fc-fi-mag-${i}">${f.mag.toFixed(0)}</b> N，θ = <b id="fc-fi-ang-${i}">${f.angle.toFixed(0)}</b>°</span>
+                </div>`;
+            });
+            html += `
+                <div class="fc-row" style="margin-top:.4rem;border-top:1px dashed rgba(255,255,255,.15);padding-top:.4rem">
                     <span class="fc-label" style="color:#2ecc71">合力 R = <b id="fc-r-mag">0</b> N，θ = <b id="fc-r-ang">0</b>°</span>
                 </div>`;
+            wrap.innerHTML = html;
+            // 事件绑定
+            const addBtn = wrap.querySelector('#fc-add-force');
+            const rmBtn  = wrap.querySelector('#fc-rm-force');
+            const polyBtn = wrap.querySelector('#fc-method-poly');
+            const paraBtn = wrap.querySelector('#fc-method-para');
+            if (addBtn) this._on(addBtn, 'click', () => this._addForce());
+            if (rmBtn)  this._on(rmBtn, 'click', () => this._removeForce());
+            if (polyBtn) this._on(polyBtn, 'click', () => this._setCompMethod('polygon'));
+            if (paraBtn && !paraBtn.disabled) this._on(paraBtn, 'click', () => this._setCompMethod('parallelogram'));
         } else if (this.mode === 'decomposition') {
             wrap.innerHTML = `
                 <div class="fc-hint">拖拽箭头端点改变力的大小和方向</div>
@@ -228,12 +261,14 @@ const ForceComposition = {
             this._mouse = { ...p, down: true };
 
             if (this.mode === 'composition') {
-                // 检查哪个箭头端点被点击
-                const tip1 = this._forceTip(this.f1);
-                const tip2 = this._forceTip(this.f2);
-                if (this._dist(p, tip1) < 18) this._dragTarget = 'f1';
-                else if (this._dist(p, tip2) < 18) this._dragTarget = 'f2';
-                else this._dragTarget = null;
+                // v4.6.0-α1：遍历所有 force，找最近的端点
+                this._dragForceIdx = -1;
+                let best = 19;
+                this.forces.forEach((f, i) => {
+                    const tip = this._forceTip(f);
+                    const d = this._dist(p, tip);
+                    if (d < best) { best = d; this._dragForceIdx = i; }
+                });
             } else if (this.mode === 'decomposition') {
                 const tip = this._forceTip(this.fd);
                 this._dragDecomp = this._dist(p, tip) < 18;
@@ -245,9 +280,11 @@ const ForceComposition = {
                 // Hover cursor
                 const p = getPos(e);
                 if (this.mode === 'composition') {
-                    const t1 = this._forceTip(this.f1);
-                    const t2 = this._forceTip(this.f2);
-                    this.canvas.style.cursor = (this._dist(p, t1) < 18 || this._dist(p, t2) < 18) ? 'grab' : 'default';
+                    let near = false;
+                    for (const f of this.forces) {
+                        if (this._dist(p, this._forceTip(f)) < 18) { near = true; break; }
+                    }
+                    this.canvas.style.cursor = near ? 'grab' : 'default';
                 } else if (this.mode === 'decomposition') {
                     const t = this._forceTip(this.fd);
                     this.canvas.style.cursor = this._dist(p, t) < 18 ? 'grab' : 'default';
@@ -258,12 +295,12 @@ const ForceComposition = {
             const p = getPos(e);
             const ox = this.origin.x, oy = this.origin.y;
 
-            if (this.mode === 'composition' && this._dragTarget) {
+            if (this.mode === 'composition' && this._dragForceIdx >= 0) {
                 const dx = p.x - ox, dy = oy - p.y;
                 const mag = Math.max(10, Math.sqrt(dx * dx + dy * dy) / this.scale);
                 const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-                if (this._dragTarget === 'f1') { this.f1.mag = mag; this.f1.angle = angle; }
-                else { this.f2.mag = mag; this.f2.angle = angle; }
+                this.forces[this._dragForceIdx].mag = mag;
+                this.forces[this._dragForceIdx].angle = angle;
                 this.draw(); this._updateInfo();
             } else if (this.mode === 'decomposition' && this._dragDecomp) {
                 const dx = p.x - ox, dy = oy - p.y;
@@ -275,7 +312,7 @@ const ForceComposition = {
 
         const onUp = () => {
             this._mouse.down = false;
-            this._dragTarget = null;
+            this._dragForceIdx = -1;
             this._dragDecomp = false;
             this.canvas.style.cursor = 'default';
         };
@@ -343,63 +380,117 @@ const ForceComposition = {
         ctx.restore();
     },
 
-    /* ── 力的合成 ── */
+    /* ── 力的合成（v4.6.0-α1：多力，多边形/平行四边形两种法则） ── */
     _drawComposition() {
-        const { ctx, origin, scale, f1, f2 } = this;
+        const { ctx, origin, scale, forces, compMethod } = this;
         const ox = origin.x, oy = origin.y;
         this._drawAxes(ox, oy, 'x', 'y');
 
-        const r1 = f1.angle * Math.PI / 180;
-        const r2 = f2.angle * Math.PI / 180;
-        const f1x = Math.cos(r1) * f1.mag * scale;
-        const f1y = -Math.sin(r1) * f1.mag * scale;
-        const f2x = Math.cos(r2) * f2.mag * scale;
-        const f2y = -Math.sin(r2) * f2.mag * scale;
+        // 累计每个 force 的 (fx, fy)
+        const proj = forces.map(f => {
+            const r = f.angle * Math.PI / 180;
+            return { fx: Math.cos(r) * f.mag * scale, fy: -Math.sin(r) * f.mag * scale, rad: r };
+        });
 
-        // 平行四边形虚线
+        const usePara = (compMethod === 'parallelogram' && forces.length === 2);
+
+        if (usePara) {
+            // 平行四边形辅助线
+            const f1x = proj[0].fx, f1y = proj[0].fy;
+            const f2x = proj[1].fx, f2y = proj[1].fy;
+            ctx.save();
+            ctx.setLineDash([6, 4]);
+            ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(ox + f1x, oy + f1y);
+            ctx.lineTo(ox + f1x + f2x, oy + f1y + f2y);
+            ctx.lineTo(ox + f2x, oy + f2y);
+            ctx.stroke();
+            ctx.restore();
+            // 平行四边形填充
+            ctx.save();
+            ctx.fillStyle = 'rgba(46,204,113,0.06)';
+            ctx.beginPath();
+            ctx.moveTo(ox, oy);
+            ctx.lineTo(ox + f1x, oy + f1y);
+            ctx.lineTo(ox + f1x + f2x, oy + f1y + f2y);
+            ctx.lineTo(ox + f2x, oy + f2y);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        } else {
+            // 多边形法（首尾相接）— 半透明灰色辅助链
+            ctx.save();
+            ctx.setLineDash([5, 4]);
+            ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+            ctx.lineWidth = 1.2;
+            let cx = ox, cy = oy;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            for (let i = 0; i < proj.length; i++) {
+                cx += proj[i].fx;
+                cy += proj[i].fy;
+                ctx.lineTo(cx, cy);
+            }
+            ctx.stroke();
+            ctx.restore();
+            // 在每个虚线节点画小圆点
+            ctx.save();
+            ctx.fillStyle = 'rgba(255,255,255,0.35)';
+            cx = ox; cy = oy;
+            for (let i = 0; i < proj.length - 1; i++) {
+                cx += proj[i].fx;
+                cy += proj[i].fy;
+                ctx.beginPath();
+                ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        // 画每个分力（从原点出发）+ 拖拽端点
+        forces.forEach((f, i) => {
+            const c = this._forceColors[i];
+            const lab = this._forceLabels[i];
+            const fx = proj[i].fx, fy = proj[i].fy;
+            this._drawArrow(ox, oy, ox + fx, oy + fy, c, 2.5);
+            this._drawLabel(ox + fx * 0.55 + 8, oy + fy * 0.55 - 10, lab, c);
+            this._drawHandle(ox + fx, oy + fy, c);
+            // 角度弧（仅前 4 个，避免重叠）
+            if (i < 4) this._drawAngleArc(ox, oy, 0, proj[i].rad, 30 + i * 8, c);
+        });
+
+        // 合力 R = Σ(fx, fy)
+        let rx = 0, ry = 0;
+        for (const p of proj) { rx += p.fx; ry += p.fy; }
+        if (Math.hypot(rx, ry) > 1) {
+            this._drawArrow(ox, oy, ox + rx, oy + ry, '#2ecc71', 3.8);
+            this._drawLabel(ox + rx * 0.55 + 14, oy + ry * 0.55 + 4, 'R', '#2ecc71');
+        } else {
+            // 合力近 0：在原点画一个绿色平衡环
+            ctx.save();
+            ctx.strokeStyle = '#2ecc71';
+            ctx.globalAlpha = 0.7;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath(); ctx.arc(ox, oy, 14, 0, Math.PI * 2); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#2ecc71';
+            ctx.font = 'bold 12px ' + CF.sans;
+            ctx.textAlign = 'center';
+            ctx.fillText('R ≈ 0  平衡', ox, oy + 30);
+            ctx.restore();
+        }
+
+        // 右上角法则提示
         ctx.save();
-        ctx.setLineDash([6, 4]);
-        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(ox + f1x, oy + f1y);
-        ctx.lineTo(ox + f1x + f2x, oy + f1y + f2y);
-        ctx.lineTo(ox + f2x, oy + f2y);
-        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.font = '12px ' + CF.sans;
+        ctx.textAlign = 'right';
+        const methodTxt = usePara ? '▱ 平行四边形定则' : ('⛓ 多边形法（' + forces.length + ' 个力首尾相接）');
+        ctx.fillText(methodTxt, this.W - 10, 18);
         ctx.restore();
-
-        // 平行四边形填充
-        ctx.save();
-        ctx.fillStyle = 'rgba(255,255,255,0.04)';
-        ctx.beginPath();
-        ctx.moveTo(ox, oy);
-        ctx.lineTo(ox + f1x, oy + f1y);
-        ctx.lineTo(ox + f1x + f2x, oy + f1y + f2y);
-        ctx.lineTo(ox + f2x, oy + f2y);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-
-        // F1
-        this._drawArrow(ox, oy, ox + f1x, oy + f1y, '#e74c3c', 3);
-        this._drawLabel(ox + f1x * 0.5 - 10, oy + f1y * 0.5 - 12, 'F₁', '#e74c3c');
-
-        // F2
-        this._drawArrow(ox, oy, ox + f2x, oy + f2y, '#3498db', 3);
-        this._drawLabel(ox + f2x * 0.5 + 8, oy + f2y * 0.5 - 12, 'F₂', '#3498db');
-
-        // 合力 R
-        const rx = f1x + f2x, ry = f1y + f2y;
-        this._drawArrow(ox, oy, ox + rx, oy + ry, '#2ecc71', 3.5);
-        this._drawLabel(ox + rx * 0.5 + 10, oy + ry * 0.5, 'R', '#2ecc71');
-
-        // 端点拖拽手柄
-        this._drawHandle(ox + f1x, oy + f1y, '#e74c3c');
-        this._drawHandle(ox + f2x, oy + f2y, '#3498db');
-
-        // 角度弧
-        this._drawAngleArc(ox, oy, 0, r1, 30, '#e74c3c');
-        this._drawAngleArc(ox, oy, 0, r2, 40, '#3498db');
     },
 
     /* ── 正交分解 ── */
@@ -651,18 +742,19 @@ const ForceComposition = {
     /* ══════════════════ 数据更新 ══════════════════ */
     _updateInfo() {
         if (this.mode === 'composition') {
-            const r1 = this.f1.angle * Math.PI / 180;
-            const r2 = this.f2.angle * Math.PI / 180;
-            const rx = this.f1.mag * Math.cos(r1) + this.f2.mag * Math.cos(r2);
-            const ry = this.f1.mag * Math.sin(r1) + this.f2.mag * Math.sin(r2);
+            // v4.6.0-α1：多力合成
+            let rx = 0, ry = 0;
+            this.forces.forEach((f, i) => {
+                const r = f.angle * Math.PI / 180;
+                rx += f.mag * Math.cos(r);
+                ry += f.mag * Math.sin(r);
+                this._setText('fc-fi-mag-' + i, f.mag.toFixed(0));
+                this._setText('fc-fi-ang-' + i, f.angle.toFixed(0));
+            });
             const rMag = Math.sqrt(rx * rx + ry * ry);
             const rAng = Math.atan2(ry, rx) * 180 / Math.PI;
-            this._setText('fc-f1-mag', this.f1.mag.toFixed(0));
-            this._setText('fc-f1-ang', this.f1.angle.toFixed(0));
-            this._setText('fc-f2-mag', this.f2.mag.toFixed(0));
-            this._setText('fc-f2-ang', this.f2.angle.toFixed(0));
             this._setText('fc-r-mag', rMag.toFixed(1));
-            this._setText('fc-r-ang', rAng.toFixed(1));
+            this._setText('fc-r-ang', rMag < 1 ? '—' : rAng.toFixed(1));
         } else if (this.mode === 'decomposition') {
             const rad = this.fd.angle * Math.PI / 180;
             const fx = this.fd.mag * Math.cos(rad);
@@ -686,6 +778,41 @@ const ForceComposition = {
         if (el) el.textContent = val;
     },
 
+    /* v4.6.0-α1：多力合成 — 增减力 + 法则切换 */
+    _addForce() {
+        if (this.forces.length >= 6) return;
+        // 新力默认放一个观感不重叠的角度（在已有力之间均匀填）
+        const used = this.forces.map(f => f.angle);
+        let bestAng = 0, bestGap = -1;
+        for (let test = 0; test < 360; test += 15) {
+            let minDelta = 360;
+            for (const a of used) {
+                let d = Math.abs(((test - a + 540) % 360) - 180);
+                if (d < minDelta) minDelta = d;
+            }
+            if (minDelta > bestGap) { bestGap = minDelta; bestAng = test; }
+        }
+        this.forces.push({ mag: 70, angle: bestAng });
+        // 力数 ≥3 时强制 polygon 法则
+        if (this.forces.length >= 3) this.compMethod = 'polygon';
+        this._rebuildParams();
+        this.draw();
+    },
+
+    _removeForce() {
+        if (this.forces.length <= 2) return;
+        this.forces.pop();
+        this._rebuildParams();
+        this.draw();
+    },
+
+    _setCompMethod(m) {
+        if (m === 'parallelogram' && this.forces.length !== 2) return;
+        this.compMethod = m;
+        this._rebuildParams();
+        this.draw();
+    },
+
     /* ══════════════════ 教育面板 ══════════════════ */
     _injectEduPanel() {
         const edu = document.getElementById('fc-edu');
@@ -693,15 +820,15 @@ const ForceComposition = {
 
         const content = {
             composition: `
-                <h4>📐 力的合成 — 平行四边形定则</h4>
-                <p>两个共点力 <b>F₁</b> 和 <b>F₂</b> 的合力 <b>R</b> 等于以它们为邻边构成的平行四边形的对角线。</p>
+                <h4>📐 力的合成 — 平行四边形定则 / 多边形法（首尾相接）</h4>
+                <p>多个共点力的合力 <b style="color:#2ecc71">R = ΣF<sub>i</sub></b>，在二维分量上即 R<sub>x</sub> = ΣF<sub>i</sub>·cosθ<sub>i</sub>，R<sub>y</sub> = ΣF<sub>i</sub>·sinθ<sub>i</sub>。</p>
                 <ul>
-                    <li>合力大小：R = √(F₁² + F₂² + 2F₁F₂ cosθ)，其中 θ 为两力夹角</li>
-                    <li>当 θ = 0°（同向）：R = F₁ + F₂（最大值）</li>
-                    <li>当 θ = 180°（反向）：R = |F₁ − F₂|（最小值）</li>
-                    <li>当 θ = 90°：R = √(F₁² + F₂²)</li>
+                    <li><b>▱ 平行四边形定则</b>（两力情形）：合力 R 是以 F₁、F₂ 为邻边的平行四边形对角线 → R = √(F₁² + F₂² + 2F₁F₂ cosθ)</li>
+                    <li><b>⛓ 多边形法（首尾相接）</b>（任意力数）：把各分力首尾相接画成多边形，从起点画到终点的有向线段即合力 R</li>
+                    <li>θ = 0°（同向）R = F₁ + F₂；θ = 180°（反向）R = |F₁ − F₂|；θ = 90° R = √(F₁² + F₂²)</li>
+                    <li>当所有分力首尾相接构成 <b>闭合多边形</b> 时 R = 0，物体处于 <b style="color:#2ecc71">共点力平衡态</b></li>
                 </ul>
-                <p class="fc-tip">💡 拖动箭头端点观察合力如何随夹角变化</p>
+                <p class="fc-tip">💡 ➕ 增加到 3、4、5 个力，调整方向使首尾闭合 → 体验"力的平衡"几何意义</p>
             `,
             decomposition: `
                 <h4>📏 力的正交分解</h4>

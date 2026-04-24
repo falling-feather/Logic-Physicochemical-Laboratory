@@ -5,6 +5,7 @@
 const MomentumConservation = {
     canvas: null, ctx: null, W: 0, H: 0,
     mode: 'elastic',        // 'elastic' | 'inelastic' | 'perfectly'
+    dimension: '1D',        // v4.6.0-α3：'1D' | '2D'
     _listeners: [],
     _resizeObs: null,
     _raf: null,
@@ -13,9 +14,29 @@ const MomentumConservation = {
 
     /* ── 物理参数 ── */
     m1: 3, m2: 2,           // kg
-    v1i: 4, v2i: -2,        // m/s (初始速度，右为正)
+    v1i: 4, v2i: -2,        // m/s (1D 模式：右为正)
     restitution: 0.5,       // 恢复系数 e (非弹性模式)
-    v1f: 0, v2f: 0,         // 碰后速度
+    v1f: 0, v2f: 0,         // 1D 碰后速度
+
+    /* ── v4.6.0-α3：2D 物理参数 ── */
+    v1x: 4, v1y: 0,         // 球 A 初速 (m/s)
+    v2x: -2, v2y: 0.6,      // 球 B 初速 (m/s)
+    _2d: {
+        // 当前位置 (m)
+        x1: 0, y1: 0, x2: 0, y2: 0,
+        // 当前速度
+        vx1: 0, vy1: 0, vx2: 0, vy2: 0,
+        // 半径 (m)，由质量决定
+        r1: 0.4, r2: 0.4,
+        // 碰前/碰后总动量分量
+        pxBefore: 0, pyBefore: 0, pxAfter: 0, pyAfter: 0,
+        kBefore: 0, kAfter: 0,
+        // 轨迹（最多 N 点）
+        trail1: [], trail2: [],
+        // 拖拽
+        dragging: -1   // -1 / 0=A / 1=B
+    },
+    _trackHeight: 6,         // 2D 区高（m）
 
     /* ── 动画参数 ── */
     _t: 0,
@@ -106,7 +127,13 @@ const MomentumConservation = {
             { key: 'perfectly',  label: '🧲 完全非弹性' }
         ];
 
-        let html = '<div class="mc-mode-btns" role="group" aria-label="模式选择">';
+        // v4.6.0-α3：维度切换按钮组
+        let html = '<div class="mc-dim-btns" role="group" aria-label="维度选择">';
+        html += `<button class="mc-dim-btn${this.dimension === '1D' ? ' active' : ''}" data-dim="1D">📏 一维碰撞</button>`;
+        html += `<button class="mc-dim-btn${this.dimension === '2D' ? ' active' : ''}" data-dim="2D">🎯 二维碰撞</button>`;
+        html += '</div>';
+
+        html += '<div class="mc-mode-btns" role="group" aria-label="型式选择">';
         modes.forEach(m => {
             html += `<button class="mc-mode-btn${m.key === self.mode ? ' active' : ''}" data-mode="${m.key}">${m.label}</button>`;
         });
@@ -115,8 +142,18 @@ const MomentumConservation = {
         html += '<div class="mc-params">';
         html += this._sliderHTML('mc-m1', '物块 A 质量 m₁', 'kg', 1, 10, this.m1, 0.5);
         html += this._sliderHTML('mc-m2', '物块 B 质量 m₂', 'kg', 1, 10, this.m2, 0.5);
+        // v4.6.0-α3：1D / 2D 速度控件分组
+        html += '<div id="mc-1d-velocity" class="mc-vel-group">';
         html += this._sliderHTML('mc-v1', 'A 初速度 v₁', 'm/s', -8, 8, this.v1i, 0.5);
         html += this._sliderHTML('mc-v2', 'B 初速度 v₂', 'm/s', -8, 8, this.v2i, 0.5);
+        html += '</div>';
+        html += '<div id="mc-2d-velocity" class="mc-vel-group">';
+        html += this._sliderHTML('mc-v1x', 'A 初速度 v₁ₓ', 'm/s', -6, 6, this.v1x, 0.5);
+        html += this._sliderHTML('mc-v1y', 'A 初速度 v₁ᵧ', 'm/s', -4, 4, this.v1y, 0.5);
+        html += this._sliderHTML('mc-v2x', 'B 初速度 v₂ₓ', 'm/s', -6, 6, this.v2x, 0.5);
+        html += this._sliderHTML('mc-v2y', 'B 初速度 v₂ᵧ', 'm/s', -4, 4, this.v2y, 0.5);
+        html += '<div class="mc-2d-tip">💡 二维模式可<b>拖动</b>球设置初始位置（暂停时）</div>';
+        html += '</div>';
         html += '<div class="mc-e-row" id="mc-e-row">';
         html += this._sliderHTML('mc-e', '恢复系数 e', '', 0, 1, this.restitution, 0.05);
         html += '</div>';
@@ -129,6 +166,16 @@ const MomentumConservation = {
 
         html += '<div id="mc-info" class="mc-info"></div>';
         ctrl.innerHTML = html;
+
+        // v4.6.0-α3：维度切换
+        ctrl.querySelectorAll('.mc-dim-btn').forEach(btn => {
+            this._on(btn, 'click', () => {
+                self.dimension = btn.dataset.dim;
+                ctrl.querySelectorAll('.mc-dim-btn').forEach(b => b.classList.toggle('active', b === btn));
+                self._updateDimVisibility();
+                self._reset();
+            });
+        });
 
         // 模式切换
         ctrl.querySelectorAll('.mc-mode-btn').forEach(btn => {
@@ -154,6 +201,10 @@ const MomentumConservation = {
         bindSlider('mc-m2', 'm2', true);
         bindSlider('mc-v1', 'v1i', true);
         bindSlider('mc-v2', 'v2i', true);
+        bindSlider('mc-v1x', 'v1x', true);
+        bindSlider('mc-v1y', 'v1y', true);
+        bindSlider('mc-v2x', 'v2x', true);
+        bindSlider('mc-v2y', 'v2y', true);
         bindSlider('mc-e', 'restitution', true);
 
         // 播放/重置
@@ -167,7 +218,38 @@ const MomentumConservation = {
         });
         this._on(resetBtn, 'click', () => self._reset());
 
+        // v4.6.0-α3：2D 球体拖拽
+        this._bindCanvasDrag();
+
+        this._updateDimVisibility();
         this._updateERowVisibility();
+    },
+
+    _updateSliderLabel(id) {
+        const slider = document.getElementById(id);
+        const lbl = document.getElementById(id + '-lbl');
+        if (!slider || !lbl) return;
+        const map = {
+            'mc-m1':  ['物块 A 质量 m₁', 'kg'],
+            'mc-m2':  ['物块 B 质量 m₂', 'kg'],
+            'mc-v1':  ['A 初速度 v₁', 'm/s'],
+            'mc-v2':  ['B 初速度 v₂', 'm/s'],
+            'mc-v1x': ['A 初速度 v₁ₓ', 'm/s'],
+            'mc-v1y': ['A 初速度 v₁ᵧ', 'm/s'],
+            'mc-v2x': ['B 初速度 v₂ₓ', 'm/s'],
+            'mc-v2y': ['B 初速度 v₂ᵧ', 'm/s'],
+            'mc-e':   ['恢复系数 e', '']
+        };
+        const [name, unit] = map[id] || ['', ''];
+        const v = parseFloat(slider.value);
+        lbl.innerHTML = `${name} = <strong>${unit ? v + ' ' + unit : v}</strong>`;
+    },
+
+    _updateDimVisibility() {
+        const v1d = document.getElementById('mc-1d-velocity');
+        const v2d = document.getElementById('mc-2d-velocity');
+        if (v1d) v1d.style.display = this.dimension === '1D' ? '' : 'none';
+        if (v2d) v2d.style.display = this.dimension === '2D' ? '' : 'none';
     },
 
     _sliderHTML(id, label, unit, min, max, val, step) {
@@ -176,22 +258,6 @@ const MomentumConservation = {
             <label class="mc-label" id="${id}-lbl">${label} = <strong>${display}</strong></label>
             <input type="range" id="${id}" class="mc-slider" min="${min}" max="${max}" value="${val}" step="${step}">
         </div>`;
-    },
-
-    _updateSliderLabel(id) {
-        const slider = document.getElementById(id);
-        const lbl = document.getElementById(id + '-lbl');
-        if (!slider || !lbl) return;
-        const map = {
-            'mc-m1': ['物块 A 质量 m₁', 'kg'],
-            'mc-m2': ['物块 B 质量 m₂', 'kg'],
-            'mc-v1': ['A 初速度 v₁', 'm/s'],
-            'mc-v2': ['B 初速度 v₂', 'm/s'],
-            'mc-e':  ['恢复系数 e', '']
-        };
-        const [name, unit] = map[id] || ['', ''];
-        const v = parseFloat(slider.value);
-        lbl.innerHTML = `${name} = <strong>${unit ? v + ' ' + unit : v}</strong>`;
     },
 
     _updateERowVisibility() {
@@ -227,18 +293,85 @@ const MomentumConservation = {
         this._kAfter  = { k1: 0.5 * m1 * v1f * v1f, k2: 0.5 * m2 * v2f * v2f, total: 0.5 * m1 * v1f * v1f + 0.5 * m2 * v2f * v2f };
     },
 
+    // v4.6.0-α3：2D 模式恢复系数选择
+    _modeE() {
+        if (this.mode === 'elastic') return 1;
+        if (this.mode === 'perfectly') return 0;
+        return this.restitution;
+    },
+
+    // v4.6.0-α3：2D 圆球碰撞（沿连心线方向应用 e，切向不变）
+    _collide2D() {
+        const d = this._2d;
+        const dx = d.x2 - d.x1, dy = d.y2 - d.y1;
+        const dist = Math.hypot(dx, dy) || 1e-6;
+        const nx = dx / dist, ny = dy / dist;     // 单位法向（A→B）
+        // 法向速度
+        const v1n = d.vx1 * nx + d.vy1 * ny;
+        const v2n = d.vx2 * nx + d.vy2 * ny;
+        if (v1n - v2n <= 0) return false;          // 已经在分离，不碰
+        const e = this._modeE();
+        const M = this.m1 + this.m2;
+        const v1nF = ((this.m1 - e * this.m2) * v1n + (1 + e) * this.m2 * v2n) / M;
+        const v2nF = ((this.m2 - e * this.m1) * v2n + (1 + e) * this.m1 * v1n) / M;
+        // 切向不变 → 速度更新只改法向分量
+        d.vx1 += (v1nF - v1n) * nx;
+        d.vy1 += (v1nF - v1n) * ny;
+        d.vx2 += (v2nF - v2n) * nx;
+        d.vy2 += (v2nF - v2n) * ny;
+        // 修正穿透：把两球分离到相切
+        const overlap = (d.r1 + d.r2) - dist;
+        if (overlap > 0) {
+            d.x1 -= nx * overlap * 0.5;
+            d.y1 -= ny * overlap * 0.5;
+            d.x2 += nx * overlap * 0.5;
+            d.y2 += ny * overlap * 0.5;
+        }
+        return true;
+    },
+
     /* ═══════════════════ 动画控制 ═══════════════════ */
     _reset() {
         this._stop();
         this._phase = 'ready';
         this._collided = false;
         this._t = 0;
-        // 初始位置
-        this._x1 = this._trackLen * 0.3;
-        this._x2 = this._trackLen * 0.7;
-        this._v1 = this.v1i;
-        this._v2 = this.v2i;
-        this._calcPostCollision();
+        if (this.dimension === '2D') {
+            // v4.6.0-α3：2D 初始化
+            const d = this._2d;
+            d.r1 = 0.25 + 0.06 * this.m1;   // 半径随质量微增（视觉提示）
+            d.r2 = 0.25 + 0.06 * this.m2;
+            // 保留拖拽过的位置；初次或越界时归位
+            const inX = (x) => x > 0.5 && x < this._trackLen - 0.5;
+            const inY = (y) => y > 0.5 && y < this._trackHeight - 0.5;
+            if (!inX(d.x1) || !inY(d.y1)) { d.x1 = 1.8; d.y1 = this._trackHeight * 0.5; }
+            if (!inX(d.x2) || !inY(d.y2)) { d.x2 = 8.2; d.y2 = this._trackHeight * 0.5 + 0.6; }
+            d.vx1 = this.v1x; d.vy1 = this.v1y;
+            d.vx2 = this.v2x; d.vy2 = this.v2y;
+            d.trail1 = []; d.trail2 = [];
+            // 碰前总动量/动能
+            d.pxBefore = this.m1 * this.v1x + this.m2 * this.v2x;
+            d.pyBefore = this.m1 * this.v1y + this.m2 * this.v2y;
+            d.kBefore = 0.5 * this.m1 * (this.v1x ** 2 + this.v1y ** 2)
+                      + 0.5 * this.m2 * (this.v2x ** 2 + this.v2y ** 2);
+            d.pxAfter = d.pxBefore; d.pyAfter = d.pyBefore;  // 守恒——尚未碰
+            d.kAfter = d.kBefore;
+            d.dragging = -1;
+            // 兼容信息面板：把 1D 用的统计字段也填上等价值
+            this._pBefore = { p1: this.m1 * this.v1x, p2: this.m2 * this.v2x, total: d.pxBefore };
+            this._pAfter  = { ...this._pBefore };
+            this._kBefore = { k1: 0.5 * this.m1 * (this.v1x ** 2 + this.v1y ** 2),
+                              k2: 0.5 * this.m2 * (this.v2x ** 2 + this.v2y ** 2),
+                              total: d.kBefore };
+            this._kAfter = { ...this._kBefore };
+        } else {
+            // 1D
+            this._x1 = this._trackLen * 0.3;
+            this._x2 = this._trackLen * 0.7;
+            this._v1 = this.v1i;
+            this._v2 = this.v2i;
+            this._calcPostCollision();
+        }
         this._updateInfo();
         this._draw();
         const btn = document.getElementById('mc-play-btn');
@@ -279,7 +412,53 @@ const MomentumConservation = {
         const dt = Math.min((now - this._lastTime) / 1000, 0.05); // cap dt
         this._lastTime = now;
 
-        // 更新位置
+        if (this.dimension === '2D') {
+            // v4.6.0-α3：2D tick
+            const d = this._2d;
+            d.x1 += d.vx1 * dt; d.y1 += d.vy1 * dt;
+            d.x2 += d.vx2 * dt; d.y2 += d.vy2 * dt;
+            // 碰撞检测
+            const dx = d.x2 - d.x1, dy = d.y2 - d.y1;
+            const dist = Math.hypot(dx, dy);
+            if (!this._collided && dist <= d.r1 + d.r2) {
+                if (this._collide2D()) {
+                    this._collided = true;
+                    // 记录碰后总动量/能量
+                    d.pxAfter = this.m1 * d.vx1 + this.m2 * d.vx2;
+                    d.pyAfter = this.m1 * d.vy1 + this.m2 * d.vy2;
+                    d.kAfter = 0.5 * this.m1 * (d.vx1 ** 2 + d.vy1 ** 2)
+                             + 0.5 * this.m2 * (d.vx2 ** 2 + d.vy2 ** 2);
+                    // 同步 1D 风格字段以更新教学面板
+                    this._pAfter = { p1: this.m1 * d.vx1, p2: this.m2 * d.vx2, total: d.pxAfter };
+                    this._kAfter = { k1: 0.5 * this.m1 * (d.vx1 ** 2 + d.vy1 ** 2),
+                                     k2: 0.5 * this.m2 * (d.vx2 ** 2 + d.vy2 ** 2),
+                                     total: d.kAfter };
+                    this._updateInfo();
+                }
+            }
+            // 轨迹（≤ 80 点）
+            d.trail1.push([d.x1, d.y1]);
+            d.trail2.push([d.x2, d.y2]);
+            if (d.trail1.length > 80) d.trail1.shift();
+            if (d.trail2.length > 80) d.trail2.shift();
+            // 边界检测：碰后任一球出界即结束
+            if (this._collided) {
+                const out = (x, y, r) => x < -r || x > this._trackLen + r || y < -r || y > this._trackHeight + r;
+                if (out(d.x1, d.y1, d.r1) || out(d.x2, d.y2, d.r2)) {
+                    this._phase = 'done';
+                    this._stop();
+                    const btn = document.getElementById('mc-play-btn');
+                    if (btn) btn.textContent = '↺ 重来';
+                    this._draw();
+                    return;
+                }
+            }
+            this._draw();
+            this._raf = requestAnimationFrame(() => this._tick());
+            return;
+        }
+
+        // 1D
         this._x1 += this._v1 * dt;
         this._x2 += this._v2 * dt;
 
@@ -320,15 +499,33 @@ const MomentumConservation = {
     _updateInfo() {
         const info = document.getElementById('mc-info');
         if (!info) return;
-        const { m1, m2, v1i, v2i, v1f, v2f, _pBefore: pb, _pAfter: pa, _kBefore: kb, _kAfter: ka } = this;
+        const { m1, m2, _pBefore: pb, _pAfter: pa, _kBefore: kb, _kAfter: ka } = this;
         const modeLabel = { elastic: '弹性碰撞', inelastic: '非弹性碰撞', perfectly: '完全非弹性碰撞' }[this.mode];
+        const dimLabel = this.dimension === '2D' ? '二维' : '一维';
         const kLoss = kb.total - ka.total;
         const kLossPct = kb.total > 0 ? (kLoss / kb.total * 100).toFixed(1) : '0';
 
+        if (this.dimension === '2D') {
+            const d = this._2d;
+            const pBeforeMag = Math.hypot(d.pxBefore, d.pyBefore);
+            const pAfterMag = Math.hypot(d.pxAfter, d.pyAfter);
+            const dpx = Math.abs(d.pxAfter - d.pxBefore);
+            const dpy = Math.abs(d.pyAfter - d.pyBefore);
+            const cons = (dpx + dpy) < 0.05;
+            info.innerHTML = `
+                <div class="mc-mode-tag">${dimLabel} · ${modeLabel}</div>
+                <div class="mc-data-row"><span>碰前 A：</span> v₁ = (<strong>${this.v1x.toFixed(1)}</strong>, <strong>${this.v1y.toFixed(1)}</strong>) m/s</div>
+                <div class="mc-data-row"><span>碰前 B：</span> v₂ = (<strong>${this.v2x.toFixed(1)}</strong>, <strong>${this.v2y.toFixed(1)}</strong>) m/s</div>
+                <div class="mc-data-row"><span>碰后 A：</span> v₁' = (<strong>${d.vx1.toFixed(2)}</strong>, <strong>${d.vy1.toFixed(2)}</strong>) m/s</div>
+                <div class="mc-data-row"><span>碰后 B：</span> v₂' = (<strong>${d.vx2.toFixed(2)}</strong>, <strong>${d.vy2.toFixed(2)}</strong>) m/s</div>
+                <div class="mc-data-row mc-momentum">动量守恒：Σpₓ = <strong>${d.pxBefore.toFixed(1)}</strong>→<strong>${d.pxAfter.toFixed(1)}</strong>，Σpᵧ = <strong>${d.pyBefore.toFixed(1)}</strong>→<strong>${d.pyAfter.toFixed(1)}</strong>（|p| ${pBeforeMag.toFixed(1)}→${pAfterMag.toFixed(1)} kg·m/s${cons ? ' ✓' : ''}）</div>
+                <div class="mc-data-row mc-energy">动能损失：ΔEk = <strong>${kLoss.toFixed(1)}</strong> J（${kLossPct}%）</div>`;
+            return;
+        }
         info.innerHTML = `
-            <div class="mc-mode-tag">${modeLabel}</div>
-            <div class="mc-data-row"><span>碰前：</span> v₁ = <strong>${v1i}</strong> m/s，v₂ = <strong>${v2i}</strong> m/s</div>
-            <div class="mc-data-row"><span>碰后：</span> v₁' = <strong>${v1f.toFixed(2)}</strong> m/s，v₂' = <strong>${v2f.toFixed(2)}</strong> m/s</div>
+            <div class="mc-mode-tag">${dimLabel} · ${modeLabel}</div>
+            <div class="mc-data-row"><span>碰前：</span> v₁ = <strong>${this.v1i}</strong> m/s，v₂ = <strong>${this.v2i}</strong> m/s</div>
+            <div class="mc-data-row"><span>碰后：</span> v₁' = <strong>${this.v1f.toFixed(2)}</strong> m/s，v₂' = <strong>${this.v2f.toFixed(2)}</strong> m/s</div>
             <div class="mc-data-row mc-momentum">动量守恒：p = m₁v₁+m₂v₂ = <strong>${pb.total.toFixed(1)}</strong> kg·m/s（碰前=碰后）</div>
             <div class="mc-data-row mc-energy">动能损失：ΔEk = <strong>${kLoss.toFixed(1)}</strong> J（${kLossPct}%）</div>`;
     },
@@ -339,10 +536,178 @@ const MomentumConservation = {
         if (!ctx) return;
         ctx.clearRect(0, 0, W, H);
 
+        if (this.dimension === '2D') {
+            this._drawArena2D();
+            this._drawBalls2D();
+            this._drawBarCharts();
+            return;
+        }
+
         this._drawTrack();
         this._drawBlocks();
         this._drawVelocityArrows();
         this._drawBarCharts();
+    },
+
+    /* ── v4.6.0-α3：2D 绘制 ── */
+    _2dArea() {
+        const pad = 40;
+        return { x: pad, y: 30, w: this.W - pad * 2, h: this.H * 0.5 };
+    },
+    _logicX2D(lx) { const a = this._2dArea(); return a.x + (lx / this._trackLen) * a.w; },
+    _logicY2D(ly) { const a = this._2dArea(); return a.y + (ly / this._trackHeight) * a.h; },
+    _scaleR2D(r)  { const a = this._2dArea(); return (r / this._trackLen) * a.w; },
+
+    _drawArena2D() {
+        const { ctx } = this;
+        const a = this._2dArea();
+        ctx.save();
+        // 边框
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(a.x, a.y, a.w, a.h);
+        // 网格
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        ctx.lineWidth = 1;
+        for (let i = 1; i < this._trackLen; i++) {
+            const cx = this._logicX2D(i);
+            ctx.beginPath(); ctx.moveTo(cx, a.y); ctx.lineTo(cx, a.y + a.h); ctx.stroke();
+        }
+        for (let j = 1; j < this._trackHeight; j++) {
+            const cy = this._logicY2D(j);
+            ctx.beginPath(); ctx.moveTo(a.x, cy); ctx.lineTo(a.x + a.w, cy); ctx.stroke();
+        }
+        // 标签
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.font = '11px ' + CF.sans;
+        ctx.fillText('x↗ (m)', a.x + a.w - 40, a.y + a.h - 4);
+        ctx.save();
+        ctx.translate(a.x + 4, a.y + 12); ctx.fillText('y↘', 0, 0);
+        ctx.restore();
+        ctx.restore();
+    },
+
+    _drawBalls2D() {
+        const { ctx } = this;
+        const d = this._2d;
+        // 轨迹
+        const drawTrail = (pts, color) => {
+            if (pts.length < 2) return;
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            for (let i = 0; i < pts.length; i++) {
+                const px = this._logicX2D(pts[i][0]);
+                const py = this._logicY2D(pts[i][1]);
+                if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            ctx.globalAlpha = 0.35;
+            ctx.stroke();
+            ctx.restore();
+        };
+        drawTrail(d.trail1, '#6495ED');
+        drawTrail(d.trail2, '#EB5757');
+
+        // 球
+        const drawBall = (cx, cy, r, fill, stroke, label, mass) => {
+            ctx.save();
+            ctx.fillStyle = fill;
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 13px ' + CF.sans;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, cx, cy - 5);
+            ctx.font = '11px ' + CF.sans;
+            ctx.fillText(mass + 'kg', cx, cy + 9);
+            ctx.restore();
+        };
+        const cx1 = this._logicX2D(d.x1), cy1 = this._logicY2D(d.y1);
+        const cx2 = this._logicX2D(d.x2), cy2 = this._logicY2D(d.y2);
+        const r1px = this._scaleR2D(d.r1), r2px = this._scaleR2D(d.r2);
+        drawBall(cx1, cy1, r1px, 'rgba(100,149,237,0.85)', '#6495ED', 'A', this.m1);
+        drawBall(cx2, cy2, r2px, 'rgba(235,87,87,0.85)', '#EB5757', 'B', this.m2);
+
+        // 速度箭头（按速度大小自适应）
+        const arrowScale = this._scaleR2D(0.35);   // 1 m/s = 0.35m 长度
+        if (Math.hypot(d.vx1, d.vy1) > 0.05) {
+            this._drawArrow(ctx, cx1, cy1, cx1 + d.vx1 * arrowScale, cy1 + d.vy1 * arrowScale, '#6495ED', 2);
+        }
+        if (Math.hypot(d.vx2, d.vy2) > 0.05) {
+            this._drawArrow(ctx, cx2, cy2, cx2 + d.vx2 * arrowScale, cy2 + d.vy2 * arrowScale, '#EB5757', 2);
+        }
+        // 拖拽提示
+        if (this._phase === 'ready') {
+            ctx.save();
+            ctx.fillStyle = 'rgba(255,255,255,0.35)';
+            ctx.font = '11px ' + CF.sans;
+            ctx.textAlign = 'center';
+            const a = this._2dArea();
+            ctx.fillText('🖱 可拖动小球到任意位置（仅在「开始」前）', a.x + a.w / 2, a.y - 8);
+            ctx.restore();
+        }
+    },
+
+    // v4.6.0-α3：2D 球体拖拽绑定
+    _bindCanvasDrag() {
+        const c = this.canvas;
+        if (!c) return;
+        const self = this;
+        const pickBall = (ex, ey) => {
+            if (self.dimension !== '2D' || self._phase !== 'ready') return -1;
+            const rect = c.getBoundingClientRect();
+            const px = (ex - rect.left), py = (ey - rect.top);
+            const d = self._2d;
+            const cx1 = self._logicX2D(d.x1), cy1 = self._logicY2D(d.y1);
+            const cx2 = self._logicX2D(d.x2), cy2 = self._logicY2D(d.y2);
+            const r1 = self._scaleR2D(d.r1) + 4;
+            const r2 = self._scaleR2D(d.r2) + 4;
+            const d1 = Math.hypot(px - cx1, py - cy1);
+            const d2 = Math.hypot(px - cx2, py - cy2);
+            if (d1 < r1 && d1 < d2) return 0;
+            if (d2 < r2) return 1;
+            return -1;
+        };
+        const moveBall = (idx, ex, ey) => {
+            const a = self._2dArea();
+            const rect = c.getBoundingClientRect();
+            const px = (ex - rect.left), py = (ey - rect.top);
+            // 转换回逻辑坐标
+            const lx = ((px - a.x) / a.w) * self._trackLen;
+            const ly = ((py - a.y) / a.h) * self._trackHeight;
+            const d = self._2d;
+            const r = idx === 0 ? d.r1 : d.r2;
+            const clampX = Math.max(r, Math.min(self._trackLen - r, lx));
+            const clampY = Math.max(r, Math.min(self._trackHeight - r, ly));
+            if (idx === 0) { d.x1 = clampX; d.y1 = clampY; }
+            else { d.x2 = clampX; d.y2 = clampY; }
+            self._draw();
+        };
+        this._on(c, 'mousedown', (e) => {
+            const i = pickBall(e.clientX, e.clientY);
+            if (i >= 0) { self._2d.dragging = i; e.preventDefault(); }
+        });
+        this._on(window, 'mousemove', (e) => {
+            if (self._2d.dragging >= 0) moveBall(self._2d.dragging, e.clientX, e.clientY);
+        });
+        this._on(window, 'mouseup', () => { self._2d.dragging = -1; });
+        // touch
+        this._on(c, 'touchstart', (e) => {
+            const t = e.touches[0]; if (!t) return;
+            const i = pickBall(t.clientX, t.clientY);
+            if (i >= 0) { self._2d.dragging = i; e.preventDefault(); }
+        }, { passive: false });
+        this._on(window, 'touchmove', (e) => {
+            if (self._2d.dragging < 0) return;
+            const t = e.touches[0]; if (!t) return;
+            moveBall(self._2d.dragging, t.clientX, t.clientY);
+        }, { passive: true });
+        this._on(window, 'touchend', () => { self._2d.dragging = -1; });
     },
 
     _drawTrack() {
