@@ -46,9 +46,13 @@
     <link rel="stylesheet" href="pages/planets/planets.css?v=20260424v44f">
     <link rel="stylesheet" href="pages/mathematics/mathematics.css?v=20260417d">
     <link rel="stylesheet" href="pages/physics/physics.css?v=20260417d">
-    <link rel="stylesheet" href="pages/chemistry/chemistry.css?v=20260417d">
+    <link rel="stylesheet" href="pages/chemistry/chemistry.css?v=20260424v45i">
     <link rel="stylesheet" href="pages/algorithms/algorithms.css?v=20260417d">
     <link rel="stylesheet" href="pages/biology/biology.css?v=20260417d">
+    <!-- v4.5-α1 全局搜索 -->
+    <link rel="stylesheet" href="shared/css/global-search.css?v=20260424v45b">
+    <!-- v4.5-α3 相关实验推荐 -->
+    <link rel="stylesheet" href="shared/css/related-experiments.css?v=20260424v45c">
     <!-- CSS: Responsive (must be last) -->
     <link rel="stylesheet" href="shared/css/responsive.css?v=20260417d">
 
@@ -152,6 +156,11 @@
                     <i data-lucide="leaf"></i>
                     <span>生物</span>
                 </a>
+                <button type="button" id="nav-search-trigger" aria-label="全局搜索实验" title="搜索实验 (Ctrl+K 或 /)">
+                    <i data-lucide="search"></i>
+                    <span>搜索</span>
+                    <span class="gsearch-kbd">Ctrl K</span>
+                </button>
                 <div class="nav-indicator"></div>
             </div>
         </div>
@@ -1594,7 +1603,9 @@
                             <button class="mol-select-btn" data-mol="C2H4">C₂H₄ 乙烯</button>
                             <button class="mol-select-btn" data-mol="C2H2">C₂H₂ 乙炔</button>
                             <button class="mol-select-btn" data-mol="C6H6">C₆H₆ 苯</button>
-                            <button class="mol-select-btn" data-mol="NaCl">NaCl</button>
+                            <button class="mol-select-btn" data-mol="HCHO">HCHO 甲醛</button>
+                            <button class="mol-select-btn" data-mol="H2S">H₂S 硫化氢</button>
+                            <button class="mol-select-btn" data-mol="CH3COOH">CH₃COOH 乙酸</button>
                             <button class="mol-select-btn" data-mol="C2H5OH">C₂H₅OH 乙醇</button>
                             <button class="mol-select-btn" data-mol="HCl">HCl</button>
                         </div>
@@ -1625,6 +1636,7 @@
                             <button class="rxn-select-btn" data-rxn="neutralization">酸碱中和</button>
                             <button class="rxn-select-btn" data-rxn="decomposition">碳酸钙分解</button>
                             <button class="rxn-select-btn" data-rxn="redox">铁铜置换</button>
+                            <button class="rxn-select-btn" data-rxn="dissolution">NaCl 溶解</button>
                         </div>
                         <div class="rxn-canvas-wrap">
                             <canvas id="rxn-canvas" class="rxn-canvas"></canvas>
@@ -1733,13 +1745,16 @@
                 </div>
                 <div class="organic-controls">
                     <div class="organic-mol-btns">
-                        <button class="organic-mol-btn active" data-mol="methane" aria-label="甲烷 CH₄">甲烷</button>
+                        <button class="organic-mol-btn active" data-mol="ethylene" aria-label="乙烯 C₂H₄">乙烯</button>
+                        <button class="organic-mol-btn" data-mol="acetylene" aria-label="乙炔 C₂H₂">乙炔</button>
+                        <button class="organic-mol-btn" data-mol="ethane" aria-label="乙烷 C₂H₆">乙烷</button>
                         <button class="organic-mol-btn" data-mol="ethanol" aria-label="乙醇 C₂H₅OH">乙醇</button>
                         <button class="organic-mol-btn" data-mol="acetic-acid" aria-label="乙酸 CH₃COOH">乙酸</button>
                         <button class="organic-mol-btn" data-mol="benzene" aria-label="苯 C₆H₆">苯</button>
                         <button class="organic-mol-btn" data-mol="propene" aria-label="丙烯 C₃H₆">丙烯</button>
                         <button class="organic-mol-btn" data-mol="acetone" aria-label="丙酮 C₃H₆O">丙酮</button>
                     </div>
+                    <button id="organic-rotate-bond" class="organic-mol-btn" aria-pressed="false" title="演示乙烷 C—C 单键自由旋转构象">🔄 旋转 σ 键</button>
                     <button id="organic-pause" class="organic-mol-btn" aria-pressed="false">⏸ 暂停</button>
                 </div>
                 <div class="canvas-wrapper">
@@ -2798,7 +2813,7 @@
     <script src="shared/js/back-to-top.js?v=20260424rr"></script>
     <script src="shared/js/fab-trigger.js?v=20260424oo"></script>
     <script src="shared/js/touch-gestures.js?v=20260418a"></script>
-    <script src="shared/js/module-selector.js?v=20260418p"></script>
+    <script src="shared/js/module-selector.js?v=20260424v45c"></script>
     <script src="shared/js/experiment-guide.js?v=20260423w"></script>
     <script src="shared/js/experiment-export.js?v=20260424v44a"></script>
     <script src="shared/js/quiz-data.js?v=20260422v"></script>
@@ -2813,7 +2828,10 @@
     <script src="pages/home/home.js?v=20260424v44a"></script>
     <script src="pages/planets/planets.js?v=20260424v44g"></script>
     <!-- Scripts: Bootstrap (before deferred modules for fast homepage boot) -->
-    <script src="shared/js/main.js?v=20260417d"></script>
+    <script src="shared/js/global-search.js?v=20260424v45a"></script>
+    <script src="shared/js/keyboard-shortcuts.js?v=20260424v45b"></script>
+    <script src="shared/js/related-experiments.js?v=20260424v45c"></script>
+    <script src="shared/js/main.js?v=20260424v45c"></script>
     <!-- Scripts: Subject modules (deferred — download in parallel, execute after core) -->
     <script defer src="pages/mathematics/mathematics.js"></script>
     <script defer src="pages/mathematics/calculus.js"></script>
@@ -2849,12 +2867,12 @@
     <script defer src="pages/physics/charged-particle.js"></script>
     <script defer src="pages/physics/physics-zoom.js"></script>
     <script defer src="pages/chemistry/periodic-table.js"></script>
-    <script defer src="pages/chemistry/molecular-structure.js"></script>
-    <script defer src="pages/chemistry/chemical-reactions.js"></script>
+    <script defer src="pages/chemistry/molecular-structure.js?v=20260424v45e"></script>
+    <script defer src="pages/chemistry/chemical-reactions.js?v=20260424v45g"></script>
     <script defer src="pages/chemistry/chemical-equilibrium.js"></script>
     <script defer src="pages/chemistry/electrochemistry.js"></script>
-    <script defer src="pages/chemistry/chemical-bond.js"></script>
-    <script defer src="pages/chemistry/organic-chemistry.js"></script>
+    <script defer src="pages/chemistry/chemical-bond.js?v=20260424v45h"></script>
+    <script defer src="pages/chemistry/organic-chemistry.js?v=20260424v45i"></script>
     <script defer src="pages/chemistry/reaction-rate.js"></script>
     <script defer src="pages/chemistry/solution-ionization.js"></script>
     <script defer src="pages/chemistry/ionic-reaction.js"></script>
@@ -2883,5 +2901,17 @@
     <script defer src="pages/biology/cellular-respiration.js?v=20260423a"></script>
     <script defer src="pages/biology/substance-transport.js?v=20260416b"></script>
     <script defer src="pages/biology/gene-mutation.js?v=20260416b"></script>
+
+    <!-- v4.5-α1 全局搜索浮层 -->
+    <div class="gsearch-overlay" id="global-search-overlay" role="dialog" aria-modal="true" aria-label="全局实验搜索">
+        <div class="gsearch-panel">
+            <div class="gsearch__inputwrap">
+                <i data-lucide="search"></i>
+                <input class="gsearch__input" type="text" placeholder="搜索实验名 / 描述 / 学科…" aria-label="搜索关键词" autocomplete="off" spellcheck="false">
+                <span class="gsearch__hint">↑↓ 选择 · Enter 进入 · Esc 关闭</span>
+            </div>
+            <div class="gsearch__list" role="listbox" aria-label="搜索结果"></div>
+        </div>
+    </div>
 </body>
 </html>

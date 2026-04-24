@@ -1,4 +1,4 @@
-const CACHE_NAME = 'englab-static-v20260424v44g';
+const CACHE_NAME = 'englab-static-v20260424v45i';
 const APP_SHELL = [
   './',
   './index.html',
@@ -19,7 +19,12 @@ const APP_SHELL = [
   './shared/js/scroll-animations.js?v=20260417c',
   './shared/js/cards.js?v=20260417c',
   './shared/js/common.js?v=20260417c',
-  './shared/js/main.js?v=20260417c',
+  './shared/js/main.js?v=20260424v45c',
+  './shared/js/global-search.js?v=20260424v45a',
+  './shared/js/keyboard-shortcuts.js?v=20260424v45b',
+  './shared/js/related-experiments.js?v=20260424v45c',
+  './shared/css/related-experiments.css?v=20260424v45c',
+  './shared/css/global-search.css?v=20260424v45b',
   './pages/home/home.js?v=20260418f',
   './shared/workers/particle-worker.js?v=20260422y',
   './shared/css/tokens.css?v=20260424ss',
