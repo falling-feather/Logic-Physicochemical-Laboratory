@@ -126,6 +126,21 @@
     height: 16px;
 }
 
+/* v4.4-α6：星系入口 — 蓝色辉光与微旋转图标，作为目录入口的强调 */
+.nav-item--galaxy { color: rgba(58, 169, 255, 0.95); }
+.nav-item--galaxy:hover { color: #3aa9ff; text-shadow: 0 0 10px rgba(58,169,255,0.55); }
+.nav-item--galaxy i {
+    animation: navGalaxyOrbit 9s linear infinite;
+    filter: drop-shadow(0 0 4px rgba(58,169,255,0.5));
+}
+@keyframes navGalaxyOrbit {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .nav-item--galaxy i { animation: none; }
+}
+
 /* ── X-03: Theme toggle ── */
 .theme-toggle {
     display: flex;

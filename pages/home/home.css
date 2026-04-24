@@ -480,6 +480,128 @@
     to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
+/* ── v4.4-α6：首页「进入星系目录」 CTA ── */
+.home-galaxy-cta {
+    position: absolute;
+    bottom: 5%; left: 50%;
+    transform: translateX(-50%);
+    z-index: 16;
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 22px 12px 16px;
+    text-decoration: none;
+    color: rgba(212, 232, 255, 0.92);
+    font-family: var(--font-display, system-ui);
+    background: rgba(8, 18, 36, 0.55);
+    border: 1px solid rgba(58, 169, 255, 0.42);
+    border-radius: 999px;
+    backdrop-filter: blur(10px) saturate(1.2);
+    -webkit-backdrop-filter: blur(10px) saturate(1.2);
+    box-shadow:
+        0 0 0 1px rgba(58, 169, 255, 0.14) inset,
+        0 8px 32px rgba(0, 0, 0, 0.55),
+        0 0 24px rgba(58, 169, 255, 0.18);
+    opacity: 0;
+    animation: ctaFadeUp 1.6s ease-out 1.6s forwards;
+    transition: transform var(--duration-normal, 220ms) ease,
+                border-color var(--duration-normal, 220ms) ease,
+                box-shadow var(--duration-normal, 220ms) ease,
+                color var(--duration-normal, 220ms) ease;
+}
+
+.home-galaxy-cta:hover,
+.home-galaxy-cta:focus-visible {
+    transform: translateX(-50%) translateY(-3px);
+    border-color: rgba(58, 169, 255, 0.85);
+    color: #d4e8ff;
+    box-shadow:
+        0 0 0 1px rgba(58, 169, 255, 0.32) inset,
+        0 12px 36px rgba(0, 0, 0, 0.6),
+        0 0 36px rgba(58, 169, 255, 0.42);
+    outline: none;
+}
+
+.home-galaxy-cta__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, rgba(58,169,255,0.45), rgba(58,169,255,0.05));
+    border: 1px solid rgba(58, 169, 255, 0.55);
+    color: #3aa9ff;
+    flex-shrink: 0;
+}
+
+.home-galaxy-cta__icon svg {
+    width: 18px; height: 18px;
+    stroke-width: 1.8;
+    animation: ctaIconSpin 8s linear infinite;
+}
+
+@keyframes ctaIconSpin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+.home-galaxy-cta__text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.15;
+}
+
+.home-galaxy-cta__title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+}
+
+.home-galaxy-cta__sub {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.65rem;
+    letter-spacing: 0.18em;
+    color: rgba(58, 169, 255, 0.78);
+    margin-top: 2px;
+}
+
+.home-galaxy-cta__arrow {
+    font-size: 1.6rem;
+    color: rgba(58, 169, 255, 0.85);
+    line-height: 1;
+    transform: translateX(0);
+    transition: transform var(--duration-normal, 220ms) ease;
+}
+
+.home-galaxy-cta:hover .home-galaxy-cta__arrow {
+    transform: translateX(4px);
+}
+
+@keyframes ctaFadeUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@media (max-width: 640px) {
+    .home-galaxy-cta {
+        bottom: 4%;
+        padding: 10px 16px 10px 12px;
+        gap: 10px;
+    }
+    .home-galaxy-cta__icon { width: 30px; height: 30px; }
+    .home-galaxy-cta__icon svg { width: 16px; height: 16px; }
+    .home-galaxy-cta__title { font-size: 0.85rem; }
+    .home-galaxy-cta__sub { font-size: 0.58rem; letter-spacing: 0.14em; }
+    .home-galaxy-cta__arrow { font-size: 1.3rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-galaxy-cta { animation: none; opacity: 1; }
+    .home-galaxy-cta__icon svg { animation: none; }
+    .home-galaxy-cta:hover { transform: translateX(-50%); }
+}
+
 /* ── Orbit paths ── */
 .orbit-path {
     position: absolute; top: 50%; left: 50%;
