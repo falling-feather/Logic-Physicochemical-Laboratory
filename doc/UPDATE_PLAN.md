@@ -39,6 +39,30 @@
 
 **v4.5 系列累计**：α1 全局搜索 / α2 快捷键 / α3 推荐 / α4 7-1 / α5 7-2 / α6 7-3a / α7 7-3b / α8 7-4 / α9 7-5 — **化学 5 项优化（7-1 ~ 7-5）全部完成 ✅**
 
+**v4.5 已收尾**：✅ `aaac991` `V4.5.0`（squash 合并 9 个 alpha）+ annotated tag `v4.5.0` 已推送 origin；细节保留 `legacy/v4.5-detail` 分支
+
+---
+
+## 〇·〇 当前迭代：v4.6 物理深度优化（feature/v4.6，起点 main `aaac991`）
+
+**主题**：物理 5 项深度优化（套餐 B：力学+宇宙）— 8-1 force-composition 多力合成 / 8-2 energy-conservation 摩擦耗散+能量条 / 8-3 momentum-conservation 二维碰撞+三型对比 / 8-4 gravitation 开普勒+三宇宙速度 / 8-5 fluid-dynamics 伯努利原理可视化
+
+| 版本 | commit | 内容 |
+|------|--------|------|
+| **v4.6.0-α1** | **本轮** | **物理 8-1 force-composition 升级为多力合成（2-6 力）：(i) 数据结构由 f1/f2 重构为 forces 数组 + 颜色调色板 6 色；(ii) 新增 ➕ 添加力 / ➖ 删除力（边界禁用）+ 法则切换按钮 ⛓ 多边形法（默认） / ▱ 平行四边形（仅 2 力可用）；(iii) `_drawComposition` 重写：多边形法首尾相接画虚线链 + 中间节点小圆点；平行四边形法保留双邻边对角线；每个分力从原点画箭头 + 颜色对应拖拽端点 + 角度弧（前 4 个）；合力 R = ΣF 用绿色粗箭头；R≈0 时画绿色平衡环显示"平衡"；右上角法则文字提示；(iv) `_bindMouse` 拖拽改为遍历 forces 找最近端点；(v) `_updateInfo` 加多力循环；(vi) 新增 `_addForce`/`_removeForce`/`_setCompMethod`，加力时自动找最大角度间隙避免重叠；(vii) 教学面板更新：多边形法 + 闭合多边形 = 共点力平衡 几何意义；(viii) physics.css 新增 `.fc-multiforce-toolbar/.fc-mini-btn/.fc-color-dot/.fc-force-row` 等样式；缓存 v45i→v46a** |
+
+**v4.6.0-α1 修改文件**：
+- `pages/physics/force-composition.js`：composition 模式从双力 → 多力（2-6）；保留 decomposition / incline 两模式不变
+- `pages/physics/physics.css`：新增多力工具栏与按钮样式
+- `index.html`：force-composition.js + physics.css 缓存 → v46a
+- `sw.js`：CACHE_NAME → `v20260424v46a`
+
+**待办（v4.6 剩余）**：
+- 8-2 energy-conservation 加摩擦耗散 + 实时能量条/饼图
+- 8-3 momentum-conservation 二维碰撞 + 三种碰撞型式对比
+- 8-4 gravitation 开普勒三定律 + 三宇宙速度临界轨迹
+- 8-5 fluid-dynamics 伯努利原理可视化
+
 **待办（v4.5 收尾）**：
 - 合并 feature/v4.5 的 9 个 alpha 到 main，打 v4.5.0 annotated tag
 - 详细历史保留 `legacy/v4.5-detail` 分支
