@@ -49,14 +49,6 @@ const CONFIG = {
             title: '生物实验',
             subtitle: '生命科学',
             desc: '探索生命的奥秘，从细胞结构到遗传规律，可视化理解生物学核心概念。'
-        },
-        codevis: {
-            label: '代码可视化',
-            accent: 'magenta',
-            icon: 'terminal',
-            title: '代码可视化',
-            subtitle: '逐步追踪',
-            desc: '将一段代码的执行过程逐步回放，高亮当前行、追踪变量、展示数据结构形态，让逻辑流像动画一样被看见。'
         }
     },
 
@@ -137,9 +129,6 @@ const CONFIG = {
             { id: 'cellular-respiration', title: '细胞呼吸', description: '糖酵解/柠檬酸循环/电子传递链', icon: 'flame', variant: 'featured' },
             { id: 'substance-transport', title: '物质运输', description: '自由扩散/协助扩散/主动运输/胞吞胞吐', icon: 'arrow-left-right', variant: 'featured' },
             { id: 'gene-mutation', title: '基因突变', description: '碱基替换/插入/缺失对蛋白质的影响', icon: 'alert-triangle', variant: 'featured' }
-        ],
-        codevis: [
-            { id: 'code-trace', title: '代码执行追踪', description: '逐步回放算法执行：当前行高亮 + 变量面板 + 数组动画', icon: 'play-circle', variant: 'featured' }
         ]
     },
 
@@ -149,11 +138,10 @@ const CONFIG = {
         physics: 'purple',
         chemistry: 'green',
         algorithms: 'orange',
-        biology: 'teal',
-        codevis: 'magenta'
+        biology: 'teal'
     },
 
-    // v5.0：星系拓扑 — 顶层是「多星系」选择，每个星系内含若干学科行星
+    // v5.0：星系拓扑 — 顶层是「多星系」选择，每个星系内含若干学科行星或跳转到外部子站
     galaxies: [
         {
             id: 'englab',
@@ -164,12 +152,12 @@ const CONFIG = {
             subjects: ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology']
         },
         {
-            id: 'codevis',
-            label: '代码可视化',
-            tagline: 'CODE · TRACE · GALAXY',
-            desc: '把代码运行过程当成动画看 — 当前是 Phase 1，后续将加入更多语言与数据结构',
-            color: '#ec4899',
-            subjects: ['codevis']
+            id: 'codespace',
+            label: '代码空间',
+            tagline: 'CODE · SPACE',
+            desc: 'JS · Python · C/C++ 代码执行追踪与数据结构动画（独立子站）',
+            color: '#22ff88',
+            subjects: ['codespace-viz']
         }
     ]
 };

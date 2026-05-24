@@ -1,7 +1,11 @@
 # 工科实验室 - 可视化学习平台
 
-一个基于 HTML/CSS/JavaScript 的交互式科学学习平台，提供数学、物理、化学、算法、生物五大学科共 **65 个可视化实验**，全面覆盖人教版（2019 新课标）高中必修及选择性必修核心知识点。  
+一个基于 HTML/CSS/JavaScript 的交互式科学学习平台，提供数学、物理、化学、算法、生物五大学科共 **65 个可视化实验**，全面覆盖人教版（2019 新课标）高中必修及选择性必修核心知识点；并附带独立子站 [`/codevis/`](codevis/README.md) 提供多语言代码执行追踪（JS / Python / C / C++）。  
 内置 C++ 后端服务器，支持静态文件托管和 REST API。
+
+> **当前版本**: v5.1.0（2026-04-27）  
+> **v5.1 主线**：Codevis 独立为子站 `/codevis/` + Runtime 抽象层 + JS-Interpreter / Skulpt / JSCPP 三后端手写代码沙箱  
+> **v5.0 主线**：planets 多星系顶层导航 + 全局主题系统精简（移除亮色主题）+ 入场动画 + 减动偏好降级
 
 ## 📁 项目结构
 
@@ -14,11 +18,17 @@
 │   ├── DEVELOPER_GUIDE.md  # 完整开发者文档
 │   ├── UPDATE_PLAN.md      # 后续更新计划
 │   └── DEPLOY.md           # 服务器部署文档
-├── shared/                 # 全局共享资源
+├── codevis/                # 代码可视化独立子站（v5.1 升级：独立 SPA + 多语言沙箱）
+│   ├── index.html          # 子站入口
+│   ├── shared/             # codevis 专用 css/js（与主站隔离）
+│   │   └── js/runtimes/    # JS-Interpreter / Skulpt / JSCPP 三个后端
+│   └── pages/              # home + code-trace
+├── shared/                 # 主站全局共享资源
 │   ├── css/                # 设计系统（tokens → base → components → responsive）
 │   └── js/                 # 核心框架（config / router / module-selector / main）
 ├── pages/                  # 按学科分类的实验模块
 │   ├── home/               # 首页（星空 + HUD + 卫星系统 + 加载屏）
+│   ├── planets/            # 星系大屏（v5.0 升级为多星系顶层导航）
 │   ├── mathematics/        # 数学（15 个实验）
 │   ├── physics/            # 物理（17 个实验）
 │   ├── chemistry/          # 化学（12 个实验）

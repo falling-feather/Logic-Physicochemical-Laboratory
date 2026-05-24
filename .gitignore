@@ -13,3 +13,4 @@ Thumbs.db
 *~
 # Test screenshots
 test-screenshots/
+.commit-msg-*.txt

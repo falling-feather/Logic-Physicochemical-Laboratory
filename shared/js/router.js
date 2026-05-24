@@ -134,7 +134,6 @@ const Router = {
             chemistry: 'rgba(77,158,126,0.12)',
             algorithms: 'rgba(196,121,58,0.12)',
             biology: 'rgba(58,158,143,0.12)',
-            codevis: 'rgba(236,72,153,0.12)',
             home: 'rgba(91,141,206,0.08)',
             planets: 'rgba(0,255,213,0.10)'
         };
@@ -287,7 +286,7 @@ const Router = {
         document.documentElement.setAttribute('data-theme', 'dark');
 
         // v5.0：FAB 仅在学科课程页显示，首页/多星系大屏等展示页面不显示
-        const isCoursePage = ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology', 'codevis'].includes(page);
+        const isCoursePage = ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology'].includes(page);
         if (typeof BackToTop !== 'undefined') {
             if (isCoursePage) BackToTop.show(); else BackToTop.hide();
         }

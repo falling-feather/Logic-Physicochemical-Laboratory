@@ -64,7 +64,8 @@ window.PlanetsView = {
         chemistry:   { id: 'chemistry',   label: '化学', desc: '周期表·反应·平衡·电化学·有机化学 (12 实验)', color: '#10b981' },
         algorithms:  { id: 'algorithms',  label: '算法', desc: '排序·搜索·图·动态规划·KMP (8 实验)', color: '#f59e0b' },
         biology:     { id: 'biology',     label: '生物', desc: '细胞·DNA·光合·遗传·神经免疫 (13 实验)', color: '#06b6d4' },
-        codevis:     { id: 'codevis',     label: '代码可视化', desc: '代码执行追踪 Phase 1 (1 实验)', color: '#ec4899' }
+        codevis:     { id: 'codevis',     label: '代码可视化', desc: '代码执行追踪 Phase 1 (1 实验)', color: '#ec4899' },
+        'codespace-viz': { id: 'codespace-viz', label: '可视化', desc: 'JS · Python · C/C++ 执行追踪与数据结构动画（跳转子站）', color: '#22ff88', externalUrl: 'codevis/index.html' }
     },
 
     init() {
@@ -273,11 +274,12 @@ window.PlanetsView = {
             id: g.id, label: g.label, tagline: g.tagline || '', desc: g.desc || '',
             color: g.color || '#3aa9ff',
             subjectIds: g.subjects || [],
+            externalUrl: g.externalUrl || null,
             // 均匀分布在水平平面上
             angle: N === 1 ? 0 : (i / N) * Math.PI * 2,
             phase: i * 1.13,
-            // 这个星系的“资产”数量——实验总数
-            count: (g.subjects || []).reduce((acc, sid) => {
+            // 这个星系的“资产”数量——实验总数（外链星系不计算）
+            count: g.externalUrl ? 0 : (g.subjects || []).reduce((acc, sid) => {
                 const exps = (typeof CONFIG !== 'undefined' && CONFIG.experiments && CONFIG.experiments[sid]) || [];
                 return acc + exps.length;
             }, 0)
@@ -296,6 +298,11 @@ window.PlanetsView = {
 
     _enterGalaxy(g) {
         if (!g) return;
+        // 外链星系：直接跳转到子站，不进入 galaxy 展开模式
+        if (g.externalUrl) {
+            window.location.href = g.externalUrl;
+            return;
+        }
         this.currentGalaxy = g;
         // 将子学科映射为有角度的行星
         const ids = g.subjectIds || [];
@@ -331,6 +338,11 @@ window.PlanetsView = {
     // ── v4.4 子星系：进入学科 ──
     _enterSubject(subject) {
         if (!subject) return;
+        // v5.1.1：行星带 externalUrl 时直跳子站，不进入子星系展开
+        if (subject.externalUrl) {
+            window.location.href = subject.externalUrl;
+            return;
+        }
         this.currentSubject = subject;
         this._buildSatellites(subject.id);
         this.mode = 'subject';

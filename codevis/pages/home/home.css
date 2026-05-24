@@ -1,0 +1,217 @@
+/* ============================================================
+ * Codevis · 首页样式
+ * ============================================================ */
+
+.cv-home-hero {
+    position: relative;
+    min-height: calc(100vh - 64px - 80px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 40px 24px;
+}
+
+.cv-home-hero__canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.7;
+}
+
+.cv-home-hero__content {
+    position: relative;
+    z-index: 1;
+    max-width: 760px;
+}
+
+.cv-home-hero__tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    margin-bottom: 22px;
+    border: 1px solid var(--cv-border-strong);
+    border-radius: 999px;
+    background: var(--cv-cyan-ghost);
+    font-family: var(--cv-font-mono);
+    font-size: 0.74rem;
+    color: var(--cv-cyan);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+.cv-home-hero__tag::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--cv-cyan);
+    box-shadow: 0 0 8px var(--cv-cyan);
+    animation: cvBrandPulse 2s ease-in-out infinite;
+}
+
+.cv-home-hero__title {
+    font-size: clamp(2.2rem, 5vw, 3.6rem);
+    line-height: 1.12;
+    margin: 0 0 18px;
+    background: linear-gradient(120deg, #e6f4ff 0%, #00d4ff 60%, #a78bfa 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.02em;
+}
+
+.cv-home-hero__subtitle {
+    font-size: clamp(1rem, 1.6vw, 1.15rem);
+    color: var(--cv-text-secondary);
+    max-width: 56ch;
+    margin: 0 auto 32px;
+}
+
+.cv-home-hero__actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    justify-content: center;
+}
+
+/* ─── 特性卡片 ─── */
+.cv-features {
+    margin-top: 80px;
+    margin-bottom: 60px;
+}
+
+.cv-feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 18px;
+}
+
+.cv-feature {
+    padding: 22px;
+    border-radius: var(--cv-radius-lg);
+    background: var(--cv-bg-glass);
+    border: 1px solid var(--cv-border-soft);
+    transition: all var(--cv-dur-fast) var(--cv-ease);
+    position: relative;
+    overflow: hidden;
+}
+.cv-feature::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(420px circle at var(--cv-mx, 50%) var(--cv-my, 0%), rgba(0, 212, 255, 0.12), transparent 55%);
+    opacity: 0;
+    transition: opacity var(--cv-dur-fast) var(--cv-ease);
+    pointer-events: none;
+}
+.cv-feature:hover {
+    border-color: var(--cv-cyan);
+    transform: translateY(-4px);
+    box-shadow: var(--cv-shadow-glow);
+}
+.cv-feature:hover::before { opacity: 1; }
+.cv-feature:hover .cv-feature__icon {
+    background: var(--cv-cyan);
+    color: #061018;
+    box-shadow: 0 0 16px rgba(0, 212, 255, 0.55);
+}
+
+.cv-feature__icon {
+    display: inline-flex;
+    align-items: center; justify-content: center;
+    width: 40px; height: 40px;
+    border-radius: var(--cv-radius-md);
+    background: var(--cv-cyan-ghost);
+    color: var(--cv-cyan);
+    font-family: var(--cv-font-mono);
+    font-size: 1.1rem;
+    margin-bottom: 14px;
+}
+
+.cv-feature__title {
+    font-size: 1.05rem;
+    margin: 0 0 6px;
+    color: var(--cv-text-primary);
+}
+
+.cv-feature__desc {
+    font-size: 0.9rem;
+    color: var(--cv-text-secondary);
+    margin: 0;
+    line-height: 1.55;
+}
+
+.cv-feature__tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    padding: 3px 9px;
+    border-radius: 4px;
+    background: rgba(94, 234, 212, 0.12);
+    color: var(--cv-accent-mint);
+    font-family: var(--cv-font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+}
+.cv-feature__tag::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 6px currentColor;
+    animation: cvTagPulse 1.6s ease-in-out infinite;
+}
+.cv-feature__tag--soon {
+    background: rgba(251, 191, 36, 0.12);
+    color: var(--cv-accent-amber);
+}
+.cv-feature__tag--soon::before { animation-duration: 2.4s; opacity: 0.6; }
+
+@keyframes cvTagPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.45; transform: scale(0.8); }
+}
+
+/* ─── 打字机─── */
+.cv-typewriter {
+    /* 必须 inline，避免 inline-block 切断父元素 background-clip:text 的渐变上下文 */
+    display: inline;
+    position: relative;
+    /* 让渐变文字穿透到子 span（背景不继承，需重设） */
+    background: linear-gradient(120deg, #e6f4ff 0%, #00d4ff 60%, #a78bfa 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.cv-typewriter::after {
+    content: '';
+    display: inline-block;
+    width: 3px;
+    height: 1em;
+    margin-left: 4px;
+    vertical-align: -3px;
+    background: var(--cv-cyan);
+    box-shadow: 0 0 8px var(--cv-cyan);
+    animation: cvCaretBlink 0.9s steps(1) infinite;
+}
+.cv-typewriter--no-caret::after { display: none; }
+
+@keyframes cvCaretBlink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+
+@media (max-width: 768px) {
+    .cv-home-hero { min-height: 60vh; padding: 32px 16px; }
+    .cv-features { margin-top: 48px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cv-typewriter::after { animation: none; opacity: 0.6; }
+}

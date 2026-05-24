@@ -1,12 +1,58 @@
 # 工科实验室 — 后续更新计划
 
-> **制定日期**: 2026-04-13 | **最后更新**: 2026-04-24 | **状态**: Phase 1 内容规划全部完成，进入 Phase 2 深化阶段
+> **制定日期**: 2026-04-13 | **最后更新**: 2026-04-27 | **状态**: v5.1 Codevis 子站独立化 + 多语言沙箱接入完成
 >
 > **📌 文档边界约定**（自 v4.0.4 起）：本文档仅承载 *近期已完成增量*（最近 1-2 个小版本）+ *未来更新规划*。所有历史完成的大版本（≤ v4.0.1）、阶段性实验汇总、完整 Bug 修复履历，请参阅 [`doc/have_done.md`](have_done.md)。两份文档分工：UPDATE_PLAN 面向"下一步"，have_done 面向"已沉淀"。
 
 ---
 
-## 〇、近期已完成增量（v4.5 系列，feature/v4.5 分支）
+## ★ 当前主线：v5.1 系列（main 分支，2026-04-27）
+
+**主题**：Codevis 升级为独立子站（`/codevis/`）+ 多语言代码执行沙箱（JS / Python / C / C++）
+
+| 版本 | commit | 内容 |
+|------|--------|------|
+| **v5.1.0** | (待提交) | **(i) Codevis 独立化**：新建 `codevis/` 子目录形成独立 SPA（自有 `index.html` + `shared/css|js` + `pages/home|code-trace`），用 hash 路由 `#home`/`#trace`；主站移除 `pages/codevis/` 旧目录、移除 config.js 第六学科条目，planets 顶层星系图保留两个星系入口（一个跳本站，一个跳 `../codevis/`）。**(ii) Runtime 抽象层**：新增 `codevis/shared/js/runtime.js` 提供 `CvRuntime.register(lang, backend)` / `run(lang, payload)` 统一接口，所有后端约定输出 `{ steps: [{line, vars, highlight, msg, stdout, arrOverride?}] }`。**(iii) JS 后端**：`runtime-js.js` 用 [JS-Interpreter](https://github.com/NeilFraser/JS-Interpreter) + acorn，注入 `markPtr/markSwap/markArray/snap/print` 沙箱 API，单步 step() 控制最大 maxSteps 防死循环。**(iv) Python 后端**：`runtime-py.js` 用 [Skulpt](https://skulpt.org/)，相同 API 用 `Sk.builtin.func` 注入；冒泡 23 步 / 二分 / 斐波那契均跑通。**(v) C/C++ 后端**：`runtime-cpp.js` 用 [JSCPP v2.0.9](https://github.com/felixhao28/JSCPP)（gh-pages 分支的 `dist/JSCPP.es5.min.js`），同时注册 `c`/`cpp` 两个 key；通过 `<cstdio>` + `printf("@@CV_XXX ...")` stdio 协议把标记信息传出，runtime 拦截 `config.stdio.write` 并解析 `@@CV_PTR/SWAP/ARR/SNAP`。**(vi) UI 升级**：code-trace 页面新增语言选择（JS/Python/C++/C/Java[占位]）+ 示例选择（bubble/binsearch/fib）+ 可编辑代码区（textarea），末尾自动补一帧 final 捕获最后一次 mark 之后的 stdout/snap。**(vii) 文档**：codevis/README.md 罗列 Phase 1/2/3 与三语 API 对照表。|
+
+**v5.1.0 关键技术备忘**：
+- **JSCPP CDN**：npm 包不含 `dist/`，必须用 `cdn.jsdelivr.net/gh/felixhao28/JSCPP@gh-pages/dist/JSCPP.es5.min.js`
+- **JSCPP 限制**：不支持 namespace（`std::cout` 直接挂解析）、不支持 class/OOP/goto/多文件；prelude 必须用 `<cstdio>` + `printf`，用户代码可用 `using namespace std;` + `cout`
+- **stdio 协议**：标记函数走 stdout，runtime 按行分流 — 以 `@@CV_` 开头的去推快照，其余进 stdout 面板
+- **追加 final 帧**：JSCPP 没有原生 step 钩子，最后一次 markPtr 之后的 `cout`/`snap` 必须在 run 结束后比较 stdout/lastVars 长度，超出则补一帧
+
+**v5.1.0 修改文件**（预计）：
+- 新增：`codevis/index.html`、`codevis/shared/{css,js}/**`、`codevis/pages/{home,code-trace}/**`、`codevis/shared/js/runtimes/runtime-{js,py,cpp}.js`
+- 删除：`pages/codevis/` 旧目录
+- 修改：`shared/js/config.js`（移除第六学科）、`pages/planets/planets.js`（galaxy 跳转目标）、主站 `index.html`（移除 codevis section/script 引用）、`sw.js`（更新缓存清单）
+
+**待办（v5.1 收尾）**：
+- 评估是否新增 C++ 链表/树遍历样例（与 Phase 3 数据结构画布同步）
+- Java 后端候选：[CheerpJ 3.0](https://labs.leaningtech.com/cheerpj3)（WASM 1.4MB+，需要 Java class 字节码）或 [doppio](https://github.com/plasma-umass/doppio)（弃维），暂定搁置
+
+---
+
+## ☆ 上一主线：v5.0 系列（main 分支，2026-04-26）
+
+**主题**：第六学科 `codevis`（代码可视化）首次落地 + planets 多星系顶层导航 + 全局主题系统精简 + UI/UX 打磨
+
+| 版本 | commit | 内容 |
+|------|--------|------|
+| v5.0.0 | （未单独打标，纳入 v5.0.1 同提交）| **(i) 新学科 codevis**：新增 `pages/codevis/` 目录（codevis.css + code-trace.js 首个实验「代码执行追踪」），shared/js/config.js 注册第六学科 `#ec4899` 粉色 + 1 个实验条目；router.js 增加 codevis init/destroy 分支；fab-trigger/scroll-animations/module-selector 扩展到 6 学科；index.html 加 `<section data-module>` + `<script>` 引用。**(ii) planets 多星系**：planets.js 重构为三段式导航 `mode: 'galaxies' \| 'galaxy' \| 'subject'`，galaxies 顶层渲染 2 个螺旋星系（"工科实验室"蓝色 + "代码可视化"粉色），按 `_galaxyPos` 在 1.5 半径环上排布；新增 `_enterGalaxy`/`_exitGalaxy`/`tG` 缓动；`_drawSpiralGalaxy` 拆分 Body+Label 两趟绘制避免标签互相遮挡。**(iii) 主题系统精简**：移除亮色主题（`shared/js/theme-switch.js` 整文件删除 + `tokens.css` `html[data-theme="light"]` 段删除 + `navbar.css` `.theme-toggle/.theme-fab` 段删除 + `fab-trigger.css` 4 FAB 缩为 3 FAB 重新计算偏移 + `index.html` inline theme bootstrapper 删除 + `sw.js` 缓存条目删除）。**(iv) UI 清理**：FAB 仅在 6 个课程页显示（router 内 `isCoursePage` 白名单），首页/星系图不显示；FAB 角标改动态计数（_refreshBadge 按 DOM 实查）。**(v) 全局搜索修复**：global-search.js 拆 `init()`/`_ensureDom()`，overlay DOM 查询延迟到 open()，避开 main.js 早于 HTML overlay 执行的时序问题 |
+| v5.0.1 | `5d74473` | **planets v5.0 打磨**：(i) 顶层星系**错峰入场动画**——每个星系延迟 0.18s + ease-out cubic + 0.55× → 1.0× 缩放，1400ms 内完成；状态新增 `tEnter`/`enterStart`，loop 中以 `(t - enterStart) / 1400` 推进；`_drawSpiralGalaxyBody` 接 `enter` 参数缩放 `scaleK = 0.55 + 0.45*enter`。(ii) **chrome 错峰淡入**——`.planets-entering` 类触发 `planetsChromeIn` keyframe，标题 0.10s → HUD 4 角 0.25/0.30/0.40/0.45s → 返回键 0.55s 按序淡入。(iii) **顶部导航栏遮挡修复**——`router.js init()` 阶段补充 `navbar--hidden/transparent` 切换（之前只有 navigateTo 切换，直刷 #planets 时 HTML 默认 `navbar--transparent` 不会被替换，导致顶栏与"多星系导航"标题重叠）。(iv) **减动偏好降级**——`prefers-reduced-motion: reduce` 时 tEnter 立即为 1，`.planets-entering` 不挂，CSS 同时兜底 `animation: none` + 禁 `.blink` + 禁 entry 圆点闪烁。(v) **移动端布局**——`@media (max-width: 768px)` 扩展：HUD 4 角内移到 12-14px + 字号 0.62rem、信息卡变底部贯通条（左右各 12px）+ 上下滑入过渡、返回键缩小、标题/副标题字距收紧 |
+
+**v5.0.1 修改文件**（17 个，+1304 / -425）：
+- 新增：`pages/codevis/code-trace.js`、`pages/codevis/codevis.css`
+- 删除：`shared/js/theme-switch.js`
+- 修改：`index.html`、`pages/planets/planets.{css,js}`、`shared/css/{fab-trigger,navbar,tokens}.css`、`shared/js/{config,fab-trigger,global-search,main,module-selector,router,scroll-animations}.js`、`sw.js`
+
+**待办（v5.0 收尾）**：
+- 推送 `git push origin main && git push origin v5.0.1`（用户暂未推送）
+- 评估是否需要进一步打磨：进入星系时的过渡闪光/吐字提示、多星系顶层连线/星云粒子点缀
+- 若决定走规范分支管理，可补建 `feature/v5.0` 反推（次优先级）
+
+---
+
+## 〇、历史增量（v4.5 系列，feature/v4.5 分支）
 
 | 微版本 | 提交 | 内容 |
 | ------ | ---- | ---- |

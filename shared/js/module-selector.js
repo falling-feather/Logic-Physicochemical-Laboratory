@@ -10,7 +10,7 @@ const ModuleSelector = {
     _swipeBackCtrls: {}, // { pageName: SwipeBack controller }
 
     init() {
-        const pages = ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology', 'codevis'];
+        const pages = ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology'];
         pages.forEach(page => {
             const pageEl = document.getElementById(`page-${page}`);
             if (!pageEl) return;
@@ -405,7 +405,6 @@ const ModuleSelector = {
             'neural-regulation': () => { if (typeof initNeuralReg === 'function') initNeuralReg(); },
             'immune-system': () => { if (typeof initImmuneSystem === 'function') initImmuneSystem(); },
             'ecosystem': () => { if (typeof initEcosystem === 'function') initEcosystem(); },
-            'code-trace': () => { if (typeof initCodeTrace === 'function') initCodeTrace(); },
         };
 
         const initFn = initMap[moduleId];
