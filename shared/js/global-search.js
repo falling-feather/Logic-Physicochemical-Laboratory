@@ -13,12 +13,9 @@ const GlobalSearch = {
     _trigger: null,
 
     init() {
-        this.overlay = document.getElementById('global-search-overlay');
-        if (!this.overlay) return; // HTML 未注入则跳过
-        this.input = this.overlay.querySelector('.gsearch__input');
-        this.list = this.overlay.querySelector('.gsearch__list');
+        // v5.0：HTML 中的 #global-search-overlay 位于 main.js 之后才被解析，
+        // 因此这里只挂全局事件 & 触发按钮；overlay/input/list 的查找延迟到 _ensureDom()。
         this._trigger = document.getElementById('nav-search-trigger');
-        this._buildIndex();
 
         // 绑定触发按钮
         if (this._trigger) this._trigger.addEventListener('click', () => this.open());
@@ -37,6 +34,14 @@ const GlobalSearch = {
                 else this._activate();
             }
         });
+    },
+
+    _ensureDom() {
+        if (this.overlay) return true;
+        this.overlay = document.getElementById('global-search-overlay');
+        if (!this.overlay) return false;
+        this.input = this.overlay.querySelector('.gsearch__input');
+        this.list = this.overlay.querySelector('.gsearch__list');
         // 点击遮罩关闭
         this.overlay.addEventListener('click', (e) => {
             if (e.target === this.overlay) this.close();
@@ -60,6 +65,7 @@ const GlobalSearch = {
                 this._highlight();
             }
         });
+        return true;
     },
 
     _buildIndex() {
@@ -86,17 +92,23 @@ const GlobalSearch = {
 
     _accentColor(accent) {
         switch (accent) {
-            case 'blue':   return '#3aa9ff';
-            case 'purple': return '#a98aff';
-            case 'green':  return '#4ade80';
-            case 'orange': return '#fb923c';
-            case 'teal':   return '#2dd4bf';
-            default:       return '#3aa9ff';
+            case 'blue':    return '#3aa9ff';
+            case 'purple':  return '#a98aff';
+            case 'green':   return '#4ade80';
+            case 'orange':  return '#fb923c';
+            case 'teal':    return '#2dd4bf';
+            case 'magenta': return '#ec4899';
+            case 'pink':    return '#ec4899';
+            default:        return '#3aa9ff';
         }
     },
 
     open() {
         if (this.isOpen) return;
+        // 防御：HTML 在 main.js 之后才解析，因此 init() 不会找到 overlay，需在此惰性查找
+        if (!this._ensureDom()) return;
+        // 防御：CONFIG 可能在 init() 后才完全可用，或被动态扩充（如 v5.0 加入 codevis）
+        if (!this.items.length) this._buildIndex();
         this.isOpen = true;
         this.overlay.classList.add('gsearch--visible');
         this.input.value = '';
@@ -163,7 +175,9 @@ const GlobalSearch = {
             </button>`;
         }).join('');
         this.list.innerHTML = html;
-        if (typeof lucide !== 'undefined') lucide.createIcons({ nameAttr: 'data-lucide', attrs: {} });
+        if (typeof lucide !== 'undefined') {
+            try { lucide.createIcons(); } catch (e) { /* lucide 版本差异容错 */ }
+        }
         this._highlight();
     },
 

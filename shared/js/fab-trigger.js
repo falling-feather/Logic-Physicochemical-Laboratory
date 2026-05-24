@@ -23,7 +23,7 @@
             btn.className = 'fab-trigger';
             btn.setAttribute('aria-label', '展开/收起浮动按钮');
             btn.setAttribute('data-tip', '更多操作');
-            btn.innerHTML = '<i class="fab-trigger-icon fab-trigger-icon--menu" data-lucide="more-vertical"></i><i class="fab-trigger-icon fab-trigger-icon--close" data-lucide="x"></i><span class="fab-trigger-badge" aria-hidden="true">4</span>';
+            btn.innerHTML = '<i class="fab-trigger-icon fab-trigger-icon--menu" data-lucide="more-vertical"></i><i class="fab-trigger-icon fab-trigger-icon--close" data-lucide="x"></i><span class="fab-trigger-badge" aria-hidden="true">0</span>';
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.toggle();
@@ -36,6 +36,20 @@
             document.body.appendChild(btn);
             this._btn = btn;
             if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [btn] });
+
+            // v5.0：徒章根据实际存在的 FAB 数量动态更新，延迟等其他模块创建完成
+            this._refreshBadge = () => {
+                if (!this._btn) return;
+                const badge = this._btn.querySelector('.fab-trigger-badge');
+                if (!badge) return;
+                const count = document.querySelectorAll(
+                    '.favorite-fab, .experiment-guide-help-btn, .back-to-top-fab, .experiment-export-btn'
+                ).length;
+                badge.textContent = String(count);
+                badge.style.display = count > 0 ? '' : 'none';
+            };
+            setTimeout(this._refreshBadge, 300);
+            setTimeout(this._refreshBadge, 1200);
 
             // v4.2.27：创建半透明遮罩（默认隐藏）
             const scrim = document.createElement('div');
@@ -95,7 +109,6 @@
                 const t = e.target;
                 if (!t || !t.closest) return;
                 if (t.closest('.fab-trigger') ||
-                    t.closest('.theme-fab') ||
                     t.closest('.favorite-fab') ||
                     t.closest('.experiment-guide-help-btn') ||
                     t.closest('.back-to-top-fab') ||
@@ -161,6 +174,8 @@
             this._expanded = true;
             document.body.setAttribute('data-fab-expanded', 'true');
             document.body.removeAttribute('data-fab-collapsing');
+            // v5.0：展开前再次刷新徒章数量，保证与实际弹出的 FAB 匹配
+            if (this._refreshBadge) this._refreshBadge();
             if (this._btn) {
                 this._btn.classList.toggle('fab-trigger--open', this._expanded);
                 this._btn.setAttribute('data-tip', this._expanded ? '收起菜单' : '更多操作');

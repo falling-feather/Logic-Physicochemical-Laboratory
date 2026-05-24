@@ -269,10 +269,9 @@ body[data-fab-expanded="false"] .fab-trace .fab-trace-line { transition: stroke-
 }
 
 /* ── 折叠/展开状态：控制 4 个功能 FAB 的可见性 ── */
-/* v4.2.43：纳入 .experiment-export-btn 作为第 5 个 FAB（遵循同样的隐藏与动画规则） */
+/* v5.0：移除 theme-fab；剩 4 个：导出 / 返回顶部 / 收藏 / 帮助 */
 body[data-fab-expanded="false"] .experiment-guide-help-btn,
 body[data-fab-expanded="false"] .favorite-fab,
-body[data-fab-expanded="false"] .theme-fab,
 body[data-fab-expanded="false"] .back-to-top-fab,
 body[data-fab-expanded="false"] .experiment-export-btn {
     opacity: 0 !important;
@@ -283,7 +282,6 @@ body[data-fab-expanded="false"] .experiment-export-btn {
 
 body[data-fab-expanded="true"] .experiment-guide-help-btn,
 body[data-fab-expanded="true"] .favorite-fab,
-body[data-fab-expanded="true"] .theme-fab,
 body[data-fab-expanded="true"] .back-to-top-fab,
 body[data-fab-expanded="true"] .experiment-export-btn {
     transition: opacity 0.28s ease,
@@ -292,16 +290,13 @@ body[data-fab-expanded="true"] .experiment-export-btn {
                 right 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* 错峰飞入：从下到上依次出现（v4.2.43 加入 export 作为第 5 项 0.20s） */
+/* 错峰飞入：从下到上依次出现（4 项） */
 body[data-fab-expanded="true"] .experiment-guide-help-btn { transition-delay: 0.00s; }
 body[data-fab-expanded="true"] .favorite-fab               { transition-delay: 0.05s; }
-body[data-fab-expanded="true"] .theme-fab                  { transition-delay: 0.10s; }
-body[data-fab-expanded="true"] .back-to-top-fab            { transition-delay: 0.15s; }
-body[data-fab-expanded="true"] .experiment-export-btn      { transition-delay: 0.20s; }
+body[data-fab-expanded="true"] .back-to-top-fab            { transition-delay: 0.10s; }
+body[data-fab-expanded="true"] .experiment-export-btn      { transition-delay: 0.15s; }
 
-/* v4.3.0：垂直堆叠布局（自下而上：导出 → 返回顶部 → 主题 → 收藏 → 帮助）
-   全部右对齐到主控按钮中线（right: 22px ≈ 主控 44px 居中），不再做扇形展开。
-   每个 FAB 间距 12px，主控按钮位于最底部。 */
+/* v5.0：垂直堆叠布局（4 个功能 FAB，主控在最底） */
 body[data-fab-expanded="true"] .experiment-export-btn {
     bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
     right: 24px !important;
@@ -310,21 +305,16 @@ body[data-fab-expanded="true"] .back-to-top-fab {
     bottom: calc(124px + env(safe-area-inset-bottom, 0px)) !important;
     right: 22px !important;
 }
-body[data-fab-expanded="true"] .theme-fab {
+body[data-fab-expanded="true"] .favorite-fab {
     bottom: calc(176px + env(safe-area-inset-bottom, 0px)) !important;
     right: 22px !important;
 }
-body[data-fab-expanded="true"] .favorite-fab {
+body[data-fab-expanded="true"] .experiment-guide-help-btn {
     bottom: calc(228px + env(safe-area-inset-bottom, 0px)) !important;
     right: 22px !important;
 }
-body[data-fab-expanded="true"] .experiment-guide-help-btn {
-    bottom: calc(280px + env(safe-area-inset-bottom, 0px)) !important;
-    right: 22px !important;
-}
 
-/* v4.3.0：tooltip 一律放在按钮左侧、垂直居中，统一抬升与样式 */
-body[data-fab-expanded="true"] .theme-fab[data-tip]::after,
+/* v5.0：tooltip 在展开时一律放在按钮左侧 */
 body[data-fab-expanded="true"] .favorite-fab[data-tip]::after,
 body[data-fab-expanded="true"] .experiment-guide-help-btn[data-tip]::after,
 body[data-fab-expanded="true"] .back-to-top-fab[data-tip]::after,
@@ -339,13 +329,11 @@ body[data-fab-expanded="true"] .experiment-export-btn[data-tip]::after {
 }
 body[data-fab-expanded="true"] .experiment-guide-help-btn[data-tip]::after { transition-delay: 0.05s; }
 body[data-fab-expanded="true"] .favorite-fab[data-tip]::after              { transition-delay: 0.10s; }
-body[data-fab-expanded="true"] .theme-fab[data-tip]::after                 { transition-delay: 0.15s; }
-body[data-fab-expanded="true"] .back-to-top-fab[data-tip]::after           { transition-delay: 0.20s; }
-body[data-fab-expanded="true"] .experiment-export-btn[data-tip]::after     { transition-delay: 0.25s; }
+body[data-fab-expanded="true"] .back-to-top-fab[data-tip]::after           { transition-delay: 0.15s; }
+body[data-fab-expanded="true"] .experiment-export-btn[data-tip]::after     { transition-delay: 0.20s; }
 
-/* v4.3.0：键盘聚焦环统一蓝色 */
+/* 键盘聚焦环统一蓝色 */
 .fab-trigger:focus-visible,
-.theme-fab:focus-visible,
 .favorite-fab:focus-visible,
 .back-to-top-fab:focus-visible,
 .experiment-guide-help-btn:focus-visible,
@@ -354,13 +342,11 @@ body[data-fab-expanded="true"] .experiment-export-btn[data-tip]::after     { tra
     outline-offset: 3px;
 }
 
-/* v4.2.33：收起时反向错峰（远端先归位 → 近端最后） */
-/* v4.2.33：收起时反向错峰（远端先归位 → 近端最后；v4.2.43 加入 export 作为最远端） */
+/* 收起时反向错峰（远端先归位 → 近端最后） */
 body[data-fab-collapsing="true"] .experiment-export-btn      { transition-delay: 0.00s; }
 body[data-fab-collapsing="true"] .back-to-top-fab            { transition-delay: 0.05s; }
-body[data-fab-collapsing="true"] .theme-fab                  { transition-delay: 0.10s; }
-body[data-fab-collapsing="true"] .favorite-fab               { transition-delay: 0.15s; }
-body[data-fab-collapsing="true"] .experiment-guide-help-btn  { transition-delay: 0.20s; }
+body[data-fab-collapsing="true"] .favorite-fab               { transition-delay: 0.10s; }
+body[data-fab-collapsing="true"] .experiment-guide-help-btn  { transition-delay: 0.15s; }
 
 @media (max-width: 768px) {
     .fab-trigger {
@@ -373,7 +359,7 @@ body[data-fab-collapsing="true"] .experiment-guide-help-btn  { transition-delay:
     .fab-trigger .fab-trigger-icon { width: 18px; height: 18px; margin: -9px 0 0 -9px; }
     .fab-trigger[data-tip]::after { display: none; }
 
-    /* v4.3.0：移动端的垂直堆叠间距收紧（主控 16+40+8 = 64 起步，10px 间距） */
+    /* v5.0：移动端 4 个 FAB 间距收紧 */
     body[data-fab-expanded="true"] .experiment-export-btn {
         bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
         right: 18px !important;
@@ -382,16 +368,12 @@ body[data-fab-collapsing="true"] .experiment-guide-help-btn  { transition-delay:
         bottom: calc(106px + env(safe-area-inset-bottom, 0px)) !important;
         right: 18px !important;
     }
-    body[data-fab-expanded="true"] .theme-fab {
+    body[data-fab-expanded="true"] .favorite-fab {
         bottom: calc(152px + env(safe-area-inset-bottom, 0px)) !important;
         right: 18px !important;
     }
-    body[data-fab-expanded="true"] .favorite-fab {
-        bottom: calc(198px + env(safe-area-inset-bottom, 0px)) !important;
-        right: 18px !important;
-    }
     body[data-fab-expanded="true"] .experiment-guide-help-btn {
-        bottom: calc(244px + env(safe-area-inset-bottom, 0px)) !important;
+        bottom: calc(198px + env(safe-area-inset-bottom, 0px)) !important;
         right: 18px !important;
     }
 }

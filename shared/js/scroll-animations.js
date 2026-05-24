@@ -135,7 +135,8 @@ function initHeroVisual(page) {
         physics: () => drawWaveInterference(ctx, w, h),
         chemistry: () => drawMolecule(ctx, w, h),
         algorithms: () => drawSortBars(ctx, w, h),
-        biology: () => drawDNAHelix(ctx, w, h)
+        biology: () => drawDNAHelix(ctx, w, h),
+        codevis: () => drawCodeRain(ctx, w, h)
     };
 
     if (visuals[page]) visuals[page]();
@@ -317,6 +318,36 @@ function drawSortBars(ctx, w, h) {
 window.initScrollAnimations = initScrollAnimations;
 window.initPageScrollAnimations = initPageScrollAnimations;
 window.initHeroVisual = initHeroVisual;
+
+// ── Code Rain for CodeVis (Matrix-style 字符雨, magenta 配色) ──
+function drawCodeRain(ctx, w, h) {
+    const fontSize = 14;
+    const cols = Math.floor(w / fontSize);
+    const drops = new Array(cols).fill(0).map(() => Math.random() * h);
+    const chars = '01{}[]<>;=+-*/_abcdefghijklmnopqrstuvwxyz';
+    let t = 0;
+    function draw() {
+        // 半透明遮罩制造拖尾
+        ctx.fillStyle = 'rgba(8, 4, 18, 0.18)';
+        ctx.fillRect(0, 0, w, h);
+        ctx.font = `${fontSize}px var(--font-mono, monospace)`;
+        for (let i = 0; i < cols; i++) {
+            const ch = chars[Math.floor(Math.random() * chars.length)];
+            const x = i * fontSize;
+            const y = drops[i];
+            // 头部亮粉，尾部暗紫
+            ctx.fillStyle = `rgba(236, 72, 153, ${0.85})`;
+            ctx.fillText(ch, x, y);
+            ctx.fillStyle = `rgba(168, 85, 247, 0.35)`;
+            ctx.fillText(ch, x, y - fontSize);
+            drops[i] += fontSize * 0.6;
+            if (drops[i] > h + Math.random() * 60) drops[i] = -Math.random() * 100;
+        }
+        t += 0.016;
+        requestAnimationFrame(draw);
+    }
+    draw();
+}
 
 // ── DNA double helix for Biology ──
 function drawDNAHelix(ctx, w, h) {

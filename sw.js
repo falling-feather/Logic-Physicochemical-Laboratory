@@ -5,7 +5,6 @@ const APP_SHELL = [
   './shared/js/lucide.min.js?v=20260417c',
   './shared/js/config.js?v=20260418q',
   './shared/js/learning-progress.js?v=20260422a',
-  './shared/js/theme-switch.js?v=20260423q',
   './shared/js/back-to-top.js?v=20260424rr',
   './shared/js/fab-trigger.js?v=20260424oo',
   './shared/js/touch-gestures.js?v=20260418a',

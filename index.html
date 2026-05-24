@@ -5,10 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="工科实验室 - 交互式可视化科学学习平台，涵盖数学、物理、化学、算法与生物">
     <meta name="theme-color" content="#08090e">
-    <!-- X-03: Apply saved theme before first paint to prevent flash -->
-    <script>
-        (function(){var t=localStorage.getItem('englab-theme');if(!t){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t);if(t==='light')document.querySelector('meta[name=theme-color]').content='#f5f6fa'})();
-    </script>
     <title>工科实验室 - 可视化学习平台</title>
     <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48" type="image/x-icon">
     <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
@@ -49,6 +45,7 @@
     <link rel="stylesheet" href="pages/chemistry/chemistry.css?v=20260424v45i">
     <link rel="stylesheet" href="pages/algorithms/algorithms.css?v=20260417d">
     <link rel="stylesheet" href="pages/biology/biology.css?v=20260417d">
+    <link rel="stylesheet" href="pages/codevis/codevis.css?v=20260524a">
     <!-- v4.5-α1 全局搜索 -->
     <link rel="stylesheet" href="shared/css/global-search.css?v=20260424v45b">
     <!-- v4.5-α3 相关实验推荐 -->
@@ -132,10 +129,6 @@
                     <i data-lucide="home"></i>
                     <span>首页</span>
                 </a>
-                <a href="#planets" class="nav-item nav-item--galaxy" data-page="planets" title="星系目录大屏">
-                    <i data-lucide="orbit"></i>
-                    <span>星系</span>
-                </a>
                 <a href="#mathematics" class="nav-item" data-page="mathematics">
                     <i data-lucide="calculator"></i>
                     <span>数学</span>
@@ -155,6 +148,10 @@
                 <a href="#biology" class="nav-item" data-page="biology">
                     <i data-lucide="leaf"></i>
                     <span>生物</span>
+                </a>
+                <a href="#codevis" class="nav-item" data-page="codevis">
+                    <i data-lucide="terminal"></i>
+                    <span>代码</span>
                 </a>
                 <button type="button" id="nav-search-trigger" aria-label="全局搜索实验" title="搜索实验 (Ctrl+K 或 /)">
                     <i data-lucide="search"></i>
@@ -225,7 +222,7 @@
                     <div class="tagline-cursor"></div>
                 </div>
 
-                <a href="#planets" class="home-galaxy-cta" data-page="planets" aria-label="进入星系目录大屏">
+                <a href="#planets" class="home-galaxy-cta" data-page="planets" aria-label="进入星系目录大屏" hidden style="display:none">
                     <span class="home-galaxy-cta__icon" aria-hidden="true">
                         <i data-lucide="orbit"></i>
                     </span>
@@ -2719,6 +2716,75 @@
                 <div class="bento-grid" id="biology-experiments"></div>
             </div>
         </section>
+
+        <!-- ────────── CODE VISUALIZATION (v5.0 新星系：代码可视化) ────────── -->
+        <section id="page-codevis" class="page" aria-label="代码可视化">
+            <div class="page-hero page-hero--magenta">
+                <div class="page-hero__text">
+                    <span class="page-hero__label page-hero__label--magenta">Code Visualization</span>
+                    <h1 class="page-hero__title">代码可视化</h1>
+                    <p class="page-hero__desc">把一段代码的执行过程逐步回放：当前行高亮、变量面板、数组与节点图实时同步。Phase 1 提供「代码执行追踪」演示，后续将加入更多语言与数据结构。</p>
+                </div>
+                <div class="page-hero__visual">
+                    <canvas id="hero-canvas-codevis" class="page-hero__canvas" role="img" aria-label="代码可视化装饰动画"></canvas>
+                </div>
+            </div>
+
+            <div class="content-section" data-module="code-trace">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>代码执行追踪 · Bubble Sort</h2>
+                        <p>选一段算法，按下播放，逐步观察当前行、变量变化与数组动画</p>
+                    </div>
+                    <div id="code-trace-root" class="code-trace-root">
+                        <div class="code-trace-controls">
+                            <label class="code-trace-field">
+                                <span>示例</span>
+                                <select id="code-trace-sample" aria-label="选择代码示例">
+                                    <option value="bubble">冒泡排序 (Python-like)</option>
+                                    <option value="binsearch">二分查找 (Python-like)</option>
+                                    <option value="fib">斐波那契递归 (Python-like)</option>
+                                </select>
+                            </label>
+                            <button type="button" id="code-trace-prev" class="btn btn--ghost btn--sm">◀ 上一步</button>
+                            <button type="button" id="code-trace-play" class="btn btn--primary btn--sm">▶ 播放</button>
+                            <button type="button" id="code-trace-next" class="btn btn--ghost btn--sm">下一步 ▶</button>
+                            <label class="code-trace-field">
+                                <span>速度</span>
+                                <select id="code-trace-speed" aria-label="播放速度">
+                                    <option value="900">慢</option>
+                                    <option value="450" selected>正常</option>
+                                    <option value="200">快</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div class="code-trace-grid">
+                            <div class="code-trace-panel code-trace-panel--code">
+                                <div class="code-trace-panel__title">SOURCE · 高亮当前行</div>
+                                <pre id="code-trace-source" class="code-trace-source" aria-live="polite"></pre>
+                            </div>
+                            <div class="code-trace-panel code-trace-panel--vars">
+                                <div class="code-trace-panel__title">VARIABLES · 红色 = 本步变化</div>
+                                <div id="code-trace-vars" class="code-trace-vars"></div>
+                            </div>
+                            <div class="code-trace-panel code-trace-panel--array">
+                                <div class="code-trace-panel__title">ARRAY · 数组可视化</div>
+                                <div id="code-trace-array" class="code-trace-array"></div>
+                            </div>
+                            <div class="code-trace-panel code-trace-panel--stdout">
+                                <div class="code-trace-panel__title">STDOUT · 标准输出</div>
+                                <pre id="code-trace-stdout" class="code-trace-stdout"></pre>
+                            </div>
+                        </div>
+                        <div class="code-trace-seek">
+                            <input type="range" id="code-trace-seek" min="0" max="0" value="0" step="1" aria-label="跳转步骤">
+                            <span id="code-trace-step-label" class="code-trace-step-label">0 / 0</span>
+                        </div>
+                        <p class="code-trace-hint">设计灵感来自姐妹项目 <code>代码可视化设计</code>。当前为纯前端模拟：trace 在 JS 中预先生成；下一阶段计划接入 Pyodide 真正运行 Python。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- ═══════════════ Element Detail Panel ═══════════════ -->
@@ -2809,7 +2875,6 @@
     <!-- Application Scripts: Shared -->
     <script src="shared/js/config.js?v=20260418p"></script>
     <script src="shared/js/learning-progress.js?v=20260422a"></script>
-    <script src="shared/js/theme-switch.js?v=20260423q"></script>
     <script src="shared/js/back-to-top.js?v=20260424rr"></script>
     <script src="shared/js/fab-trigger.js?v=20260424oo"></script>
     <script src="shared/js/touch-gestures.js?v=20260418a"></script>
@@ -2901,6 +2966,7 @@
     <script defer src="pages/biology/cellular-respiration.js?v=20260423a"></script>
     <script defer src="pages/biology/substance-transport.js?v=20260416b"></script>
     <script defer src="pages/biology/gene-mutation.js?v=20260416b"></script>
+    <script defer src="pages/codevis/code-trace.js?v=20260524a"></script>
 
     <!-- v4.5-α1 全局搜索浮层 -->
     <div class="gsearch-overlay" id="global-search-overlay" role="dialog" aria-modal="true" aria-label="全局实验搜索">

@@ -53,6 +53,34 @@
     50% { opacity: 0.25; }
 }
 
+/* v5.0：chrome 错峰入场动画（HUD / 标题 / 返回键） */
+@keyframes planetsChromeIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: var(--planets-chrome-opacity, 1); transform: translateY(0); }
+}
+#page-planets.planets-entering .planets-title { animation: planetsChromeIn 0.7s ease-out 0.10s both; }
+#page-planets.planets-entering .planets-hud--tl { animation: planetsChromeIn 0.7s ease-out 0.25s both; --planets-chrome-opacity: 0.7; }
+#page-planets.planets-entering .planets-hud--tr { animation: planetsChromeIn 0.7s ease-out 0.30s both; --planets-chrome-opacity: 0.7; }
+#page-planets.planets-entering .planets-hud--bl { animation: planetsChromeIn 0.7s ease-out 0.40s both; --planets-chrome-opacity: 0.7; }
+#page-planets.planets-entering .planets-hud--br { animation: planetsChromeIn 0.7s ease-out 0.45s both; --planets-chrome-opacity: 0.7; }
+#page-planets.planets-entering .planets-back { animation: planetsChromeIn 0.7s ease-out 0.55s both; }
+
+/* v5.0：减动偏好——跳过 chrome 入场动画与闪烁黄点 */
+@media (prefers-reduced-motion: reduce) {
+    #page-planets.planets-entering .planets-title,
+    #page-planets.planets-entering .planets-hud--tl,
+    #page-planets.planets-entering .planets-hud--tr,
+    #page-planets.planets-entering .planets-hud--bl,
+    #page-planets.planets-entering .planets-hud--br,
+    #page-planets.planets-entering .planets-back {
+        animation: none !important;
+        opacity: var(--planets-chrome-opacity, 1);
+        transform: none;
+    }
+    #page-planets .planets-hud .blink { animation: none; }
+    .planets-entry::before { animation: none; }
+}
+
 /* 标题 + 提示 */
 #page-planets .planets-title {
     position: fixed;
@@ -109,6 +137,22 @@
 #page-planets .planets-crumb--root:focus-visible {
     color: #3aa9ff;
     text-shadow: 0 0 12px rgba(58,169,255,0.75);
+    outline: none;
+}
+
+#page-planets .planets-crumb--galaxy {
+    cursor: pointer;
+    color: rgba(190, 220, 255, 0.95);
+    background: transparent;
+    border: 0;
+    font: inherit;
+    padding: 4px 6px;
+}
+
+#page-planets .planets-crumb--galaxy:hover,
+#page-planets .planets-crumb--galaxy:focus-visible {
+    color: #ffffff;
+    text-shadow: 0 0 12px rgba(255,255,255,0.6);
     outline: none;
 }
 
@@ -266,16 +310,37 @@
         font-size: 1.1rem;
         letter-spacing: 0.3em;
     }
-    #page-planets .planets-info {
-        right: 16px;
-        left: 16px;
-        bottom: 16px;
-        min-width: 0;
+    #page-planets .planets-subtitle {
+        font-size: 0.62rem;
+        letter-spacing: 0.22em;
     }
+    #page-planets .planets-hud {
+        font-size: 0.62rem;
+        letter-spacing: 0.08em;
+        line-height: 1.5;
+        opacity: 0.6;
+    }
+    #page-planets .planets-hud--tl { top: 68px; left: 12px; }
+    #page-planets .planets-hud--tr { top: 68px; right: 12px; }
+    #page-planets .planets-hud--bl { bottom: 14px; left: 12px; }
+    #page-planets .planets-hud--br { bottom: 14px; right: 12px; }
+    #page-planets .planets-info {
+        right: 12px;
+        left: 12px;
+        bottom: 12px;
+        min-width: 0;
+        padding: 12px 14px;
+        transform: translateY(20px);
+    }
+    #page-planets .planets-info--visible {
+        transform: translateY(0);
+    }
+    #page-planets .planets-info__name { font-size: 1.15rem; }
+    #page-planets .planets-info__desc { font-size: 0.72rem; }
     #page-planets .planets-back {
-        top: 16px;
-        left: 16px;
-        font-size: 0.7rem;
+        top: 12px;
+        left: 12px;
+        font-size: 0.68rem;
         padding: 6px 12px;
     }
     .planets-entry {

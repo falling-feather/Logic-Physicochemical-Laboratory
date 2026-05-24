@@ -27,8 +27,7 @@ function initApp() {
     // 1e. Initialize learning progress system (X-01)
     if (typeof LearningProgress !== 'undefined') LearningProgress.init();
 
-    // 1f. Initialize theme switch (X-03)
-    if (typeof ThemeSwitch !== 'undefined') ThemeSwitch.init();
+    // 1f. v5.0: theme switch 已移除（仅保留暗色主题）
 
     // 1g. Initialize global search (v4.5-α1)
     if (typeof GlobalSearch !== 'undefined') GlobalSearch.init();

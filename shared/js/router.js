@@ -56,6 +56,13 @@ const Router = {
         // in HTML, so initHome() was never called on first load — causing the
         // satellite animation to never start until a re-navigation.
         this._initialEnterFired = true;
+        // v5.0：初次加载（特别是直接进入 #planets）也需要同步导航栏可见性，
+        //       否则 HTML 默认的 .navbar--transparent 不会被替换为 .navbar--hidden。
+        const initNavbar = document.getElementById('navbar');
+        if (initNavbar) {
+            initNavbar.classList.toggle('navbar--transparent', initialPage === 'home');
+            initNavbar.classList.toggle('navbar--hidden', initialPage === 'planets');
+        }
         this.onPageEnter(initialPage);
 
         // Show running time footer for non-home pages
@@ -127,6 +134,7 @@ const Router = {
             chemistry: 'rgba(77,158,126,0.12)',
             algorithms: 'rgba(196,121,58,0.12)',
             biology: 'rgba(58,158,143,0.12)',
+            codevis: 'rgba(236,72,153,0.12)',
             home: 'rgba(91,141,206,0.08)',
             planets: 'rgba(0,255,213,0.10)'
         };
@@ -275,25 +283,16 @@ const Router = {
     onPageEnter(page) {
         document.body.classList.toggle('home-scroll-locked', page === 'home');
 
-        // v4.2.45：主题切换不再受路由强制干预；主页内容区由 CSS 锁定 dark token，
-        // 仅顶栏（navbar）会响应主题切换；其它页面照常完整响应主题。
-        const stored = localStorage.getItem('englab-theme');
-        document.documentElement.setAttribute('data-theme', stored === 'light' ? 'light' : 'dark');
+        // v5.0：移除亮色主题，全站固定 dark
+        document.documentElement.setAttribute('data-theme', 'dark');
 
-        // v4.2.4：非首页统一显示右下角主题切换 FAB；返回首页则隐藏
-        if (typeof ThemeSwitch !== 'undefined') {
-            if (page === 'home') ThemeSwitch.hide();
-            else ThemeSwitch.show();
-        }
-        // v4.2.17：非首页显示返回顶部 FAB
+        // v5.0：FAB 仅在学科课程页显示，首页/多星系大屏等展示页面不显示
+        const isCoursePage = ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology', 'codevis'].includes(page);
         if (typeof BackToTop !== 'undefined') {
-            if (page === 'home') BackToTop.hide();
-            else BackToTop.show();
+            if (isCoursePage) BackToTop.show(); else BackToTop.hide();
         }
-        // v4.2.19：非首页显示 FAB 折叠主控按钮（默认折叠）
         if (typeof FabTrigger !== 'undefined') {
-            if (page === 'home') FabTrigger.hide();
-            else FabTrigger.show();
+            if (isCoursePage) FabTrigger.show(); else FabTrigger.hide();
         }
 
         // === Page Initialization ===
