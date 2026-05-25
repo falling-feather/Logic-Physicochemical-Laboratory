@@ -1,23 +1,31 @@
-# 工科实验室 - 可视化学习平台
+# 星序 Astra · 多学科可视化学习平台
 
-一个基于 HTML/CSS/JavaScript 的交互式科学学习平台，提供数学、物理、化学、算法、生物五大学科共 **65 个可视化实验**，全面覆盖人教版（2019 新课标）高中必修及选择性必修核心知识点；并附带独立子站 [`/codevis/`](codevis/README.md) 提供多语言代码执行追踪（JS / Python / C / C++）。  
-内置 C++ 后端服务器，支持静态文件托管和 REST API。
+「星序 Astra」是一个基于 HTML/CSS/JavaScript 的交互式科学学习平台，由两大子站构成：
 
-> **当前版本**: v5.1.0（2026-04-27）  
-> **v5.1 主线**：Codevis 独立为子站 `/codevis/` + Runtime 抽象层 + JS-Interpreter / Skulpt / JSCPP 三后端手写代码沙箱  
-> **v5.0 主线**：planets 多星系顶层导航 + 全局主题系统精简（移除亮色主题）+ 入场动画 + 减动偏好降级
+- 🌌 **工科实验室星系**（主站）：数学、物理、化学、算法、生物五大学科共 **65 个可视化实验**，全面覆盖人教版（2019 新课标）高中必修及选择性必修核心知识点
+- 💻 **代码空间星系**（[子站 `/codevis/`](codevis/README.md)）：多语言代码执行追踪播放器（JavaScript / Python / C / C++），含 Runtime 抽象层与三沙箱后端
+
+后续将延伸更多"星系"（智能、历史、宇宙等方向），详见 [doc/02-更新规划.md](doc/02-更新规划.md#-未来星系构思v60-新增)。内置 C++ httplib 后端服务器，支持静态文件托管。
+
+> **当前版本**: v6.0.0（2026-05-26）— 项目层级调整 · 正式更名为「星序 Astra」  
+> **v6.0 主线**：双子站架构正式确立 + muban UI 模板扩充 + 开发者手册 §0/§6.6/§17 新增星系开发指南  
+> **v5.1 主线**：Codevis 独立为子站 + Runtime 抽象层 + JS-Interpreter / Skulpt / JSCPP 三后端沙箱  
+> **v5.0 主线**：planets 多星系顶层导航 + 全局主题系统精简（移除亮色主题）
 
 ## 📁 项目结构
 
 ```
-工科实验室/
-├── index.html              # 单页入口（含所有页面结构）
+星序 Astra/
+├── index.html              # 主站 SPA 入口（含所有页面结构）
 ├── sw.js                   # Service Worker（离线缓存 + stale-while-revalidate）
 ├── deploy.ps1              # Windows 一键部署脚本
-├── doc/                    # 项目文档
-│   ├── DEVELOPER_GUIDE.md  # 完整开发者文档
-│   ├── UPDATE_PLAN.md      # 后续更新计划
-│   └── DEPLOY.md           # 服务器部署文档
+├── doc/                    # 项目文档（v5.1.4 中文化重组）
+│   ├── 01-开发者手册.md            # 完整开发者文档
+│   ├── 02-更新规划.md              # 后续更新计划
+│   ├── 03-发布历史.md              # 已完成沉淀
+│   ├── 04-部署指南.md              # 服务器部署文档
+│   ├── 05-UI规范模板.md            # UI 基准模板
+│   └── 99-历史审视报告归档.md      # v4.x 一次性审视报告归档
 ├── codevis/                # 代码可视化独立子站（v5.1 升级：独立 SPA + 多语言沙箱）
 │   ├── index.html          # 子站入口
 │   ├── shared/             # codevis 专用 css/js（与主站隔离）
@@ -60,7 +68,7 @@ cmake --build build --config Release
 
 ```powershell
 .\deploy.ps1
-# 详见 doc/DEPLOY.md
+# 详见 doc/04-部署指南.md
 ```
 
 ## ✨ 功能特性
@@ -128,7 +136,7 @@ cmake --build build --config Release
 - 🔤 数学实验 Canvas 字体放大 1.5-2×（15 个文件）
 - 🔤 生物实验 Canvas 字体标准化重构（13 个文件）
 - 🔤 全项目 Canvas 字体统一使用 CSS 变量（`--font-sans` / `--font-mono`）
-- 📄 新增 `doc/UI_TEMPLATES.md` 各学科 UI 基准模板文档
+- 📄 新增 `doc/05-UI规范模板.md` 各学科 UI 基准模板文档
 
 ### v4.0.1 — 2026-04-17
 - 🐛 修复生物模块语法错误（cell-structure.js / gene-mutation.js）
@@ -141,7 +149,7 @@ cmake --build build --config Release
 - ✅ 12 个模块深度 v2 重写，质量提升至 11-12/12
 - ✅ Bug 修复 BF-01~11（DPR 适配、ARIA 无障碍、防抖锁等）
 - ✅ 首页加载优化（内联 CSS 加载屏 + defer 脚本 + 分阶段初始化）
-- ✅ Windows 云服务器部署（deploy.ps1 + doc/DEPLOY.md，端口 910）
+- ✅ Windows 云服务器部署（deploy.ps1 + doc/04-部署指南.md，端口 910）
 
 ### v3.0 — 2026-04-14
 - 全部 P0/P1/P2 实验完成
