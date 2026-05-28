@@ -266,7 +266,7 @@ window.PlanetsView = {
         // 默认 fallback：只列出工科实验室
         const list = fromCfg.length ? fromCfg : [{
             id: 'englab', label: '工科实验室', tagline: 'ENGINEERING · LAB',
-            desc: '五大学科 63 个可视化实验', color: '#3aa9ff',
+            desc: '五大学科 65 个可视化实验', color: '#3aa9ff',
             subjects: ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology']
         }];
         const N = list.length;
@@ -626,7 +626,11 @@ window.PlanetsView = {
             if (labelEl) labelEl.textContent = 'GALAXY';
             if (nameEl) nameEl.textContent = this.hovered.label;
             if (descEl) descEl.textContent = `${this.hovered.tagline || ''}　${this.hovered.desc || ''}`.trim();
-            if (hintEl) hintEl.textContent = `CLICK TO ENTER →  (${this.hovered.count || 0} EXP)`;
+            if (hintEl) {
+                hintEl.textContent = this.hovered.externalUrl
+                    ? 'OPEN SUBSITE →'
+                    : `CLICK TO ENTER →  (${this.hovered.count || 0} EXP)`;
+            }
             this.info.style.borderLeftColor = this.hovered.color;
         } else if (this.mode === 'galaxy' && this.hovered === '__center') {
             // 子星系主星 → 返回多星系

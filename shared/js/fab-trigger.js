@@ -23,7 +23,7 @@
             btn.className = 'fab-trigger';
             btn.setAttribute('aria-label', '展开/收起浮动按钮');
             btn.setAttribute('data-tip', '更多操作');
-            btn.innerHTML = '<i class="fab-trigger-icon fab-trigger-icon--menu" data-lucide="more-vertical"></i><i class="fab-trigger-icon fab-trigger-icon--close" data-lucide="x"></i><span class="fab-trigger-badge" aria-hidden="true">0</span>';
+            btn.innerHTML = '<i class="fab-trigger-icon fab-trigger-icon--menu" data-lucide="more-vertical"></i><i class="fab-trigger-icon fab-trigger-icon--close" data-lucide="x"></i><span class="fab-trigger-badge" title="折叠中的快捷操作数量">0</span>';
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.toggle();
@@ -47,6 +47,12 @@
                 ).length;
                 badge.textContent = String(count);
                 badge.style.display = count > 0 ? '' : 'none';
+                badge.title = count > 0 ? '折叠中的快捷操作：' + count + ' 个，点击主按钮展开' : '';
+                badge.setAttribute('aria-label', count > 0 ? '折叠中的快捷操作：' + count + ' 个' : '');
+                // v6.0.x：根据数量动态调整 data-tip 让主按钮 tooltip 也含意更明确
+                if (this._btn) {
+                    this._btn.setAttribute('data-tip', count > 0 ? '更多操作 · ' + count + ' 项' : '更多操作');
+                }
             };
             setTimeout(this._refreshBadge, 300);
             setTimeout(this._refreshBadge, 1200);

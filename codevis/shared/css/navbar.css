@@ -78,6 +78,16 @@
     background: var(--cv-cyan-ghost);
     box-shadow: inset 0 -2px 0 var(--cv-cyan);
 }
+.cv-nav-item.cv-nav-item--disabled {
+    color: var(--cv-text-muted);
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: auto; /* 允许 title hover 提示 */
+}
+.cv-nav-item.cv-nav-item--disabled:hover {
+    color: var(--cv-text-muted);
+    background: transparent;
+}
 
 .cv-nav-external {
     margin-left: 12px;

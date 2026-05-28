@@ -39,7 +39,10 @@
 
             // nav 高亮
             document.querySelectorAll('.cv-nav-item').forEach(el => {
-                el.classList.toggle('cv-nav-item--active', el.dataset.page === target);
+                const isActive = el.dataset.page === target;
+                el.classList.toggle('cv-nav-item--active', isActive);
+                if (isActive) el.setAttribute('aria-current', 'page');
+                else el.removeAttribute('aria-current');
             });
 
             this.currentPage = target;

@@ -188,6 +188,14 @@ const ModuleSelector = {
 
         this.activeModule[page] = moduleId;
 
+        // v6.1：同步深链接到 URL hash（#subject/experiment），便于分享 / 刷新保持现场
+        try {
+            const newHash = '#' + page + '/' + moduleId;
+            if (window.location.hash !== newHash) {
+                history.replaceState(null, '', newHash);
+            }
+        } catch (e) {}
+
         // X-01: Track learning progress
         if (typeof LearningProgress !== 'undefined') {
             LearningProgress.markVisited(moduleId);
@@ -265,6 +273,14 @@ const ModuleSelector = {
         if (toggle) toggle.style.display = 'none';
 
         this.activeModule[page] = null;
+
+        // v6.1：清理深链接，把 #subject/experiment 还原成 #subject
+        try {
+            const newHash = '#' + page;
+            if (window.location.hash !== newHash) {
+                history.replaceState(null, '', newHash);
+            }
+        } catch (e) {}
 
         // Clear sidebar active states
         const sidebar = this._sidebars[page];

@@ -21,6 +21,21 @@
 
     const backends = Object.create(null);
 
+    function normalizeStep(step) {
+        const line = Number(step && step.line);
+        const stdout = step && step.stdout;
+        return {
+            line: Number.isFinite(line) ? Math.max(0, Math.floor(line)) : 0,
+            vars: step && step.vars && typeof step.vars === 'object' ? step.vars : {},
+            highlight: step && step.highlight && typeof step.highlight === 'object' ? step.highlight : {},
+            arrOverride: step ? step.arrOverride : undefined,
+            msg: step && step.msg ? String(step.msg) : '',
+            stdout: Array.isArray(stdout)
+                ? stdout.map(String)
+                : (stdout == null || stdout === '' ? [] : [String(stdout)])
+        };
+    }
+
     const CvRuntime = {
         register(language, backend) {
             if (!backend || typeof backend.trace !== 'function') {
@@ -41,7 +56,9 @@
                 if (!result || !Array.isArray(result.steps)) {
                     return { steps: [], error: '后端未返回有效 steps 数组' };
                 }
-                return result;
+                return Object.assign({}, result, {
+                    steps: result.steps.map(normalizeStep)
+                });
             } catch (err) {
                 return { steps: [], error: (err && err.message) || String(err) };
             }

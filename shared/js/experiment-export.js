@@ -200,7 +200,14 @@ const ExperimentExport = {
 
     _copyShareLink() {
         this._closeMenu();
-        var url = window.location.href;
+        // 若当前有实验打开，生成 #subject/experiment 形式的深链接；否则使用当前 URL
+        var url;
+        if (this._currentPage && this._currentModule) {
+            url = window.location.origin + window.location.pathname +
+                  '#' + this._currentPage + '/' + this._currentModule;
+        } else {
+            url = window.location.href;
+        }
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(url).then(
                 function() { ExperimentExport._showToast('链接已复制到剪贴板'); },

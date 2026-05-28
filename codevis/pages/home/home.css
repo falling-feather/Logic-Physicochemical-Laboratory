@@ -2,9 +2,17 @@
  * Codevis · 首页样式
  * ============================================================ */
 
+/* v0.2.x：首页锁定为单屏，不可上下滚动（与工科实验室子站首页一致） */
+body:has(#cv-page-home.cv-page--active) {
+    overflow: hidden;
+    height: 100vh;
+}
+/* 首页隐藏页脚（一级导航已在 navbar，首页无需滚到底） */
+body:has(#cv-page-home.cv-page--active) .cv-footer { display: none; }
+
 .cv-home-hero {
     position: relative;
-    min-height: calc(100vh - 64px - 80px);
+    min-height: calc(100vh - 64px - 64px);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -61,7 +69,7 @@
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
 }
 
 .cv-home-hero__subtitle {

@@ -336,16 +336,19 @@ int main() {
         playing: false,
         speed: 450,
         _timer: null,
+        _statusTimer: null,
         _prevVars: {},
 
         init() {
-            if (this._inited) return;
-            this._inited = true;
-            this._cacheDOM();
-            this._bind();
+            if (!this._inited) {
+                this._inited = true;
+                this._cacheDOM();
+                this._bind();
+                this._maybeShowIntro();
+                this._applyLanguage(this.language || 'demo');
+            }
             this._bindKeyboard();
-            this._maybeShowIntro();
-            this._applyLanguage('demo');
+            this._syncControls();
         },
 
         destroy() {
@@ -441,6 +444,24 @@ int main() {
                     btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
                 });
             });
+            // V6.1.0-alpha11 滚动时自动收束快捷键提示行
+            this._setupShortcutCollapse();
+        },
+
+        _setupShortcutCollapse() {
+            const shortcut = document.querySelector('.code-trace-shortcut');
+            if (!shortcut) return;
+            const apply = () => {
+                const y = window.scrollY || document.documentElement.scrollTop || 0;
+                shortcut.classList.toggle('code-trace-shortcut--collapsed', y > 40);
+            };
+            let ticking = false;
+            window.addEventListener('scroll', () => {
+                if (ticking) return;
+                ticking = true;
+                requestAnimationFrame(() => { apply(); ticking = false; });
+            }, { passive: true });
+            apply();
         },
 
         _flashStatus(text, kind) {
@@ -457,6 +478,7 @@ int main() {
         },
 
         _bindKeyboard() {
+            if (this._keyHandler) return;
             this._keyHandler = (e) => {
                 // 在输入控件里不抓取（避免干扰代码编辑）
                 const tag = (e.target && e.target.tagName) || '';
@@ -493,14 +515,17 @@ int main() {
         _applyLanguage(lang) {
             this.language = lang;
             if (lang === 'demo') {
-                this.$editorWrap.style.display = 'none';
-                this.$run.style.display = 'none';
+                this.$editorWrap.hidden = true;
+                this.$editorWrap.setAttribute('aria-hidden', 'true');
+                this.$run.hidden = true;
                 this._loadSample(this.$sample.value || 'bubble');
             } else if (lang === 'javascript' || lang === 'python' || lang === 'cpp' || lang === 'c') {
-                this.$editorWrap.style.display = '';
-                this.$run.style.display = '';
+                this.$editorWrap.hidden = false;
+                this.$editorWrap.removeAttribute('aria-hidden');
+                this.$run.hidden = false;
                 this._loadEditorSample(this.$sample.value || 'bubble');
             }
+            this._syncControls();
         },
 
         _editorSamplesFor(lang) {
@@ -535,11 +560,13 @@ int main() {
             this.idx = 0;
             this.$seek.max = '0';
             this.$seek.value = '0';
+            this.$seek.style.setProperty('--cv-seek-pct', '0%');
             this.$stepLabel.textContent = '0 / 0';
-            this.$vars.innerHTML = '<div class="code-trace-var" style="opacity:.5">(尚未运行)</div>';
+            this.$vars.innerHTML = '<div class="code-trace-empty">(尚未运行)</div>';
             this.$array.innerHTML = '';
             this.$stdout.textContent = '';
             this._renderTimeline();
+            this._syncControls();
         },
 
         // v5.1.3 关键步骤时间轴
@@ -601,8 +628,10 @@ int main() {
             }
             const code = this.$editor.value;
             this._setStatus('执行中…');
+            this.$run.disabled = true;
             const t0 = performance.now();
             const result = await global.CvRuntime.trace({ language: lang, code, maxSteps: 3000 });
+            this.$run.disabled = false;
             const ms = (performance.now() - t0).toFixed(0);
             if (result.error) {
                 this._setStatus(`✕ ${result.error}（${result.steps.length} 步）`, 'error');
@@ -637,6 +666,7 @@ int main() {
             this._renderSource(s.source);
             this.$seek.max = String(Math.max(0, this.steps.length - 1));
             this.$seek.value = '0';
+            this.$seek.style.setProperty('--cv-seek-pct', '0%');
             this._renderTimeline();
             this._renderStep();
         },
@@ -689,12 +719,15 @@ int main() {
             const pct = this.steps.length > 1 ? (this.idx / (this.steps.length - 1)) * 100 : 0;
             this.$seek.style.setProperty('--cv-seek-pct', pct.toFixed(2) + '%');
             this._renderStep();
+            this._syncControls();
         },
 
         _play() {
             if (!this.steps.length) return;
             this.playing = true;
-            this.$play.textContent = '⏸ 暂停';
+            this.$play.textContent = '暂停';
+            this.$play.setAttribute('aria-pressed', 'true');
+            this._syncControls();
             this._timer = setInterval(() => {
                 if (this.idx >= this.steps.length - 1) { this._stop(); return; }
                 this._goto(this.idx + 1);
@@ -703,13 +736,15 @@ int main() {
 
         _stop() {
             this.playing = false;
-            this.$play.textContent = '▶ 播放';
+            this.$play.textContent = '播放';
+            this.$play.setAttribute('aria-pressed', 'false');
             if (this._timer) { clearInterval(this._timer); this._timer = null; }
+            this._syncControls();
         },
 
         _renderStep() {
             const step = this.steps[this.idx];
-            if (!step) return;
+            if (!step) { this._syncControls(); return; }
             this.$stepLabel.textContent = `${this.idx + 1} / ${this.steps.length}`;
 
             // 高亮当前行
@@ -717,11 +752,12 @@ int main() {
             lines.forEach((el, i) => el.classList.toggle('code-trace-line--active', i === (step.line - 1)));
             const activeEl = lines[step.line - 1];
             if (activeEl && activeEl.scrollIntoView) {
-                activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                activeEl.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
             }
 
             // 变量面板
-            const varEntries = Object.entries(step.vars).filter(([k]) => k !== 'arr' && k !== 'stack');
+            const varEntries = Object.entries(step.vars || {}).filter(([k]) => k !== 'arr' && k !== 'stack');
             this.$vars.innerHTML = varEntries.map(([k, v]) => {
                 const changed = JSON.stringify(this._prevVars[k]) !== JSON.stringify(v);
                 const valStr = this._fmtVal(v);
@@ -729,7 +765,7 @@ int main() {
                     <span class="code-trace-var__name">${this._esc(k)}</span>
                     <span class="code-trace-var__val">${this._esc(valStr)}</span>
                 </div>`;
-            }).join('') || '<div class="code-trace-var" style="opacity:.5">(无变量)</div>';
+            }).join('') || '<div class="code-trace-empty">(无变量)</div>';
             this._prevVars = {};
             varEntries.forEach(([k, v]) => { this._prevVars[k] = v; });
 
@@ -748,11 +784,25 @@ int main() {
                     </div>`;
                 }).join('');
             } else {
-                this.$array.innerHTML = '<div style="opacity:.5;font-family:monospace">(无数组)</div>';
+                this.$array.innerHTML = '<div class="code-trace-empty">(无数组)</div>';
             }
 
             // stdout
             this.$stdout.textContent = (step.stdout || []).join('\n') + (step.msg ? `\n# ${step.msg}` : '');
+            this._syncControls();
+        },
+
+        _syncControls() {
+            const hasSteps = this.steps.length > 0;
+            const atStart = this.idx <= 0;
+            const atEnd = !hasSteps || this.idx >= this.steps.length - 1;
+            if (this.$prev) this.$prev.disabled = !hasSteps || atStart;
+            if (this.$next) this.$next.disabled = !hasSteps || atEnd;
+            if (this.$play) {
+                this.$play.disabled = !hasSteps || this.steps.length < 2;
+                this.$play.setAttribute('aria-pressed', this.playing ? 'true' : 'false');
+            }
+            if (this.$seek) this.$seek.disabled = !hasSteps || this.steps.length < 2;
         },
 
         _fmtVal(v) {

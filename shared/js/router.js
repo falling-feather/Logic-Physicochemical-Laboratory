@@ -1,7 +1,7 @@
 // ===== Router: GSAP Page Transitions =====
 const Router = {
     overlay: null,
-    currentPage: 'home',
+    currentPage: 'planets',
     isTransitioning: false,
     _initialEnterFired: false,
     _runningTimeId: null,
@@ -40,11 +40,13 @@ const Router = {
         });
 
         // Initial state — determine page from hash
-        const initialPage = window.location.hash.slice(1) || 'home';
+        const parsedInit = this._parseHash();
+        const initialPage = parsedInit.page;
         this.currentPage = initialPage;
+        this._pendingModule = parsedInit.moduleId;
 
-        // Ensure the correct page has 'active' class (HTML defaults to home)
-        if (initialPage !== 'home') {
+        // Ensure the correct page has 'active' class (HTML defaults to planets v6.1.0-alpha5)
+        if (initialPage !== 'planets') {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             const initEl = document.getElementById(`page-${initialPage}`);
             if (initEl) initEl.classList.add('active');
@@ -74,9 +76,27 @@ const Router = {
         window.addEventListener('popstate', () => this.handleHash());
     },
 
+    /**
+     * 解析 hash，支持 "subject/experiment" 深链接格式。
+     * 返回 { page, moduleId }，moduleId 为 null 表示未指定。
+     */
+    _parseHash() {
+        const raw = (window.location.hash || '').slice(1);
+        if (!raw) return { page: 'planets', moduleId: null };
+        const idx = raw.indexOf('/');
+        if (idx === -1) return { page: raw, moduleId: null };
+        return { page: raw.slice(0, idx), moduleId: raw.slice(idx + 1) || null };
+    },
+
     handleHash() {
-        const page = window.location.hash.slice(1) || 'home';
-        if (page === this.currentPage && document.querySelector('.page.active')) return;
+        const parsed = this._parseHash();
+        const page = parsed.page;
+        this._pendingModule = parsed.moduleId;
+        // 同 page 但深链接变化：直接调 ModuleSelector，不重走转场
+        if (page === this.currentPage && document.querySelector('.page.active')) {
+            this._applyPendingModule(page);
+            return;
+        }
         this.navigateTo(page, false);
     },
 
@@ -90,8 +110,10 @@ const Router = {
         if (!targetEl) { this.isTransitioning = false; return; }
 
         // Update hash without triggering hashchange
-        if (window.location.hash.slice(1) !== page) {
-            history.pushState(null, '', `#${page}`);
+        // 保留可能存在的深链接模块后缀（如 #physics/momentum-conservation）
+        const desiredHash = this._pendingModule ? `${page}/${this._pendingModule}` : page;
+        if (window.location.hash.slice(1) !== desiredHash) {
+            history.pushState(null, '', `#${desiredHash}`);
         }
 
         // Update nav
@@ -280,6 +302,20 @@ const Router = {
     },
 
     onPageEnter(page) {
+        // v6.1.0-alpha6 修复：home / planets 是「单屏锁定式」展示页，若沿用前一页的 scrollTop，
+        // 加上 home-scroll-locked 后 body 高度被钉死在 100vh，旧滚动偏移会让首页卡在下方留黑框。
+        // 用双阶段重置：同步置 0 + rAF 再置 0（覆盖 GSAP 转场结束后浏览器恢复滚动的边缘场景）。
+        if (page === 'home' || page === 'planets') {
+            const resetScroll = () => {
+                try {
+                    window.scrollTo(0, 0);
+                    document.documentElement.scrollTop = 0;
+                    document.body.scrollTop = 0;
+                } catch (e) { /* noop */ }
+            };
+            resetScroll();
+            requestAnimationFrame(resetScroll);
+        }
         document.body.classList.toggle('home-scroll-locked', page === 'home');
 
         // v5.0：移除亮色主题，全站固定 dark
@@ -301,6 +337,10 @@ const Router = {
             if (typeof initHome === 'function') initHome();
         } else if (page === 'planets') {
             if (typeof initPlanets === 'function') initPlanets();
+        } else if (page === 'license') {
+            if (typeof initLicense === 'function') initLicense();
+        } else if (page === 'changelog') {
+            if (typeof initChangelog === 'function') initChangelog();
         }
         // Subject pages: show sidebar toggle if an experiment was previously open,
         // but don't eagerly initialize any experiments (ModuleSelector handles it).
@@ -322,6 +362,30 @@ const Router = {
         if (page !== 'home' && page !== 'planets' && typeof initHeroVisual === 'function') {
             initHeroVisual(page);
         }
+
+        // 深链接：URL 形如 #physics/momentum-conservation 时，自动打开对应实验
+        this._applyPendingModule(page);
+    },
+
+    /**
+     * 若 _pendingModule 与当前 page（课程页）匹配，则尝试调用 ModuleSelector.openModule。
+     * 等待 ModuleSelector 渲染好侧栏后再调用，以处理首屏即直达的场景。
+     */
+    _applyPendingModule(page) {
+        const moduleId = this._pendingModule;
+        if (!moduleId) return;
+        const isCoursePage = ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology'].includes(page);
+        if (!isCoursePage) { this._pendingModule = null; return; }
+        const tryOpen = (retries) => {
+            if (typeof ModuleSelector !== 'undefined' && typeof ModuleSelector.openModule === 'function') {
+                try { ModuleSelector.openModule(page, moduleId); } catch (e) {}
+                this._pendingModule = null;
+                return;
+            }
+            if (retries > 0) setTimeout(() => tryOpen(retries - 1), 60);
+        };
+        // 等一个 microtask + 一次 60ms 重试，覆盖 ModuleSelector 尚未初始化的边缘场景
+        setTimeout(() => tryOpen(5), 0);
     },
 
     onPageLeave(page) {

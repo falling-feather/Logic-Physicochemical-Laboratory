@@ -60,6 +60,8 @@
         _bindFeatureGlow() {
             const cards = document.querySelectorAll('.cv-feature');
             cards.forEach((c) => {
+                if (c.dataset.cvGlowBound === '1') return;
+                c.dataset.cvGlowBound = '1';
                 c.addEventListener('mousemove', (e) => {
                     const rect = c.getBoundingClientRect();
                     const mx = ((e.clientX - rect.left) / rect.width) * 100;
@@ -240,8 +242,9 @@
             if (!els.length) return;
 
             els.forEach(el => {
-                el.dataset.full = el.textContent;
+                if (!el.dataset.full) el.dataset.full = el.textContent;
                 el.textContent = '';
+                el.classList.remove('cv-typewriter--done', 'cv-typewriter--no-caret');
                 el.classList.add('cv-typewriter');
             });
 

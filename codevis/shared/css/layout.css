@@ -98,18 +98,98 @@
     gap: 18px;
 }
 
-/* ─── Footer ─── */
+/* ─── Footer（参考主站 site-footer：2 列 grid + bottom 跨列） ─── */
 .cv-footer {
-    padding: 24px 0;
+    background: var(--cv-bg-elevated, rgba(8, 14, 22, 0.6));
     border-top: 1px solid var(--cv-border-soft);
-    text-align: center;
-    color: var(--cv-text-muted);
-    font-family: var(--cv-font-mono);
-    font-size: 0.78rem;
-    letter-spacing: 0.06em;
+    padding: 56px 0 24px;
+    position: relative;
 }
-.cv-footer a { color: var(--cv-text-muted); }
-.cv-footer a:hover { color: var(--cv-cyan); }
+.cv-footer__grid {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr;
+    gap: 40px;
+}
+.cv-footer__brand {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.cv-footer__logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--cv-font-mono);
+    font-size: 1rem;
+    color: var(--cv-text);
+    letter-spacing: 0.04em;
+}
+.cv-footer__logo-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--cv-cyan);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--cv-cyan);
+}
+.cv-footer__desc {
+    font-size: 0.82rem;
+    color: var(--cv-text-muted);
+    max-width: 320px;
+    line-height: 1.75;
+    margin: 0;
+}
+.cv-footer__col {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.cv-footer__col-title {
+    font-size: 0.82rem;
+    color: var(--cv-text-secondary);
+    font-weight: 600;
+    margin: 0 0 6px;
+    letter-spacing: 0.04em;
+}
+.cv-footer__col a {
+    font-size: 0.82rem;
+    color: var(--cv-text-muted);
+    text-decoration: none;
+    transition: color var(--cv-dur-fast) var(--cv-ease);
+}
+.cv-footer__col a:hover { color: var(--cv-cyan); }
+.cv-footer__bottom {
+    grid-column: 1 / -1;
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid var(--cv-border-soft);
+    font-size: 0.74rem;
+    color: var(--cv-text-muted);
+    text-align: left;
+    font-family: var(--cv-font-mono);
+    letter-spacing: 0.04em;
+}
+.cv-footer__running {
+    margin: 8px 0 0;
+    font-size: 0.74rem;
+    color: var(--cv-text-muted);
+    line-height: 1.85;
+}
+.cv-footer__running span {
+    color: var(--cv-cyan);
+    font-weight: 600;
+    margin: 0 2px;
+}
+
+@media (max-width: 768px) {
+    .cv-footer { padding: 40px 0 20px; }
+    .cv-footer__grid {
+        grid-template-columns: 1fr;
+        gap: 28px;
+    }
+}
 
 @media (max-width: 900px) {
     .cv-hero__inner { grid-template-columns: 1fr; gap: 24px; }

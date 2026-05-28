@@ -147,7 +147,7 @@ const CONFIG = {
             id: 'englab',
             label: '工科实验室',
             tagline: 'ENGINEERING · LAB',
-            desc: '数学 · 物理 · 化学 · 算法 · 生物 五大学科 63 个可视化实验',
+            desc: '数学 · 物理 · 化学 · 算法 · 生物 五大学科 65 个可视化实验',
             color: '#3aa9ff',
             subjects: ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology']
         },
@@ -157,7 +157,8 @@ const CONFIG = {
             tagline: 'CODE · SPACE',
             desc: 'JS · Python · C/C++ 代码执行追踪与数据结构动画（独立子站）',
             color: '#22ff88',
-            subjects: ['codespace-viz']
+            subjects: ['codespace-viz'],
+            externalUrl: 'codevis/index.html'
         }
     ]
 };
