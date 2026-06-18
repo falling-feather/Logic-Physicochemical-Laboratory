@@ -2,14 +2,14 @@
 
 /* ── Page Hero (split layout) ── */
 .page-hero {
-    min-height: 45vh;
+    min-height: clamp(340px, 38vh, 420px);
     max-width: 1100px;
     margin: 0 auto;
-    padding: var(--space-16) var(--space-8) var(--space-12);
+    padding: var(--space-12) var(--space-8) var(--space-10);
     display: grid;
     grid-template-columns: 1fr 1fr;
     align-items: center;
-    gap: var(--space-12);
+    gap: var(--space-10);
     position: relative;
 }
 
@@ -64,14 +64,14 @@
     align-items: center;
     justify-content: center;
     position: relative;
-    min-height: 260px;
+    min-height: 220px;
 }
 
 .page-hero__canvas {
     width: 100%;
-    max-width: 360px;
+    max-width: 320px;
     aspect-ratio: 1;
-    opacity: 0.5;
+    opacity: 0.46;
 }
 
 /* ── Content Sections ── */

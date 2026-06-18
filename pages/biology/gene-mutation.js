@@ -14,7 +14,7 @@ const GeneMutation = (() => {
     let infoEl = null, ro = null;
 
     /* ── DNA data ── */
-    const origBases = ['A','T','G','C','A','A','T','G','G','C','T','A','G','C','A'];
+    const origBases = ['T','A','C','C','A','A','T','G','G','C','T','A','A','C','T'];
     const comp = { A:'T', T:'A', G:'C', C:'G' };
     const rna  = { A:'U', T:'A', G:'C', C:'G' };
 
@@ -39,9 +39,9 @@ const GeneMutation = (() => {
 
     const bCol = { A:'#4ade80', T:'#f87171', G:'#facc15', C:'#60a5fa', U:'#c084fc' };
     const modes = [
-        { name:'碱基替换', desc:'第5位 A → G（点突变 / 错义突变）', color:'#f59e0b' },
-        { name:'插入突变', desc:'第5位后插入 C（移码突变）',       color:'#ef4444' },
-        { name:'缺失突变', desc:'缺失第5位 A（移码突变）',         color:'#8b5cf6' }
+        { name:'碱基替换', desc:'第5位 A → G（本例为错义替换）', color:'#f59e0b' },
+        { name:'插入突变', desc:'第5位后插入 C（本例为非 3 倍数插入）', color:'#ef4444' },
+        { name:'缺失突变', desc:'缺失第5位 A（本例为非 3 倍数缺失）', color:'#8b5cf6' }
     ];
     let mutBases = [];
 
@@ -136,6 +136,17 @@ const GeneMutation = (() => {
         ctx.textAlign = 'right'; ctx.fillStyle = c || '#94a3b8';
         ctx.fillText(t, x - 8, y); ctx.globalAlpha = 1;
     }
+    function drawFitText(text, x, y, maxSize, color, weight = '') {
+        let size = maxSize;
+        do {
+            ctx.font = weight + size + 'px ' + CF.sans;
+            if (ctx.measureText(text).width <= W - 24 || size <= 10) break;
+            size -= 1;
+        } while (size > 10);
+        ctx.textAlign = 'center';
+        ctx.fillStyle = color;
+        ctx.fillText(text, x, y);
+    }
     function drawArrow(x1, y1, x2, y2, c, a) {
         ctx.globalAlpha = a; ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.setLineDash([6,4]);
         ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.setLineDash([]);
@@ -200,22 +211,20 @@ const GeneMutation = (() => {
             }
             if ((mode===1||mode===2)&&progress>0.55) {
                 ctx.globalAlpha = Math.min(1,(progress-0.55)/0.3);
-                ctx.font = 'bold ' + (fs + 5) + 'px ' + CF.sans; ctx.textAlign = 'center';
-                ctx.fillStyle = '#fbbf24';
-                ctx.fillText('⚠ 移码突变：突变位点后所有密码子改变 → 氨基酸序列大幅改变', W/2, H-18);
+                const warning = W < 520 ? '移码：后续密码子分组改变' : '本例移码：突变位点后密码子分组改变，后续氨基酸序列随之改写';
+                drawFitText(warning, W/2, H-34, fs + 3, '#fbbf24', 'bold ');
                 ctx.globalAlpha = 1;
             }
             if (progress > 0.25) {
                 ctx.globalAlpha = Math.min(1,(progress-0.25)/0.3);
-                ctx.font = fs + 'px ' + CF.sans; ctx.textAlign = 'center';
-                ctx.fillStyle = m.color; ctx.fillText(m.desc, W/2, H-5);
+                drawFitText(m.desc, W/2, H-12, fs, m.color);
                 ctx.globalAlpha = 1;
             }
         }
         if (!mutated) {
             ctx.font = fs + 'px ' + CF.sans; ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(200,200,200,0.4)';
-            ctx.fillText('点击 "触发突变" 查看突变效果', W/2, H-12);
+            ctx.fillText('点击“触发突变”比较读码框与氨基酸序列', W/2, H-12);
         }
         if (hoverBase) drawTip();
     }
@@ -259,16 +268,17 @@ const GeneMutation = (() => {
         if (!infoEl) return;
         const m = modes[mode];
         const oMR = toRNA(origBases), oC = codons(oMR), oA = aas(oC);
-        let h = '<div class="gmut-info__hd">📘 基因突变可视化</div>';
+        let h = '<div class="gmut-info__hd">基因突变、点突变与移码</div>';
         h += '<div class="gmut-info__grid">';
         h += `<div class="gmut-info__block">
             <div class="gmut-info__sub">${m.name}</div>
             <div class="gmut-info__val" style="color:${m.color}">${m.desc}</div>
-            <div class="gmut-info__desc">${mode===0?'点突变（碱基替换）不改变阅读框，仅影响单个密码子':
-            mode===1?'插入碱基后突变位点后读码框全部右移（移码突变）':
-            '缺失碱基后突变位点后读码框全部左移（移码突变）'}</div></div>`;
+            <div class="gmut-info__desc">${mode===0?'单个核苷酸被另一个替换，读码框保持不变；结果可能是同义、错义或无义。':
+            mode===1?'本例插入 1 个碱基，后续密码子重新分组；插入数若为 3 的倍数，通常不会造成移码。':
+            '本例缺失 1 个碱基，后续密码子重新分组；缺失数若为 3 的倍数，通常不会造成移码。'}</div></div>`;
         h += `<div class="gmut-info__block"><div class="gmut-info__sub">原始氨基酸序列</div>
-            <p class="gmut-aa-seq">${oA.map(a=>`<span class="${a==='Stop'?'gmut-stop':a==='Met'?'gmut-start':''}">${a}</span>`).join(' → ')}</p></div>`;
+            <p class="gmut-aa-seq">${oA.map(a=>`<span class="${a==='Stop'?'gmut-stop':a==='Met'?'gmut-start':''}">${a}</span>`).join(' → ')}</p>
+            <div class="gmut-info__desc">示例使用一个短编码片段，展示每 3 个 mRNA 碱基构成 1 个密码子的判读方式。</div></div>`;
         if (mutated) {
             const mMR = toRNA(mutBases), mC = codons(mMR), mA = aas(mC);
             h += `<div class="gmut-info__block"><div class="gmut-info__sub">突变后氨基酸序列</div>
@@ -280,14 +290,20 @@ const GeneMutation = (() => {
             h += `<div class="gmut-info__block gmut-summary">
                 <div class="gmut-info__sub">突变总结</div>
                 <div class="gmut-info__val">共 ${mA.length} 个密码子，<strong>${chg}</strong> 个氨基酸改变</div>
-                <div class="gmut-info__desc">${mode===0?'错义突变（missense）— 改变单个氨基酸':'移码突变 — 蛋白质序列大幅改变，通常导致功能丧失'}</div></div>`;
+                <div class="gmut-info__desc">${mode===0?'本例为错义突变：一个密码子对应的氨基酸发生改变，但阅读框没有移动。':'本例为移码突变：非 3 倍数插入或缺失改变后续读码框，可能提前遇到终止密码子或改变蛋白质功能。'}</div></div>`;
         }
-        h += `<div class="gmut-info__block"><div class="gmut-info__sub">基因突变的类型</div>
+        h += `<div class="gmut-info__block"><div class="gmut-info__sub">结果判读</div>
             <table class="gmut-table"><tr><th>类型</th><th>机制</th><th>影响</th></tr>
-            <tr><td>碱基替换</td><td>一个碱基被另一个替换</td><td>点突变，可能改变 1 个氨基酸</td></tr>
-            <tr><td>碱基插入</td><td>额外碱基插入 DNA 序列</td><td>移码突变，后续所有氨基酸受影响</td></tr>
-            <tr><td>碱基缺失</td><td>碱基从 DNA 序列中丢失</td><td>移码突变，后续所有氨基酸受影响</td></tr>
-            </table></div></div>`;
+            <tr><td>同义/沉默</td><td>密码子改变但氨基酸不变</td><td>蛋白序列不变，但仍可能影响表达或剪接等过程</td></tr>
+            <tr><td>错义</td><td>密码子改为另一种氨基酸</td><td>可能无明显影响，也可能改变蛋白结构或功能</td></tr>
+            <tr><td>无义</td><td>密码子变成终止密码子</td><td>常产生较短、可能无功能的蛋白</td></tr>
+            <tr><td>移码</td><td>非 3 倍数插入或缺失</td><td>突变位点后的密码子分组整体改变</td></tr>
+            </table></div>
+            <div class="gmut-info__block">
+                <div class="gmut-info__sub">模型边界</div>
+                <div class="gmut-info__note">画布只演示编码片段中的替换、插入和缺失如何影响 mRNA 密码子；未模拟 DNA 修复、非编码区变异、剪接、表达调控、染色体大片段变异或表型与环境的关系。</div>
+            </div></div>
+            <div class="gmut-info__source">资料依据：NHGRI Talking Glossary 的 Mutation、Point Mutation、Substitution、Missense Mutation、Nonsense Mutation 与 Frameshift Mutation 条目。</div>`;
         infoEl.innerHTML = h;
     }
 
@@ -341,7 +357,10 @@ const GeneMutation = (() => {
         if (pBtn) pBtn.addEventListener('click', () => {
             paused=!paused; pBtn.textContent=paused?'▶':'⏸';
             pBtn.setAttribute('aria-label', paused?'继续':'暂停');
+            pBtn.setAttribute('aria-pressed', String(paused));
         });
+        cvs.setAttribute('role', 'img');
+        cvs.setAttribute('aria-label', '基因突变可视化：比较碱基替换、插入和缺失对读码框与氨基酸序列的影响');
         cvs.addEventListener('mousemove', onMove);
         cvs.addEventListener('mouseleave', onLeave);
         ro = new ResizeObserver(() => resize());

@@ -1,5 +1,5 @@
 // ===== Solution & Ionization Visualization v2 =====
-// 6 substances, Ka/Kb pH, education panel, hover, speed/pause
+// 6 substances, Ka/Kb pH, learning panel, hover, speed/pause
 
 const SolutionIon = {
     canvas: null, ctx: null, W: 0, H: 0,
@@ -31,14 +31,28 @@ const SolutionIon = {
         nacl:     { name: '氯化钠 NaCl',     type: '强电解质盐', eq: 'NaCl → Na⁺ + Cl⁻',
                     ions: [{s:'Na⁺',c:'#e5c07b',r:1},{s:'Cl⁻',c:'#5b8dce',r:1}],
                     pH: () => 7, deg: 1 },
-        nahco3:   { name: '碳酸氢钠 NaHCO₃', type: '盐(水解呈碱性)', eq: 'NaHCO₃ → Na⁺ + HCO₃⁻ (HCO₃⁻水解)',
+        nahco3:   { name: '碳酸氢钠 NaHCO₃', type: '两性弱酸根盐(水解呈弱碱性)', eq: 'NaHCO₃ → Na⁺ + HCO₃⁻；HCO₃⁻ 既可电离又可水解',
                     ions: [{s:'Na⁺',c:'#e5c07b',r:1},{s:'HCO₃⁻',c:'#4d9e7e',r:1}],
-                    pH: c => 7 + 0.5 * (4.7 + Math.log10(c)), deg: 1 }
+                    pH: () => 8.3, deg: 1 }
     },
 
     _on(el, evt, fn, opts) {
         el.addEventListener(evt, fn, opts);
         this._listeners.push({ el, evt, fn, opts });
+    },
+
+    _isCompact() {
+        return this.W < 520;
+    },
+
+    _bounds() {
+        return this._isCompact()
+            ? { cL: 0.08, cR: 0.92, cT: 0.32, cB: 0.88 }
+            : { cL: 0.05, cR: 0.55, cT: 0.2, cB: 0.88 };
+    },
+
+    _degreeLabel() {
+        return (this.substance === 'nacl' || this.substance === 'nahco3') ? '解离度' : '电离度';
     },
 
     init() {
@@ -70,7 +84,10 @@ const SolutionIon = {
         if (!wrap) return;
         const dpr = window.devicePixelRatio || 1;
         const w = wrap.getBoundingClientRect().width;
-        const h = Math.min(Math.max(w * 0.48, 280), 400);
+        const compact = w < 520;
+        const h = compact
+            ? Math.min(Math.max(w * 0.62, 260), 320)
+            : Math.min(Math.max(w * 0.48, 280), 400);
         this.canvas.width = w * dpr; this.canvas.height = h * dpr;
         this.canvas.style.width = w + 'px'; this.canvas.style.height = h + 'px';
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -94,7 +111,7 @@ const SolutionIon = {
         this.particles = [];
         const info = this.getInfo();
         const maxP = 65;
-        const cL = 0.05, cR = 0.55, cT = 0.2, cB = 0.88;
+        const { cL, cR, cT, cB } = this._bounds();
 
         // Water molecules (background)
         for (let i = 0; i < 12; i++) {
@@ -200,7 +217,7 @@ const SolutionIon = {
     },
 
     updateParticles(dt) {
-        const cL = 0.05, cR = 0.55, cT = 0.2, cB = 0.88;
+        const { cL, cR, cT, cB } = this._bounds();
         const f = dt * 60; // normalize to ~60fps feel
         for (const p of this.particles) {
             p.vx += (Math.random() - 0.5) * 0.0003 * f;
@@ -227,8 +244,9 @@ const SolutionIon = {
     },
 
     drawContainer() {
-        const { ctx, W, H, _prevT } = this;
-        const cL = W * 0.05, cR = W * 0.55, cT = H * 0.2, cB = H * 0.88;
+        const { ctx, W, H } = this;
+        const bounds = this._bounds();
+        const cL = W * bounds.cL, cR = W * bounds.cR, cT = H * bounds.cT, cB = H * bounds.cB;
         const info = this.getInfo();
         const pH = info.pH;
         const t = performance.now() / 1000;
@@ -299,9 +317,13 @@ const SolutionIon = {
         const { ctx, W, H } = this;
         const info = this.getInfo();
         const pH = info.pH;
-        const fs = Math.max(13, W * 0.013);
+        const compact = this._isCompact();
+        const fs = compact ? 11 : Math.max(13, W * 0.013);
 
-        const barL = W * 0.62, barR = W * 0.95, barY = H * 0.14, barH = 14;
+        const barL = W * (compact ? 0.08 : 0.62);
+        const barR = W * (compact ? 0.92 : 0.95);
+        const barY = H * (compact ? 0.09 : 0.14);
+        const barH = compact ? 12 : 14;
 
         // Gradient
         const grad = ctx.createLinearGradient(barL, 0, barR, 0);
@@ -315,9 +337,10 @@ const SolutionIon = {
 
         // Ticks
         ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = `${fs - 1}px ${CF.mono}`; ctx.textAlign = 'center';
-        for (let i = 0; i <= 14; i++) {
+        const tickStep = compact ? 2 : 1;
+        for (let i = 0; i <= 14; i += tickStep) {
             const x = barL + (i / 14) * (barR - barL);
-            ctx.fillText(i, x, barY + barH + 10);
+            ctx.fillText(i, x, barY + barH + (compact ? 9 : 10));
         }
 
         // Indicator triangle
@@ -326,20 +349,33 @@ const SolutionIon = {
         ctx.moveTo(indX - 5, barY - 2); ctx.lineTo(indX + 5, barY - 2); ctx.lineTo(indX, barY + 5); ctx.fill();
 
         // pH value
-        ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = `${fs + 3}px ${CF.mono}`; ctx.textAlign = 'center';
-        ctx.fillText('pH = ' + pH.toFixed(2), (barL + barR) / 2, barY - 10);
+        ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = `${compact ? fs + 2 : fs + 3}px ${CF.mono}`; ctx.textAlign = 'center';
+        ctx.fillText('pH = ' + pH.toFixed(2), (barL + barR) / 2, barY - (compact ? 8 : 10));
 
         // Labels
         ctx.font = `${fs}px ${CF.sans}`;
-        ctx.fillStyle = 'rgba(224,108,117,0.4)'; ctx.textAlign = 'left'; ctx.fillText('酸性', barL, barY + barH + 24);
-        ctx.fillStyle = 'rgba(139,111,192,0.4)'; ctx.textAlign = 'right'; ctx.fillText('碱性', barR, barY + barH + 24);
-        ctx.fillStyle = 'rgba(77,158,126,0.4)'; ctx.textAlign = 'center'; ctx.fillText('中性', (barL + barR) / 2, barY + barH + 24);
+        const labelY = barY + barH + (compact ? 22 : 24);
+        ctx.fillStyle = 'rgba(224,108,117,0.4)'; ctx.textAlign = 'left'; ctx.fillText('酸性', barL, labelY);
+        ctx.fillStyle = 'rgba(139,111,192,0.4)'; ctx.textAlign = 'right'; ctx.fillText('碱性', barR, labelY);
+        ctx.fillStyle = 'rgba(77,158,126,0.4)'; ctx.textAlign = 'center'; ctx.fillText('中性', (barL + barR) / 2, labelY);
     },
 
     drawCanvasInfo() {
         const { ctx, W, H } = this;
         const info = this.getInfo();
-        const fs = Math.max(14, W * 0.014);
+        const compact = this._isCompact();
+        const fs = compact ? 12 : Math.max(14, W * 0.014);
+        if (compact) {
+            const x0 = W * 0.08, y0 = H * 0.22;
+            ctx.fillStyle = 'rgba(255,255,255,0.48)';
+            ctx.font = `${fs + 1}px ${CF.sans}`;
+            ctx.textAlign = 'left';
+            ctx.fillText(`${info.name} · pH ${info.pH.toFixed(2)}`, x0, y0);
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.font = `${fs}px ${CF.mono}`;
+            ctx.fillText(`${info.type} · ${this._degreeLabel()} ${(info.degree * 100).toFixed(1)}%`, x0, y0 + 17);
+            return;
+        }
         const x0 = W * 0.62, y0 = H * 0.45;
 
         ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = `${fs + 1}px ${CF.sans}`; ctx.textAlign = 'left';
@@ -348,7 +384,7 @@ const SolutionIon = {
         ctx.fillText('类型: ' + info.type, x0, y0 + 18);
         ctx.fillText('c = ' + this.concentration.toFixed(2) + ' mol/L', x0, y0 + 36);
         ctx.fillText('pH = ' + info.pH.toFixed(2), x0, y0 + 54);
-        ctx.fillText('电离度: ' + (info.degree * 100).toFixed(1) + '%', x0, y0 + 72);
+        ctx.fillText(this._degreeLabel() + ': ' + (info.degree * 100).toFixed(1) + '%', x0, y0 + 72);
 
         // Equation
         ctx.fillStyle = 'rgba(77,158,126,0.45)'; ctx.font = `${fs}px ${CF.mono}`;
@@ -391,8 +427,11 @@ const SolutionIon = {
             }
         }
         // pH scale region
-        if (hoverX > this.W * 0.62 && hoverY < this.H * 0.35) {
-            this.hoverLabel = 'pH = -lg[H⁺]，每差1个单位[H⁺]差10倍';
+        const inScale = this._isCompact()
+            ? hoverY < this.H * 0.2
+            : hoverX > this.W * 0.62 && hoverY < this.H * 0.35;
+        if (inScale) {
+            this.hoverLabel = 'pH = -lg[H₃O⁺]；25°C水溶液中 pH+pOH=14';
             return;
         }
         this.hoverLabel = '';
@@ -419,26 +458,41 @@ const SolutionIon = {
         const info = this.getInfo();
         const isWeak = info.degree < 1;
         const isHydro = this.substance === 'nahco3';
+        const pOH = Math.max(0, Math.min(14, 14 - info.pH));
+        const degree = info.degree * 100;
+        const degreeText = degree < 0.1 ? degree.toFixed(3) : degree < 10 ? degree.toFixed(2) : degree.toFixed(1);
+        const pHText = info.pH.toFixed(2);
+        const pOHText = pOH.toFixed(2);
+        let calcText = '';
+        if (this.substance === 'hcl') calcText = '强酸模型近似完全电离，pH = -lg[H₃O⁺]，且 [H₃O⁺]≈c(HCl)。';
+        else if (this.substance === 'naoh') calcText = '强碱模型近似完全电离，pOH = -lg[OH⁻]，25°C 时 pH = 14 - pOH。';
+        else if (this.substance === 'ch3cooh') calcText = 'Ka = [H₃O⁺][CH₃COO⁻]/[CH₃COOH] = 1.8×10⁻⁵，按一元弱酸平衡估算 pH。';
+        else if (this.substance === 'nh3h2o') calcText = 'Kb = [NH₄⁺][OH⁻]/[NH₃·H₂O] = 1.8×10⁻⁵，先求 [OH⁻] 再换算 pH。';
+        else if (this.substance === 'nacl') calcText = '强酸强碱盐通常不水解，理想 25°C 水溶液近似 pH = 7。';
+        else if (this.substance === 'nahco3') calcText = 'HCO₃⁻ 是两性离子，水解与电离竞争；教学模型取弱碱性近似，pH 约 8.3。';
+        const ideaText = isWeak
+            ? '弱电解质只部分电离，稀释会提高电离度，但对应离子浓度未必同步增大。'
+            : isHydro
+                ? '盐类水解来自弱酸根或弱碱阳离子与水的反应，溶液酸碱性取决于竞争过程。'
+                : '强电解质在这个模型中按完全电离处理，因此没有电离平衡滑动。';
         let html = `<div class="sol-hd"><span class="sol-tag${isWeak ? ' sol-tag--amber' : ''}">${info.type}</span>${info.name}</div>`;
+        html += `<div class="sol-summary">
+            <div class="sol-summary__card"><span>pH</span><strong>${pHText}</strong></div>
+            <div class="sol-summary__card"><span>pOH</span><strong>${pOHText}</strong></div>
+            <div class="sol-summary__card"><span>${this._degreeLabel()}</span><strong>${degreeText}%</strong></div>
+            <div class="sol-summary__card"><span>浓度</span><strong>${this.concentration.toFixed(2)} mol/L</strong></div>
+        </div>`;
         html += `<div class="sol-row"><span class="sol-key">电离方程式</span>${info.eq}</div>`;
-        html += `<div class="sol-row"><span class="sol-key sol-key--purple">pH 计算</span>`;
-        if (this.substance === 'hcl') html += 'pH = -lg c(HCl) = -lg[H⁺]';
-        else if (this.substance === 'naoh') html += 'pOH = -lg c(NaOH)，pH = 14 - pOH';
-        else if (this.substance === 'ch3cooh') html += 'Ka = [H⁺][CH₃COO⁻]/[CH₃COOH] = 1.8×10⁻⁵';
-        else if (this.substance === 'nh3h2o') html += 'Kb = [NH₄⁺][OH⁻]/[NH₃·H₂O] = 1.8×10⁻⁵';
-        else if (this.substance === 'nacl') html += '强酸强碱盐，不水解，pH = 7';
-        else if (this.substance === 'nahco3') html += 'HCO₃⁻ 水解 > 电离 → OH⁻多 → pH > 7';
-        html += '</div>';
+        html += `<div class="sol-row"><span class="sol-key sol-key--purple">pH 计算</span>${calcText}</div>`;
         if (isWeak) {
-            html += `<div class="sol-row"><span class="sol-key sol-key--amber">电离平衡</span>升温 → 平衡正移 → 电离度↑，加水稀释 → 电离度↑但[H⁺]↓</div>`;
+            html += `<div class="sol-row"><span class="sol-key sol-key--amber">电离平衡</span>电离和结合同时发生，达到动态平衡；加水稀释通常使电离度增大。</div>`;
         }
         if (isHydro) {
-            html += `<div class="sol-row"><span class="sol-key sol-key--teal">盐类水解</span>弱酸阴离子/弱碱阳离子与水反应 → 破坏水的电离平衡</div>`;
+            html += `<div class="sol-row"><span class="sol-key sol-key--teal">盐类水解</span>HCO₃⁻ + H₂O ⇌ H₂CO₃ + OH⁻；同时 HCO₃⁻ ⇌ H⁺ + CO₃²⁻，两条路径共同影响 pH。</div>`;
         }
-        html += `<div class="sol-note">💡 ${isWeak ?
-            '弱电解质电离是可逆的，存在动态平衡(v正=v逆)' :
-            isHydro ? '盐类水解的实质：盐中弱离子与水电离产生的H⁺或OH⁻结合' :
-            '强电解质在水中完全电离，不存在电离平衡'}</div>`;
+        html += `<div class="sol-note"><strong>学习要点：</strong>${ideaText}</div>`;
+        html += `<div class="sol-note sol-note--boundary"><strong>模型边界：</strong>pH+pOH=14 使用 25°C 水溶液常用近似；弱酸、弱碱和盐类水解数值按单一平衡教学模型估算，未展开活度系数、离子强度、多级平衡、温度变化和 CO₂ 交换。</div>`;
+        html += `<div class="sol-source">资料依据：OpenStax Chemistry 2e 的 pH and pOH、Relative Strengths of Acids and Bases、Hydrolysis of Salts。</div>`;
         el.innerHTML = html;
     }
 };

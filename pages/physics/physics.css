@@ -1201,3 +1201,365 @@
     background: rgba(91,141,206,0.1); border-radius: 6px;
     font-size: 13px; color: var(--accent, #5b8dce);
 }
+
+/* ===== 气体实验定律 ===== */
+.gas-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.gas-mode-btns {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.gas-btn {
+    padding: 6px 14px;
+    border: 1px solid rgba(91,141,206,0.35);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary, #aaa);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all .2s;
+}
+.gas-btn:hover {
+    background: rgba(91,141,206,0.12);
+    color: var(--text-primary, #fff);
+}
+.gas-btn.active {
+    background: rgba(91,141,206,0.24);
+    color: #fff;
+    border-color: rgba(125,211,252,0.72);
+}
+.gas-sliders {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.gas-slider {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary, #bbb);
+    white-space: nowrap;
+}
+.gas-slider input[type="range"] {
+    width: 78px;
+    accent-color: #7dd3fc;
+}
+.gas-slider__value {
+    min-width: 54px;
+    color: rgba(226,232,240,0.82);
+    font-variant-numeric: tabular-nums;
+}
+.gas-slider.is-locked {
+    opacity: .54;
+}
+.gas-slider.is-locked input[type="range"] {
+    cursor: not-allowed;
+}
+.gas-info {
+    margin-top: 16px;
+    padding: 16px 18px;
+    background: rgba(91,141,206,0.05);
+    border: 1px solid rgba(91,141,206,0.16);
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text-secondary, #ccc);
+}
+.gas-info__hd {
+    font-weight: 700;
+    color: var(--text-primary, #fff);
+    margin-bottom: 10px;
+}
+.gas-info__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.gas-info__sub {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: rgba(255,255,255,.42);
+    margin-bottom: 4px;
+}
+.gas-info__val {
+    color: #7dd3fc;
+    font-weight: 700;
+}
+.gas-info__desc,
+.gas-info__row,
+.gas-info__note {
+    color: rgba(255,255,255,.62);
+}
+.gas-info__key {
+    display: inline-block;
+    padding: 1px 7px;
+    margin-right: 6px;
+    border-radius: 4px;
+    color: var(--c, #7dd3fc);
+    background: color-mix(in srgb, var(--c, #7dd3fc) 12%, transparent);
+    font-size: 11px;
+    font-weight: 700;
+}
+@media (max-width: 768px) {
+    .gas-controls {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .gas-sliders {
+        width: 100%;
+    }
+    .gas-slider {
+        width: 100%;
+        justify-content: space-between;
+    }
+    .gas-slider input[type="range"] {
+        flex: 1;
+        min-width: 130px;
+    }
+    .gas-info__grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== 原子物理 ===== */
+.atomphys-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.atomphys-mode-btns {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.atomphys-btn {
+    padding: 7px 14px;
+    border: 1px solid rgba(125, 211, 252, 0.28);
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.34);
+    color: var(--text-secondary, #aaa);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all .2s;
+}
+.atomphys-btn:hover {
+    background: rgba(125, 211, 252, 0.12);
+    color: var(--text-primary, #fff);
+}
+.atomphys-btn.active {
+    background: rgba(96, 165, 250, 0.24);
+    color: #fff;
+    border-color: rgba(125, 211, 252, 0.72);
+}
+.atomphys-sliders {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(174px, 1fr));
+    gap: 10px 12px;
+}
+.atomphys-slider {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 5px;
+    padding: 10px 12px;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.24);
+    color: var(--text-secondary, #bbb);
+    font-size: 12px;
+}
+.atomphys-slider input[type="range"] {
+    width: 100%;
+    accent-color: #7dd3fc;
+}
+.atomphys-slider__value {
+    color: rgba(226, 232, 240, 0.86);
+    font-variant-numeric: tabular-nums;
+}
+.atomphys-info {
+    margin-top: 16px;
+    padding: 16px 18px;
+    background: rgba(91, 141, 206, 0.05);
+    border: 1px solid rgba(91, 141, 206, 0.16);
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text-secondary, #ccc);
+}
+.atomphys-info__hd {
+    font-weight: 700;
+    color: var(--text-primary, #fff);
+    margin-bottom: 10px;
+}
+.atomphys-info__grid {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr 1fr;
+    gap: 12px;
+}
+.atomphys-info__sub {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: rgba(255,255,255,.42);
+    margin-bottom: 4px;
+}
+.atomphys-info__val {
+    color: #7dd3fc;
+    font-weight: 700;
+}
+.atomphys-info__desc,
+.atomphys-info__row,
+.atomphys-info__note {
+    color: rgba(255,255,255,.62);
+}
+.atomphys-info__key {
+    display: inline-block;
+    padding: 1px 7px;
+    margin-right: 6px;
+    border-radius: 4px;
+    color: var(--c, #7dd3fc);
+    background: color-mix(in srgb, var(--c, #7dd3fc) 12%, transparent);
+    font-size: 11px;
+    font-weight: 700;
+}
+@media (max-width: 768px) {
+    .atomphys-sliders {
+        grid-template-columns: 1fr;
+    }
+    .atomphys-info__grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== 热力学基础 ===== */
+.thermo-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.thermo-mode-btns,
+.thermo-process-btns {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.thermo-btn,
+.thermo-mini-btn {
+    padding: 7px 14px;
+    border: 1px solid rgba(251, 191, 36, 0.26);
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.34);
+    color: var(--text-secondary, #aaa);
+    cursor: pointer;
+    font-size: 13px;
+    transition: background .2s, border-color .2s, color .2s;
+}
+.thermo-mini-btn {
+    padding: 5px 11px;
+    font-size: 12px;
+}
+.thermo-btn:hover,
+.thermo-mini-btn:hover {
+    background: rgba(251, 191, 36, 0.12);
+    color: var(--text-primary, #fff);
+}
+.thermo-btn.active,
+.thermo-mini-btn.active {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fff;
+    border-color: rgba(251, 191, 36, 0.68);
+}
+.thermo-dynamic-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.thermo-sliders {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(176px, 1fr));
+    gap: 10px 12px;
+}
+.thermo-slider {
+    display: grid;
+    gap: 5px;
+    padding: 10px 12px;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.24);
+    color: var(--text-secondary, #bbb);
+    font-size: 12px;
+}
+.thermo-slider input[type="range"] {
+    width: 100%;
+    accent-color: #fbbf24;
+}
+.thermo-slider__value {
+    color: rgba(226, 232, 240, 0.86);
+    font-variant-numeric: tabular-nums;
+}
+.thermo-info {
+    margin-top: 16px;
+    padding: 16px 18px;
+    background: rgba(251, 191, 36, 0.045);
+    border: 1px solid rgba(251, 191, 36, 0.15);
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text-secondary, #ccc);
+}
+.thermo-info__hd {
+    font-weight: 700;
+    color: var(--text-primary, #fff);
+    margin-bottom: 10px;
+}
+.thermo-info__grid {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr 1.1fr;
+    gap: 12px;
+}
+.thermo-info__block--wide {
+    grid-column: 1 / -1;
+}
+.thermo-info__sub {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: rgba(255,255,255,.42);
+    margin-bottom: 4px;
+}
+.thermo-info__val {
+    color: #fbbf24;
+    font-weight: 700;
+}
+.thermo-info__desc,
+.thermo-info__row,
+.thermo-info__note {
+    color: rgba(255,255,255,.64);
+}
+.thermo-info__key {
+    display: inline-block;
+    padding: 1px 7px;
+    margin-right: 6px;
+    border-radius: 4px;
+    color: var(--c, #fbbf24);
+    background: color-mix(in srgb, var(--c, #fbbf24) 12%, transparent);
+    font-size: 11px;
+    font-weight: 700;
+}
+@media (max-width: 768px) {
+    .thermo-sliders,
+    .thermo-info__grid {
+        grid-template-columns: 1fr;
+    }
+}

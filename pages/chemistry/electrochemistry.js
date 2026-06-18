@@ -16,8 +16,8 @@ const Electrochemistry = {
     // Electrolytic: CuSO4 electrolysis
     cells: {
         galvanic: {
-            anode: { metal: 'Zn', color: '#7a8fc2', label: '\u8d1f\u6781(Zn)', reaction: 'Zn \u2212 2e\u207b \u2192 Zn\u00b2\u207a' },
-            cathode: { metal: 'Cu', color: '#c49566', label: '\u6b63\u6781(Cu)', reaction: 'Cu\u00b2\u207a + 2e\u207b \u2192 Cu' },
+            anode: { metal: 'Zn', color: '#7a8fc2', label: '\u8d1f\u6781/\u9633\u6781(Zn)', reaction: 'Zn \u2212 2e\u207b \u2192 Zn\u00b2\u207a' },
+            cathode: { metal: 'Cu', color: '#c49566', label: '\u6b63\u6781/\u9634\u6781(Cu)', reaction: 'Cu\u00b2\u207a + 2e\u207b \u2192 Cu' },
             electrolyte: 'ZnSO\u2084 / CuSO\u2084',
             title: '\u539f\u7535\u6c60 (Zn\u2012Cu)',
             emf: 'E\u00b0 = 1.10 V'
@@ -139,7 +139,8 @@ const Electrochemistry = {
 <div class="chem-row"><span class="chem-key chem-key--purple">负极（氧化）</span>${cell.anode.reaction} — 较活泼金属失电子</div>
 <div class="chem-row"><span class="chem-key chem-key--amber">正极（还原）</span>${cell.cathode.reaction} — 较不活泼金属/碳棒得电子</div>
 <div class="chem-row"><span class="chem-key">电解质</span>${cell.electrolyte} — 离子定向移动形成内电路</div>
-<div class="chem-row"><span class="chem-key">判断方法</span>活泼性：Zn > Cu → Zn 为负极。电子外电路：负极→正极；离子内电路：阳→阴</div>
+<div class="chem-row"><span class="chem-key">判断方法</span>活泼性：Zn > Cu → Zn 为负极（阳极，氧化）。电子外电路：负极→正极</div>
+<div class="chem-row"><span class="chem-key">离子迁移</span>阳离子向阴极附近、阴离子向阳极附近移动，以维持溶液电中性</div>
 <div class="chem-note">💡 人教版必修2：原电池将化学能转化为电能。构成条件：①两种活泼性不同的电极 ②电解质溶液 ③形成闭合回路 ④自发氧化还原反应</div>`;
         } else {
             h = `<div class="chem-hd"><span class="chem-tag">电解池</span>电化学知识点</div>
@@ -147,6 +148,7 @@ const Electrochemistry = {
 <div class="chem-row"><span class="chem-key chem-key--purple">阳极（氧化）</span>${cell.anode.reaction} — 阴离子在阳极失电子</div>
 <div class="chem-row"><span class="chem-key chem-key--amber">阴极（还原）</span>${cell.cathode.reaction} — 阳离子在阴极得电子</div>
 <div class="chem-row"><span class="chem-key">电解质</span>${cell.electrolyte} — 外加电源强制非自发反应发生</div>
+<div class="chem-row"><span class="chem-key">电极符号</span>电解池阳极接电源正极，阴极接电源负极；阳极氧化、阴极还原</div>
 <div class="chem-row"><span class="chem-key">放电顺序</span>阳极：S²⁻>I⁻>Br⁻>Cl⁻>OH⁻；阴极：Ag⁺>Cu²⁺>H⁺>…</div>
 <div class="chem-note">💡 人教版选择性必修1：电解将电能转化为化学能。阳极连电源正极，阴极连负极。"阳氧阴还"口诀</div>`;
         }

@@ -11,12 +11,25 @@ const GeneExpression = {
     speed: 1,
     // DNA template strand
     dnaTemplate: ['T','A','C','G','A','T','C','C','A','T','A','G','G','C','T','A','C','T'],
-    // codon table (simplified)
+    // Codon table entries needed by the teaching sequence plus common examples.
     codonTable: {
-        'AUG': 'Met(\u8D77\u59CB)', 'GCU': 'Ala', 'GCC': 'Ala', 'GAU': 'Asp',
+        'AUG': 'Met', 'GCU': 'Ala', 'GCC': 'Ala', 'GAU': 'Asp',
         'UUU': 'Phe', 'UUC': 'Phe', 'CCA': 'Pro', 'GGU': 'Gly',
         'UAC': 'Tyr', 'CUA': 'Leu', 'GUA': 'Val', 'AGA': 'Arg',
+        'AUC': 'Ile', 'CGA': 'Arg',
         'UAA': 'Stop', 'UAG': 'Stop', 'UGA': 'Stop'
+    },
+    modeMeta: {
+        transcription: {
+            label: '转录 (DNA→mRNA)',
+            title: '转录：DNA 信息被拷贝成 RNA',
+            desc: 'RNA 聚合酶沿模板链读取 DNA，并按互补配对合成 5′→3′ 方向的 RNA；真核细胞中蛋白编码转录产物还要加工成熟。'
+        },
+        translation: {
+            label: '翻译 (mRNA→蛋白质)',
+            title: '翻译：核糖体按密码子连接氨基酸',
+            desc: '核糖体从 mRNA 的起始密码子开始，以三个碱基为一组读取密码子，tRNA 带来对应氨基酸，直到遇到终止密码子。'
+        }
     },
 
     init() {
@@ -61,21 +74,24 @@ const GeneExpression = {
         const ctrl = document.getElementById('gene-expression-controls');
         if (!ctrl) return;
         ctrl.innerHTML = '';
-        const modes = [
-            { id: 'transcription', label: '\u8F6C\u5F55 (DNA\u2192mRNA)' },
-            { id: 'translation', label: '\u7FFB\u8BD1 (mRNA\u2192\u86CB\u767D\u8D28)' }
-        ];
         const btnWrap = document.createElement('div');
         btnWrap.className = 'genexp-mode-btns';
-        modes.forEach(m => {
+        btnWrap.setAttribute('role', 'group');
+        btnWrap.setAttribute('aria-label', '基因表达观察模式');
+        Object.entries(this.modeMeta).forEach(([id, m]) => {
             const b = document.createElement('button');
-            b.className = m.id === this.mode ? 'btn btn--primary btn--sm' : 'btn btn--ghost btn--sm';
+            b.type = 'button';
+            b.className = 'genexp-btn' + (id === this.mode ? ' active' : '');
+            b.dataset.mode = id;
             b.textContent = m.label;
+            b.setAttribute('aria-pressed', id === this.mode ? 'true' : 'false');
             this._on(b, 'click', () => {
-                this.mode = m.id;
+                this.mode = id;
                 this.progress = 0;
-                btnWrap.querySelectorAll('.btn').forEach(x => { x.className = 'btn btn--ghost btn--sm'; });
-                b.className = 'btn btn--primary btn--sm';
+                btnWrap.querySelectorAll('.genexp-btn').forEach(x => {
+                    x.classList.toggle('active', x === b);
+                    x.setAttribute('aria-pressed', x === b ? 'true' : 'false');
+                });
                 this._updateInfo();
             });
             btnWrap.appendChild(b);
@@ -87,13 +103,30 @@ const GeneExpression = {
         label.innerHTML = '<span>\u901F\u5EA6</span>';
         const inp = document.createElement('input');
         inp.type = 'range'; inp.min = 0.3; inp.max = 3; inp.step = 0.1; inp.value = 1;
-        this._on(inp, 'input', () => { this.speed = parseFloat(inp.value); });
+        const speedVal = document.createElement('span');
+        speedVal.className = 'genexp-speed__value';
+        speedVal.textContent = '1.0x';
+        this._on(inp, 'input', () => {
+            this.speed = parseFloat(inp.value);
+            speedVal.textContent = this.speed.toFixed(1) + 'x';
+        });
         label.appendChild(inp);
+        label.appendChild(speedVal);
         ctrl.appendChild(label);
+        const playBtn = document.createElement('button');
+        playBtn.type = 'button';
+        playBtn.className = 'genexp-btn genexp-btn--utility';
+        playBtn.textContent = '暂停';
+        this._on(playBtn, 'click', () => {
+            this.autoPlay = !this.autoPlay;
+            playBtn.textContent = this.autoPlay ? '暂停' : '播放';
+        });
+        ctrl.appendChild(playBtn);
         // replay
         const btn = document.createElement('button');
-        btn.className = 'btn btn--ghost btn--sm';
-        btn.textContent = '\u21BA \u91CD\u64AD';
+        btn.type = 'button';
+        btn.className = 'genexp-btn genexp-btn--utility';
+        btn.textContent = '重播';
         this._on(btn, 'click', () => { this.progress = 0; });
         ctrl.appendChild(btn);
     },
@@ -106,30 +139,54 @@ const GeneExpression = {
     _baseColor(base) {
         return { 'A': 'rgba(100,200,100,0.8)', 'T': 'rgba(220,80,80,0.8)', 'U': 'rgba(255,150,50,0.8)', 'C': 'rgba(100,150,255,0.8)', 'G': 'rgba(255,200,50,0.8)' }[base] || 'rgba(200,200,200,0.5)';
     },
+    _molecules() {
+        const template = this.dnaTemplate.join('');
+        const coding = this.dnaTemplate.map(b => this._dnaComplement(b)).join('');
+        const mrna = this.dnaTemplate.map(b => this._complement(b)).join('');
+        const codons = [];
+        for (let i = 0; i < mrna.length - 2; i += 3) {
+            codons.push(mrna.slice(i, i + 3));
+        }
+        const aminoAcids = [];
+        for (const codon of codons) {
+            const aa = this.codonTable[codon] || '未定';
+            if (aa === 'Stop') break;
+            aminoAcids.push(aa);
+        }
+        return { template, coding, mrna, codons, aminoAcids };
+    },
 
     _drawTranscription(t) {
         const ctx = this.ctx, W = this.W, H = this.H;
+        const compact = W < 520;
         const fs = Math.max(13, W * 0.012);
         const dna = this.dnaTemplate;
         const n = dna.length;
-        const bw = Math.min(36, (W - 80) / n);
+        const bw = Math.min(36, (W - (compact ? 34 : 80)) / n);
         const startX = (W - n * bw) / 2;
         const dnaY = H * 0.3;
         const mrnaY = H * 0.6;
 
         // title
-        ctx.font = 'bold ' + (fs + 8) + 'px ' + CF.sans;
+        ctx.font = 'bold ' + (compact ? fs + 4 : fs + 8) + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(58,158,143,0.9)';
-        ctx.fillText('\u8F6C\u5F55\u8FC7\u7A0B: DNA \u2192 mRNA', W / 2, 24);
+        ctx.fillText(compact ? '\u8F6C\u5F55\uFF1ADNA \u2192 mRNA' : '\u8F6C\u5F55\u8FC7\u7A0B: DNA \u2192 mRNA', W / 2, 24);
 
         // labels
         ctx.font = (fs + 5) + 'px ' + CF.sans;
-        ctx.textAlign = 'right';
         ctx.fillStyle = 'rgba(200,200,200,0.6)';
-        ctx.fillText('DNA \u6A21\u677F\u94FE (3\u2032\u21925\u2032)', startX - 8, dnaY + 5);
-        ctx.fillText('DNA \u7F16\u7801\u94FE (5\u2032\u21923\u2032)', startX - 8, dnaY - 25);
-        ctx.fillText('mRNA (5\u2032\u21923\u2032)', startX - 8, mrnaY + 5);
+        if (compact) {
+            ctx.textAlign = 'left';
+            ctx.fillText('\u7F16\u7801\u94FE 5\u2032\u21923\u2032', startX, dnaY - 40);
+            ctx.fillText('\u6A21\u677F\u94FE 3\u2032\u21925\u2032', startX, dnaY + 38);
+            ctx.fillText('mRNA 5\u2032\u21923\u2032', startX, mrnaY - 8);
+        } else {
+            ctx.textAlign = 'right';
+            ctx.fillText('DNA \u6A21\u677F\u94FE (3\u2032\u21925\u2032)', startX - 8, dnaY + 5);
+            ctx.fillText('DNA \u7F16\u7801\u94FE (5\u2032\u21923\u2032)', startX - 8, dnaY - 25);
+            ctx.fillText('mRNA (5\u2032\u21923\u2032)', startX - 8, mrnaY + 5);
+        }
 
         // RNA polymerase position
         const polyPos = Math.floor(this.progress * n);
@@ -220,26 +277,32 @@ const GeneExpression = {
 
     _drawTranslation(t) {
         const ctx = this.ctx, W = this.W, H = this.H;
+        const compact = W < 520;
         const fs = Math.max(13, W * 0.012);
         const dna = this.dnaTemplate;
         // generate mRNA from DNA template
         const mrna = dna.map(b => this._complement(b));
         const n = mrna.length;
-        const bw = Math.min(30, (W - 80) / n);
+        const bw = Math.min(30, (W - (compact ? 34 : 80)) / n);
         const startX = (W - n * bw) / 2;
         const mrnaY = H * 0.35;
         const proteinY = H * 0.72;
 
-        ctx.font = 'bold ' + (fs + 8) + 'px ' + CF.sans;
+        ctx.font = 'bold ' + (compact ? fs + 4 : fs + 8) + 'px ' + CF.sans;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(58,158,143,0.9)';
-        ctx.fillText('\u7FFB\u8BD1\u8FC7\u7A0B: mRNA \u2192 \u86CB\u767D\u8D28 (\u6C28\u57FA\u9178\u94FE)', W / 2, 24);
+        ctx.fillText(compact ? '\u7FFB\u8BD1\uFF1AmRNA \u2192 \u86CB\u767D\u8D28' : '\u7FFB\u8BD1\u8FC7\u7A0B: mRNA \u2192 \u86CB\u767D\u8D28 (\u6C28\u57FA\u9178\u94FE)', W / 2, 24);
 
         // draw mRNA strand
         ctx.font = fs + 'px ' + CF.sans;
-        ctx.textAlign = 'right';
         ctx.fillStyle = 'rgba(200,200,200,0.5)';
-        ctx.fillText('mRNA', startX - 6, mrnaY + 12);
+        if (compact) {
+            ctx.textAlign = 'left';
+            ctx.fillText('mRNA', startX, mrnaY - 8);
+        } else {
+            ctx.textAlign = 'right';
+            ctx.fillText('mRNA', startX - 6, mrnaY + 12);
+        }
 
         for (let i = 0; i < n; i++) {
             const x = startX + i * bw;
@@ -305,9 +368,14 @@ const GeneExpression = {
 
         // tRNA + amino acid chain
         ctx.font = fs + 'px ' + CF.sans;
-        ctx.textAlign = 'right';
         ctx.fillStyle = 'rgba(200,200,200,0.5)';
-        ctx.fillText('\u6C28\u57FA\u9178\u94FE', startX - 6, proteinY + 5);
+        if (compact) {
+            ctx.textAlign = 'left';
+            ctx.fillText('\u6C28\u57FA\u9178\u94FE', startX, proteinY - 30);
+        } else {
+            ctx.textAlign = 'right';
+            ctx.fillText('\u6C28\u57FA\u9178\u94FE', startX - 6, proteinY + 5);
+        }
 
         const aaColors = [
             'rgba(100,200,100,0.7)', 'rgba(200,100,100,0.7)', 'rgba(100,150,255,0.7)',
@@ -316,7 +384,7 @@ const GeneExpression = {
 
         for (let i = 0; i < Math.min(riboPos, codons.length); i++) {
             const codon = codons[i];
-            const aa = this.codonTable[codon] || '?';
+            const aa = this.codonTable[codon] || '未定';
             if (aa === 'Stop') break;
             const ax = startX + i * 40 + 20;
             // amino acid circle
@@ -385,34 +453,55 @@ const GeneExpression = {
         const el = document.getElementById('genexp-info');
         if (!el) return;
         el.innerHTML = `
-            <div class="genexp-info__hd">📘 基因表达知识点</div>
+            <div class="genexp-info__hd">基因表达知识点</div>
             <div class="genexp-info__grid">
                 <div class="genexp-info__block">
                     <div class="genexp-info__sub">当前过程</div>
-                    <div id="genexp-mode-display" class="genexp-info__val">转录 (DNA→mRNA)</div>
+                    <div id="genexp-mode-display" class="genexp-info__val"></div>
+                    <div id="genexp-mode-desc" class="genexp-info__desc"></div>
                 </div>
                 <div class="genexp-info__block">
                     <div class="genexp-info__sub">中心法则</div>
-                    <div class="genexp-info__row"><span class="genexp-info__key" style="--c:var(--color-teal,#3a9e8f)">转录</span> DNA → mRNA（RNA聚合酶，细胞核）</div>
-                    <div class="genexp-info__row"><span class="genexp-info__key" style="--c:var(--color-purple,#8b6fc0)">翻译</span> mRNA → 蛋白质（核糖体，细胞质）</div>
+                    <div class="genexp-info__row"><span class="genexp-info__key" style="--c:var(--color-teal,#3a9e8f)">转录</span> DNA 信息被拷贝到 RNA。</div>
+                    <div class="genexp-info__row"><span class="genexp-info__key" style="--c:var(--color-purple,#8b6fc0)">翻译</span> mRNA 密码子指定氨基酸顺序。</div>
                 </div>
                 <div class="genexp-info__block">
-                    <div class="genexp-info__sub">碱基配对规则</div>
-                    <div class="genexp-info__row"><span class="genexp-info__key" style="--c:#e06c75">转录</span> A-U, T-A, C-G, G-C</div>
-                    <div class="genexp-info__row"><span class="genexp-info__key" style="--c:#e5c07b">翻译</span> 密码子与反密码子互补配对</div>
+                    <div class="genexp-info__sub">读码规则</div>
+                    <div class="genexp-info__row"><span class="genexp-info__key" style="--c:#e06c75">配对</span>转录时 A-U、T-A、C-G、G-C。</div>
+                    <div class="genexp-info__row"><span class="genexp-info__key" style="--c:#e5c07b">三联体</span>翻译时每 3 个 mRNA 碱基构成 1 个密码子。</div>
                 </div>
                 <div class="genexp-info__block">
-                    <div class="genexp-info__sub">💡 知识要点</div>
-                    <div class="genexp-info__note">mRNA上每3个相邻碱基构成一个密码子，编码一个氨基酸。AUG为起始密码子(Met)，UAA/UAG/UGA为终止密码子。</div>
+                    <div class="genexp-info__sub">当前位置</div>
+                    <div id="genexp-readout" class="genexp-info__desc"></div>
+                </div>
+                <div class="genexp-info__block">
+                    <div class="genexp-info__sub">真核细胞边界</div>
+                    <div class="genexp-info__note">真核蛋白编码基因通常先转录为 pre-mRNA，经 5′ 端加帽、3′ poly-A 尾和剪接后，成熟 mRNA 才进入细胞质参与翻译。</div>
+                </div>
+                <div class="genexp-info__block">
+                    <div class="genexp-info__sub">模型边界</div>
+                    <div class="genexp-info__note">画布展示的是概念流程：未呈现启动子、增强子、完整转录因子网络、翻译后修饰，也不表示所有基因都表达为蛋白质。</div>
                 </div>
             </div>
+            <div class="genexp-info__source">资料依据：OpenStax Biology 2e 15.1、15.3、15.4、15.5。</div>
         `;
+        this._updateInfo();
     },
 
     _updateInfo() {
-        const el = document.getElementById('genexp-mode-display');
-        if (el) {
-            el.textContent = this.mode === 'transcription' ? '转录 (DNA→mRNA)' : '翻译 (mRNA→蛋白质)';
+        const meta = this.modeMeta[this.mode] || this.modeMeta.transcription;
+        const title = document.getElementById('genexp-mode-display');
+        const desc = document.getElementById('genexp-mode-desc');
+        const readout = document.getElementById('genexp-readout');
+        if (title) title.textContent = meta.title;
+        if (desc) desc.textContent = meta.desc;
+        if (readout) {
+            const data = this._molecules();
+            if (this.mode === 'translation') {
+                readout.textContent = `mRNA ${data.mrna} · 密码子 ${data.codons.join(' | ')} · 多肽链 ${data.aminoAcids.join('-')}，遇到 ${data.codons[data.aminoAcids.length]} 终止。`;
+            } else {
+                readout.textContent = `模板链 ${data.template} · 编码链 ${data.coding} · 转录产物 mRNA ${data.mrna}。`;
+            }
         }
     },
 

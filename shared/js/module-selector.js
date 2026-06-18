@@ -9,6 +9,12 @@ const ModuleSelector = {
     _sidebarOpen: {},   // { pageName: bool }
     _swipeBackCtrls: {}, // { pageName: SwipeBack controller }
 
+    _getExperimentGuide() {
+        if (window.ExperimentGuide) return window.ExperimentGuide;
+        if (globalThis.ExperimentGuide) return globalThis.ExperimentGuide;
+        return typeof ExperimentGuide !== 'undefined' ? ExperimentGuide : null;
+    },
+
     init() {
         const pages = ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology'];
         pages.forEach(page => {
@@ -20,6 +26,7 @@ const ModuleSelector = {
             this._sidebarOpen[page] = false;
 
             this.createSidebar(page, pageEl);
+            this.createLearningOverview(page, pageEl);
             this.createGallery(page, pageEl);
         });
 
@@ -63,11 +70,11 @@ const ModuleSelector = {
         // Experiment items
         experiments.forEach((exp, idx) => {
             if (exp.variant === 'upcoming') return;
-
             const item = document.createElement('button');
             item.className = 'module-sidebar__item';
             item.dataset.moduleTarget = exp.id;
             item.setAttribute('aria-label', exp.title);
+            item.title = exp.description || exp.title;
 
             item.innerHTML = `
                 <span class="module-sidebar__item-icon"><i data-lucide="${exp.icon || 'box'}"></i></span>
@@ -98,6 +105,73 @@ const ModuleSelector = {
         if (typeof lucide !== 'undefined') lucide.createIcons();
     },
 
+    createLearningOverview(page, pageEl) {
+        const experiments = CONFIG.experiments[page];
+        const hero = pageEl.querySelector('.page-hero');
+        const learning = CONFIG.learningDesign;
+        const subject = learning && learning.subjects ? learning.subjects[page] : null;
+        if (!experiments || !hero || !subject) return;
+
+        const activeCount = experiments.filter(exp => exp.variant !== 'upcoming').length;
+        const label = this._escapeHtml(CONFIG.pages[page]?.label || page);
+        const methodText = subject.teachingNote || '建议先完成基础实验，再进入带有模型近似或跨学科背景的主题。每个实验都配有观察任务、可调参数和小测验。';
+        const featured = experiments.filter(exp => exp.variant !== 'upcoming').slice(0, 3).map((exp, idx) => `
+            <div class="learning-path__item">
+                <span class="learning-path__index">${String(idx + 1).padStart(2, '0')}</span>
+                <strong>${this._escapeHtml(exp.title)}</strong>
+                <p>${this._escapeHtml(exp.description || '')}</p>
+            </div>
+        `).join('');
+        const sourceLinks = (subject.sources || []).slice(0, 6).map(source => {
+            const item = this._normalizeLearningSource(source);
+            if (!item.label) return '';
+            if (item.url) {
+                return `<a href="${this._escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${this._escapeHtml(item.label)}</a>`;
+            }
+            return `<span>${this._escapeHtml(item.label)}</span>`;
+        }).join('');
+        const sourceBlock = sourceLinks ? `
+            <div class="learning-overview__sources" aria-label="${label}参考资料">
+                <span>参考资料</span>
+                ${sourceLinks}
+            </div>
+        ` : '';
+        const sourceNote = learning.sourceNote ? `
+            <div class="learning-overview__note" aria-label="${label}学习说明">
+                <i data-lucide="book-open"></i>
+                <p>${this._escapeHtml(learning.sourceNote)}</p>
+            </div>
+        ` : '';
+
+        const overview = document.createElement('section');
+        overview.className = 'learning-overview';
+        overview.id = `learning-overview-${page}`;
+        overview.setAttribute('aria-label', `${label}学习地图`);
+        overview.innerHTML = `
+            <div class="learning-overview__copy">
+                <span class="learning-overview__eyebrow">${label} · 学习地图</span>
+                <h2>${this._escapeHtml(CONFIG.pages[page]?.title || label)}</h2>
+                <p>${this._escapeHtml(subject.overview || CONFIG.pages[page]?.desc || '')}</p>
+            </div>
+            <div class="learning-overview__ledger" aria-label="学习概览">
+                <div><span>实验数</span><strong>${activeCount}</strong></div>
+                <div><span>学习方式</span><strong>互动观察</strong></div>
+                <div><span>练习入口</span><strong>小测验</strong></div>
+            </div>
+            <div class="learning-overview__method">
+                <i data-lucide="route"></i>
+                <p>${this._escapeHtml(methodText)}</p>
+            </div>
+            ${sourceNote}
+            ${sourceBlock}
+            <div class="learning-path" aria-label="${label}推荐学习起点">
+                ${featured}
+            </div>
+        `;
+
+        hero.insertAdjacentElement('afterend', overview);
+    },
+
     createGallery(page, pageEl) {
         const experiments = CONFIG.experiments[page];
         if (!experiments || experiments.length === 0) return;
@@ -111,6 +185,7 @@ const ModuleSelector = {
 
         experiments.forEach((exp, idx) => {
             if (exp.variant === 'upcoming') return;
+            const meta = this.getLearningMeta(page, exp);
 
             const card = document.createElement('div');
             card.className = 'module-card';
@@ -118,11 +193,20 @@ const ModuleSelector = {
             card.setAttribute('role', 'button');
             card.setAttribute('tabindex', '0');
             card.setAttribute('aria-label', exp.title);
+            card.title = exp.description || exp.title;
 
             card.innerHTML = `
-                <div class="module-card__icon"><i data-lucide="${exp.icon || 'box'}"></i></div>
-                <div class="module-card__title">${exp.title}</div>
-                <div class="module-card__desc">${exp.description}</div>
+                <div class="module-card__topline">
+                    <div class="module-card__icon"><i data-lucide="${this._escapeHtml(exp.icon || 'box')}"></i></div>
+                </div>
+                <div class="module-card__title">${this._escapeHtml(exp.title)}</div>
+                <div class="module-card__desc">${this._escapeHtml(exp.description)}</div>
+                <div class="module-card__learning">
+                    <div>
+                        <span>学习目标</span>
+                        <p>${this._escapeHtml(meta.task)}</p>
+                    </div>
+                </div>
                 <div class="module-card__badge">${String(idx + 1).padStart(2, '0')}</div>
             `;
 
@@ -136,13 +220,40 @@ const ModuleSelector = {
             gallery.appendChild(card);
         });
 
-        hero.insertAdjacentElement('afterend', gallery);
+        const overview = document.getElementById(`learning-overview-${page}`);
+        (overview || hero).insertAdjacentElement('afterend', gallery);
         pageEl.classList.add('module-gallery-active');
 
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
         // Show favorite indicators on gallery cards
         if (window.ExperimentFavorites) ExperimentFavorites.updateGalleryCards();
+    },
+
+    getLearningMeta(page, exp) {
+        const learning = CONFIG.learningDesign || {};
+        const focus = learning.focus ? learning.focus[exp.id] : null;
+        return {
+            task: focus?.task || `观察 ${exp.title} 中参数变化与结论的对应关系。`
+        };
+    },
+
+    _normalizeLearningSource(source) {
+        if (!source) return { label: '', url: '' };
+        if (typeof source === 'string') return { label: source, url: '' };
+        return {
+            label: source.label || source.title || source.url || '',
+            url: /^https?:\/\//i.test(source.url || '') ? source.url : ''
+        };
+    },
+
+    _escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     },
 
     openModule(page, moduleId) {
@@ -235,7 +346,8 @@ const ModuleSelector = {
         if (!pageEl) return;
 
         // Hide experiment guide help button
-        if (window.ExperimentGuide) ExperimentGuide.hideHelpButton();
+        const guide = this._getExperimentGuide();
+        if (guide) guide.hideHelpButton();
 
         // Hide export button (E-03)
         if (window.ExperimentExport) ExperimentExport.hide();
@@ -342,120 +454,162 @@ const ModuleSelector = {
     // Only initialize a module when it is first opened.
     _initModule(page, moduleId) {
         const key = `${page}:${moduleId}`;
-        if (this._initialized[key]) return;
-        this._initialized[key] = true;
+        if (this._initialized[key]) {
+            this._showModuleTools(page, moduleId);
+            return;
+        }
 
         // Map moduleId to init function
+        const retryInit = (fnName) => {
+            const fn = window[fnName];
+            if (typeof fn !== 'function') return false;
+            fn();
+            return true;
+        };
         const initMap = {
             // Mathematics
-            'function-graph': () => { if (typeof initFunctionGraph === 'function') initFunctionGraph(); },
-            'calculus': () => { if (typeof initCalculus === 'function') initCalculus(); },
-            'geometry': () => { if (typeof initGeoTransform === 'function') initGeoTransform(); },
-            'complex': () => { if (typeof initComplexVis === 'function') initComplexVis(); },
-            'trigonometry': () => { if (typeof initTrigVis === 'function') initTrigVis(); },
-            'set-operations': () => { if (typeof initSetOps === 'function') initSetOps(); },
-            'probability': () => { if (typeof initProbability === 'function') initProbability(); },
-            'vector-ops': () => { if (typeof initVectorOps === 'function') initVectorOps(); },
-            'inequality': () => { if (typeof initInequality === 'function') initInequality(); },
-            'conic-sections': () => { if (typeof initConicSections === 'function') initConicSections(); },
-            'solid-geometry': () => { if (typeof initSolidGeom === 'function') initSolidGeom(); },
-            'permutation-combination': () => { if (typeof initPermComb === 'function') initPermComb(); },
-            'sequences': () => { if (typeof initSequences === 'function') initSequences(); },
-            'function-properties': () => { if (typeof initFuncProps === 'function') initFuncProps(); },
-            'exp-log': () => { if (typeof initExpLog === 'function') initExpLog(); },
+            'function-graph': () => retryInit('initFunctionGraph'),
+            'calculus': () => retryInit('initCalculus'),
+            'geometry': () => retryInit('initGeoTransform'),
+            'complex': () => retryInit('initComplexVis'),
+            'trigonometry': () => retryInit('initTrigVis'),
+            'set-operations': () => retryInit('initSetOps'),
+            'probability': () => retryInit('initProbability'),
+            'vector-ops': () => retryInit('initVectorOps'),
+            'inequality': () => retryInit('initInequality'),
+            'conic-sections': () => retryInit('initConicSections'),
+            'solid-geometry': () => retryInit('initSolidGeom'),
+            'permutation-combination': () => retryInit('initPermComb'),
+            'sequences': () => retryInit('initSequences'),
+            'function-properties': () => retryInit('initFuncProps'),
+            'exp-log': () => retryInit('initExpLog'),
+            'binomial-theorem': () => retryInit('initBinomial'),
+            'statistics-regression': () => retryInit('initStatReg'),
+            'modeling-numerical': () => retryInit('initModelingNumerical'),
+            'spatial-vector': () => retryInit('initSpatialVec'),
+            'derivative-application': () => retryInit('initDerivApp'),
 
             // Physics
-            'mechanics': () => { if (typeof initPhysics === 'function') initPhysics(); },
-            'electromagnetism': () => { if (typeof initElectromagnetic === 'function') initElectromagnetic(); },
-            'waves': () => { if (typeof initWaves === 'function') initWaves(); },
-            'relativity': () => { if (typeof initRelativity === 'function') initRelativity(); },
-            'fluid-dynamics': () => { if (typeof initFluidDynamics === 'function') initFluidDynamics(); },
-            'optics': () => { if (typeof initOptics === 'function') initOptics(); },
-            'kinematics': () => { if (typeof initKinematics === 'function') initKinematics(); },
-            'projectile': () => { if (typeof initProjectile === 'function') initProjectile(); },
-            'circular-motion': () => { if (typeof initCircularMotion === 'function') initCircularMotion(); },
-            'energy-conservation': () => { if (typeof initEnergyConservation === 'function') initEnergyConservation(); },
-            'circuit-analysis': () => { if (typeof initCircuitAnalysis === 'function') initCircuitAnalysis(); },
-            'em-induction': () => { if (typeof initEMInduction === 'function') initEMInduction(); },
-            'alternating-current': () => { if (typeof initACCircuit === 'function') initACCircuit(); },
-            'gravitation': () => { if (typeof initGravitation === 'function') initGravitation(); },
-            'force-composition': () => { if (typeof initForceComposition === 'function') initForceComposition(); },
-            'momentum-conservation': () => { if (typeof initMomentumConservation === 'function') initMomentumConservation(); },
-            'charged-particle': () => { if (typeof initChargedParticle === 'function') initChargedParticle(); },
+            'mechanics': () => retryInit('initPhysics'),
+            'gas-laws': () => retryInit('initGasLaws'),
+            'thermodynamics': () => retryInit('initThermodynamics'),
+            'electromagnetism': () => retryInit('initElectromagnetic'),
+            'waves': () => retryInit('initWaves'),
+            'relativity': () => retryInit('initRelativity'),
+            'fluid-dynamics': () => retryInit('initFluidDynamics'),
+            'optics': () => retryInit('initOptics'),
+            'kinematics': () => retryInit('initKinematics'),
+            'projectile': () => retryInit('initProjectile'),
+            'circular-motion': () => retryInit('initCircularMotion'),
+            'energy-conservation': () => retryInit('initEnergyConservation'),
+            'circuit-analysis': () => retryInit('initCircuitAnalysis'),
+            'em-induction': () => retryInit('initEMInduction'),
+            'alternating-current': () => retryInit('initACCircuit'),
+            'gravitation': () => retryInit('initGravitation'),
+            'force-composition': () => retryInit('initForceComposition'),
+            'momentum-conservation': () => retryInit('initMomentumConservation'),
+            'charged-particle': () => retryInit('initChargedParticle'),
+            'atomic-physics': () => retryInit('initAtomicPhysics'),
 
             // Chemistry
-            'periodic-table': () => { if (typeof initPeriodicTable === 'function') initPeriodicTable(); },
-            'molecular-structure': () => { if (typeof initMoleculeVis === 'function') initMoleculeVis(); },
-            'reactions': () => { if (typeof initChemReaction === 'function') initChemReaction(); },
-            'chemical-equilibrium': () => { if (typeof initChemEquilibrium === 'function') initChemEquilibrium(); },
-            'electrochemistry': () => { if (typeof initElectrochemistry === 'function') initElectrochemistry(); },
-            'chemical-bond': () => { if (typeof initChemBond === 'function') initChemBond(); },
-            'organic-chemistry': () => { if (typeof initOrganicChem === 'function') initOrganicChem(); },
-            'reaction-rate': () => { if (typeof initReactionRate === 'function') initReactionRate(); },
-            'solution-ionization': () => { if (typeof initSolutionIon === 'function') initSolutionIon(); },
-            'ionic-reaction': () => { if (typeof initIonicReaction === 'function') initIonicReaction(); },
-            'redox': () => { if (typeof initRedox === 'function') initRedox(); },
-            'atomic-structure': () => { if (typeof initAtomicStructure === 'function') initAtomicStructure(); },
+            'periodic-table': () => retryInit('initPeriodicTable'),
+            'molecular-structure': () => retryInit('initMoleculeVis'),
+            'hybrid-orbitals': () => retryInit('initHybridOrbitals'),
+            'crystal-structures': () => retryInit('initCrystalStructures'),
+            'reactions': () => retryInit('initChemReaction'),
+            'chemical-equilibrium': () => retryInit('initChemEquilibrium'),
+            'electrochemistry': () => retryInit('initElectrochemistry'),
+            'chemical-bond': () => retryInit('initChemBond'),
+            'organic-chemistry': () => retryInit('initOrganicChem'),
+            'reaction-rate': () => retryInit('initReactionRate'),
+            'solution-ionization': () => retryInit('initSolutionIon'),
+            'ionic-reaction': () => retryInit('initIonicReaction'),
+            'redox': () => retryInit('initRedox'),
+            'atomic-structure': () => retryInit('initAtomicStructure'),
+            'element-compounds': () => retryInit('initElementCompounds'),
+            'intermolecular-forces': () => retryInit('initIntermolecular'),
+            'experiments': () => retryInit('initChemVirtualExperiments'),
 
             // Algorithms
-            'sorting': () => { /* algorithms.js self-inits */ },
-            'searching': () => { if (typeof initSearchAlgorithms === 'function') initSearchAlgorithms(); },
-            'graph': () => { if (typeof initGraphAlgo === 'function') initGraphAlgo(); },
-            'data-structures': () => { if (typeof initDataStructVis === 'function') initDataStructVis(); },
-            'sorting-compare': () => { if (typeof initSortCompare === 'function') initSortCompare(); },
-            'recursion-vis': () => { if (typeof initRecursionVis === 'function') initRecursionVis(); },
-            'dynamic-programming': () => { if (typeof initDPVis === 'function') initDPVis(); },
-            'string-matching': () => { if (typeof initStringMatch === 'function') initStringMatch(); },
+            'sorting': () => true, // algorithms.js self-inits
+            'searching': () => retryInit('initSearchAlgorithms'),
+            'hash-tables': () => retryInit('initHashTablesLab'),
+            'bst-avl': () => retryInit('initBSTAVL'),
+            'graph': () => retryInit('initGraphAlgo'),
+            'mst-compare': () => retryInit('initMSTCompare'),
+            'greedy-scheduling': () => retryInit('initGreedyScheduling'),
+            'data-structures': () => retryInit('initDataStructVis'),
+            'sorting-compare': () => retryInit('initSortCompare'),
+            'recursion-vis': () => retryInit('initRecursionVis'),
+            'dynamic-programming': () => retryInit('initDPVis'),
+            'string-matching': () => retryInit('initStringMatch'),
 
             // Biology
-            'cell-structure': () => { if (typeof initCellStructure === 'function') initCellStructure(); },
-            'dna': () => { if (typeof initDNAHelix === 'function') initDNAHelix(); },
-            'photosynthesis': () => { if (typeof initPhotosynthesis === 'function') initPhotosynthesis(); },
-            'genetics': () => { if (typeof initGenetics === 'function') initGenetics(); },
-            'mitosis': () => { if (typeof initMitosis === 'function') initMitosis(); },
-            'meiosis': () => { if (typeof initMeiosis === 'function') initMeiosis(); },
-            'gene-expression': () => { if (typeof initGeneExpression === 'function') initGeneExpression(); },
-            'cellular-respiration': () => { if (typeof initCellularResp === 'function') initCellularResp(); },
-            'substance-transport': () => { if (typeof initSubstanceTransport === 'function') initSubstanceTransport(); },
-            'gene-mutation': () => { if (typeof initGeneMutation === 'function') initGeneMutation(); },
-            'neural-regulation': () => { if (typeof initNeuralReg === 'function') initNeuralReg(); },
-            'immune-system': () => { if (typeof initImmuneSystem === 'function') initImmuneSystem(); },
-            'ecosystem': () => { if (typeof initEcosystem === 'function') initEcosystem(); },
+            'cell-structure': () => retryInit('initCellStructure'),
+            'dna': () => retryInit('initDNAHelix'),
+            'photosynthesis': () => retryInit('initPhotosynthesis'),
+            'enzyme-properties': () => retryInit('initEnzymeProperties'),
+            'homeostasis': () => retryInit('initHomeostasis'),
+            'humoral-regulation': () => retryInit('initHumoralRegulation'),
+            'genetics': () => retryInit('initGenetics'),
+            'mitosis': () => retryInit('initMitosis'),
+            'meiosis': () => retryInit('initMeiosis'),
+            'gene-expression': () => retryInit('initGeneExpression'),
+            'gene-engineering': () => retryInit('initGeneEngineering'),
+            'cellular-respiration': () => retryInit('initCellularResp'),
+            'substance-transport': () => retryInit('initSubstanceTransport'),
+            'gene-mutation': () => retryInit('initGeneMutation'),
+            'neural-regulation': () => retryInit('initNeuralReg'),
+            'immune-system': () => retryInit('initImmuneSystem'),
+            'population-community': () => retryInit('initPopulationCommunity'),
+            'material-cycles': () => retryInit('initMaterialCycles'),
+            'ecosystem': () => retryInit('initEcosystem'),
         };
 
         const initFn = initMap[moduleId];
         if (initFn) {
             // Small delay to ensure DOM is visible and has layout before init
-            setTimeout(() => {
-                initFn();
+            const runInit = (attempt = 0) => {
+                const initialized = initFn();
+                if (initialized === false && attempt < 20) {
+                    setTimeout(() => runInit(attempt + 1), 100);
+                    return;
+                }
+                this._initialized[key] = true;
                 if (page === 'physics' && window.PhysicsZoom && typeof window.PhysicsZoom.init === 'function') {
                     window.PhysicsZoom.init();
                 }
                 if (page === 'biology' && window.BiologyZoom && typeof window.BiologyZoom.init === 'function') {
                     window.BiologyZoom.init();
                 }
-                // Show experiment guide on first visit
-                if (window.ExperimentGuide) {
-                    ExperimentGuide.showIfFirstTime(page, moduleId);
-                    ExperimentGuide.showHelpButton(page, moduleId);
-                }
-                // Show export button (E-03)
-                if (window.ExperimentExport) {
-                    ExperimentExport.show(page, moduleId);
-                }
-                // Show quiz FAB (X-02)
-                if (window.ExperimentQuiz) {
-                    ExperimentQuiz.show(moduleId);
-                }
-                // Show favorites button
-                if (window.ExperimentFavorites) {
-                    ExperimentFavorites.show(moduleId);
-                }
-                // Show rating card after delay
-                if (window.ExperimentRating) {
-                    ExperimentRating.show(moduleId);
-                }
-            }, 50);
+                this._showModuleTools(page, moduleId);
+            };
+            setTimeout(() => runInit(), 50);
+        }
+    },
+
+    _showModuleTools(page, moduleId) {
+        // Show experiment guide on first visit
+        const guide = this._getExperimentGuide();
+        if (guide) {
+            guide.showIfFirstTime(page, moduleId);
+            guide.showHelpButton(page, moduleId);
+        }
+        // Show export button (E-03)
+        if (window.ExperimentExport) {
+            ExperimentExport.show(page, moduleId);
+        }
+        // Show quiz FAB (X-02)
+        if (window.ExperimentQuiz) {
+            ExperimentQuiz.show(moduleId);
+        }
+        // Show favorites button
+        if (window.ExperimentFavorites) {
+            ExperimentFavorites.show(moduleId);
+        }
+        // Show rating card after delay
+        if (window.ExperimentRating) {
+            ExperimentRating.show(moduleId);
         }
     },
 

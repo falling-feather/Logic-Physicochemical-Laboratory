@@ -1,11 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
- * About 模块 —— 自动同步仓库 Markdown 渲染（开源协议 / 更新日志）
- *
- * - 开源协议：从 LICENSE.md 拉取并整段渲染
- * - 更新日志：从 README.md 拉取，截取 "## 📝 更新日志" 段落
- *
- * 按需懒加载 marked.js（jsDelivr CDN），结果在内存中缓存，
- * 同一会话内不再重复网络请求。
+ * About 模块 —— 开源协议与用户版更新摘要
  * ═══════════════════════════════════════════════════════════════ */
 
 (() => {
@@ -14,6 +8,36 @@
     const MARKED_CDN = 'https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js';
     const cache = Object.create(null);
     let markedPromise = null;
+
+    const PUBLIC_CHANGELOG = [
+        {
+            date: '2026-06-18',
+            title: '多学科学习地图升级',
+            items: [
+                '首页学科地图补充了学习建议、主题层级与参考资料入口。',
+                '数学、物理、化学、生物、算法等模块的实验卡片说明更贴近学习任务。',
+                '新增工程、材料、信息技术、数据科学、人文与宇宙等方向的可视化入口。'
+            ]
+        },
+        {
+            date: '2026-06-18',
+            title: '知识内容与交互细化',
+            items: [
+                '生命科学模块补充细胞呼吸、光合作用等主题的概念边界与参考教材。',
+                '理化模块加强单位、模型近似和适用条件说明，降低误读概率。',
+                '多个实验补充移动端适配、画布文字排版和交互反馈。'
+            ]
+        },
+        {
+            date: '2026-06-18',
+            title: '页面体验整理',
+            items: [
+                '统一模块选择器、实验卡片、悬浮入口和返回顶部等公共界面。',
+                '刷新本地缓存版本，减少旧资源导致的页面显示异常。',
+                '整理公开页面文案，使说明面向学习者而不是开发流程。'
+            ]
+        }
+    ];
 
     /** 懒加载 marked.js */
     function loadMarked() {
@@ -43,21 +67,6 @@
         return txt;
     }
 
-    /** 从 README.md 中截取 "## 📝 更新日志" 起到下一个二级标题之前的内容 */
-    function extractChangelog(readme) {
-        const lines = readme.split(/\r?\n/);
-        const startIdx = lines.findIndex((l) => /^##\s+📝\s*更新日志/.test(l));
-        if (startIdx === -1) return readme;
-        let endIdx = lines.length;
-        for (let i = startIdx + 1; i < lines.length; i++) {
-            if (/^##\s+/.test(lines[i])) {
-                endIdx = i;
-                break;
-            }
-        }
-        return lines.slice(startIdx, endIdx).join('\n');
-    }
-
     /** 简单的 HTML 转义（用于内容回退） */
     function escapeHtml(s) {
         return String(s)
@@ -74,26 +83,25 @@
     }
 
     /** 主渲染函数 */
-    async function render(targetId, { url, transform, title, subtitle }) {
+    async function renderMarkdown(targetId, { url, title, subtitle }) {
         const root = document.getElementById(targetId);
         if (!root) return;
         root.innerHTML = `<div class="about-doc__loading">正在加载内容…</div>`;
 
         try {
             const [marked, src] = await Promise.all([loadMarked(), fetchText(url)]);
-            const md = transform ? transform(src) : src;
 
             // marked v12 推荐 API：marked.parse(md, options)
-            const html = marked.parse(md, { gfm: true, breaks: false });
+            const html = marked.parse(src, { gfm: true, breaks: false });
 
             root.innerHTML = `
                 <header class="about-doc__header">
                     <span class="about-doc__eyebrow">${escapeHtml(subtitle)}</span>
                     <h1 class="about-doc__title">${escapeHtml(title)}</h1>
                     <p class="about-doc__source">
-                        <span>内容自动同步自仓库 <code>${escapeHtml(url)}</code></span>
+                        <span>开源协议文本 <code>${escapeHtml(url)}</code></span>
                         <span>· 加载时间 ${fmtTime(new Date())}</span>
-                        <button type="button" data-action="refresh" title="清除缓存并重新拉取">⟳ 重新拉取</button>
+                        <button type="button" data-action="refresh" title="刷新内容">刷新内容</button>
                     </p>
                 </header>
                 <article class="about-doc__body markdown-body">${html}</article>
@@ -103,7 +111,7 @@
             if (refreshBtn) {
                 refreshBtn.addEventListener('click', () => {
                     delete cache[url];
-                    render(targetId, { url, transform, title, subtitle });
+                    renderMarkdown(targetId, { url, title, subtitle });
                 });
             }
         } catch (err) {
@@ -111,15 +119,39 @@
                 <div class="about-doc__error">
                     <h2>加载失败</h2>
                     <p>${escapeHtml(err.message || String(err))}</p>
-                    <p>可尝试刷新页面，或前往仓库查看：<code>${escapeHtml(url)}</code></p>
+                    <p>可尝试刷新页面后重新打开。</p>
                 </div>
             `;
         }
     }
 
+    function renderChangelog() {
+        const root = document.getElementById('about-changelog-content');
+        if (!root) return;
+
+        const entries = PUBLIC_CHANGELOG.map((entry) => `
+            <article class="about-release">
+                <div class="about-release__date">${escapeHtml(entry.date)}</div>
+                <h2>${escapeHtml(entry.title)}</h2>
+                <ul>
+                    ${entry.items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
+                </ul>
+            </article>
+        `).join('');
+
+        root.innerHTML = `
+            <header class="about-doc__header">
+                <span class="about-doc__eyebrow">CHANGELOG · 学习体验更新</span>
+                <h1 class="about-doc__title">更新日志</h1>
+                <p class="about-doc__intro">这里记录面向学习者的主要内容和体验变化。</p>
+            </header>
+            <div class="about-release-list">${entries}</div>
+        `;
+    }
+
     // ─── 暴露给 router.js 调用 ─────────────────────────────────────
     window.initLicense = function () {
-        render('about-license-content', {
+        renderMarkdown('about-license-content', {
             url: 'LICENSE.md',
             title: '开源协议',
             subtitle: 'LICENSE · 使用许可',
@@ -127,11 +159,17 @@
     };
 
     window.initChangelog = function () {
-        render('about-changelog-content', {
-            url: 'README.md',
-            transform: extractChangelog,
-            title: '更新日志',
-            subtitle: 'CHANGELOG · 从 README 自动同步',
-        });
+        renderChangelog();
     };
+
+    function syncCurrentAboutRoute() {
+        const page = (location.hash || '').replace(/^#/, '').split('/')[0];
+        if (page === 'license') window.initLicense();
+        if (page === 'changelog') window.initChangelog();
+    }
+
+    syncCurrentAboutRoute();
+    window.addEventListener('hashchange', () => {
+        setTimeout(syncCurrentAboutRoute, 0);
+    });
 })();

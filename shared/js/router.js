@@ -4,6 +4,8 @@ const Router = {
     currentPage: 'planets',
     isTransitioning: false,
     _initialEnterFired: false,
+    _queuedNavigation: null,
+    _pageEnterComplete: true,
     _runningTimeId: null,
     // Store origin point for radial wipe (set by selectModule or default center)
     transitionOrigin: { x: 50, y: 50 },
@@ -101,13 +103,22 @@ const Router = {
     },
 
     navigateTo(page, animate = true) {
-        if (this.isTransitioning) return;
+        if (this.isTransitioning) {
+            this._queueNavigation(page, animate);
+            return;
+        }
         if (page === this.currentPage && document.querySelector('.page.active')) return;
         this.isTransitioning = true; // Set immediately to prevent race conditions
 
         const currentEl = document.querySelector('.page.active');
         const targetEl = document.getElementById(`page-${page}`);
-        if (!targetEl) { this.isTransitioning = false; return; }
+        if (!targetEl) {
+            this.isTransitioning = false;
+            this._pageEnterComplete = true;
+            this._flushQueuedNavigation();
+            return;
+        }
+        this._pageEnterComplete = false;
 
         // Update hash without triggering hashchange
         // 保留可能存在的深链接模块后缀（如 #physics/momentum-conservation）
@@ -144,8 +155,8 @@ const Router = {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             targetEl.classList.add('active');
             window.scrollTo({ top: 0 });
-            this.isTransitioning = false;
             this.onPageEnter(page);
+            this._finishTransition();
             return;
         }
 
@@ -156,6 +167,12 @@ const Router = {
             chemistry: 'rgba(77,158,126,0.12)',
             algorithms: 'rgba(196,121,58,0.12)',
             biology: 'rgba(58,158,143,0.12)',
+            cosmos: 'rgba(116,185,255,0.12)',
+            datascience: 'rgba(138,167,255,0.12)',
+            infotech: 'rgba(94,224,216,0.12)',
+            materials: 'rgba(224,181,106,0.12)',
+            humanities: 'rgba(126,215,193,0.12)',
+            engineering: 'rgba(216,163,72,0.12)',
             home: 'rgba(91,141,206,0.08)',
             planets: 'rgba(0,255,213,0.10)'
         };
@@ -166,9 +183,7 @@ const Router = {
 
         const tl = gsap.timeline({
             onComplete: () => {
-                this.isTransitioning = false;
-                // Reset origin to center for next transition
-                this.transitionOrigin = { x: 50, y: 50 };
+                this._finishTransition();
             }
         });
 
@@ -235,6 +250,34 @@ const Router = {
             ease: 'power3.out',
             onComplete: () => this.animatePageContent(page, targetEl)
         }, '-=0.18');
+    },
+
+    _queueNavigation(page, animate) {
+        this._queuedNavigation = {
+            page,
+            moduleId: this._pendingModule,
+            animate
+        };
+    },
+
+    _finishTransition() {
+        this.isTransitioning = false;
+        this.transitionOrigin = { x: 50, y: 50 };
+        this._flushQueuedNavigation();
+    },
+
+    _flushQueuedNavigation() {
+        if (!this._queuedNavigation || this.isTransitioning || !this._pageEnterComplete) return;
+        const next = this._queuedNavigation;
+        this._queuedNavigation = null;
+        this._pendingModule = next.moduleId;
+
+        if (next.page === this.currentPage && document.querySelector('.page.active')) {
+            this._applyPendingModule(next.page);
+            return;
+        }
+
+        setTimeout(() => this.navigateTo(next.page, next.animate), 0);
     },
 
     // Staggered entry for page sub-elements
@@ -337,6 +380,18 @@ const Router = {
             if (typeof initHome === 'function') initHome();
         } else if (page === 'planets') {
             if (typeof initPlanets === 'function') initPlanets();
+        } else if (page === 'cosmos') {
+            if (typeof initCosmosSeasons === 'function') initCosmosSeasons();
+        } else if (page === 'datascience') {
+            if (typeof initLinearRegressionLab === 'function') initLinearRegressionLab();
+        } else if (page === 'infotech') {
+            if (typeof initNetworkLayersLab === 'function') initNetworkLayersLab();
+        } else if (page === 'materials') {
+            if (typeof initMaterialsLab === 'function') initMaterialsLab();
+        } else if (page === 'humanities') {
+            if (typeof initHumanitiesLab === 'function') initHumanitiesLab();
+        } else if (page === 'engineering') {
+            if (typeof initBridgeTruss === 'function') initBridgeTruss();
         } else if (page === 'license') {
             if (typeof initLicense === 'function') initLicense();
         } else if (page === 'changelog') {
@@ -365,6 +420,8 @@ const Router = {
 
         // 深链接：URL 形如 #physics/momentum-conservation 时，自动打开对应实验
         this._applyPendingModule(page);
+        this._pageEnterComplete = true;
+        this._flushQueuedNavigation();
     },
 
     /**
@@ -398,6 +455,18 @@ const Router = {
             if (typeof SatelliteSystem !== 'undefined') SatelliteSystem.isRunning = false;
         } else if (page === 'planets') {
             if (typeof destroyPlanets === 'function') destroyPlanets();
+        } else if (page === 'cosmos') {
+            if (typeof destroyCosmosSeasons === 'function') destroyCosmosSeasons();
+        } else if (page === 'datascience') {
+            if (typeof destroyLinearRegressionLab === 'function') destroyLinearRegressionLab();
+        } else if (page === 'infotech') {
+            if (typeof destroyNetworkLayersLab === 'function') destroyNetworkLayersLab();
+        } else if (page === 'materials') {
+            if (typeof destroyMaterialsLab === 'function') destroyMaterialsLab();
+        } else if (page === 'humanities') {
+            if (typeof destroyHumanitiesLab === 'function') destroyHumanitiesLab();
+        } else if (page === 'engineering') {
+            if (typeof destroyBridgeTruss === 'function') destroyBridgeTruss();
         } else {
             // v4.2.3 Bug3 修复：先调用 closeModule 隐藏全部浮动控件
             // （ExperimentExport / ExperimentQuiz / ExperimentFavorites / ExperimentRating /
@@ -408,7 +477,10 @@ const Router = {
                 try { ModuleSelector.closeModule(page); } catch (e) { /* ignore */ }
             }
             // 兜底：即便 ModuleSelector 未记录 active module，也强制隐藏全部浮动控件
-            try { if (window.ExperimentGuide) ExperimentGuide.hideHelpButton(); } catch(e){}
+            try {
+                const guide = window.ExperimentGuide || (typeof ExperimentGuide !== 'undefined' ? ExperimentGuide : null);
+                if (guide) guide.hideHelpButton();
+            } catch(e){}
             try { if (window.ExperimentExport) ExperimentExport.hide(); } catch(e){}
             try { if (window.ExperimentQuiz) ExperimentQuiz.hide(); } catch(e){}
             try { if (window.ExperimentFavorites) ExperimentFavorites.hide(); } catch(e){}
@@ -432,6 +504,10 @@ const Router = {
                     () => { if (typeof Sequences !== 'undefined' && Sequences.destroy) Sequences.destroy(); },
                     () => { if (typeof FuncProps !== 'undefined' && FuncProps.destroy) FuncProps.destroy(); },
                     () => { if (typeof ExpLog !== 'undefined' && ExpLog.destroy) ExpLog.destroy(); },
+                    () => { if (typeof Binomial !== 'undefined' && Binomial.destroy) Binomial.destroy(); },
+                    () => { if (typeof StatReg !== 'undefined' && StatReg.destroy) StatReg.destroy(); },
+                    () => { if (typeof SpatialVec !== 'undefined' && SpatialVec.destroy) SpatialVec.destroy(); },
+                    () => { if (typeof DerivApp !== 'undefined' && DerivApp.destroy) DerivApp.destroy(); },
                 ],
                 physics: [
                     () => { if (typeof destroyPhysics === 'function') destroyPhysics(); },
@@ -465,6 +541,8 @@ const Router = {
                     () => { if (typeof IonicReaction !== 'undefined' && IonicReaction.destroy) IonicReaction.destroy(); },
                     () => { if (typeof Redox !== 'undefined' && Redox.destroy) Redox.destroy(); },
                     () => { if (typeof AtomicStructure !== 'undefined' && AtomicStructure.destroy) AtomicStructure.destroy(); },
+                    () => { if (typeof ElementCompounds !== 'undefined' && ElementCompounds.destroy) ElementCompounds.destroy(); },
+                    () => { if (typeof Intermolecular !== 'undefined' && Intermolecular.destroy) Intermolecular.destroy(); },
                 ],
                 algorithms: [
                     () => { if (typeof SearchComparison !== 'undefined' && SearchComparison.destroy) SearchComparison.destroy(); },

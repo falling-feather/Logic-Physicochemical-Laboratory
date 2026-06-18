@@ -33,6 +33,8 @@ const Photosynthesis = {
     respRate: 0,
 
     slider: null,
+    tempOutput: null,
+    co2Output: null,
 
     /* ============ Init / Destroy ============ */
 
@@ -43,10 +45,13 @@ const Photosynthesis = {
         this.info = document.getElementById('photo-info');
 
         this.slider = document.getElementById('bio-light-intensity');
+        this.tempOutput = document.getElementById('bio-photo-temp-value');
+        this.co2Output = document.getElementById('bio-photo-co2-value');
         this.resize();
         this.bindControls();
         this._injectInfoPanel();
         this._updateInfo();
+        this._updateCurveLabels();
         this.startLoop();
         this._generateCurveData();
 
@@ -129,17 +134,50 @@ const Photosynthesis = {
         // Temperature slider
         this._on(document.getElementById('bio-photo-temp'), 'input', (e) => {
             this.temperature = parseInt(e.target.value) || 25;
+            this._updateCurveLabels();
             this._generateCurveData();
         });
 
         // CO2 slider
         this._on(document.getElementById('bio-photo-co2'), 'input', (e) => {
             this.co2Concentration = parseFloat(e.target.value) || 0.04;
+            this._updateCurveLabels();
+            this._generateCurveData();
         });
     },
 
+    _updateCurveLabels() {
+        if (this.tempOutput) this.tempOutput.textContent = this.temperature + '\u00b0C';
+        if (this.co2Output) this.co2Output.textContent = this.co2Concentration.toFixed(2) + '%';
+    },
+
+    _syncCurveInputs() {
+        const tempInput = document.getElementById('bio-photo-temp');
+        const co2Input = document.getElementById('bio-photo-co2');
+        let changed = false;
+        if (tempInput) {
+            const nextTemp = parseInt(tempInput.value);
+            if (Number.isFinite(nextTemp) && nextTemp !== this.temperature) {
+                this.temperature = nextTemp;
+                changed = true;
+            }
+        }
+        if (co2Input) {
+            const nextCo2 = parseFloat(co2Input.value);
+            if (Number.isFinite(nextCo2) && Math.abs(nextCo2 - this.co2Concentration) > 0.0001) {
+                this.co2Concentration = nextCo2;
+                changed = true;
+            }
+        }
+        if (changed) {
+            this._updateCurveLabels();
+            this._generateCurveData();
+        }
+    },
+
     _injectModeButtons() {
-        const controls = this.canvas?.parentElement?.querySelector('.viz-controls');
+        const section = this.canvas?.closest('.demo-section');
+        const controls = section?.querySelector('#bio-photo-sim-controls') || section?.querySelector('.viz-controls');
         if (!controls || document.getElementById('bio-photo-modes')) return;
 
         const wrap = document.createElement('div');
@@ -179,13 +217,13 @@ const Photosynthesis = {
     },
 
     _generateCurveData() {
-        // Photosynthesis rate as function of light intensity at given temperature
+        // Photosynthesis rate as a teaching model for light, temperature, and CO2 limitation.
         this.curveData = [];
-        const tempFactor = 1 - Math.abs(this.temperature - 30) * 0.02; // Optimal ~30C
+        const tempFactor = Math.max(0.2, 1 - Math.abs(this.temperature - 28) * 0.025);
+        const co2Factor = Math.max(0.35, Math.min(1.15, this.co2Concentration / 0.04));
         for (let light = 0; light <= 100; light += 2) {
-            // Michaelis-Menten-like curve
-            const vmax = 80 * Math.max(0.2, tempFactor);
-            const km = 25;
+            const vmax = 78 * tempFactor * co2Factor;
+            const km = 25 + (1 - Math.min(co2Factor, 1)) * 18;
             const rate = (vmax * light) / (km + light);
             this.curveData.push({ light, rate });
         }
@@ -317,6 +355,7 @@ const Photosynthesis = {
     draw() {
         const { ctx, W, H, mode } = this;
         if (!ctx || W === 0) return;
+        this._syncCurveInputs();
         ctx.clearRect(0, 0, W, H);
 
         switch (mode) {
@@ -440,10 +479,10 @@ const Photosynthesis = {
 
         ctx.fillStyle = 'rgba(200,170,80,0.6)';
         ctx.font = fs + 'px ' + CF.sans;
-        ctx.fillText('\u6697\u53cd\u5e94', dzX + dzW / 2, dzY - 6);
+        ctx.fillText('Calvin \u5faa\u73af', dzX + dzW / 2, dzY - 6);
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
         ctx.font = (fs - 3) + 'px ' + CF.sans;
-        ctx.fillText('Calvin \u5faa\u73af', ccX, ccY);
+        ctx.fillText('\u5149\u4e0d\u76f4\u63a5\u4f9d\u8d56', ccX, ccY);
         ctx.fillText('\u53f6\u7eff\u4f53\u57fa\u8d28', dzX + dzW / 2, dzY + dzH + 14);
 
         // Transfer arrow
@@ -895,15 +934,17 @@ const Photosynthesis = {
                     <div class="${P}__sub">光反应（类囊体薄膜）</div>
                     <div class="${P}__row">${k('#3a9e8f','水的光解')} H₂O → [H] + O₂</div>
                     <div class="${P}__row">${k('#6fa8dc','ATP合成')} ADP + Pi → ATP（光合磷酸化）</div>
-                    <div class="${P}__desc">需要光能驱动，产生 [H](NADPH) 和 ATP 供暗反应使用</div>
+                    <div class="${P}__desc">需要光能驱动，产生 [H](NADPH) 和 ATP 供 Calvin 循环使用</div>
                 </div>
                 <div class="${P}__block">
-                    <div class="${P}__sub">暗反应（叶绿体基质）</div>
+                    <div class="${P}__sub">Calvin 循环（光不直接依赖反应，叶绿体基质）</div>
                     <div class="${P}__row">${k('#8b6fc0','CO₂固定')} CO₂ + C₅ → 2C₃</div>
-                    <div class="${P}__row">${k('#c4793a','C₃还原')} C₃ + [H] + ATP → G3P → 葡萄糖</div>
-                    <div class="${P}__desc">Calvin 循环，不直接需要光，但依赖光反应产物</div>
+                    <div class="${P}__row">${k('#c4793a','C₃还原')} C₃ + [H] + ATP → G3P（三碳糖磷酸/甘油醛-3-磷酸）→ 糖类</div>
+                    <div class="${P}__desc">该过程不直接需要光，但依赖光反应提供的 ATP 和 NADPH</div>
                 </div>`;
-            extra.innerHTML = `<div class="${P}__note">💡 总反应：6CO₂ + 12H₂O →(光能/叶绿体) C₆H₁₂O₆ + 6O₂ + 6H₂O</div>`;
+            extra.innerHTML = `
+                <div class="${P}__note">总反应可写作：6CO₂ + 12H₂O →(光能/叶绿体) C₆H₁₂O₆ + 6O₂ + 6H₂O。O₂ 来自水的裂解；Calvin 循环不直接需要光，但需要光反应提供的 ATP 和 NADPH，所以不等于夜间才发生。</div>
+                <div class="${P}__source">参考 OpenStax Biology 2e 8.1 Photosynthesis Overview、8.2 Light-Dependent Reactions 与 8.3 Using Light Energy to Make Organic Molecules。</div>`;
         } else if (this.mode === 'curve') {
             title.textContent = '光合速率影响因素';
             grid.innerHTML = `
@@ -915,11 +956,13 @@ const Photosynthesis = {
                 </div>
                 <div class="${P}__block">
                     <div class="${P}__sub">温度效应</div>
-                    <div class="${P}__row">${k('#8b6fc0','最适温度')} 暗反应酶活性最高（约25-30°C）</div>
-                    <div class="${P}__row">${k('#6fa8dc','高温抑制')} 酶变性导致光合速率骤降</div>
-                    <div class="${P}__desc">温度同时影响呼吸作用，改变补偿点位置</div>
+                    <div class="${P}__row">${k('#8b6fc0','温度窗口')} Calvin 循环涉及多种酶，适宜范围随植物和环境变化</div>
+                    <div class="${P}__row">${k('#6fa8dc','高温抑制')} 高温、缺水或气孔关闭都会改变 CO₂ 供应和酶活性</div>
+                    <div class="${P}__desc">温度同时影响呼吸作用，改变补偿点位置；曲线只表达趋势</div>
                 </div>`;
-            extra.innerHTML = `<div class="${P}__note">📈 拖动温度/CO₂ 滑块观察曲线形态变化，理解限制因素的切换</div>`;
+            extra.innerHTML = `
+                <div class="${P}__note">拖动温度与 CO₂ 滑块观察限制因素切换。页面曲线是相对教学模型，不代表某种植物的实测光合速率。</div>
+                <div class="${P}__source">参考 OpenStax Biology 2e 8.1 对光合作用结构、底物与产物的说明，以及 8.3 对 Calvin 循环和气孔/水分限制的说明。</div>`;
         } else {
             title.textContent = '光合作用与呼吸作用';
             grid.innerHTML = `
@@ -935,7 +978,9 @@ const Photosynthesis = {
                     <div class="${P}__row">${k('#8b6fc0','本质')} 分解有机物，释放能量</div>
                     <div class="${P}__desc">将有机物中的化学能转变为 ATP 活跃化学能</div>
                 </div>`;
-            extra.innerHTML = `<div class="${P}__note">🔄 两者互为原料与产物，形成物质循环与能量流动，共同维持生命活动</div>`;
+            extra.innerHTML = `
+                <div class="${P}__note">光合作用把光能储存在有机物中；呼吸作用释放有机物中的能量并合成 ATP。两者连接碳循环和能量流动，但不是简单“完全相反”的同一过程。</div>
+                <div class="${P}__source">参考 OpenStax Biology 2e 第 8 章对光合作用能量流的说明，以及第 7 章对细胞呼吸的说明。</div>`;
         }
     },
 

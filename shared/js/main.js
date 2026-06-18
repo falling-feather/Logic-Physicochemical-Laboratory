@@ -3,8 +3,11 @@
 function initApp() {
     if (window.__loadProgress) window.__loadProgress(30);
 
-    // 1. Initialize card system
-    initExperimentCards();
+    // 1. Initialize legacy card system when it is available.
+    // The module gallery is the primary entry now; missing legacy cards must not block routing.
+    if (typeof initExperimentCards === 'function') {
+        initExperimentCards();
+    }
 
     // 1b. Initialize module selector (gallery-based navigation per subject page)
     if (typeof ModuleSelector !== 'undefined') ModuleSelector.init();
@@ -116,25 +119,17 @@ function initApp() {
         _loadDismissed = true;
         if (window.__loadProgress) window.__loadProgress(100);
         requestAnimationFrame(function () {
-            var ls = document.getElementById('loading-screen');
-            if (ls) {
-                ls.classList.add('hidden');
-                ls.addEventListener('transitionend', function () { ls.remove(); }, { once: true });
-                setTimeout(function () { if (ls.parentNode) ls.remove(); }, 800);
+            if (typeof window.__dismissEnglabLoading === 'function') {
+                window.__dismissEnglabLoading();
             }
-            // Clean up inline loading-screen styles
-            var lsStyles = document.getElementById('loading-screen-styles');
-            if (lsStyles) setTimeout(function () { lsStyles.remove(); }, 1000);
             delete window.__loadProgress;
         });
     }
 
-    // Core readiness check — GSAP and Router are the only hard dependencies.
-    // lucide is now local so it's always available synchronously.
-    // We do NOT block on lucide CDN fallback here.
+    // Core readiness check: Router is the only hard dependency.
+    // Animation libraries are progressive enhancement and must not block boot.
     function _coreReady() {
-        return typeof gsap !== 'undefined' &&
-               typeof Router !== 'undefined' &&
+        return typeof Router !== 'undefined' &&
                Router._initialEnterFired;
     }
 
@@ -208,7 +203,7 @@ function updateFooterVisibility() {
 
 window.updateFooterVisibility = updateFooterVisibility;
 
-const ENGLAB_ASSET_VERSION = '20260417c';
+const ENGLAB_ASSET_VERSION = '20260618materialsP1';
 const HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',
@@ -229,7 +224,21 @@ const HTTP_FALLBACK_ASSETS = [
     './shared/js/cards.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/common.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/main.js?v=' + ENGLAB_ASSET_VERSION,
-    './pages/home/home.js?v=' + ENGLAB_ASSET_VERSION
+    './pages/home/home.js?v=' + ENGLAB_ASSET_VERSION,
+    './pages/planets/planets.css?v=' + ENGLAB_ASSET_VERSION,
+    './pages/planets/planets.js?v=' + ENGLAB_ASSET_VERSION,
+    './pages/cosmos/cosmos.css?v=' + ENGLAB_ASSET_VERSION,
+    './pages/cosmos/earth-sun.js?v=' + ENGLAB_ASSET_VERSION,
+    './pages/datascience/datascience.css?v=' + ENGLAB_ASSET_VERSION,
+    './pages/datascience/linear-regression.js?v=' + ENGLAB_ASSET_VERSION,
+    './pages/infotech/infotech.css?v=' + ENGLAB_ASSET_VERSION,
+    './pages/infotech/network-layers.js?v=' + ENGLAB_ASSET_VERSION,
+    './pages/materials/materials.css?v=' + ENGLAB_ASSET_VERSION,
+    './pages/materials/materials-lab.js?v=' + ENGLAB_ASSET_VERSION,
+    './pages/humanities/humanities.css?v=' + ENGLAB_ASSET_VERSION,
+    './pages/humanities/text-lab.js?v=' + ENGLAB_ASSET_VERSION,
+    './pages/engineering/engineering.css?v=' + ENGLAB_ASSET_VERSION,
+    './pages/engineering/bridge-truss.js?v=' + ENGLAB_ASSET_VERSION
 ];
 
 function updateCacheDiagnostics(patch) {
@@ -287,7 +296,11 @@ function registerServiceWorker() {
     } catch (_) {}
 
     const supportsSW = 'serviceWorker' in navigator;
-    const canUseSW = supportsSW && (window.isSecureContext || isLocalhost) && forcedMode !== 'fallback';
+    const forcedServiceWorker = forcedMode === 'service-worker' || forcedMode === 'sw';
+    const canUseSW = supportsSW &&
+        (window.isSecureContext || isLocalhost) &&
+        forcedMode !== 'fallback' &&
+        (!isLocalhost || forcedServiceWorker);
 
     updateCacheDiagnostics({
         origin: location.origin,
@@ -296,6 +309,36 @@ function registerServiceWorker() {
         supportsSW: supportsSW,
         cacheMode: canUseSW ? 'service-worker-pending' : 'http-fallback'
     });
+
+    if (isLocalhost && supportsSW && !forcedServiceWorker) {
+        updateCacheDiagnostics({
+            cacheMode: 'http-fallback',
+            transport: 'browser-http-cache',
+            swRegistered: false,
+            swDisabledForLocalhost: true
+        });
+
+        navigator.serviceWorker.getRegistrations()
+            .then(function (registrations) {
+                return Promise.all(registrations.map(function (registration) {
+                    return registration.unregister();
+                }));
+            })
+            .then(function (results) {
+                updateCacheDiagnostics({
+                    swUnregisteredForLocalhost: results.some(Boolean)
+                });
+            })
+            .catch(function (error) {
+                updateCacheDiagnostics({
+                    swUnregisterError: String(error && error.message ? error.message : error)
+                });
+            })
+            .finally(function () {
+                warmHttpCacheFallback();
+            });
+        return;
+    }
 
     if (!canUseSW) {
         warmHttpCacheFallback();

@@ -132,7 +132,7 @@ const PhysicsSim = {
         if (pauseBtn) pauseBtn.textContent = '暂停';
 
         this.updateStats();
-        this.draw();
+        this.render();
     },
 
     bindCanvas() {

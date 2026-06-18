@@ -36,7 +36,7 @@ const NeuralReg = {
         this.bindEvents();
         this.updateInfo();
         this.canvas.setAttribute('role', 'img');
-        this.canvas.setAttribute('aria-label', '神经调节可视化：突触传递与动作电位');
+        this.canvas.setAttribute('aria-label', '神经调节可视化：化学突触传递与动作电位变化');
         this.loop();
     },
 
@@ -400,7 +400,7 @@ const NeuralReg = {
         else if (phase < 0.5) s = '③ Ca²⁺内流 → 突触小泡向前膜移动';
         else if (phase < 0.65) s = '④ 突触小泡与前膜融合(胞吐) → 递质释放';
         else if (phase < 0.8) s = '⑤ 神经递质扩散穿越间隙 → 与受体结合';
-        else s = '⑥ 离子通道开放 → 突触后膜产生兴奋性电位(EPSP)';
+        else s = '⑥ 受体通道改变 → 产生兴奋性或抑制性突触后电位';
         ctx.fillText(s, 8, H * 0.06);
 
         this.detectSynapseHover();
@@ -414,12 +414,12 @@ const NeuralReg = {
             { this.hoverLabel = '突触小体：含线粒体(供能ATP)和突触小泡(储存递质)'; return; }
         for (const v of this.vesicles) {
             if (!v.released && Math.hypot(hoverX - v.bx * W, hoverY - v.by * H) < 8)
-                { this.hoverLabel = '突触小泡：内含乙酰胆碱(ACh)等神经递质分子'; return; }
+            { this.hoverLabel = '突触小泡：储存神经递质；乙酰胆碱只是常见示例之一'; return; }
         }
         if (hoverX > W * 0.41 && hoverX < W * 0.53)
-            { this.hoverLabel = '突触间隙：宽约20-50nm，递质通过扩散穿越'; return; }
+            { this.hoverLabel = '突触间隙：很窄的细胞间隙，递质通过扩散到达后膜受体'; return; }
         if (hoverX > W * 0.53 && hoverX < W * 0.85)
-            { this.hoverLabel = '突触后膜：特异性受体与递质结合 → 离子通道打开'; return; }
+            { this.hoverLabel = '突触后膜：递质与受体结合，受体类型决定兴奋或抑制效应'; return; }
         this.hoverLabel = '';
     },
 
@@ -574,12 +574,12 @@ const NeuralReg = {
             const t = (hoverX - padL) / gW;
             const v = apCurve(t), cy = vToY(v);
             if (Math.abs(hoverY - cy) < 15) {
-                if (t < 0.15) this.hoverLabel = `静息电位 ${v.toFixed(0)}mV: Na⁺/K⁺-ATP酶维持 (3Na⁺出/2K⁺入)`;
+                if (t < 0.15) this.hoverLabel = `静息电位 ${v.toFixed(0)}mV: Na⁺/K⁺-ATP酶长期维持离子梯度`;
                 else if (t < 0.25) this.hoverLabel = '阈刺激: 膜电位达到-55mV时触发 (全或无定律)';
                 else if (t < 0.35) this.hoverLabel = `去极化 ${v.toFixed(0)}mV: 电压门控Na⁺通道大量开放，Na⁺内流`;
                 else if (t < 0.5) this.hoverLabel = `复极化 ${v.toFixed(0)}mV: Na⁺通道关闭，K⁺通道开放，K⁺外流`;
                 else if (t < 0.65) this.hoverLabel = `超极化 ${v.toFixed(0)}mV: K⁺通道延迟关闭，膜电位低于静息`;
-                else this.hoverLabel = '恢复: Na⁺/K⁺泵恢复离子浓度梯度';
+                else this.hoverLabel = '恢复阶段: 漏通道与Na⁺/K⁺泵共同维持静息状态和离子梯度';
                 return;
             }
         }
@@ -607,52 +607,54 @@ const NeuralReg = {
         if (!el) return;
         if (this.mode === 'synapse') {
             el.innerHTML = `
-                <div class="neur-info__hd">📘 突触传递 — 化学突触的信号转导过程</div>
+                <div class="neur-info__hd">化学突触：电信号转为化学信号</div>
                 <div class="neur-info__grid">
                     <div class="neur-info__block">
-                        <div class="neur-info__sub">突触小泡</div>
-                        <div class="neur-info__val">胞吐释放递质</div>
-                        <div class="neur-info__desc">含乙酰胆碱(ACh)等递质，Ca²⁺触发胞吐释放到突触间隙</div>
+                        <div class="neur-info__sub">Ca²⁺ 触发释放</div>
+                        <div class="neur-info__val" style="color:#e5c07b">电压门控 Ca²⁺ 通道</div>
+                        <div class="neur-info__desc">动作电位到达突触末端后，Ca²⁺ 内流促使突触小泡与前膜融合，并以胞吐方式释放神经递质。</div>
                     </div>
                     <div class="neur-info__block">
-                        <div class="neur-info__sub">Ca²⁺ 内流</div>
-                        <div class="neur-info__val" style="color:#e5c07b">电压门控通道</div>
-                        <div class="neur-info__desc">动作电位 → 电压门控Ca²⁺通道开放 → Ca²⁺涌入突触小体</div>
+                        <div class="neur-info__sub">递质与受体</div>
+                        <div class="neur-info__val">结合后产生突触后电位</div>
+                        <div class="neur-info__desc">递质跨过突触间隙并结合后膜受体；受体和离子通道类型决定兴奋性或抑制性效应。</div>
                     </div>
                     <div class="neur-info__block">
-                        <div class="neur-info__sub">关键过程</div>
-                        <div class="neur-info__row"><span class="neur-info__key" style="--c:var(--accent-teal,#3a9e8f)">受体结合</span> 递质与后膜特异性受体结合 → 离子通道开放 → 突触后电位</div>
-                        <div class="neur-info__row"><span class="neur-info__key" style="--c:#e06c75">信号终止</span> 递质被酶降解(如AChE)或突触前膜回收再利用</div>
+                        <div class="neur-info__sub">信号终止</div>
+                        <div class="neur-info__row"><span class="neur-info__key" style="--c:var(--accent-teal,#3a9e8f)">扩散</span> 递质离开突触间隙。</div>
+                        <div class="neur-info__row"><span class="neur-info__key" style="--c:#e06c75">降解/回收</span> 递质可被酶降解，或被突触前末端、胶质细胞回收。</div>
                     </div>
                     <div class="neur-info__block">
-                        <div class="neur-info__sub">💡 知识要点</div>
-                        <div class="neur-info__note">突触传递是单向的：前膜→间隙→后膜（递质只能由前膜释放）。兴奋性递质使后膜去极化，抑制性递质使后膜超极化。</div>
+                        <div class="neur-info__sub">模型边界</div>
+                        <div class="neur-info__note">画布演示典型化学突触；未完整呈现电突触、递质多样性、受体亚型、空间/时间总和和真实突触形态。</div>
                     </div>
-                </div>`;
+                </div>
+                <div class="neur-info__source">资料依据：OpenStax Anatomy & Physiology 2e 12.5 Communication Between Neurons。</div>`;
         } else {
             el.innerHTML = `
-                <div class="neur-info__hd">📘 动作电位 — 神经冲动的产生与传导</div>
+                <div class="neur-info__hd">动作电位：膜电位快速反转与恢复</div>
                 <div class="neur-info__grid">
+                    <div class="neur-info__block">
+                        <div class="neur-info__sub">阈值与全或无</div>
+                        <div class="neur-info__val" style="color:#e5c07b">达到阈值才触发</div>
+                        <div class="neur-info__desc">刺激使膜电位接近阈值后，动作电位按全或无规律发生；幅度不是随刺激强度连续增大。</div>
+                    </div>
                     <div class="neur-info__block">
                         <div class="neur-info__sub">去极化</div>
                         <div class="neur-info__val" style="color:#e06c75">-70 → +40 mV</div>
-                        <div class="neur-info__desc">Na⁺通道开放 → Na⁺大量内流 → 膜内变正</div>
+                        <div class="neur-info__desc">电压门控 Na⁺ 通道开放，Na⁺ 内流使膜内侧快速变得更正。</div>
                     </div>
                     <div class="neur-info__block">
-                        <div class="neur-info__sub">复极化</div>
-                        <div class="neur-info__val" style="color:#61afef">+40 → -70 mV</div>
-                        <div class="neur-info__desc">Na⁺通道关闭 + K⁺通道开放 → K⁺外流 → 膜电位回降</div>
+                        <div class="neur-info__sub">复极化/超极化</div>
+                        <div class="neur-info__val" style="color:#61afef">K⁺ 外流带回负电位</div>
+                        <div class="neur-info__desc">Na⁺ 通道失活后，K⁺ 通道开放使 K⁺ 外流；K⁺ 通道延迟关闭可造成短暂超极化。</div>
                     </div>
                     <div class="neur-info__block">
-                        <div class="neur-info__sub">关键过程</div>
-                        <div class="neur-info__row"><span class="neur-info__key" style="--c:#c678dd">超极化</span> K⁺通道延迟关闭 → 膜电位暂时低于静息电位(-90mV)</div>
-                        <div class="neur-info__row"><span class="neur-info__key" style="--c:var(--accent-teal,#3a9e8f)">Na⁺/K⁺ 泵</span> 3Na⁺泵出 / 2K⁺泵入，消耗ATP维持浓度梯度</div>
+                        <div class="neur-info__sub">模型边界</div>
+                        <div class="neur-info__note">-70 mV、-55 mV、+40 mV、-90 mV 是常见教学近似；真实神经元阈值、峰值、离子通道动力学和髓鞘/节点结构会随细胞类型与条件变化。</div>
                     </div>
-                    <div class="neur-info__block">
-                        <div class="neur-info__sub">💡 知识要点</div>
-                        <div class="neur-info__note">全或无定律：只有达到阈值(-55mV)才会产生动作电位，幅度恒定。神经冲动在有髓鞘神经纤维上以跳跃传导方式快速传播。</div>
-                    </div>
-                </div>`;
+                </div>
+                <div class="neur-info__source">资料依据：OpenStax Anatomy & Physiology 2e 12.4 The Action Potential。</div>`;
         }
     }
 };

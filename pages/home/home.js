@@ -6,7 +6,7 @@ const ParticleNetwork = {
     canvas: null, ctx: null,
     particles: [],
     mouse: { x: -1000, y: -1000 },
-    maxDist: 140,
+    maxDist: 124,
     W: 0, H: 0,
     running: false,
     _resizeObs: null,
@@ -33,7 +33,7 @@ const ParticleNetwork = {
     init() {
         this.canvas = document.getElementById('particle-network');
         if (!this.canvas) return;
-        this._maxParticles = (typeof _isLowEnd !== 'undefined' && _isLowEnd) ? 40 : 80;
+        this._maxParticles = (typeof _isLowEnd !== 'undefined' && _isLowEnd) ? 28 : 56;
         this._cellSize = this.maxDist;
 
         // 优先使用 OffscreenCanvas + Web Worker（释放主线程）
@@ -323,13 +323,11 @@ const ParticleNetwork = {
 // ===== 打字机标语 =====
 const TaglineTyper = {
     phrases: [
-        '探索科学的星辰大海',
+        '星序 Astra · 多星系可视化学习平台',
+        '工科实验室星系 · 71 个交互实验',
         'Visualize. Interact. Understand.',
         '数学 · 物理 · 化学 · 算法 · 生物',
-        'f(x) = curiosity × imagination',
-        'E = mc² | F = ma | PV = nRT',
-        '从抽象到直觉，从公式到画面',
-        'Made by Fallingfeather'
+        '从抽象到直觉，从公式到画面'
     ],
     idx: 0,
     el: null,
@@ -379,8 +377,8 @@ const HUDData = {
         const right = document.getElementById('hud-data-right');
         if (!left || !right) return;
 
-        const dataL = ['SYS.OK', 'LAT: 39.9°N', 'FREQ: 60Hz', 'MEM: 512MB', 'CPU: IDLE', 'NET: ●', 'NODES: 16', 'δt: 16ms'];
-        const dataR = ['v' + new Date().getFullYear() + '.06', 'π≈3.1416', 'e≈2.7183', 'φ≈1.6180', 'i²=−1', 'ℏ=1.055e-34', '∇·E=ρ/ε₀', 'Σ=∞'];
+        const dataL = ['ASTRA.ONLINE', 'GALAXIES: 2', 'ENG.LAB: 71', 'CODE.SPACE: 1', 'ROUTE: HASH', 'CANVAS: DPR', 'CACHE: READY'];
+        const dataR = ['v' + new Date().getFullYear() + '.06', 'MATH: 19', 'PHYSICS: 17', 'CHEM: 14', 'ALGO: 8', 'BIO: 13', 'FOCUS: LEARN'];
 
         left.innerHTML = dataL.map(d => `<span>${d}</span>`).join('<br>');
         right.innerHTML = dataR.map(d => `<span>${d}</span>`).join('<br>');
@@ -399,33 +397,30 @@ const HUDData = {
     }
 };
 
-// ===== 独立轨道卫星系统 =====
+// ===== 独立轨道行星系统 =====
 const SatelliteSystem = {
     isRunning: true,
     startTime: Date.now(),
     satellites: [],
     orbit: null,
+    rafId: null,
 
-    // 每颗行星拥有独立轨道参数
+    // 每颗行星保留独立轨道；phase 让首屏分散，避免一加载就挤在同侧。
     orbits: [
-        { radiusX: 320, radiusY: 200, tiltX: 65, tiltZ: 25,  period: 18000, dir:  1 },
-        { radiusX: 420, radiusY: 260, tiltX: 60, tiltZ: -15, period: 25000, dir: -1 },
-        { radiusX: 520, radiusY: 320, tiltX: 70, tiltZ: 35,  period: 32000, dir:  1 },
-        { radiusX: 450, radiusY: 280, tiltX: 55, tiltZ: -30, period: 22000, dir: -1 },
-        { radiusX: 380, radiusY: 240, tiltX: 62, tiltZ: 18,  period: 28000, dir:  1 }
+        { radiusX: 300, radiusY: 170, tiltX: 65, tiltZ: 25,  period: 26000, dir:  1, phase:  55 },
+        { radiusX: 365, radiusY: 212, tiltX: 60, tiltZ: -15, period: 33000, dir: -1, phase: 250 },
+        { radiusX: 430, radiusY: 248, tiltX: 70, tiltZ: 35,  period: 41000, dir:  1, phase: 205 },
+        { radiusX: 385, radiusY: 224, tiltX: 55, tiltZ: -30, period: 30000, dir: -1, phase: 210 },
+        { radiusX: 340, radiusY: 198, tiltX: 62, tiltZ: 18,  period: 36000, dir:  1, phase: 345 }
     ],
 
-    // 移动端缩放轨道半径
+    // 移动端缩放轨道半径，避免图标贴边或遮挡底部 CTA。
     getScaledOrbits: function() {
         const w = window.innerWidth;
         if (w <= 480) {
-            return this.orbits.map(o => ({
-                ...o, radiusX: o.radiusX * 0.58, radiusY: o.radiusY * 0.58
-            }));
+            return this.orbits.map(o => ({ ...o, radiusX: o.radiusX * 0.54, radiusY: o.radiusY * 0.54 }));
         } else if (w <= 768) {
-            return this.orbits.map(o => ({
-                ...o, radiusX: o.radiusX * 0.78, radiusY: o.radiusY * 0.78
-            }));
+            return this.orbits.map(o => ({ ...o, radiusX: o.radiusX * 0.74, radiusY: o.radiusY * 0.74 }));
         }
         return this.orbits;
     },
@@ -439,6 +434,7 @@ const SatelliteSystem = {
 
         if (!this.orbit || this.satellites.length === 0) return;
 
+        if (this.rafId) cancelAnimationFrame(this.rafId);
         this.startTime = Date.now();
         this.isRunning = true;
         this._lastFrameTime = 0;
@@ -447,7 +443,7 @@ const SatelliteSystem = {
 
     loop: function() {
         if (!this.isRunning) return;
-        requestAnimationFrame(this.loop.bind(this));
+        this.rafId = requestAnimationFrame(this.loop.bind(this));
 
         // 低端设备帧率限制：约 30fps（~33ms 间隔）
         const perfNow = performance.now();
@@ -465,29 +461,28 @@ const SatelliteSystem = {
 
             const orb = scaledOrbits[index];
             const elapsed = (now - this.startTime) % orb.period;
-            const angle = ((elapsed / orb.period) * 360 * orb.dir) * toRad;
+            const angle = (orb.phase + ((elapsed / orb.period) * 360 * orb.dir)) * toRad;
 
-            const x_orbit = orb.radiusX * Math.cos(angle);
-            const y_orbit = orb.radiusY * Math.sin(angle);
+            const xOrbit = orb.radiusX * Math.cos(angle);
+            const yOrbit = orb.radiusY * Math.sin(angle);
 
             const cosTiltX = Math.cos(orb.tiltX * toRad);
             const sinTiltX = Math.sin(orb.tiltX * toRad);
             const cosTiltZ = Math.cos(orb.tiltZ * toRad);
             const sinTiltZ = Math.sin(orb.tiltZ * toRad);
 
-            const y_rotX = y_orbit * cosTiltX;
-            const z_rotX = y_orbit * sinTiltX;
+            const yRotX = yOrbit * cosTiltX;
+            const zRotX = yOrbit * sinTiltX;
 
-            const x_final = x_orbit * cosTiltZ - y_rotX * sinTiltZ;
-            const y_final = x_orbit * sinTiltZ + y_rotX * cosTiltZ;
-            const z_final = z_rotX;
+            const xFinal = xOrbit * cosTiltZ - yRotX * sinTiltZ;
+            const yFinal = xOrbit * sinTiltZ + yRotX * cosTiltZ;
+            const zFinal = zRotX;
 
-            const scale = this.perspective / (this.perspective - z_final);
+            const scale = this.perspective / (this.perspective - zFinal);
 
-            sat.style.transform = `translate(-50%, -50%) translate3d(${x_final}px, ${y_final}px, 0) scale(${scale})`;
-            sat.style.zIndex = z_final > 0 ? 20 : 5;
-            // 远近深度透视：远处更暗
-            sat.style.opacity = Math.max(0.4, Math.min(1, 0.45 + (scale - 0.7) * 1.6));
+            sat.style.transform = `translate(-50%, -50%) translate3d(${xFinal}px, ${yFinal}px, 0) scale(${scale})`;
+            sat.style.zIndex = zFinal > 0 ? 20 : 5;
+            sat.style.opacity = Math.max(0.48, Math.min(1, 0.62 + (scale - 0.82) * 1.35));
         });
     }
 };
@@ -618,9 +613,9 @@ function createStars() {
     const lowEnd = typeof _isLowEnd !== 'undefined' && _isLowEnd;
     const returning = typeof _isReturningVisitor !== 'undefined' && _isReturningVisitor;
     const layers = [
-        { id: 'star-layer-1', count: lowEnd ? 40 : (returning ? 70 : 90), classes: ['small'] },
-        { id: 'star-layer-2', count: lowEnd ? 18 : (returning ? 36 : 50), classes: ['small', 'medium'] },
-        { id: 'star-layer-3', count: lowEnd ? 8 : (returning ? 14 : 20), classes: ['medium', 'large', 'bright'] }
+        { id: 'star-layer-1', count: lowEnd ? 32 : (returning ? 58 : 72), classes: ['small'] },
+        { id: 'star-layer-2', count: lowEnd ? 16 : (returning ? 28 : 38), classes: ['small', 'medium'] },
+        { id: 'star-layer-3', count: lowEnd ? 6 : (returning ? 10 : 14), classes: ['medium', 'large', 'bright'] }
     ];
 
     layers.forEach(layer => {
@@ -673,13 +668,15 @@ function initParallax() {
 
 // ===== 眼睛跟随 + 眨眼 =====
 function initEyeTracking() {
-    if (window.__homeEyeTrackingBound) return;
-    window.__homeEyeTrackingBound = true;
-
     const main = document.getElementById('main-star');
     const pl = document.getElementById('pupil-left');
     const pr = document.getElementById('pupil-right');
-    if (!main) return;
+    if (!main || !pl || !pr) {
+        window.__homeEyeTrackingBound = false;
+        return;
+    }
+    if (window.__homeEyeTrackingBound) return;
+    window.__homeEyeTrackingBound = true;
 
     function trackEye(clientX, clientY) {
         const rect = main.getBoundingClientRect();

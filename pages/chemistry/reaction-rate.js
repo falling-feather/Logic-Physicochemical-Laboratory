@@ -13,6 +13,7 @@ const ReactionRate = {
     hoverX: -1, hoverY: -1,
 
     _on(el, evt, fn, opts) { el.addEventListener(evt, fn, opts); this._listeners.push({ el, evt, fn, opts }); },
+    _simWidth(width = this.W || 500) { return width < 520 ? width : width * 0.52; },
 
     /* ─── lifecycle ─── */
     init() {
@@ -27,6 +28,8 @@ const ReactionRate = {
         this.spawnParticles();
         this.bindEvents();
         this.updateInfo();
+        this.canvas.setAttribute('role', 'img');
+        this.canvas.setAttribute('aria-label', '化学反应速率模拟：粒子碰撞、能量分布、活化能和催化剂影响');
         this._lastT = performance.now();
         this.loop();
     },
@@ -42,7 +45,7 @@ const ReactionRate = {
         if (!wrap) return;
         const dpr = window.devicePixelRatio || 1;
         const w = wrap.getBoundingClientRect().width;
-        const h = Math.min(Math.max(w * 0.5, 280), 400);
+        const h = w < 520 ? Math.min(Math.max(w * 0.62, 220), 260) : Math.min(Math.max(w * 0.5, 280), 400);
         this.canvas.width = w * dpr; this.canvas.height = h * dpr;
         this.canvas.style.width = w + 'px'; this.canvas.style.height = h + 'px';
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -56,7 +59,7 @@ const ReactionRate = {
         this.history = []; this.flashes = [];
         const n = Math.round(this.concentration / 100 * 40) + 10;
         const sp = this.temperature / 300;
-        const simW = (this.W || 500) * 0.52;
+        const simW = this._simWidth(this.W || 500);
         for (let i = 0; i < n; i++) {
             const type = i < n / 2 ? 'A' : 'B';
             this.particles.push({
@@ -125,7 +128,7 @@ const ReactionRate = {
         const { particles, W, H } = this;
         const sp = this.temperature / 300;
         const Ea = this.catalyst ? 0.3 : 0.7;
-        const simW = W * 0.52;
+        const simW = this._simWidth(W);
         const scale = dt * 60; // normalise to ~60fps
 
         for (const p of particles) {
@@ -172,7 +175,8 @@ const ReactionRate = {
         const { ctx, W, H } = this;
         if (!ctx || W === 0) return;
         ctx.clearRect(0, 0, W, H);
-        const simW = W * 0.52;
+        const compact = W < 520;
+        const simW = this._simWidth(W);
 
         // simulation area
         ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1;
@@ -195,15 +199,24 @@ const ReactionRate = {
             ctx.beginPath(); ctx.arc(f.x, f.y, 8 + (1 - f.t) * 6, 0, Math.PI * 2); ctx.fill();
         }
         // legend
-        ctx.font = '14px ' + CF.sans; ctx.textAlign = 'left';
-        ctx.fillStyle = 'rgba(224,108,117,0.7)'; ctx.fillText('● A (反应物)', 8, H - 6);
-        ctx.fillStyle = 'rgba(91,141,206,0.7)'; ctx.fillText('● B (反应物)', 80, H - 6);
-        ctx.fillStyle = 'rgba(100,100,100,0.4)'; ctx.fillText('● 产物', 152, H - 6);
+        const legendY = compact ? H - 18 : H - 6;
+        ctx.font = (compact ? '12px ' : '14px ') + CF.sans; ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(224,108,117,0.7)'; ctx.fillText('● A (反应物)', 8, legendY);
+        ctx.fillStyle = 'rgba(91,141,206,0.7)'; ctx.fillText('● B (反应物)', compact ? 88 : 80, legendY);
+        ctx.fillStyle = 'rgba(100,100,100,0.4)'; ctx.fillText('● 产物', compact ? 170 : 152, legendY);
 
         // right side: top = Maxwell-Boltzmann, bottom = reaction progress
-        const rx = simW + 12, rw = W - simW - 20;
-        this.drawMB(rx, 8, rw, H * 0.48 - 12);
-        this.drawProgress(rx, H * 0.48 + 4, rw, H * 0.52 - 12);
+        if (!compact) {
+            const rx = simW + 12, rw = W - simW - 20;
+            this.drawMB(rx, 8, rw, H * 0.48 - 12);
+            this.drawProgress(rx, H * 0.48 + 4, rw, H * 0.52 - 12);
+        } else {
+            ctx.font = '13px ' + CF.mono;
+            ctx.textAlign = 'right';
+            ctx.fillStyle = 'rgba(255,255,255,0.34)';
+            ctx.fillText(`T=${this.temperature}K  Ea=${this.catalyst ? '低' : '高'}`, W - 10, 18);
+            ctx.fillText(`碰撞 ${this.collisions}  转化 ${this.reacted}/${this.particles.length}`, W - 10, 36);
+        }
 
         // hover
         this.drawHover(simW);
@@ -357,11 +370,24 @@ const ReactionRate = {
         const pct = total > 0 ? (this.reacted / total * 100).toFixed(1) : '0.0';
         const Ea = this.catalyst ? '低（催化剂降低活化能）' : '高（无催化剂）';
         el.innerHTML = `<div class="rxr-hd"><span class="rxr-tag">碰撞理论</span>化学反应速率</div>
+<div class="rxr-grid">
+    <div class="rxr-card">
+        <span class="rxr-card__label">速率含义</span>
+        <strong>浓度随时间变化</strong>
+        <p>反应速率通常用反应物消耗或生成物形成的浓度变化除以时间间隔表示。</p>
+    </div>
+    <div class="rxr-card">
+        <span class="rxr-card__label">有效碰撞</span>
+        <strong>足够能量 + 合适取向</strong>
+        <p>粒子碰撞只有在能量达到活化能并且取向合适时，才更可能形成产物。</p>
+    </div>
+</div>
 <div class="rxr-row"><span class="rxr-key">Arrhenius</span>k = A·e<sup>-Ea/(RT)</sup> &nbsp; 温度↑ → k↑ → 速率↑</div>
-<div class="rxr-row"><span class="rxr-key rxr-key--purple">速率方程</span>v = k[A]<sup>m</sup>[B]<sup>n</sup> &nbsp; 浓度↑ → 碰撞频率↑</div>
+<div class="rxr-row"><span class="rxr-key rxr-key--purple">浓度影响</span>浓度↑ → 单位体积粒子数↑ → 碰撞频率↑</div>
 <div class="rxr-row"><span class="rxr-key rxr-key--amber">活化能 Ea</span>${Ea}</div>
 <div class="rxr-row"><span class="rxr-key">当前</span>T=${T}K  转化率=${pct}%  碰撞=${this.collisions}次</div>
-<div class="rxr-note">💡 升温使 Maxwell-Boltzmann 曲线右移，超过 Ea 的粒子比例增大；催化剂降低 Ea 而非改变分布。绿色阴影区域 = 有效碰撞比例。</div>`;
+<div class="rxr-note"><strong>模型边界：</strong>画布使用二维粒子和简化能量阈值表达趋势；真实反应速率还受反应机理、取向因子、溶剂、表面积、光照和实验测定速率级数等条件影响。催化剂提供较低活化能路径，不改变反应物和产物的热力学平衡关系。</div>
+<div class="rxr-source">资料依据：OpenStax Chemistry 2e 12.1 Chemical Reaction Rates、12.2 Factors Affecting Reaction Rates、12.5 Collision Theory。</div>`;
     }
 };
 

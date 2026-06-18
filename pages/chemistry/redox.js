@@ -26,6 +26,8 @@ const Redox = {
             redLine: 'Cu\u00b2\u207a: +2 \u2192 0\u00a0(\u5f97\u52302e\u207b, \u88ab\u8fd8\u539f)',
             halfOx: 'Fe \u2212 2e\u207b \u2192 Fe\u00b2\u207a',
             halfRed: 'Cu\u00b2\u207a + 2e\u207b \u2192 Cu',
+            shortOx: 'Fe 0 \u2192 +2',
+            shortRed: 'Cu\u00b2\u207a +2 \u2192 0',
             note: '\u8f83\u6d3b\u6cfc\u91d1\u5c5e\u7f6e\u6362\u4e0d\u6d3b\u6cfc\u91d1\u5c5e\uff0c\u94c1\u5c06\u94dc\u4ece\u786b\u9178\u94dc\u6eb6\u6db2\u4e2d\u7f6e\u6362\u51fa\u6765'
         },
         {
@@ -38,6 +40,8 @@ const Redox = {
             redLine: '2H\u207a: +1 \u2192 0\u00a0(\u5f97\u52302e\u207b, \u88ab\u8fd8\u539f)',
             halfOx: 'Zn \u2212 2e\u207b \u2192 Zn\u00b2\u207a',
             halfRed: '2H\u207a + 2e\u207b \u2192 H\u2082\u2191',
+            shortOx: 'Zn 0 \u2192 +2',
+            shortRed: 'H\u207a +1 \u2192 0',
             note: '\u6d3b\u6cfc\u91d1\u5c5e\u4e0e\u9178\u53cd\u5e94\u4ea7\u751f\u6c22\u6c14\uff0c\u9524\u4f4d\u4e8e\u6c22\u4e4b\u524d\uff08\u91d1\u5c5e\u6d3b\u52a8\u6027\u5e8f\u5217\uff09'
         },
         {
@@ -45,11 +49,13 @@ const Redox = {
             type: '\u5316\u5408\u53cd\u5e94',
             reducer: { sym: 'Na', color: '#ffb464', afterSym: 'Na\u207a', afterColor: '#ffcc88' },
             oxidizer: { sym: 'Cl\u2082', color: '#5eff96', afterSym: 'Cl\u207b', afterColor: '#88ffaa' },
-            eCount: 1,
-            oxLine: 'Na: 0 \u2192 +1\u00a0(\u5931\u53bb1e\u207b, \u88ab\u6c27\u5316)',
-            redLine: 'Cl: 0 \u2192 \u22121\u00a0(\u5f97\u52301e\u207b, \u88ab\u8fd8\u539f)',
-            halfOx: 'Na \u2212 e\u207b \u2192 Na\u207a',
+            eCount: 2,
+            oxLine: 'Na: 0 \u2192 +1\u00a0(\u6bcf\u4e2aNa\u5931\u53bb1e\u207b, \u88ab\u6c27\u5316)',
+            redLine: 'Cl: 0 \u2192 \u22121\u00a0(\u6bcf\u4e2aCl\u5f97\u52301e\u207b, \u88ab\u8fd8\u539f)',
+            halfOx: '2Na \u2212 2e\u207b \u2192 2Na\u207a',
             halfRed: 'Cl\u2082 + 2e\u207b \u2192 2Cl\u207b',
+            shortOx: 'Na 0 \u2192 +1',
+            shortRed: 'Cl 0 \u2192 \u22121',
             note: '\u5178\u578b\u79bb\u5b50\u5316\u5408\u7269\u751f\u6210\u53cd\u5e94\uff0c\u94a0\u7684\u5916\u5c42 1 \u4e2a\u7535\u5b50\u8f6c\u79fb\u7ed9\u6c2f'
         },
         {
@@ -57,11 +63,13 @@ const Redox = {
             type: '\u5316\u5408\u53cd\u5e94',
             reducer: { sym: 'Mg', color: '#c8dcdc', afterSym: 'Mg\u00b2\u207a', afterColor: '#88c8ff' },
             oxidizer: { sym: 'O\u2082', color: '#ff6464', afterSym: 'O\u00b2\u207b', afterColor: '#ff9696' },
-            eCount: 2,
-            oxLine: 'Mg: 0 \u2192 +2\u00a0(\u5931\u53bb2e\u207b, \u88ab\u6c27\u5316)',
-            redLine: 'O: 0 \u2192 \u22122\u00a0(\u5f97\u52302e\u207b, \u88ab\u8fd8\u539f)',
-            halfOx: 'Mg \u2212 2e\u207b \u2192 Mg\u00b2\u207a',
+            eCount: 4,
+            oxLine: 'Mg: 0 \u2192 +2\u00a0(\u4e24\u4e2aMg\u5171\u5931\u53bb4e\u207b, \u88ab\u6c27\u5316)',
+            redLine: 'O: 0 \u2192 \u22122\u00a0(O\u2082\u5171\u5f97\u52304e\u207b, \u88ab\u8fd8\u539f)',
+            halfOx: '2Mg \u2212 4e\u207b \u2192 2Mg\u00b2\u207a',
             halfRed: 'O\u2082 + 4e\u207b \u2192 2O\u00b2\u207b',
+            shortOx: 'Mg 0 \u2192 +2',
+            shortRed: 'O 0 \u2192 \u22122',
             note: '\u9541\u5728\u6c27\u6c14\u4e2d\u71c3\u70e7\u53d1\u51fa\u8000\u773c\u767d\u5149\uff0c\u662f\u7ecf\u5178\u6c27\u5316\u8fd8\u539f\u6f14\u793a\u5b9e\u9a8c'
         },
         {
@@ -74,6 +82,8 @@ const Redox = {
             redLine: 'Cu\u00b2\u207a: +2 \u2192 0\u00a0(\u5f97\u52302e\u207b, \u88ab\u8fd8\u539f)',
             halfOx: 'H\u2082 \u2212 2e\u207b \u2192 2H\u207a',
             halfRed: 'Cu\u00b2\u207a + 2e\u207b \u2192 Cu',
+            shortOx: 'H 0 \u2192 +1',
+            shortRed: 'Cu\u00b2\u207a +2 \u2192 0',
             note: '\u6c22\u6c14\u8fd8\u539f\u6c27\u5316\u94dc\u662f\u7ecf\u5178\u5b9e\u9a8c\uff0c\u9ed1\u8272 CuO \u53d8\u7ea2\u8272 Cu\uff0c\u8bd5\u7ba1\u53e3\u51fa\u73b0\u6c34\u73e0'
         }
     ],
@@ -103,6 +113,8 @@ const Redox = {
         this._resetElectrons();
         this._bindEvents();
         this._updateInfo();
+        this.canvas.setAttribute('role', 'img');
+        this.canvas.setAttribute('aria-label', '\u6c27\u5316\u8fd8\u539f\u53cd\u5e94\u53ef\u89c6\u5316\uff1a\u8fd8\u539f\u5242\u5931\u7535\u5b50\u3001\u6c27\u5316\u5242\u5f97\u7535\u5b50\u4e0e\u534a\u53cd\u5e94\u7535\u5b50\u914d\u5e73');
         this.animId = requestAnimationFrame(ts => this._loop(ts));
     },
 
@@ -124,7 +136,7 @@ const Redox = {
         if (!wrap) return;
         const dpr = window.devicePixelRatio || 1;
         const w = wrap.clientWidth;
-        const h = Math.min(w * 0.58, 440);
+        const h = Math.min(Math.max(w * 0.58, 280), 440);
         this.canvas.width = w * dpr;
         this.canvas.height = h * dpr;
         this.canvas.style.width = w + 'px';
@@ -241,7 +253,12 @@ const Redox = {
                     '<small>' + rxn.redLine + '</small>' +
                 '</div>' +
             '</div>' +
-            '<p class="redox-info__note">\ud83d\udca1 ' + rxn.note + '</p>';
+            '<div class="redox-info__guide">' +
+                '<div><b>\u5224\u8bfb\u987a\u5e8f</b><span>\u5148\u6807\u5316\u5408\u4ef7\uff0c\u518d\u627e\u5347\u964d\uff1b\u5347\u9ad8\u7684\u4e00\u65b9\u5931\u7535\u5b50\u88ab\u6c27\u5316\uff0c\u964d\u4f4e\u7684\u4e00\u65b9\u5f97\u7535\u5b50\u88ab\u8fd8\u539f\u3002</span></div>' +
+                '<div><b>\u7535\u5b50\u5b88\u6052</b><span>\u6c27\u5316\u534a\u53cd\u5e94\u653e\u51fa\u7684\u7535\u5b50\u6570\u5fc5\u987b\u7b49\u4e8e\u8fd8\u539f\u534a\u53cd\u5e94\u6d88\u8017\u7684\u7535\u5b50\u6570\u3002</span></div>' +
+            '</div>' +
+            '<p class="redox-info__note"><strong>\u6a21\u578b\u8fb9\u754c\uff1a</strong>' + rxn.note + '\u3002\u753b\u5e03\u7528\u7535\u5b50\u6cbf\u7bad\u5934\u79fb\u52a8\u8868\u793a\u7535\u5b50\u5f97\u5931\uff0c\u4fbf\u4e8e\u5b66\u4e60\u534a\u53cd\u5e94\u914d\u5e73\uff1b\u771f\u5b9e\u53cd\u5e94\u8fd8\u53ef\u80fd\u6d89\u53ca\u79bb\u5b50\u6269\u6563\u3001\u8868\u9762\u8fc7\u7a0b\u3001\u7535\u6781\u754c\u9762\u6216\u6eb6\u6db2\u6761\u4ef6\u3002</p>' +
+            '<p class="redox-info__source">\u8d44\u6599\u4f9d\u636e\uff1aOpenStax Chemistry 2e Chapter 17 Redox Chemistry\uff1b17.2 Galvanic Cells\u3002</p>';
     },
 
     /* ── animation loop ── */
@@ -433,14 +450,15 @@ const Redox = {
         }
 
         // ── bottom: oxidation state summary ──
-        ctx.font = `${fs}px ${CF.sans}`;
+        const compact = W < 430;
+        ctx.font = `${compact ? Math.max(12, W * 0.038) : fs}px ${CF.sans}`;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(255,180,100,0.8)';
-        ctx.fillText(rxn.oxLine, W / 2, H * 0.79);
+        ctx.fillText(compact ? '\u5316\u5408\u4ef7\u5347\u9ad8\uff1a' + rxn.shortOx : rxn.oxLine, W / 2, H * 0.79);
         ctx.fillStyle = 'rgba(100,180,255,0.8)';
-        ctx.fillText(rxn.redLine, W / 2, H * 0.86);
+        ctx.fillText(compact ? '\u5316\u5408\u4ef7\u964d\u4f4e\uff1a' + rxn.shortRed : rxn.redLine, W / 2, H * 0.86);
 
-        if (H > 280) {
+        if (H > 280 && !compact) {
             ctx.font = `${Math.max(14, fs - 1)}px ${CF.mono}`;
             ctx.fillStyle = 'rgba(200,200,200,0.45)';
             ctx.fillText(rxn.halfOx + '  |  ' + rxn.halfRed, W / 2, H * 0.94);

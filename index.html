@@ -6,9 +6,9 @@
     <meta name="description" content="星序 Astra - 交互式可视化多学科学习平台，集成工科实验室与代码空间两大子站，涵盖数学、物理、化学、算法、生物与多语言代码执行追踪">
     <meta name="theme-color" content="#08090e">
     <title>星序 Astra - 多学科可视化学习平台</title>
-    <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48" type="image/x-icon">
-    <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
-    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="icon" href="UI/favicon.ico" sizes="16x16 32x32 48x48" type="image/x-icon">
+    <link rel="icon" href="UI/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="UI/apple-touch-icon.png">
 
     <!-- Resource Hints -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,32 +27,38 @@
     <link rel="stylesheet" href="shared/css/base.css?v=20260417f">
     <link rel="stylesheet" href="shared/css/typography.css?v=20260526v61c">
     <link rel="stylesheet" href="shared/css/navbar.css?v=20260424v44e">
-    <link rel="stylesheet" href="shared/css/page-layout.css?v=20260526v61c">
-    <link rel="stylesheet" href="shared/css/cards.css?v=20260417d">
-    <link rel="stylesheet" href="shared/css/module-selector.css?v=20260418c">
-    <link rel="stylesheet" href="shared/css/experiment-guide.css?v=20260424oo">
+    <link rel="stylesheet" href="shared/css/page-layout.css?v=20260606v62e">
+    <link rel="stylesheet" href="shared/css/cards.css?v=20260618publicCleanP1">
+    <link rel="stylesheet" href="shared/css/module-selector.css?v=20260618publicCleanP1">
+    <link rel="stylesheet" href="shared/css/experiment-guide.css?v=20260618publicCleanP1">
     <link rel="stylesheet" href="shared/css/experiment-export.css?v=20260424v44a">
     <link rel="stylesheet" href="shared/css/experiment-quiz.css?v=20260422z">
     <link rel="stylesheet" href="shared/css/experiment-favorites.css?v=20260424oo">
     <link rel="stylesheet" href="shared/css/experiment-rating.css?v=20260422z">
-    <link rel="stylesheet" href="pages/about/about.css?v=20260528v61e">
+    <link rel="stylesheet" href="pages/about/about.css?v=20260618publicCleanP1">
     <link rel="stylesheet" href="shared/css/back-to-top.css?v=20260424oo">
-    <link rel="stylesheet" href="shared/css/fab-trigger.css?v=20260424v44a">
+    <link rel="stylesheet" href="shared/css/fab-trigger.css?v=20260618publicCleanP1">
     <!-- CSS: Pages -->
-    <link rel="stylesheet" href="pages/home/home.css?v=20260424v44e">
-    <link rel="stylesheet" href="pages/planets/planets.css?v=20260424v44f">
-    <link rel="stylesheet" href="pages/mathematics/mathematics.css?v=20260417d">
-    <link rel="stylesheet" href="pages/physics/physics.css?v=20260424v46c">
-    <link rel="stylesheet" href="pages/chemistry/chemistry.css?v=20260424v45i">
-    <link rel="stylesheet" href="pages/algorithms/algorithms.css?v=20260417d">
-    <link rel="stylesheet" href="pages/biology/biology.css?v=20260417d">
+    <link rel="stylesheet" href="pages/home/home.css?v=20260605v62e">
+    <link rel="stylesheet" href="pages/planets/planets.css?v=20260618crossCanvasP1">
+    <link rel="stylesheet" href="pages/cosmos/cosmos.css?v=20260618publicCleanP1">
+    <link rel="stylesheet" href="pages/datascience/datascience.css?v=20260618dataP2">
+    <link rel="stylesheet" href="pages/infotech/infotech.css?v=20260618publicCleanP1">
+    <link rel="stylesheet" href="pages/materials/materials.css?v=20260618materialsP1">
+    <link rel="stylesheet" href="pages/humanities/humanities.css?v=20260618humanP3">
+    <link rel="stylesheet" href="pages/engineering/engineering.css?v=20260618engP2">
+    <link rel="stylesheet" href="pages/mathematics/mathematics.css?v=20260618mathModelP1">
+    <link rel="stylesheet" href="pages/physics/physics.css?v=20260618thermoP1">
+    <link rel="stylesheet" href="pages/chemistry/chemistry.css?v=20260618ionP1">
+    <link rel="stylesheet" href="pages/algorithms/algorithms.css?v=20260618algoTextP1">
+    <link rel="stylesheet" href="pages/biology/biology.css?v=20260618neuralP1">
     <!-- v4.5-α1 全局搜索 -->
-    <link rel="stylesheet" href="shared/css/global-search.css?v=20260424v45b">
+    <link rel="stylesheet" href="shared/css/global-search.css?v=20260606v62e">
     <!-- v4.5-α3 相关实验推荐 -->
     <link rel="stylesheet" href="shared/css/related-experiments.css?v=20260424v45c">
     <link rel="stylesheet" href="shared/css/experiment-polish.css?v=20260526v61c">
     <!-- CSS: Responsive (must be last) -->
-    <link rel="stylesheet" href="shared/css/responsive.css?v=20260417d">
+    <link rel="stylesheet" href="shared/css/responsive.css?v=20260606v62e">
 
     <!-- Loading Screen (inline — zero dependency, shows immediately) -->
     <style id="loading-screen-styles">
@@ -114,7 +120,48 @@
             var b = document.getElementById('loading-bar');
             if (b) b.style.width = Math.min(p, 100) + '%';
         };
+        window.__dismissEnglabLoading = function() {
+            var ls = document.getElementById('loading-screen');
+            if (ls) {
+                ls.classList.add('hidden');
+                ls.style.pointerEvents = 'none';
+                ls.style.opacity = '0';
+                ls.style.visibility = 'hidden';
+                setTimeout(function () { if (ls.parentNode) ls.remove(); }, 700);
+            }
+            var lsStyles = document.getElementById('loading-screen-styles');
+            if (lsStyles) setTimeout(function () {
+                if (!document.getElementById('loading-screen')) lsStyles.remove();
+            }, 900);
+        };
+        setTimeout(function () {
+            if (document.getElementById('loading-screen')) window.__dismissEnglabLoading();
+        }, window.__englabCache.returnVisitor ? 1200 : 2600);
         window.__loadProgress(window.__englabCache.returnVisitor ? 22 : 5);
+
+        (function () {
+            var isLocalhost = location.hostname === 'localhost' ||
+                location.hostname === '127.0.0.1' ||
+                location.hostname === '::1';
+            if (!isLocalhost || !('serviceWorker' in navigator)) return;
+
+            navigator.serviceWorker.getRegistrations()
+                .then(function (registrations) {
+                    return Promise.all(registrations.map(function (registration) {
+                        return registration.unregister();
+                    }));
+                })
+                .then(function (results) {
+                    window.__englabCache.swEarlyUnregistered = results.some(Boolean);
+                    if (navigator.serviceWorker.controller && !sessionStorage.getItem('englab-sw-detach-reload')) {
+                        sessionStorage.setItem('englab-sw-detach-reload', '1');
+                        location.reload();
+                    }
+                })
+                .catch(function (error) {
+                    window.__englabCache.swEarlyUnregisterError = String(error && error.message ? error.message : error);
+                });
+        })();
     </script>
     <!-- ═══════════════ Navigation ═══════════════ -->
     <nav class="navbar navbar--transparent" id="navbar">
@@ -123,7 +170,7 @@
                 <div class="logo-icon">
                     <i data-lucide="flask-conical"></i>
                 </div>
-                <span class="logo-text desktop-only">工科实验室</span>
+                <span class="logo-text desktop-only">星序</span>
             </a>
             <div class="nav-menu">
                 <a href="#home" class="nav-item active" data-page="home">
@@ -201,8 +248,9 @@
                         <div class="planet-surface"></div>
                         <div class="planet-highlight"></div>
                         <h1 class="star-title" data-text="工科实验室">工科实验室</h1>
+                        <span class="star-subtitle">Engineering Lab · 86 Experiments</span>
                     </div>
-                    <div class="star-eyes-container">
+                    <div class="star-eyes-container" aria-hidden="true">
                         <div class="star-eyes">
                             <div class="eye" id="eye-left">
                                 <div class="pupil" id="pupil-left"><div class="pupil-shine"></div></div>
@@ -299,41 +347,1072 @@
                         </div>
                     </div>
                 </div>
-                <a href="#planets" class="planets-entry" aria-label="进入沉浸式星系导航大屏">星系大屏</a>
+                <a href="#planets" class="planets-entry" aria-label="返回星序多星系导航">返回星序</a>
             </div>
         </section>
 
-        <!-- ────────── PLANETS (沉浸式 3D 镂空星系导航大屏 v4.2.0-α4) ────────── -->
-        <section id="page-planets" class="page active" aria-label="星系大屏">
-            <canvas id="planets-canvas" class="planets-canvas" role="img" aria-label="3D 星系导航 Canvas"></canvas>
-            <a href="#home" class="planets-back" data-page="home">→ 进入工科实验室</a>
-            <div class="planets-title">
-                星 系 导 航
-                <div class="planets-subtitle">SUBJECT · GALAXY · MAP</div>
+        <!-- ────────── PLANETS · 星序顶层星系入口 ────────── -->
+        <section id="page-planets" class="page active" aria-label="星序星系入口">
+            <canvas id="planets-starfield" class="planets-starfield" aria-hidden="true"></canvas>
+
+            <div class="planets-atlas">
+                <header class="planets-topbar">
+                    <a class="planets-mark" href="#planets" aria-label="返回星序总览">
+                        <span class="planets-mark__symbol">星</span>
+                        <span class="planets-mark__text">
+                            <strong>星序</strong>
+                            <span>Astra</span>
+                        </span>
+                    </a>
+                </header>
+
+                <main class="planets-hero">
+                    <section class="planets-intro" aria-labelledby="planets-main-title">
+                        <h1 id="planets-main-title">星序</h1>
+                        <p>在深空中选择一座知识星系。进入之后，再展开它自己的学科与实验菜单。</p>
+                    </section>
+
+                    <section class="planets-stage" aria-label="星序星系图">
+                        <div class="planets-stage-halo planets-stage-halo--outer"></div>
+                        <div class="planets-stage-halo planets-stage-halo--inner"></div>
+                        <div class="planets-stage-crosshair"></div>
+
+                        <svg class="planets-lines" viewBox="0 0 1000 700" preserveAspectRatio="none" aria-hidden="true">
+                            <ellipse class="planets-line planets-line--orbit" cx="500" cy="350" rx="325" ry="156" />
+                            <ellipse class="planets-line planets-line--orbit planets-line--tilt" cx="500" cy="350" rx="390" ry="198" />
+                            <path class="planets-line planets-line--axis" d="M500 66 L500 634" />
+                            <path class="planets-line planets-line--axis" d="M122 350 L878 350" />
+                        </svg>
+
+                        <div class="planets-beacon" aria-hidden="true">
+                            <span></span>
+                            <strong>ASTRA</strong>
+                        </div>
+
+                        <button class="planets-galaxy planets-galaxy--eng" type="button" data-galaxy="englab" aria-label="进入工科实验室星系二级菜单">
+                            <span class="planets-galaxy-glow"></span>
+                            <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
+                            <span class="planets-galaxy-orbit planets-galaxy-orbit--two"></span>
+                            <span class="planets-galaxy-disc" data-particles="englab">
+                                <span class="planets-galaxy-core"></span>
+                            </span>
+                            <span class="planets-galaxy-label">
+                                <strong>工科实验室</strong>
+                                <span>Engineering Lab</span>
+                            </span>
+                        </button>
+
+                        <button class="planets-galaxy planets-galaxy--code" type="button" data-galaxy="codespace" aria-label="进入代码空间星系二级菜单">
+                            <span class="planets-galaxy-glow planets-galaxy-glow--green"></span>
+                            <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
+                            <span class="planets-galaxy-orbit planets-galaxy-orbit--two"></span>
+                            <span class="planets-galaxy-disc planets-galaxy-disc--code" data-particles="codespace">
+                                <span class="planets-galaxy-core"></span>
+                            </span>
+                            <span class="planets-galaxy-label">
+                                <strong>代码空间</strong>
+                                <span>Code Space</span>
+                            </span>
+                        </button>
+
+                        <button class="planets-galaxy planets-galaxy--roadmap" type="button" data-galaxy="frontier" aria-label="查看未来星图学习方向">
+                            <span class="planets-galaxy-glow planets-galaxy-glow--amber"></span>
+                            <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
+                            <span class="planets-galaxy-orbit planets-galaxy-orbit--two"></span>
+                            <span class="planets-galaxy-disc planets-galaxy-disc--roadmap" data-particles="frontier">
+                                <span class="planets-galaxy-core"></span>
+                            </span>
+                            <span class="planets-galaxy-label">
+                                <strong>未来星图</strong>
+                                <span>Roadmap</span>
+                            </span>
+                        </button>
+
+                        <aside class="planets-menu" id="planets-menu" aria-live="polite" aria-label="星系二级菜单">
+                            <button class="planets-menu__close" type="button" data-close-menu aria-label="关闭二级菜单">×</button>
+                            <span class="planets-menu__state" id="planets-menu-state">进入星系</span>
+                            <h2 id="planets-menu-title">工科实验室</h2>
+                            <p id="planets-menu-copy">选择学科后进入该星系自己的二级内容。</p>
+                            <nav class="planets-module-menu" id="planets-module-menu" aria-label="二级模块"></nav>
+                        </aside>
+                    </section>
+                </main>
             </div>
-            <div class="planets-hud planets-hud--tl">
-                <div><span class="blink">●</span> SYS.SCAN</div>
-                <div>MODE: ORBIT</div>
-                <div>NODES: 5</div>
+        </section>
+
+        <section id="page-cosmos" class="page cosmos-page" aria-label="地球与宇宙科学">
+            <div class="page-hero">
+                <div class="page-hero__text">
+                    <span class="page-hero__label page-hero__label--sky">Earth & Space</span>
+                    <h1 class="page-hero__title">地球与宇宙科学</h1>
+                    <p class="page-hero__desc">从地轴倾角、太阳直射点和昼长变化入手，理解季节为什么出现，以及同一天不同纬度接收太阳辐射为何不同。</p>
+                </div>
+                <div class="page-hero__visual">
+                    <canvas id="hero-canvas-cosmos" class="page-hero__canvas" role="img" aria-label="地球绕太阳运行与地轴倾角装饰动画"></canvas>
+                </div>
             </div>
-            <div class="planets-hud planets-hud--tr">
-                <div>v2026.06</div>
-                <div>FOV: 0.45</div>
-                <div>R: 1.40</div>
+
+            <div class="cosmos-shell">
+                <section class="cosmos-overview" aria-label="地球与宇宙学习概览">
+                    <div class="cosmos-overview__copy">
+                        <h2>用太阳高度理解季节</h2>
+                        <p>季节主要来自地轴约 23.44° 的倾斜：地球绕太阳运动时，太阳直射纬度在南北回归线之间移动，改变各纬度的正午太阳高度和昼长。</p>
+                    </div>
+                    <div class="cosmos-overview__metrics" aria-label="当前模块要点">
+                        <div class="cosmos-overview__metric">
+                            <span>地轴倾角</span>
+                            <strong>约 23.44°</strong>
+                        </div>
+                        <div class="cosmos-overview__metric">
+                            <span>核心变量</span>
+                            <strong>日期 × 纬度</strong>
+                        </div>
+                        <div class="cosmos-overview__metric">
+                            <span>观察</span>
+                            <strong>太阳高度与昼长</strong>
+                        </div>
+                        <div class="cosmos-overview__metric">
+                            <span>范围</span>
+                            <strong>近似天文模型</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="cosmos-lab" aria-labelledby="earth-sun-title">
+                    <div class="cosmos-lab__header">
+                        <div>
+                            <span class="cosmos-lab__eyebrow">Sun Path Model</span>
+                            <h2 id="earth-sun-title">季节、太阳高度与昼长</h2>
+                            <p>拖动日期和纬度，观察太阳赤纬、正午太阳高度、理论昼长和本半球季节倾向如何同步变化。</p>
+                        </div>
+                        <span class="cosmos-lab__badge">Axial Tilt</span>
+                    </div>
+
+                    <div class="cosmos-workbench">
+                        <div class="cosmos-controls" aria-label="太阳高度参数控制">
+                            <div class="cosmos-control">
+                                <label for="cosmos-day">
+                                    <span>年内日期</span>
+                                    <strong id="cosmos-day-value">6月21日</strong>
+                                </label>
+                                <input id="cosmos-day" type="range" min="1" max="365" step="1" value="172">
+                            </div>
+                            <div class="cosmos-control">
+                                <label for="cosmos-latitude">
+                                    <span>观察纬度</span>
+                                    <strong id="cosmos-latitude-value">39.9°N</strong>
+                                </label>
+                                <input id="cosmos-latitude" type="range" min="-66.5" max="66.5" step="0.5" value="39.9">
+                            </div>
+                            <div class="cosmos-control">
+                                <label>
+                                    <span>快速定位</span>
+                                    <strong>典型纬度</strong>
+                                </label>
+                                <div class="cosmos-lat-buttons">
+                                    <button type="button" data-cosmos-lat="0" aria-pressed="false">赤道 0°</button>
+                                    <button type="button" data-cosmos-lat="23.5" aria-pressed="false">北回归线</button>
+                                    <button type="button" data-cosmos-lat="39.9" class="is-active" aria-pressed="true">北京附近</button>
+                                    <button type="button" data-cosmos-lat="-23.5" aria-pressed="false">南回归线</button>
+                                </div>
+                            </div>
+                            <div class="cosmos-note">
+                                <i data-lucide="info"></i>
+                                <p>这是近似学习模型，不处理大气折射、地形遮挡、云量、时区和地方真太阳时差异。</p>
+                            </div>
+                        </div>
+                        <div class="cosmos-canvas-wrap">
+                            <canvas id="earth-sun-canvas" aria-label="地轴倾角、太阳直射点和昼长变化可视化画布"></canvas>
+                        </div>
+                        <div id="cosmos-info" class="cosmos-info" aria-live="polite"></div>
+                    </div>
+                </section>
+
+                <section class="cosmos-interpretation" aria-label="季节与太阳路径判读路径">
+                    <div class="cosmos-interpretation__header">
+                        <span class="cosmos-interpretation__eyebrow">How to Read</span>
+                        <h2>把季节图读成四个问题</h2>
+                        <p>季节、太阳高度和昼长是同一套几何关系的不同投影。先看地轴指向，再看直射纬度、观察纬度和太阳在天空中的路径。</p>
+                    </div>
+                    <div class="cosmos-interpretation__grid">
+                        <article class="cosmos-interpretation__item">
+                            <span>01</span>
+                            <h3>地轴决定哪边更直接</h3>
+                            <p>地轴倾斜使一年中不同半球轮流获得更直接的阳光。北半球夏季不是因为地球离太阳更近，而是北半球朝向太阳更多。</p>
+                        </article>
+                        <article class="cosmos-interpretation__item">
+                            <span>02</span>
+                            <h3>赤纬指出直射纬度</h3>
+                            <p>太阳赤纬可理解为直射点相对赤道的纬度。它在南北回归线之间往返，决定同一天不同纬度的正午太阳高度。</p>
+                        </article>
+                        <article class="cosmos-interpretation__item">
+                            <span>03</span>
+                            <h3>纬度改变太阳路径</h3>
+                            <p>同一天，低纬地区太阳高度通常更高；高纬地区日出日落角度更浅，昼长变化也更明显。</p>
+                        </article>
+                        <article class="cosmos-interpretation__item">
+                            <span>04</span>
+                            <h3>近似模型不能替代实测</h3>
+                            <p>本页不处理大气折射、天气、地形遮挡、时区和地方真太阳时。实际日出日落会因这些条件偏离理论值。</p>
+                        </article>
+                    </div>
+                </section>
+
+                <section class="cosmos-reference" aria-label="参考资料">
+                    <span class="cosmos-reference__eyebrow">References</span>
+                    <h2>参考资料</h2>
+                    <p>本页采用 NASA 对季节成因的说明，并参考 NOAA 太阳位置计算资料中对太阳高度、日出日落、大气折射和近似误差的边界提示。NOAA 页面说明其计算器不再维护，因此本页只使用其公开的计算说明和误差范围提示。</p>
+                    <div class="cosmos-reference__links">
+                        <a href="https://spaceplace.nasa.gov/seasons/en/" target="_blank" rel="noopener">NASA Space Place · Seasons</a>
+                        <a href="https://gml.noaa.gov/grad/solcalc/calcdetails.html" target="_blank" rel="noopener">NOAA GML · Solar Calculation Details</a>
+                    </div>
+                </section>
             </div>
-            <div class="planets-hud planets-hud--bl">
-                <div>← DRAG TO ROTATE</div>
-                <div>TAP PLANET TO ENTER</div>
+        </section>
+
+        <section id="page-datascience" class="page datascience-page" aria-label="数据科学与 AI">
+            <div class="page-hero">
+                <div class="page-hero__text">
+                    <span class="page-hero__label page-hero__label--data">Data & AI</span>
+                    <h1 class="page-hero__title">数据科学与 AI</h1>
+                    <p class="page-hero__desc">从特征、标签、损失函数和参数训练开始，理解一个模型怎样把散点数据转化为可解释的预测线。</p>
+                </div>
+                <div class="page-hero__visual">
+                    <canvas id="hero-canvas-datascience" class="page-hero__canvas" role="img" aria-label="数据科学线性模型装饰动画"></canvas>
+                </div>
             </div>
-            <div class="planets-hud planets-hud--br">
-                <div>α4 · HOLOGRAPHIC</div>
-                <div class="blink">● LIVE</div>
+
+            <div class="datascience-shell">
+                <section class="datascience-overview" aria-label="数据科学学习概览">
+                    <div class="datascience-overview__copy">
+                        <h2>从散点到模型</h2>
+                        <p>线性回归把一个或多个特征映射到预测值。入门时先看单特征模型 ŷ = b + wx：点到预测线的竖直距离是残差，普通最小二乘会寻找让残差平方和最小的直线。</p>
+                    </div>
+                    <div class="datascience-overview__metrics" aria-label="当前模块要点">
+                        <div class="datascience-overview__metric">
+                            <span>输入</span>
+                            <strong>特征 x</strong>
+                        </div>
+                        <div class="datascience-overview__metric">
+                            <span>输出</span>
+                            <strong>预测 ŷ</strong>
+                        </div>
+                        <div class="datascience-overview__metric">
+                            <span>目标</span>
+                            <strong>降低残差平方和</strong>
+                        </div>
+                        <div class="datascience-overview__metric">
+                            <span>方法</span>
+                            <strong>最小二乘与梯度下降</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="datascience-model-map" aria-label="线性回归概念桥">
+                    <div class="datascience-model-map__header">
+                        <h2>先把模型读成一条学习链</h2>
+                        <p>线性回归的关键不只是“画一条线”。它把输入特征、模型参数、预测误差和适用边界连在一起；先读懂这条链，再去调节实验台上的斜率和截距。</p>
+                    </div>
+                    <div class="datascience-model-map__grid">
+                        <article class="datascience-model-card">
+                            <span>01 · Data</span>
+                            <h3>特征与标签</h3>
+                            <p>特征 x 是模型已知的输入，标签 y 是观测到的结果。预测值 ŷ 来自模型，不一定等于真实观测值 y。</p>
+                        </article>
+                        <article class="datascience-model-card">
+                            <span>02 · Model</span>
+                            <h3>权重与偏置</h3>
+                            <p>在 ŷ = b + wx 中，w 对应直线斜率，b 对应截距或偏置；训练过程调整这些参数，让预测更贴近数据。</p>
+                        </article>
+                        <article class="datascience-model-card">
+                            <span>03 · Loss</span>
+                            <h3>残差与平方损失</h3>
+                            <p>残差是 y - ŷ。把残差平方后求和得到 SSE，取平均得到 MSE；平方会放大较大的误差。</p>
+                        </article>
+                        <article class="datascience-model-card">
+                            <span>04 · Boundary</span>
+                            <h3>范围与解释边界</h3>
+                            <p>残差图应尽量像随机波动；若出现弯曲、扇形或孤立大点，就要警惕非线性、异常值或样本范围外推。</p>
+                        </article>
+                    </div>
+                </section>
+
+                <section class="datascience-lab" aria-labelledby="linear-regression-title">
+                    <div class="datascience-lab__header">
+                        <div>
+                            <span class="datascience-lab__eyebrow">Regression Model</span>
+                            <h2 id="linear-regression-title">线性回归与损失函数</h2>
+                            <p>调节斜率和截距，观察残差与平均平方损失如何变化；也可以一键显示最小二乘线，或用梯度下降逐步靠近它。</p>
+                        </div>
+                        <span class="datascience-lab__badge">Least Squares</span>
+                    </div>
+
+                    <div class="regression-workbench">
+                        <div class="regression-controls" aria-label="线性回归参数控制">
+                            <div class="regression-control">
+                                <label>
+                                    <span>数据集</span>
+                                    <strong>示例场景</strong>
+                                </label>
+                                <div class="regression-presets">
+                                    <button type="button" data-regression-dataset="study" class="is-active" aria-pressed="true">学习时长</button>
+                                    <button type="button" data-regression-dataset="climate" aria-pressed="false">温度销量</button>
+                                    <button type="button" data-regression-dataset="outlier" aria-pressed="false">含异常点</button>
+                                </div>
+                            </div>
+                            <div class="regression-control">
+                                <label for="regression-slope">
+                                    <span>斜率 w</span>
+                                    <strong id="regression-slope-value">6.00</strong>
+                                </label>
+                                <input id="regression-slope" type="range" min="-8" max="16" step="0.05" value="6">
+                            </div>
+                            <div class="regression-control">
+                                <label for="regression-intercept">
+                                    <span>截距 b</span>
+                                    <strong id="regression-intercept-value">38.0</strong>
+                                </label>
+                                <input id="regression-intercept" type="range" min="-20" max="120" step="0.5" value="38">
+                            </div>
+                            <div class="regression-control">
+                                <label for="regression-rate">
+                                    <span>学习率</span>
+                                    <strong id="regression-rate-value">0.15</strong>
+                                </label>
+                                <input id="regression-rate" type="range" min="0.02" max="0.6" step="0.01" value="0.15">
+                            </div>
+                            <div class="regression-control">
+                                <label>
+                                    <span>训练操作</span>
+                                    <strong>参数更新</strong>
+                                </label>
+                                <div class="regression-actions">
+                                    <button type="button" id="regression-step">梯度下降一步</button>
+                                    <button type="button" id="regression-fit">显示最小二乘线</button>
+                                    <button type="button" id="regression-reset">重置模型</button>
+                                </div>
+                            </div>
+                            <div class="datascience-note">
+                                <i data-lucide="info"></i>
+                                <p>线性模型适合近似直线趋势；散点图、残差图、样本范围和异常点同样重要。相关关系不自动说明因果关系。</p>
+                            </div>
+                        </div>
+                        <div class="regression-canvas-wrap">
+                            <canvas id="linear-regression-canvas" aria-label="线性回归散点、残差和损失函数可视化画布"></canvas>
+                        </div>
+                        <div id="regression-info" class="regression-info" aria-live="polite"></div>
+                    </div>
+                </section>
+
+                <section class="datascience-interpretation" aria-label="线性回归判读路径">
+                    <div class="datascience-interpretation__header">
+                        <span class="datascience-interpretation__eyebrow">How to Read</span>
+                        <h2>把一条回归线读成四个问题</h2>
+                        <p>线性回归不是只找一条看起来合适的直线。先确认变量含义，再看残差、损失和预测范围，才能判断模型能解释什么、不能解释什么。</p>
+                    </div>
+                    <div class="datascience-interpretation__grid">
+                        <article class="datascience-interpretation__item">
+                            <span>01</span>
+                            <h3>变量代表什么</h3>
+                            <p>x 是特征，y 是标签，ŷ 是模型预测。斜率表示 x 每增加 1 个单位时，预测值平均改变多少；解释时必须回到具体场景。</p>
+                        </article>
+                        <article class="datascience-interpretation__item">
+                            <span>02</span>
+                            <h3>残差有没有模式</h3>
+                            <p>残差是数据点到预测线的竖直差。若残差随 x 呈弯曲、扇形或孤立大点，直线模型可能遗漏了非线性关系或异常样本。</p>
+                        </article>
+                        <article class="datascience-interpretation__item">
+                            <span>03</span>
+                            <h3>损失怎样被压低</h3>
+                            <p>最小二乘线让残差平方和尽量小，MSE 是平方误差的平均值。因为平方会放大大误差，异常点会明显拉动直线位置。</p>
+                        </article>
+                        <article class="datascience-interpretation__item">
+                            <span>04</span>
+                            <h3>预测能走多远</h3>
+                            <p>在样本 x 范围内预测通常更稳妥；向外延伸需要额外证据。相关关系不自动说明因果关系，R² 也不能替代背景解释。</p>
+                        </article>
+                    </div>
+                </section>
+
+                <section class="datascience-reference" aria-label="参考资料">
+                    <span class="datascience-reference__eyebrow">References</span>
+                    <h2>参考资料</h2>
+                    <p>本页依据开放统计教材对最小二乘线、残差、SSE、残差图和样本范围的说明，并参考机器学习教材中“特征、标签、权重、偏置、MSE 和异常点”的表述；实现层面对应普通最小二乘线性模型。</p>
+                    <div class="datascience-reference__links">
+                        <a href="https://openstax.org/books/introductory-statistics-2e/pages/12-3-the-regression-equation" target="_blank" rel="noopener">OpenStax · Regression Equation</a>
+                        <a href="https://developers.google.com/machine-learning/crash-course/linear-regression" target="_blank" rel="noopener">Google ML Crash Course · Linear Regression</a>
+                        <a href="https://developers.google.com/machine-learning/crash-course/linear-regression/loss" target="_blank" rel="noopener">Google ML Crash Course · Loss</a>
+                        <a href="https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LinearRegression.html" target="_blank" rel="noopener">scikit-learn · LinearRegression</a>
+                    </div>
+                </section>
             </div>
-            <div class="planets-info" id="planets-info">
-                <div class="planets-info__label">SUBJECT</div>
-                <div class="planets-info__name">—</div>
-                <div class="planets-info__desc">—</div>
-                <div class="planets-info__hint">CLICK TO ENTER →</div>
+        </section>
+
+        <section id="page-infotech" class="page infotech-page" aria-label="信息技术基础">
+            <div class="page-hero">
+                <div class="page-hero__text">
+                    <span class="page-hero__label page-hero__label--info">Information Technology</span>
+                    <h1 class="page-hero__title">信息技术基础</h1>
+                    <p class="page-hero__desc">从一次网页请求出发，观察域名解析、TCP 分段、IPv6 包头和逐跳转发怎样协同，把浏览器里的操作送到服务器。</p>
+                </div>
+                <div class="page-hero__visual">
+                    <canvas id="hero-canvas-infotech" class="page-hero__canvas" role="img" aria-label="网络分层与数据包路径装饰动画"></canvas>
+                </div>
+            </div>
+
+            <div class="infotech-shell">
+                <section class="infotech-overview" aria-label="信息技术学习概览">
+                    <div class="infotech-overview__copy">
+                        <h2>把“上网”拆成可观察的层</h2>
+                        <p>日常看到的是域名、网页和按钮；底层发生的是名字到地址的转换、字节流分段、网络层寻址和每一跳链路上的重新封装。这个页面先用一个近似模型建立分层直觉。</p>
+                    </div>
+                    <div class="infotech-overview__metrics" aria-label="当前模块要点">
+                        <div class="infotech-overview__metric">
+                            <span>名称</span>
+                            <strong>域名与 IP</strong>
+                        </div>
+                        <div class="infotech-overview__metric">
+                            <span>传输</span>
+                            <strong>TCP 段</strong>
+                        </div>
+                        <div class="infotech-overview__metric">
+                            <span>网络</span>
+                            <strong>IPv6 包</strong>
+                        </div>
+                        <div class="infotech-overview__metric">
+                            <span>链路</span>
+                            <strong>逐跳封装</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="infotech-protocols" aria-label="网络协议分层要点">
+                    <article class="infotech-protocol">
+                        <span>DNS</span>
+                        <h3>名字到地址</h3>
+                        <p>域名系统把人可读名称组织成分布式层级，并通过解析器向名称服务器查询记录；缓存会让下一次查询更快。</p>
+                    </article>
+                    <article class="infotech-protocol">
+                        <span>HTTP/2</span>
+                        <h3>语义到帧</h3>
+                        <p>HTTP/2 把请求和响应映射成二进制帧，并用流在同一连接上交错传输多个交换，减少应用层排队等待。</p>
+                    </article>
+                    <article class="infotech-protocol">
+                        <span>TCP</span>
+                        <h3>可靠字节流</h3>
+                        <p>TCP 为应用提供可靠、有序的字节流；序号、校验和、确认与重传共同处理丢失和错误。</p>
+                    </article>
+                    <article class="infotech-protocol">
+                        <span>IPv6</span>
+                        <h3>寻址与跳数</h3>
+                        <p>IPv6 包携带源地址、目的地址、Next Header 与 Hop Limit；每经过转发节点，Hop Limit 会递减。</p>
+                    </article>
+                </section>
+
+                <section class="infotech-lab" aria-labelledby="network-layers-title">
+                    <div class="infotech-lab__header">
+                        <div>
+                            <span class="infotech-lab__eyebrow">Packet Journey</span>
+                            <h2 id="network-layers-title">网络分层与数据包旅程</h2>
+                            <p>选择一次网络操作，调节应用数据大小和路径跳数，观察应用数据如何依次进入 TCP 段、IPv6 包和链路帧。</p>
+                        </div>
+                        <span class="infotech-lab__badge">DNS · HTTP/2 · TCP · IPv6</span>
+                    </div>
+
+                    <div class="network-workbench">
+                        <div class="network-controls" aria-label="网络分层参数控制">
+                            <div class="network-control">
+                                <label>
+                                    <span>操作场景</span>
+                                    <strong>示例请求</strong>
+                                </label>
+                                <div class="network-presets">
+                                    <button type="button" data-network-scenario="web" class="is-active" aria-pressed="true">网页请求</button>
+                                    <button type="button" data-network-scenario="media" aria-pressed="false">视频片段</button>
+                                    <button type="button" data-network-scenario="form" aria-pressed="false">表单提交</button>
+                                    <button type="button" data-network-scenario="sync" aria-pressed="false">同步消息</button>
+                                </div>
+                            </div>
+                            <div class="network-control">
+                                <label for="network-payload">
+                                    <span>应用数据</span>
+                                    <strong id="network-payload-value">1800 B</strong>
+                                </label>
+                                <input id="network-payload" type="range" min="300" max="6000" step="100" value="1800">
+                            </div>
+                            <div class="network-control">
+                                <label for="network-hops">
+                                    <span>路径跳数</span>
+                                    <strong id="network-hops-value">4 跳</strong>
+                                </label>
+                                <input id="network-hops" type="range" min="2" max="8" step="1" value="4">
+                            </div>
+                            <div class="infotech-note">
+                                <i data-lucide="info"></i>
+                                <p>这是分层学习模型：TCP 头部按最小 20 B、IPv6 固定头部按 40 B、单段上限按 1200 B 近似处理；真实网络还会受到 MTU、TLS、HTTP 版本、拥塞控制、压缩和链路类型影响。</p>
+                            </div>
+                        </div>
+                        <div class="network-canvas-wrap">
+                            <canvas id="network-layers-canvas" aria-label="网络分层封装和数据包逐跳路径可视化画布"></canvas>
+                        </div>
+                        <div id="network-info" class="network-info" aria-live="polite"></div>
+                    </div>
+                </section>
+
+                <section class="infotech-interpretation" aria-label="网络分层判读路径">
+                    <div class="infotech-interpretation__header">
+                        <span class="infotech-interpretation__eyebrow">How to Read</span>
+                        <h2>把一次请求拆成四个问题</h2>
+                        <p>同一次访问会同时出现名称、连接、寻址和链路传递。先问每一层负责回答什么，再判断图中的字节和跳数属于哪一层的近似。</p>
+                    </div>
+                    <div class="infotech-interpretation__grid">
+                        <article class="infotech-interpretation__item">
+                            <span>01</span>
+                            <h3>DNS 回答“去哪里”</h3>
+                            <p>域名是人可读的名字；浏览器或系统缓存没有答案时，会向 DNS 服务器查询对应 IP。DNS 负责找到地址，不负责传输网页数据本身。</p>
+                        </article>
+                        <article class="infotech-interpretation__item">
+                            <span>02</span>
+                            <h3>TCP 回答“怎样可靠交付”</h3>
+                            <p>TCP 面向字节流，用序号、确认、校验和与重传支持可靠、有序传输。MSS 与路径 MTU 会影响每个段能承载多少数据。</p>
+                        </article>
+                        <article class="infotech-interpretation__item">
+                            <span>03</span>
+                            <h3>IP 回答“下一跳走哪条路”</h3>
+                            <p>IPv6 包携带源地址、目的地址、Next Header 和 Hop Limit。路由器按目标地址转发，Hop Limit 会随每一跳递减。</p>
+                        </article>
+                        <article class="infotech-interpretation__item">
+                            <span>04</span>
+                            <h3>链路回答“这一跳怎么送”</h3>
+                            <p>每一跳会在本地链路重新封装成帧。页面的总经过量是观察链路传递的教学估算，不是抓包工具里的完整开销。</p>
+                        </article>
+                    </div>
+                </section>
+
+                <section class="infotech-reference" aria-label="参考资料">
+                    <span class="infotech-reference__eyebrow">References</span>
+                    <h2>参考资料</h2>
+                    <p>本页的 DNS 查询模型、HTTP/2 帧与流、TCP 字节流和 IPv6 头部/最小链路 MTU，参考 IETF RFC 原文。页面数值用于教学近似，不等同于抓包工具中的完整协议开销。</p>
+                    <div class="infotech-reference__links">
+                        <a href="https://www.rfc-editor.org/rfc/rfc1034.html" target="_blank" rel="noopener">IETF RFC 1034 · DNS Concepts</a>
+                        <a href="https://www.rfc-editor.org/rfc/rfc9113.html" target="_blank" rel="noopener">IETF RFC 9113 · HTTP/2</a>
+                        <a href="https://www.rfc-editor.org/rfc/rfc9293.html" target="_blank" rel="noopener">IETF RFC 9293 · TCP</a>
+                        <a href="https://www.rfc-editor.org/rfc/rfc8200.html" target="_blank" rel="noopener">IETF RFC 8200 · IPv6</a>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+        <section id="page-materials" class="page materials-page" aria-label="材料与微观结构">
+            <div class="page-hero">
+                <div class="page-hero__text">
+                    <span class="page-hero__label page-hero__label--materials">Materials</span>
+                    <h1 class="page-hero__title">材料与微观结构</h1>
+                    <p class="page-hero__desc">从晶胞、堆积方式和晶粒边界开始，看见微米尺度的结构怎样影响材料的强度、延展性和加工表现。</p>
+                </div>
+                <div class="page-hero__visual">
+                    <canvas id="hero-canvas-materials" class="page-hero__canvas" role="img" aria-label="材料晶体结构与晶粒纹理装饰动画"></canvas>
+                </div>
+            </div>
+
+            <div class="materials-shell">
+                <section class="materials-overview" aria-label="材料微观结构学习概览">
+                    <div class="materials-overview__copy">
+                        <h2>从原子排列到宏观性能</h2>
+                        <p>同一种元素或合金，可能因为晶体结构、晶粒尺寸、缺陷密度和热处理历史不同而表现出不同性能。这个页面先把问题拆成两个入门尺度：晶胞里原子怎样堆积，多晶材料中晶粒边界怎样阻碍位错滑移。</p>
+                    </div>
+                    <div class="materials-overview__metrics" aria-label="当前模块要点">
+                        <div class="materials-overview__metric">
+                            <span>晶体结构</span>
+                            <strong>SC / BCC / FCC / HCP</strong>
+                        </div>
+                        <div class="materials-overview__metric">
+                            <span>几何量</span>
+                            <strong>配位数与堆积效率</strong>
+                        </div>
+                        <div class="materials-overview__metric">
+                            <span>微观尺度</span>
+                            <strong>晶粒与晶界</strong>
+                        </div>
+                        <div class="materials-overview__metric">
+                            <span>性能联系</span>
+                            <strong>Hall-Petch 型趋势</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="materials-scales" aria-label="材料结构尺度桥接">
+                    <article class="materials-scale">
+                        <span>Unit Cell</span>
+                        <h3>晶胞是理想几何</h3>
+                        <p>配位数、等效原子数和堆积效率来自理想晶体模型，适合比较 SC、BCC、FCC、HCP 的原子排列差异。</p>
+                    </article>
+                    <article class="materials-scale">
+                        <span>Defects</span>
+                        <h3>位错连接结构与塑性</h3>
+                        <p>金属塑性变形常与位错滑移有关；晶体结构、滑移面和缺陷会共同影响材料是否容易变形。</p>
+                    </article>
+                    <article class="materials-scale">
+                        <span>Grain Boundary</span>
+                        <h3>晶界会阻碍滑移</h3>
+                        <p>平均晶粒更小时，晶界数量通常更多，位错跨越晶界更困难，因此微米级多晶金属常出现细晶强化趋势。</p>
+                    </article>
+                    <article class="materials-scale">
+                        <span>Processing</span>
+                        <h3>加工历史会改变机制</h3>
+                        <p>快速凝固、再结晶和退火都会改变晶粒尺寸、缺陷密度或相分布；同一晶粒尺寸下，不同材料也可能强度不同。</p>
+                    </article>
+                </section>
+
+                <section class="materials-judgement" aria-label="材料模型判断路径">
+                    <div class="materials-judgement__header">
+                        <h2>把显微图像转成材料判断</h2>
+                        <p>材料性能不能只从一张晶粒图或一个晶胞模型推出。更稳妥的读法，是先确认尺度，再追问位错、晶界和加工历史是否能支持你的解释。</p>
+                    </div>
+                    <div class="materials-judgement__grid">
+                        <article class="materials-judgement-card">
+                            <span>Scale</span>
+                            <h3>先分清观察尺度</h3>
+                            <p>晶胞解释理想原子排列，晶粒图解释多晶组织；两者相隔多个尺度，不能把晶胞堆积效率直接等同于宏观强度。</p>
+                        </article>
+                        <article class="materials-judgement-card">
+                            <span>Mechanism</span>
+                            <h3>再说明强化机制</h3>
+                            <p>微米级细晶强化通常用晶界阻碍位错滑移来解释；若材料主要受析出、相变或孔隙控制，晶粒尺寸就不是唯一变量。</p>
+                        </article>
+                        <article class="materials-judgement-card">
+                            <span>Range</span>
+                            <h3>限定 Hall-Petch 范围</h3>
+                            <p>σy = σ0 + ky·d^-1/2 是经验关系，适合表达趋势。晶粒进入纳米尺度或分布很不均匀时，机制可能改变。</p>
+                        </article>
+                        <article class="materials-judgement-card">
+                            <span>Evidence</span>
+                            <h3>用更多证据约束结论</h3>
+                            <p>真实判断还需要材料成分、热处理、相组成、孔隙、温度和实验方法。页面中的指数只用于学习方向，不用于工程选材。</p>
+                        </article>
+                    </div>
+                </section>
+
+                <section class="materials-lab" aria-labelledby="materials-lab-title">
+                    <div class="materials-lab__header">
+                        <div>
+                            <span class="materials-lab__eyebrow">Microstructure Lab</span>
+                            <h2 id="materials-lab-title">晶体结构与晶粒尺寸</h2>
+                            <p>切换常见金属晶体结构，观察配位数和堆积效率；再调节晶粒尺寸，看晶界数量和相对强度趋势如何变化。</p>
+                        </div>
+                        <span class="materials-lab__badge">Packing & Grains</span>
+                    </div>
+
+                    <div class="materials-workbench">
+                        <div class="materials-controls" aria-label="材料微观结构参数控制">
+                            <div class="materials-control">
+                                <label>
+                                    <span>晶体结构</span>
+                                    <strong>常见金属晶胞</strong>
+                                </label>
+                                <div class="materials-presets">
+                                    <button type="button" data-material-cell="sc" aria-pressed="false">简单立方</button>
+                                    <button type="button" data-material-cell="bcc" aria-pressed="false">体心立方</button>
+                                    <button type="button" data-material-cell="fcc" class="is-active" aria-pressed="true">面心立方</button>
+                                    <button type="button" data-material-cell="hcp" aria-pressed="false">密排六方</button>
+                                </div>
+                            </div>
+                            <div class="materials-control">
+                                <label for="materials-grain-size">
+                                    <span>平均晶粒尺寸</span>
+                                    <strong id="materials-grain-size-value">45 μm</strong>
+                                </label>
+                                <input id="materials-grain-size" type="range" min="5" max="120" step="1" value="45">
+                            </div>
+                            <div class="materials-control">
+                                <label>
+                                    <span>示例处理</span>
+                                    <strong>改变晶粒尺度</strong>
+                                </label>
+                                <div class="materials-processes">
+                                    <button type="button" data-material-preset="refined" aria-pressed="false">快速凝固</button>
+                                    <button type="button" data-material-preset="recrystallized" aria-pressed="false">再结晶</button>
+                                    <button type="button" data-material-preset="annealed" aria-pressed="false">退火长大</button>
+                                </div>
+                            </div>
+                            <div class="materials-note">
+                                <i data-lucide="info"></i>
+                                <p>页面中的强度指数是相对趋势，用来理解晶粒细化的方向；真实材料还受成分、相变、孔隙、温度、加工历史和纳米晶机制影响。</p>
+                            </div>
+                        </div>
+                        <div class="materials-canvas-wrap">
+                            <canvas id="materials-canvas" aria-label="晶胞、晶粒边界和相对强度趋势可视化画布"></canvas>
+                        </div>
+                        <div id="materials-info" class="materials-info" aria-live="polite"></div>
+                    </div>
+                </section>
+
+                <section class="materials-interpretation" aria-label="材料结构性能判读路径">
+                    <div class="materials-interpretation__header">
+                        <span class="materials-interpretation__eyebrow">How to Read</span>
+                        <h2>把图像结论落到三个问题</h2>
+                        <p>晶胞、晶粒和性能不是同一个层级。学习时先分清理想几何、微观缺陷和真实材料条件，再把可视化结果放回模型适用范围。</p>
+                    </div>
+                    <div class="materials-interpretation__grid">
+                        <article class="materials-interpretation__item">
+                            <span>01</span>
+                            <h3>晶胞告诉你怎样堆积</h3>
+                            <p>等效原子数、配位数和堆积效率描述的是理想晶体几何。SC、BCC、FCC、HCP 的比较能解释紧密堆积差异，但不能单独决定材料强度。</p>
+                        </article>
+                        <article class="materials-interpretation__item">
+                            <span>02</span>
+                            <h3>晶界改变位错运动</h3>
+                            <p>在多晶金属的入门模型中，Hall-Petch 关系常写作 σy = σ0 + ky·d^-1/2：平均晶粒 d 变小，晶界增多，屈服应力通常上升。</p>
+                        </article>
+                        <article class="materials-interpretation__item">
+                            <span>03</span>
+                            <h3>边界条件决定能否外推</h3>
+                            <p>纳米晶、异常晶粒分布、相变、析出、孔隙、温度和加工历史都会改变机制。本页只表达微米级教学趋势，不把指数当作真实材料预测。</p>
+                        </article>
+                    </div>
+                </section>
+
+                <section class="materials-reference" aria-label="参考资料">
+                    <span class="materials-reference__eyebrow">References</span>
+                    <h2>参考资料</h2>
+                    <p>本页的晶胞、配位数和堆积效率参考开放化学教材；晶粒尺寸与强度的关系采用入门级相对趋势，并保留 Hall-Petch 经验模型、统计分散性和纳米尺度偏离。</p>
+                    <div class="materials-reference__links">
+                        <a href="https://openstax.org/books/chemistry-2e/pages/10-6-lattice-structures-in-crystalline-solids" target="_blank" rel="noopener">OpenStax · Crystal Structures</a>
+                        <a href="https://arxiv.org/abs/2209.04891" target="_blank" rel="noopener">Gu, Stiles & El-Awady · Hall-Petch Statistics</a>
+                        <a href="https://arxiv.org/abs/2402.11798" target="_blank" rel="noopener">Dangwal et al. · Hall-Petch Breaks</a>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+        <section id="page-humanities" class="page humanities-page" aria-label="语言与人文可视化">
+            <div class="page-hero">
+                <div class="page-hero__text">
+                    <span class="page-hero__label page-hero__label--humanities">Humanities</span>
+                    <h1 class="page-hero__title">语言与人文可视化</h1>
+                    <p class="page-hero__desc">把文本拆成词项、上下文和共现关系，学习如何用图表提出回读问题，而不是让数字替代解释。</p>
+                </div>
+                <div class="page-hero__visual">
+                    <canvas id="hero-canvas-humanities" class="page-hero__canvas" role="img" aria-label="文本词项弧线与共现网络装饰动画"></canvas>
+                </div>
+            </div>
+
+            <div class="humanities-shell">
+                <section class="humanities-overview" aria-label="语言与人文可视化学习概览">
+                    <div class="humanities-overview__copy">
+                        <h2>从词项线索回到细读</h2>
+                        <p>词频、关键词上下文和共现网络可以帮助定位主题、比较文本段落和提出问题；但词项统计会弱化语序、语气和材料背景，所以解释必须回到原文和相关资料。</p>
+                    </div>
+                    <div class="humanities-overview__metrics" aria-label="当前模块要点">
+                        <div class="humanities-overview__metric">
+                            <span>词项</span>
+                            <strong>出现次数与分布</strong>
+                        </div>
+                        <div class="humanities-overview__metric">
+                            <span>上下文</span>
+                            <strong>句内回读</strong>
+                        </div>
+                        <div class="humanities-overview__metric">
+                            <span>共现</span>
+                            <strong>同句关系线索</strong>
+                        </div>
+                        <div class="humanities-overview__metric">
+                            <span>史料意识</span>
+                            <strong>观察 · 反思 · 提问</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="humanities-evidence-chain" aria-label="文本证据链">
+                    <div class="humanities-evidence-chain__header">
+                        <h2>把文本图表接回证据链</h2>
+                        <p>文本可视化适合发现线索，但解释要回到原文、出处和材料背景。可以把一次阅读拆成“清理文本、观察分布、回到上下文、提出问题、继续求证”五步。</p>
+                    </div>
+                    <div class="humanities-evidence-chain__grid">
+                        <article class="humanities-evidence-card">
+                            <span>01 · Prepare</span>
+                            <h3>先说明语料怎样进入图表</h3>
+                            <p>分词方式、停用词、文本长短和选入材料都会改变词频结果。图表前要先知道被统计的到底是什么。</p>
+                        </article>
+                        <article class="humanities-evidence-card">
+                            <span>02 · Observe</span>
+                            <h3>用数量线索提出观察</h3>
+                            <p>词频和分布能提示哪些词反复出现，适合帮你找到值得回读的段落，而不是直接给出主题结论。</p>
+                        </article>
+                        <article class="humanities-evidence-card">
+                            <span>03 · Context</span>
+                            <h3>把关键词放回句子</h3>
+                            <p>关键词上下文用于比较目标词左右邻词和句内角色，判断它是在定义、叙述、评价还是限定条件。</p>
+                        </article>
+                        <article class="humanities-evidence-card">
+                            <span>04 · Relate</span>
+                            <h3>把共现当作近邻线索</h3>
+                            <p>同句或窗口内共同出现只说明词项距离近，不直接证明因果、作者意图或文本主题。</p>
+                        </article>
+                        <article class="humanities-evidence-card">
+                            <span>05 · Verify</span>
+                            <h3>继续追问出处和背景</h3>
+                            <p>一手资料阅读要观察、反思、提问并继续探究作者、年代、受众、传播方式和相关材料。</p>
+                        </article>
+                    </div>
+                </section>
+
+                <section class="humanities-lab" aria-labelledby="humanities-lab-title">
+                    <div class="humanities-lab__header">
+                        <div>
+                            <span class="humanities-lab__eyebrow">Text Reading Lab</span>
+                            <h2 id="humanities-lab-title">文本结构与阅读问题</h2>
+                            <p>切换练习文本和可视化方式，比较高频词、回读位置与同句共现关系如何引导下一步阅读。</p>
+                        </div>
+                        <span class="humanities-lab__badge">Terms & Context</span>
+                    </div>
+
+                    <div class="humanities-workbench">
+                        <div class="humanities-controls" aria-label="文本可视化参数控制">
+                            <div class="humanities-control">
+                                <label>
+                                    <span>练习文本</span>
+                                    <strong>课堂样本</strong>
+                                </label>
+                                <div class="humanities-samples">
+                                    <button type="button" data-humanities-sample="learning" aria-pressed="false">学习札记</button>
+                                    <button type="button" data-humanities-sample="city" aria-pressed="false">城市水利</button>
+                                    <button type="button" data-humanities-sample="primary" class="is-active" aria-pressed="true">史料方法</button>
+                                </div>
+                            </div>
+                            <div class="humanities-control">
+                                <label>
+                                    <span>可视化方式</span>
+                                    <strong>阅读视角</strong>
+                                </label>
+                                <div class="humanities-modes">
+                                    <button type="button" data-humanities-mode="terms" class="is-active" aria-pressed="true">词项分布</button>
+                                    <button type="button" data-humanities-mode="contexts" aria-pressed="false">上下文</button>
+                                    <button type="button" data-humanities-mode="network" aria-pressed="false">共现网络</button>
+                                </div>
+                            </div>
+                            <div class="humanities-control">
+                                <label>
+                                    <span>关注词项</span>
+                                    <strong>自动提取</strong>
+                                </label>
+                                <div class="humanities-focus-list" id="humanities-focus-list" aria-label="关注词项"></div>
+                            </div>
+                            <div class="humanities-note">
+                                <i data-lucide="info"></i>
+                                <p>练习文本用于演示方法。研究真实文本时，需要确认原文、作者、年代、传播方式和相关材料，再解释图表线索。</p>
+                            </div>
+                        </div>
+                        <div class="humanities-canvas-wrap">
+                            <canvas id="humanities-canvas" aria-label="词项分布、上下文和共现关系可视化画布"></canvas>
+                        </div>
+                        <div id="humanities-info" class="humanities-info" aria-live="polite"></div>
+                    </div>
+                </section>
+
+                <section class="humanities-interpretation" aria-label="文本图表判读路径">
+                    <div class="humanities-interpretation__header">
+                        <span class="humanities-interpretation__eyebrow">How to Read</span>
+                        <h2>把文本图表读成五个问题</h2>
+                        <p>文本可视化适合帮助你发现线索，但不能替代细读。先确认词项如何被统计，再回到句子、出处和材料背景中解释。</p>
+                    </div>
+                    <div class="humanities-interpretation__grid">
+                        <article class="humanities-interpretation__item">
+                            <span>01</span>
+                            <h3>这个词为什么被算进去</h3>
+                            <p>词频表展示的是词项在语料中的出现次数。分词方式、停用词、文本长度和选入材料都会影响结果，所以高频不等于自动重要。</p>
+                        </article>
+                        <article class="humanities-interpretation__item">
+                            <span>02</span>
+                            <h3>它在句子里怎样使用</h3>
+                            <p>关键词上下文会把目标词放回左右邻词。比较不同句子的用法，才能判断它是在定义概念、组织叙述，还是表达立场。</p>
+                        </article>
+                        <article class="humanities-interpretation__item">
+                            <span>03</span>
+                            <h3>共现只是一种近邻线索</h3>
+                            <p>同句或窗口内共同出现提示可能关系，但不直接证明因果、主题或作者意图。连线越密，越需要回到原句核对。</p>
+                        </article>
+                        <article class="humanities-interpretation__item">
+                            <span>04</span>
+                            <h3>解释要回到材料背景</h3>
+                            <p>一手资料阅读需要观察、反思、提问，并继续追查作者、年代、受众、传播方式和相关材料。图表负责提出问题，解释来自证据链。</p>
+                        </article>
+                        <article class="humanities-interpretation__item">
+                            <span>05</span>
+                            <h3>样本选择会改变结论</h3>
+                            <p>同一方法用于不同语料可能得到不同高频词和共现关系。解释时要说明材料范围，避免把小样本线索推广为整体判断。</p>
+                        </article>
+                    </div>
+                </section>
+
+                <section class="humanities-reference" aria-label="参考资料">
+                    <span class="humanities-reference__eyebrow">References</span>
+                    <h2>参考资料</h2>
+                    <p>本页参考 Voyant Tools 对 Corpus Terms、Contexts 和 Links 的工具说明；史料阅读提示采用美国国会图书馆面向学生的观察、反思、提问与继续探究流程；词频边界参考信息检索教材中对 term frequency、stop words 与 bag-of-words 的说明。</p>
+                    <div class="humanities-reference__links">
+                        <a href="https://voyant-tools.org/docs/" target="_blank" rel="noopener">Voyant Tools Help</a>
+                        <a href="https://www.loc.gov/programs/teachers/getting-started-with-primary-sources/guides/" target="_blank" rel="noopener">Library of Congress · Primary Sources</a>
+                        <a href="https://nlp.stanford.edu/IR-book/html/htmledition/term-frequency-and-weighting-1.html" target="_blank" rel="noopener">Stanford IR Book · Term Frequency</a>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+        <section id="page-engineering" class="page engineering-page" aria-label="工程应用">
+            <div class="page-hero">
+                <div class="page-hero__text">
+                    <span class="page-hero__label page-hero__label--amber">Engineering</span>
+                    <h1 class="page-hero__title">工程应用</h1>
+                    <p class="page-hero__desc">把物理、数学和材料知识放进真实结构问题：从桥梁桁架受力开始，理解荷载路径、支座反力和杆件拉压。</p>
+                </div>
+                <div class="page-hero__visual">
+                    <canvas id="hero-canvas-engineering" class="page-hero__canvas" role="img" aria-label="工程应用桁架结构装饰动画"></canvas>
+                </div>
+            </div>
+
+            <div class="engineering-shell">
+                <section class="engineering-overview" aria-label="工程学习概览">
+                    <div class="engineering-overview__copy">
+                        <h2>从受力图到结构判断</h2>
+                        <p>工程问题通常先把真实物体抽象成可计算模型。这个页面使用理想 Warren 桁架：节点铰接、杆件只承受轴向拉压力、外荷载作用在节点上；它适合帮助你看清力沿结构传递的路径。</p>
+                    </div>
+                    <div class="engineering-overview__metrics" aria-label="当前模块要点">
+                        <div class="engineering-overview__metric">
+                            <span>模型</span>
+                            <strong>二维静定桁架</strong>
+                        </div>
+                        <div class="engineering-overview__metric">
+                            <span>方法</span>
+                            <strong>节点平衡方程</strong>
+                        </div>
+                        <div class="engineering-overview__metric">
+                            <span>观察</span>
+                            <strong>拉压与反力分布</strong>
+                        </div>
+                        <div class="engineering-overview__metric">
+                            <span>范围</span>
+                            <strong>概念学习模型</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="engineering-model-chain" aria-label="桁架分析概念桥">
+                    <div class="engineering-model-chain__header">
+                        <h2>把桥梁问题拆成一条工程判断链</h2>
+                        <p>理想桁架分析不是直接“算每根杆”。先判断模型能不能简化为简单桁架，再用整体平衡求反力，用节点平衡传递杆力，最后回到真实结构讨论安全边界。</p>
+                    </div>
+                    <div class="engineering-model-chain__grid">
+                        <article class="engineering-model-card">
+                            <span>01 · Idealize</span>
+                            <h3>先确认模型假设</h3>
+                            <p>简单桁架把杆件视为二力杆，节点按无摩擦铰接处理，并把荷载和支座反力作用在节点上。</p>
+                        </article>
+                        <article class="engineering-model-card">
+                            <span>02 · Reactions</span>
+                            <h3>整体平衡先求反力</h3>
+                            <p>把整座桁架看成刚体，使用 ΣFx = 0、ΣFy = 0、ΣM = 0。荷载越靠近某侧支座，该侧反力通常越大。</p>
+                        </article>
+                        <article class="engineering-model-card">
+                            <span>03 · Members</span>
+                            <h3>节点平衡传递杆力</h3>
+                            <p>节点法把每个连接点当作受力粒子。每个平面节点可列 ΣFx = 0 与 ΣFy = 0，通常最多先解两个未知杆力。</p>
+                        </article>
+                        <article class="engineering-model-card">
+                            <span>04 · Design</span>
+                            <h3>从杆力走向设计验算</h3>
+                            <p>轴力只是第一步。真实桥梁还要继续考虑自重、连接刚度、屈曲、疲劳、移动荷载和规范安全系数。</p>
+                        </article>
+                    </div>
+                </section>
+
+                <section class="engineering-lab" aria-labelledby="bridge-truss-title">
+                    <div class="engineering-lab__header">
+                        <div>
+                            <span class="engineering-lab__eyebrow">Interactive Structure</span>
+                            <h2 id="bridge-truss-title">桥梁桁架受力实验</h2>
+                            <p>调整荷载大小和作用节点，观察左右支座反力、关键杆件轴力以及受拉/受压状态如何随之变化。</p>
+                        </div>
+                        <span class="engineering-lab__badge">Warren Truss</span>
+                    </div>
+
+                    <div class="truss-workbench">
+                        <div class="truss-controls" aria-label="桁架参数控制">
+                            <div class="truss-control">
+                                <label for="truss-load">
+                                    <span>竖向荷载</span>
+                                    <strong id="truss-load-value">60 kN</strong>
+                                </label>
+                                <input id="truss-load" type="range" min="20" max="120" step="5" value="60">
+                            </div>
+                            <div class="truss-control">
+                                <label>
+                                    <span>作用节点</span>
+                                    <strong>桥面节点</strong>
+                                </label>
+                                <div class="truss-node-buttons">
+                                    <button type="button" data-truss-joint="B" aria-pressed="false">左跨 B</button>
+                                    <button type="button" data-truss-joint="C" class="is-active" aria-pressed="true">中跨 C</button>
+                                    <button type="button" data-truss-joint="D" aria-pressed="false">右跨 D</button>
+                                </div>
+                            </div>
+                            <div class="engineering-note">
+                                <i data-lucide="info"></i>
+                                <p>这是理想桁架的入门模型，不模拟焊接刚度、材料屈服、疲劳、风载、车辆移动和真实规范设计。</p>
+                            </div>
+                        </div>
+                        <div class="truss-canvas-wrap">
+                            <canvas id="bridge-truss-canvas" aria-label="Warren 桁架桥受力可视化画布"></canvas>
+                        </div>
+                        <div id="truss-info" class="truss-info" aria-live="polite"></div>
+                    </div>
+                </section>
+
+                <section class="engineering-interpretation" aria-label="桁架受力判读路径">
+                    <div class="engineering-interpretation__header">
+                        <span class="engineering-interpretation__eyebrow">How to Read</span>
+                        <h2>把桁架图读成四个判断</h2>
+                        <p>桁架实验不是先看哪根杆最粗，而是先确认模型假设，再按整体平衡和节点平衡追踪力怎样从荷载走向支座。</p>
+                    </div>
+                    <div class="engineering-interpretation__grid">
+                        <article class="engineering-interpretation__item">
+                            <span>01</span>
+                            <h3>整体先满足平衡</h3>
+                            <p>把整座桥当作刚体时，竖向力之和和任一点力矩之和都应为零。荷载位置改变时，左右支座反力会随力臂一起改变。</p>
+                        </article>
+                        <article class="engineering-interpretation__item">
+                            <span>02</span>
+                            <h3>节点再分配杆力</h3>
+                            <p>节点法把每个铰接点当成受力粒子，分别列出 ΣFx = 0 与 ΣFy = 0。已知力会沿相邻杆件传到下一个节点。</p>
+                        </article>
+                        <article class="engineering-interpretation__item">
+                            <span>03</span>
+                            <h3>符号决定拉还是压</h3>
+                            <p>常见做法先假定未知杆力为受拉；计算结果若为负，表示实际方向相反，也就是受压。本页用青色表示受拉、琥珀色表示受压。</p>
+                        </article>
+                        <article class="engineering-interpretation__item">
+                            <span>04</span>
+                            <h3>真实设计还要继续检算</h3>
+                            <p>理想桁架忽略节点刚度、杆件自重、屈曲、疲劳和组合荷载。这里帮助建立受力直觉，不代替截面选择和工程规范验算。</p>
+                        </article>
+                        <article class="engineering-interpretation__item">
+                            <span>05</span>
+                            <h3>零力杆只对当前荷载成立</h3>
+                            <p>某些杆在一个荷载工况下可能近似不传力，但在车辆移动、风载或温度作用下可能重新参与受力，因此不能简单删除。</p>
+                        </article>
+                    </div>
+                </section>
+
+                <section class="engineering-reference" aria-label="参考资料">
+                    <span class="engineering-reference__eyebrow">References</span>
+                    <h2>参考资料</h2>
+                    <p>本页的桁架概念、节点法、整体平衡、零力杆和拉压符号说明参考开放静力学教材；页面数值用于课堂观察，不等同于真实桥梁设计验算。</p>
+                    <div class="engineering-reference__links">
+                        <a href="https://engineeringstatics.org/Chapter_06-trusses.html" target="_blank" rel="noopener">Engineering Statics · Trusses</a>
+                        <a href="https://engineeringstatics.org/method-of-joints.html" target="_blank" rel="noopener">Engineering Statics · Method of Joints</a>
+                        <a href="https://engineeringstatics.org/Chapter_05.html" target="_blank" rel="noopener">Engineering Statics · Equilibrium</a>
+                        <a href="https://engineeringstatics.org/Chapter_06-trusses.html#subsection-110" target="_blank" rel="noopener">Engineering Statics · Zero-Force Members</a>
+                    </div>
+                </section>
             </div>
         </section>
 
@@ -842,6 +1921,81 @@
                 </div>
             </div>
 
+            <!-- ── 二项式定理 ── -->
+            <div class="content-section" data-module="binomial-theorem">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h3><i data-lucide="pyramid"></i> 二项式定理</h3>
+                        <p>调节指数 n，观察杨辉三角逐行生长与 (a+b)ⁿ 展开式系数 C(n,k) 的联动；点击单元格演示帕斯卡递推</p>
+                    </div>
+                    <div id="bt-controls" class="bt-controls"></div>
+                    <div class="canvas-container">
+                        <canvas id="bt-canvas" role="img" aria-label="二项式定理杨辉三角可视化画布"></canvas>
+                    </div>
+                    <div id="bt-info" class="bt-info"></div>
+                </div>
+            </div>
+
+            <!-- ── 统计与回归 ── -->
+            <div class="content-section" data-module="statistics-regression">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h3><i data-lucide="scatter-chart"></i> 统计与回归</h3>
+                        <p>「线性回归」用最小二乘法拟合散点并计算相关系数 r / R²；「统计分布」展示频率直方图、均值方差标准差与正态曲线 3σ 原则</p>
+                    </div>
+                    <div id="sr-controls" class="sr-controls"></div>
+                    <div class="canvas-container">
+                        <canvas id="sr-canvas" role="img" aria-label="统计与回归可视化画布"></canvas>
+                    </div>
+                    <div id="sr-info" class="sr-info"></div>
+                </div>
+            </div>
+
+            <!-- ── 数学建模与数值方法 ── -->
+            <div class="content-section" data-module="modeling-numerical" id="modeling-numerical-section">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h3><i data-lucide="line-chart"></i> 数学建模与数值方法</h3>
+                        <p>比较最小二乘拟合残差、Euler 步长误差与 Newton 迭代路径，理解模型假设、误差和收敛条件如何影响结论</p>
+                    </div>
+                    <div id="mn-controls" class="mn-controls"></div>
+                    <div class="canvas-container">
+                        <canvas id="mn-canvas" role="img" aria-label="数学建模、拟合误差、Euler 数值法与 Newton 迭代可视化"></canvas>
+                    </div>
+                    <div id="mn-info" class="mn-info" aria-live="polite"></div>
+                </div>
+            </div>
+
+            <!-- ── 空间向量 ── -->
+            <div class="content-section" data-module="spatial-vector">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h3><i data-lucide="box"></i> 空间向量</h3>
+                        <p>调节向量 a、b 的三维分量，拖拽画布旋转视角，观察向量加法、数量积、向量积、夹角与投影</p>
+                    </div>
+                    <div id="sv-controls" class="sv-controls"></div>
+                    <div class="canvas-container">
+                        <canvas id="sv-canvas" role="img" aria-label="空间向量 3D 可视化画布"></canvas>
+                    </div>
+                    <div id="sv-info" class="sv-info"></div>
+                </div>
+            </div>
+
+            <!-- ── 导数应用 ── -->
+            <div class="content-section" data-module="derivative-application">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h3><i data-lucide="spline"></i> 导数应用</h3>
+                        <p>拖动切点观察切线斜率与函数升降的对应；曲线按导数符号着色显示单调性，f′=0 处标记极值点</p>
+                    </div>
+                    <div id="da-controls" class="da-controls"></div>
+                    <div class="canvas-container">
+                        <canvas id="da-canvas" role="img" aria-label="导数应用可视化画布"></canvas>
+                    </div>
+                    <div id="da-info" class="da-info"></div>
+                </div>
+            </div>
+
             <div class="experiments-section">
                 <div class="section-header">
                     <h2>更多实验</h2>
@@ -937,6 +2091,68 @@
                             <span class="step-number">3</span>
                             <p><strong>能量耗散</strong> — 摩擦力和非完全弹性碰撞使动能逐渐转化为热能，球体最终趋于静止。</p>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── 气体实验定律 ── -->
+            <div class="content-section" data-module="gas-laws" id="gas-laws-section">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>气体实验定律 <span class="formula-badge">PV = nRT</span></h2>
+                        <p>用压强、体积、温度和物质的量联动理解 Boyle、Charles、Gay-Lussac 与 Avogadro 定律</p>
+                    </div>
+                    <div class="steps-panel">
+                        <div class="step-item">
+                            <span class="step-number">1</span>
+                            <p><strong>控制变量</strong> — 每条气体定律只改变两个状态量，其余状态量保持不变。</p>
+                        </div>
+                        <div class="step-item">
+                            <span class="step-number">2</span>
+                            <p><strong>绝对温度</strong> — 气体定律计算必须使用 Kelvin 温度，不能直接代入摄氏温度。</p>
+                        </div>
+                        <div class="step-item">
+                            <span class="step-number">3</span>
+                            <p><strong>理想近似</strong> — 低压、较高温条件下更接近理想气体；高压或低温时偏差会增大。</p>
+                        </div>
+                    </div>
+                    <div id="gas-laws-controls" class="gas-controls"></div>
+                    <div class="canvas-container"><canvas id="gas-laws-canvas" aria-label="气体实验定律可视化画布"></canvas></div>
+                    <div id="gas-laws-info" class="gas-info" aria-live="polite"></div>
+                </div>
+            </div>
+
+            <!-- ── 热力学基础 ── -->
+            <div class="content-section" data-module="thermodynamics" id="thermodynamics-section">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>热力学基础 <span class="subtitle">第一定律、热机效率与熵</span></h2>
+                        <p>把热量、做功、内能变化、热机效率和熵增方向放到同一张可视化图中理解</p>
+                    </div>
+                    <div class="steps-panel">
+                        <div class="step-item">
+                            <span class="step-number">1</span>
+                            <p><strong>第一定律</strong> — 采用 ΔU = Q - W：系统吸热增加内能，系统对外做功会减少内能。</p>
+                        </div>
+                        <div class="step-item">
+                            <span class="step-number">2</span>
+                            <p><strong>PV 图</strong> — 气体在 PV 图上沿路径变化时，曲线下方面积表示气体对外做功。</p>
+                        </div>
+                        <div class="step-item">
+                            <span class="step-number">3</span>
+                            <p><strong>第二定律</strong> — 热量不会自发从低温物体流向高温物体，热机也不能把吸收的热量全部转化为功。</p>
+                        </div>
+                        <div class="step-item">
+                            <span class="step-number">4</span>
+                            <p><strong>熵</strong> — 可逆传热中 ΔS=Q/T；真实不可逆过程会让孤立整体的总熵增加。</p>
+                        </div>
+                    </div>
+                    <div class="demo-content">
+                        <div id="thermodynamics-controls" class="thermo-controls"></div>
+                        <div class="canvas-container">
+                            <canvas id="thermodynamics-canvas" role="img" aria-label="热力学第一定律、PV 图、热机效率与熵增可视化"></canvas>
+                        </div>
+                        <div id="thermodynamics-info" class="thermo-info" aria-live="polite"></div>
                     </div>
                 </div>
             </div>
@@ -1542,6 +2758,42 @@
                 </div>
             </div>
 
+            <div class="content-section" data-module="atomic-physics" id="atomic-physics-section">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>原子物理 <span class="subtitle">玻尔模型、光谱跃迁与光电效应</span></h2>
+                        <p>从氢原子能级图到光电效应，理解现代物理中“量子化”的核心证据</p>
+                    </div>
+                    <div class="steps-panel">
+                        <div class="step-item">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <p><strong>量子化能级</strong> — 氢原子玻尔模型给出 Eₙ=-13.6/n² eV，能级离散；它是历史模型，不代表真实电子轨道。</p>
+                            </div>
+                        </div>
+                        <div class="step-item">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <p><strong>光谱跃迁</strong> — 电子向低能级跃迁释放光子，光子能量等于能级差 ΔE=hf=hc/λ；Balmer 系列终态为 n=2。</p>
+                            </div>
+                        </div>
+                        <div class="step-item">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <p><strong>光电效应</strong> — 光子能量超过逸出功 φ 才能打出电子，最大动能 Kmax=hf-φ；光强主要影响光电流。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="demo-content">
+                        <div id="atomic-physics-controls" class="atomphys-controls"></div>
+                        <div class="canvas-container">
+                            <canvas id="atomic-physics-canvas" role="img" aria-label="原子物理能级、光谱和光电效应可视化"></canvas>
+                        </div>
+                        <div id="atomic-physics-info" class="atomphys-info"></div>
+                    </div>
+                </div>
+            </div>
+
             <div class="experiments-section">
                 <div class="section-header">
                     <h2>物理实验</h2>
@@ -1617,6 +2869,64 @@
             </div>
 
             <!-- ── 化学反应 ── -->
+            <div class="content-section" data-module="hybrid-orbitals" id="hybrid-orbitals-section">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>杂化轨道理论 <span class="subtitle">VSEPR 与 σ/π 键</span></h2>
+                        <p>从电子域数出发，联动判断 sp、sp²、sp³ 杂化、分子形状和典型键角</p>
+                    </div>
+                    <div class="steps-panel">
+                        <h3 class="steps-panel__title">判断顺序：Lewis 结构 → 电子域 → 杂化方式 → 分子形状</h3>
+                        <ol class="steps-list">
+                            <li class="step-item">
+                                <div class="step-number">1</div>
+                                <div class="step-content"><p><strong>先数电子域</strong> — 中心原子周围的孤对电子、单键、双键、三键各算一个电子域。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">2</div>
+                                <div class="step-content"><p><strong>再配杂化</strong> — 2/3/4 个电子域通常对应 sp/sp²/sp³，与直线、平面三角、四面体电子域几何相连。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">3</div>
+                                <div class="step-content"><p><strong>最后看形状</strong> — 分子形状只看原子位置；孤对电子会改变名称并压缩键角。</p></div>
+                            </li>
+                        </ol>
+                    </div>
+                    <div id="hybrid-controls" class="hybrid-controls"></div>
+                    <div class="canvas-container"><canvas id="hybrid-canvas" aria-label="杂化轨道与 VSEPR 联动可视化画布"></canvas></div>
+                    <div id="hybrid-info" class="hybrid-info" aria-live="polite"></div>
+                </div>
+            </div>
+
+            <div class="content-section" data-module="crystal-structures" id="crystal-structures-section">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>晶体结构 <span class="subtitle">晶胞与固体类型</span></h2>
+                        <p>比较 NaCl、铜、金刚石和干冰的粒子类型、作用力、晶胞计数与宏观性质</p>
+                    </div>
+                    <div class="steps-panel">
+                        <h3 class="steps-panel__title">比较路径：先看粒子，再看作用力，最后用晶胞解释性质</h3>
+                        <ol class="steps-list">
+                            <li class="step-item">
+                                <div class="step-number">1</div>
+                                <div class="step-content"><p><strong>判断粒子类型</strong>：离子、金属原子、共价网络原子或中性分子决定了晶体分类。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">2</div>
+                                <div class="step-content"><p><strong>追踪主要作用力</strong>：离子键、金属键、共价网络和分子间作用力会对应不同硬度、熔点与导电性。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">3</div>
+                                <div class="step-content"><p><strong>用晶胞计数</strong>：角、面、边和体心粒子的贡献不同，NaCl 晶胞可数出 4 Na+ 与 4 Cl-。</p></div>
+                            </li>
+                        </ol>
+                    </div>
+                    <div id="crystal-controls" class="crystal-controls"></div>
+                    <div class="canvas-container"><canvas id="crystal-canvas" aria-label="晶体结构晶胞与固体类型可视化画布"></canvas></div>
+                    <div id="crystal-info" class="crystal-info" aria-live="polite"></div>
+                </div>
+            </div>
+
             <div class="content-section" data-module="reactions">
                 <div class="demo-section" id="reaction-section">
                     <div class="section-header">
@@ -1762,8 +3072,8 @@
             <div class="content-section" data-module="reaction-rate" id="reaction-rate-section">
                 <div class="demo-section">
                     <div class="section-header">
-                        <h2>化学反应速率</h2>
-                        <p>碰撞理论：温度、浓度、催化剂对反应速率的影响</p>
+                        <h2>化学反应速率 <span class="subtitle">碰撞理论与活化能</span></h2>
+                        <p>比较温度、浓度和催化剂如何改变有效碰撞比例，理解速率变化背后的能量条件</p>
                     </div>
                 <div class="rxr-controls">
                     <label class="rxr-label">温度 <input type="range" id="rxnrate-temp" min="100" max="800" value="300" step="50"> <span id="rxnrate-temp-val">300</span>K</label>
@@ -1776,15 +3086,15 @@
                     </div>
                 </div>
                 <div class="canvas-container"><canvas id="rxnrate-canvas" aria-label="化学反应速率碰撞模拟画布"></canvas></div>
-                <div id="rxr-info" class="rxr-info"></div>
+                <div id="rxr-info" class="rxr-info" aria-live="polite"></div>
                 </div>
             </div>
 
             <div class="content-section" data-module="solution-ionization" id="solution-section">
                 <div class="demo-section">
                     <div class="section-header">
-                        <h2>溶液与电离</h2>
-                        <p>pH 指示与强弱电解质</p>
+                        <h2>溶液与电离 <span class="subtitle">pH 与强弱电解质</span></h2>
+                        <p>比较强酸强碱、弱酸弱碱和盐类水解，观察电离程度、pH 与 25°C 条件近似的关系</p>
                     </div>
                 <div class="sol-controls">
                     <div class="sol-substance-btns" role="group" aria-label="选择溶质">
@@ -1802,7 +3112,7 @@
                     </div>
                 </div>
                 <div class="canvas-container"><canvas id="solution-canvas"></canvas></div>
-                <div id="sol-info" class="sol-info"></div>
+                    <div id="sol-info" class="sol-info" aria-live="polite"></div>
                 </div>
             </div>
 
@@ -1822,11 +3132,11 @@
                 <div class="demo-section">
                     <div class="section-header">
                         <h2>氧化还原 <span class="subtitle">电子转移可视化</span></h2>
-                        <p>电子转移可视化与双线桥法</p>
+                        <p>沿化合价升降、电子得失与半反应电子守恒，理解还原剂和氧化剂如何配对反应</p>
                     </div>
                 <div id="redox-controls" class="redox-controls"></div>
                 <div class="canvas-container"><canvas id="redox-canvas"></canvas></div>
-                <div id="redox-info" class="redox-info"></div>
+                <div id="redox-info" class="redox-info" aria-live="polite"></div>
                 </div>
             </div>
 
@@ -1843,6 +3153,50 @@
                         </div>
                         <div id="as-edu" class="as-edu"></div>
                     </div>
+                </div>
+            </div>
+
+            <div class="content-section" data-module="element-compounds">
+                <div class="demo-section" id="ec-section">
+                    <div class="section-header">
+                        <h3><i data-lucide="flame"></i> 元素化合物</h3>
+                        <p>价-类二维图（Na/Fe/Al/Cl/N/S 转化网络） / 焰色反应模拟</p>
+                    </div>
+                    <div id="ec-controls" class="ec-controls"></div>
+                    <div class="canvas-container">
+                        <canvas id="ec-canvas" role="img" aria-label="元素化合物价类二维图与焰色反应"></canvas>
+                    </div>
+                    <div id="ec-info" class="ec-info"></div>
+                    <div id="ec-edu" class="ec-edu"></div>
+                </div>
+            </div>
+
+            <div class="content-section" data-module="intermolecular-forces">
+                <div class="demo-section" id="im-section">
+                    <div class="section-header">
+                        <h3><i data-lucide="droplets"></i> 分子间力与氢键</h3>
+                        <p>氢化物沸点趋势（范德华力 vs 氢键反常） / 氢键网络模型动画</p>
+                    </div>
+                    <div id="im-controls" class="im-controls"></div>
+                    <div class="canvas-container">
+                        <canvas id="im-canvas" role="img" aria-label="氢化物沸点趋势与氢键模型"></canvas>
+                    </div>
+                    <div id="im-info" class="im-info"></div>
+                    <div id="im-edu" class="im-edu"></div>
+                </div>
+            </div>
+
+            <div class="content-section" data-module="experiments" id="chem-virtual-experiments-section">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>虚拟实验 <span class="subtitle">滴定·沉淀·指示剂</span></h2>
+                        <p>在安全的虚拟环境中观察酸碱滴定、沉淀反应和指示剂颜色变化</p>
+                    </div>
+                    <div id="vexp-controls" class="vexp-controls"></div>
+                    <div class="canvas-container">
+                        <canvas id="vexp-canvas" role="img" aria-label="化学虚拟实验可视化画布"></canvas>
+                    </div>
+                    <div id="vexp-info" class="vexp-info"></div>
                 </div>
             </div>
 
@@ -2113,6 +3467,64 @@
                 </div>
             </div>
 
+            <div class="content-section" id="hash-tables-section" data-module="hash-tables">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>哈希表 <span class="subtitle">冲突处理与负载因子</span></h2>
+                        <p>并排比较链地址法与线性探测，观察同一组键在不同冲突处理策略下的查找路径</p>
+                    </div>
+                    <div class="steps-panel">
+                        <h3 class="steps-panel__title">学习路径：hash 函数 → 冲突处理 → 负载因子 → 扩容重散列</h3>
+                        <ol class="steps-list">
+                            <li class="step-item">
+                                <div class="step-number">1</div>
+                                <div class="step-content"><p><strong>先定位槽位</strong>：示例使用 hash(key)=key mod m，把键映射到 0 到 m-1 的有限数组。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">2</div>
+                                <div class="step-content"><p><strong>再处理冲突</strong>：链地址法把同槽键放进链表；线性探测从冲突槽开始向后寻找空位。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">3</div>
+                                <div class="step-content"><p><strong>最后看负载</strong>：α=n/m 变大时，链会变长、探测路径会变长，通常需要扩容并重新散列。</p></div>
+                            </li>
+                        </ol>
+                    </div>
+                    <div id="hashtable-controls" class="hashtable-controls"></div>
+                    <div class="canvas-container"><canvas id="hashtable-canvas" aria-label="哈希表链地址法和线性探测对比可视化画布"></canvas></div>
+                    <div id="hashtable-info" class="hashtable-info" aria-live="polite"></div>
+                </div>
+            </div>
+
+            <div class="content-section" id="bst-avl-section" data-module="bst-avl">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>二叉搜索树 <span class="subtitle">BST 与 AVL 旋转</span></h2>
+                        <p>比较普通 BST 的插入顺序风险与 AVL 自平衡旋转，观察高度、平衡因子和查找路径如何变化</p>
+                    </div>
+                    <div class="steps-panel">
+                        <h3 class="steps-panel__title">学习路径：有序性 → 更新路径 → 平衡因子 → 局部旋转</h3>
+                        <ol class="steps-list">
+                            <li class="step-item">
+                                <div class="step-number">1</div>
+                                <div class="step-content"><p><strong>BST 有序性</strong>：任一节点左子树的键都更小，右子树的键都更大；因此中序遍历会得到升序序列。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">2</div>
+                                <div class="step-content"><p><strong>插入与删除</strong>：操作先沿比较路径定位；删除双子节点时常用右子树最小值（中序后继）替换。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">3</div>
+                                <div class="step-content"><p><strong>AVL 平衡</strong>：每个节点左右子树高度差不超过 1；LL/RR 用单旋，LR/RL 用双旋，旋转不改变中序顺序。</p></div>
+                            </li>
+                        </ol>
+                    </div>
+                    <div id="bstavl-controls" class="bstavl-controls"></div>
+                    <div class="canvas-container"><canvas id="bstavl-canvas" aria-label="二叉搜索树与 AVL 旋转可视化画布"></canvas></div>
+                    <div id="bstavl-info" class="bstavl-info" aria-live="polite"></div>
+                </div>
+            </div>
+
             <!-- ═══ 图算法: Dijkstra & Prim ═══ -->
             <div class="content-section" id="graph-algo-section" data-module="graph">
                 <div class="demo-section">
@@ -2175,6 +3587,72 @@
                         <span class="gal-start">起点</span>
                     </div>
                     <div class="search-info" id="ga-info"></div>
+                </div>
+            </div>
+
+            <div class="content-section" id="mst-compare-section" data-module="mst-compare">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>最小生成树对比 <span class="subtitle">Prim vs Kruskal</span></h2>
+                        <p>用同一张带权无向图并排比较“从树向外扩张”和“按边权全局扫描”的选边顺序</p>
+                    </div>
+                    <div class="steps-panel">
+                        <h3 class="steps-panel__title">学习路径：连通全部顶点，同时避开多余环</h3>
+                        <ol class="steps-list">
+                            <li class="step-item">
+                                <div class="step-number">1</div>
+                                <div class="step-content"><p><strong>最小生成树</strong>：在连通无向带权图中，选择连接全部顶点且总权重最小的一组边。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">2</div>
+                                <div class="step-content"><p><strong>Prim</strong>：从一个顶点开始，每步选连接“已在树中”和“未在树中”顶点的最小权边。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">3</div>
+                                <div class="step-content"><p><strong>Kruskal</strong>：按边权从小到大检查，只有当边连接两个不同连通分量时才接受。</p></div>
+                            </li>
+                        </ol>
+                    </div>
+                    <div id="mst-controls" class="mst-controls"></div>
+                    <div class="algo-canvas-wrap">
+                        <canvas id="mst-canvas" aria-label="Prim 与 Kruskal 最小生成树对比画布"></canvas>
+                    </div>
+                    <div id="mst-info" class="mst-info" aria-live="polite"></div>
+                </div>
+            </div>
+
+            <div class="content-section" id="greedy-scheduling-section" data-module="greedy-scheduling">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>贪心算法 <span class="subtitle">活动选择与区间调度</span></h2>
+                        <p>比较“最早结束”“最早开始”“最短时长”和“最高权重”四种局部选择，理解贪心算法何时正确、何时会失效</p>
+                    </div>
+                    <div class="steps-panel">
+                        <h3 class="steps-panel__title">学习路径：局部选择 → 不冲突约束 → 交换论证 → 加权边界</h3>
+                        <ol class="steps-list">
+                            <li class="step-item">
+                                <div class="step-number">1</div>
+                                <div class="step-content"><p><strong>无权区间调度</strong>：目标是在单个教室或机器上选出数量最多的不重叠活动。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">2</div>
+                                <div class="step-content"><p><strong>最早结束</strong>：按结束时间升序扫描，若当前活动开始时间不早于上一个已选活动结束时间，就接受它。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">3</div>
+                                <div class="step-content"><p><strong>交换论证</strong>：任意最优解中的第一个活动都可替换为结束最早的活动，且不会减少可选数量。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">4</div>
+                                <div class="step-content"><p><strong>边界条件</strong>：若活动带权重并要求最大总权重，最早结束贪心不再保证最优，通常需要动态规划。</p></div>
+                            </li>
+                        </ol>
+                    </div>
+                    <div id="greedy-controls" class="greedy-controls"></div>
+                    <div class="algo-canvas-wrap">
+                        <canvas id="greedy-canvas" aria-label="贪心区间调度、活动选择与加权反例可视化画布"></canvas>
+                    </div>
+                    <div id="greedy-info" class="greedy-info" aria-live="polite"></div>
                 </div>
             </div>
 
@@ -2374,7 +3852,7 @@
                         </li>
                         <li class="step-item">
                             <div class="step-number">4</div>
-                            <div class="step-content"><p><strong>叶绿体</strong> — 植物细胞特有，进行光合作用。</p></div>
+                            <div class="step-content"><p><strong>叶绿体</strong> — 绿色植物进行光合作用的细胞常见，并非所有植物细胞都含有。</p></div>
                         </li>
                     </ol>
                 </div>
@@ -2429,7 +3907,7 @@
                 <div class="demo-section">
                     <div class="section-header">
                         <h2>光合作用</h2>
-                        <p>光反应与暗反应可视化</p>
+                        <p>光反应与 Calvin 循环可视化</p>
                     </div>
                 <div class="steps-panel">
                     <h3 class="steps-panel__title">光合作用 — 能量转化</h3>
@@ -2443,7 +3921,7 @@
                         </li>
                         <li class="step-item">
                             <div class="step-number">2</div>
-                            <div class="step-content"><p><strong>暗反应</strong> — 在叶绿体基质中，CO₂ 被固定并还原为 C₃H₆O₃（G3P）。</p></div>
+                            <div class="step-content"><p><strong>Calvin 循环</strong> — 在叶绿体基质中，CO₂ 被固定并还原为 G3P（三碳糖磷酸/甘油醛-3-磷酸）。</p></div>
                         </li>
                     </ol>
                 </div>
@@ -2456,12 +3934,102 @@
                 <div class="viz-controls" id="bio-photo-curve-controls" style="display:none;">
                     <label style="color: var(--text-secondary); font-size: var(--text-sm);">温度:</label>
                     <input type="range" id="bio-photo-temp" min="5" max="50" value="25">
+                    <span id="bio-photo-temp-value" class="bio-range-value">25°C</span>
                     <label style="color: var(--text-secondary); font-size: var(--text-sm);">CO₂:</label>
                     <input type="range" id="bio-photo-co2" min="0.01" max="0.1" step="0.01" value="0.04">
+                    <span id="bio-photo-co2-value" class="bio-range-value">0.04%</span>
                 </div>
                 <div class="canvas-container"><canvas id="photosynthesis-canvas"></canvas></div>
                 <div class="bio-info" id="photo-info">调节光照强度，观察光合作用速率变化</div>
                 <div id="photosynth-info" class="photosynth-info" aria-live="polite"></div>
+                </div>
+            </div>
+
+            <!-- ═══ 酶的特性 ═══ -->
+            <div class="content-section" data-module="enzyme-properties" id="enzyme-properties-section">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>酶的特性 <span class="subtitle">活化能与反应速率</span></h2>
+                        <p>比较活化能、温度、pH、底物浓度和抑制剂对酶促反应的影响</p>
+                    </div>
+                <div class="steps-panel">
+                    <h3 class="steps-panel__title">酶促反应 — 降低活化能，不改变反应方向</h3>
+                    <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
+                        <strong style="color: var(--text-primary);">酶</strong>是生物催化剂，能通过与底物形成特异性结合来降低反应活化能，从而加快反应速率；但酶不会改变反应的自由能变化和平衡位置。
+                    </p>
+                    <ol class="steps-list">
+                        <li class="step-item">
+                            <div class="step-number">1</div>
+                            <div class="step-content"><p><strong>专一性</strong> — 底物与活性部位匹配，常用“锁钥/诱导契合”模型解释。</p></div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">2</div>
+                            <div class="step-content"><p><strong>条件敏感</strong> — 温度、pH 偏离适宜范围会降低活性，极端条件可使蛋白质变性。</p></div>
+                        </li>
+                    </ol>
+                </div>
+                <div id="enzyme-controls" class="enzyme-controls"></div>
+                <div class="canvas-container"><canvas id="enzyme-canvas"></canvas></div>
+                <div id="enzyme-info" class="enzyme-info" aria-live="polite"></div>
+                </div>
+            </div>
+
+            <!-- ═══ 内环境稳态 ═══ -->
+            <div class="content-section" data-module="homeostasis" id="homeostasis-section">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>内环境稳态 <span class="subtitle">设定点与反馈调节</span></h2>
+                        <p>用血糖、体温和反馈回路理解机体如何维持动态平衡</p>
+                    </div>
+                <div class="steps-panel">
+                    <h3 class="steps-panel__title">稳态 — 围绕设定点的动态调节</h3>
+                    <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
+                        <strong style="color: var(--text-primary);">稳态</strong>不是绝对不变，而是感受器、调节中枢和效应器通过反馈机制，把体内条件维持在适宜范围内。
+                    </p>
+                    <ol class="steps-list">
+                        <li class="step-item">
+                            <div class="step-number">1</div>
+                            <div class="step-content"><p><strong>负反馈</strong> — 偏离设定点时启动反向调节，是维持血糖、体温等稳态的主要机制。</p></div>
+                        </li>
+                        <li class="step-item">
+                            <div class="step-number">2</div>
+                            <div class="step-content"><p><strong>正反馈</strong> — 放大原有变化，常见于分娩、凝血等需要快速完成的过程。</p></div>
+                        </li>
+                    </ol>
+                </div>
+                <div id="homeostasis-controls" class="homeo-controls"></div>
+                <div class="canvas-container"><canvas id="homeostasis-canvas"></canvas></div>
+                <div id="homeostasis-info" class="homeo-info" aria-live="polite"></div>
+                </div>
+            </div>
+
+            <!-- ═══ 体液调节 ═══ -->
+            <div class="content-section" data-module="humoral-regulation" id="humoral-regulation-section">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>体液调节 <span class="subtitle">下丘脑-垂体-甲状腺轴</span></h2>
+                        <p>沿 TRH、TSH、T3/T4 追踪激素级联与负反馈，理解代谢和产热调节</p>
+                    </div>
+                    <div class="steps-panel">
+                        <h3 class="steps-panel__title">HPT 轴 — 神经信号到内分泌反馈</h3>
+                        <ol class="steps-list">
+                            <li class="step-item">
+                                <div class="step-number">1</div>
+                                <div class="step-content"><p><strong>神经-内分泌转换</strong> — 下丘脑把体内状态信息转化为 TRH 释放信号。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">2</div>
+                                <div class="step-content"><p><strong>三级激素轴</strong> — TRH 促进垂体前叶释放 TSH，TSH 促进甲状腺释放 T3/T4。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">3</div>
+                                <div class="step-content"><p><strong>负反馈与原料限制</strong> — T3/T4 升高会抑制上游释放；碘供应会限制甲状腺激素合成。</p></div>
+                            </li>
+                        </ol>
+                    </div>
+                    <div id="humoral-controls" class="humoral-controls"></div>
+                    <div class="canvas-container"><canvas id="humoral-canvas" aria-label="下丘脑-垂体-甲状腺轴体液调节可视化画布"></canvas></div>
+                    <div id="humoral-info" class="humoral-info" aria-live="polite"></div>
                 </div>
             </div>
 
@@ -2572,8 +4140,8 @@
                         <span class="mito-phase-dot" title="末期"></span>
                         <span class="mito-phase-dot" title="胞质分裂"></span>
                     </div>
-                    <h3 id="mito-phase-name">间期 (Interphase)</h3>
-                    <p id="mito-phase-desc">DNA复制，细胞生长，染色质松散</p>
+                    <h3 id="mito-phase-name">间期（细胞周期准备）</h3>
+                    <p id="mito-phase-desc">DNA复制、细胞生长；属于细胞周期，不属于有丝分裂期本身</p>
                 </div>
                 <div id="mito-edu-info" class="mito-edu-info" aria-live="polite"></div>
                 </div>
@@ -2582,8 +4150,8 @@
             <div class="content-section" data-module="neural-regulation" id="neural-section">
                 <div class="demo-section">
                     <div class="section-header">
-                        <h2>神经调节</h2>
-                        <p>突触传递与动作电位可视化</p>
+                        <h2>神经调节 <span class="subtitle">突触与动作电位</span></h2>
+                        <p>沿动作电位、Ca²⁺内流、递质释放、受体结合与膜电位变化，观察神经信号如何在细胞间传递</p>
                     </div>
                 <div class="neural-controls">
                     <div class="neural-mode-btns">
@@ -2597,20 +4165,20 @@
                     </div>
                 </div>
                 <div class="canvas-container"><canvas id="neural-canvas"></canvas></div>
-                <div id="neural-info" class="neur-info"></div>
+                <div id="neural-info" class="neur-info" aria-live="polite"></div>
                 </div>
             </div>
 
             <div class="content-section" data-module="immune-system" id="immune-section">
                 <div class="demo-section">
                     <div class="section-header">
-                        <h2>免疫系统</h2>
-                        <p>非特异性与特异性免疫可视化</p>
+                        <h2>免疫系统 <span class="subtitle">先天与适应性免疫</span></h2>
+                        <p>比较屏障、吞噬、抗原呈递、B/T 细胞协作和免疫记忆，理解免疫应答如何从快速防御进入精准应答</p>
                     </div>
                 <div class="immune-controls">
                     <div class="immune-mode-btns">
-                        <button class="immune-mode-btn active" data-mode="innate" aria-label="非特异性免疫模式">非特异性免疫</button>
-                        <button class="immune-mode-btn" data-mode="adaptive" aria-label="特异性免疫模式">特异性免疫</button>
+                        <button class="immune-mode-btn active" data-mode="innate" aria-label="先天免疫模式" aria-pressed="true">先天免疫</button>
+                        <button class="immune-mode-btn" data-mode="adaptive" aria-label="适应性免疫模式" aria-pressed="false">适应性免疫</button>
                     </div>
                     <div class="imm-ctrl-right">
                         <label class="imm-slider-label">速度 <input type="range" id="immune-speed" min="0.3" max="3" step="0.1" value="1" class="imm-slider"><span id="immune-speed-val">1.0x</span></label>
@@ -2620,6 +4188,64 @@
                 </div>
                 <div class="canvas-container"><canvas id="immune-canvas"></canvas></div>
                 <div id="immune-info" class="imm-info"></div>
+                </div>
+            </div>
+
+            <div class="content-section" data-module="population-community" id="population-community-section">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>种群与群落 <span class="subtitle">J/S 型增长与种间关系</span></h2>
+                        <p>比较指数增长、逻辑斯蒂增长、密度制约和群落相互作用，理解从种群到群落的生态层级</p>
+                    </div>
+                    <div class="steps-panel">
+                        <h3 class="steps-panel__title">种群生态学 — 从 N、r、K 到群落结构</h3>
+                        <ol class="steps-list">
+                            <li class="step-item">
+                                <div class="step-number">1</div>
+                                <div class="step-content"><p><strong>J/S 型增长</strong> — 资源近似无限时呈 J 型指数增长；资源受限时，S 型逻辑斯蒂增长逐渐接近 K 值。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">2</div>
+                                <div class="step-content"><p><strong>种群调节</strong> — 捕食、竞争、疾病等密度制约因素，以及天气、灾害、污染等非密度制约因素共同影响种群规模。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">3</div>
+                                <div class="step-content"><p><strong>种间关系</strong> — 用 +、-、0 表示两个物种受到的影响，进一步理解竞争排斥、资源分割和共生关系。</p></div>
+                            </li>
+                        </ol>
+                    </div>
+                    <div id="popcomm-controls" class="popcomm-controls"></div>
+                    <div class="canvas-container"><canvas id="popcomm-canvas" aria-label="种群增长与群落关系可视化画布"></canvas></div>
+                    <div id="popcomm-info" class="popcomm-info" aria-live="polite"></div>
+                </div>
+            </div>
+
+            <div class="content-section" data-module="material-cycles" id="material-cycles-section">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>生态系统物质循环 <span class="subtitle">碳循环、氮循环与温室效应</span></h2>
+                        <p>区分能量单向流动和物质循环回收，追踪碳、氮在生物群落与无机环境之间的转换</p>
+                    </div>
+                    <div class="steps-panel">
+                        <h3 class="steps-panel__title">物质循环 — 有储库、有转化、有时间尺度</h3>
+                        <ol class="steps-list">
+                            <li class="step-item">
+                                <div class="step-number">1</div>
+                                <div class="step-content"><p><strong>碳循环</strong> — CO₂ 经光合作用进入有机物，又经呼吸、分解、海气交换、火山和燃烧返回无机环境。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">2</div>
+                                <div class="step-content"><p><strong>氮循环</strong> — 固氮、铵化、硝化和反硝化主要依赖微生物，把难直接利用的 N₂ 接入生命系统。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">3</div>
+                                <div class="step-content"><p><strong>人类影响</strong> — 化石燃料燃烧、畜牧、施肥径流会改变碳氮循环，并与温室效应、富营养化等现象相关。</p></div>
+                            </li>
+                        </ol>
+                    </div>
+                    <div id="cycles-controls" class="cycles-controls"></div>
+                    <div class="canvas-container"><canvas id="cycles-canvas" aria-label="生态系统物质循环可视化画布"></canvas></div>
+                    <div id="cycles-info" class="cycles-info" aria-live="polite"></div>
                 </div>
             </div>
 
@@ -2659,6 +4285,35 @@
                 </div>
             </div>
 
+            <div class="content-section" data-module="gene-engineering" id="gene-engineering-section">
+                <div class="demo-section">
+                    <div class="section-header">
+                        <h2>基因工程 <span class="subtitle">限制酶、连接酶与载体构建</span></h2>
+                        <p>从目的基因酶切到重组质粒、转化筛选和表达验证，理解分子克隆的核心步骤</p>
+                    </div>
+                    <div class="steps-panel">
+                        <h3 class="steps-panel__title">分子克隆流程 — 先构建，再筛选，最后验证</h3>
+                        <ol class="steps-list">
+                            <li class="step-item">
+                                <div class="step-number">1</div>
+                                <div class="step-content"><p><strong>切割与连接</strong> — 用合适限制酶切开目的片段和质粒，多克隆位点提供可选择的酶切位点；DNA 连接酶把片段接入载体。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">2</div>
+                                <div class="step-content"><p><strong>转化与筛选</strong> — 感受态细菌吸收质粒后，抗性标记保留含质粒细胞，报告基因帮助区分插入片段和空载体。</p></div>
+                            </li>
+                            <li class="step-item">
+                                <div class="step-number">3</div>
+                                <div class="step-content"><p><strong>表达与验证</strong> — 目标蛋白表达还取决于启动子、读码框、宿主和诱导条件；白色菌落仍需 PCR、酶切或测序确认。</p></div>
+                            </li>
+                        </ol>
+                    </div>
+                    <div id="gene-engineering-controls" class="geng-controls"></div>
+                    <div class="canvas-container"><canvas id="gene-engineering-canvas" aria-label="基因工程分子克隆流程可视化画布"></canvas></div>
+                    <div id="gene-engineering-info" class="geng-info" aria-live="polite"></div>
+                </div>
+            </div>
+
             <div class="content-section" data-module="cellular-respiration" id="cellular-respiration-section">
                 <div class="demo-section">
                     <div class="section-header">
@@ -2686,8 +4341,8 @@
             <div class="content-section" data-module="gene-mutation" id="gene-mutation-section">
                 <div class="demo-section">
                     <div class="section-header">
-                        <h2>基因突变 <span class="subtitle">碱基替换/插入/缺失</span></h2>
-                        <p>碱基替换、插入、缺失对蛋白质的影响</p>
+                        <h2>基因突变 <span class="subtitle">读码框与氨基酸序列</span></h2>
+                        <p>比较碱基替换、插入、缺失如何影响 mRNA 密码子、错义/无义结果和移码边界</p>
                     </div>
                 <div id="gene-mutation-controls" class="gmut-controls">
                     <div class="gmut-mode-btns" role="group" aria-label="突变类型">
@@ -2698,7 +4353,7 @@
                     <button id="gmut-trigger" class="gmut-trigger-btn">触发突变</button>
                     <button id="gmut-reset" class="gmut-btn">重置</button>
                     <label class="gmut-speed"><span>速度</span><input type="range" id="gmut-speed" min="0.5" max="3" step="0.5" value="1"></label>
-                    <button id="gmut-pause" class="gmut-btn" aria-label="暂停">⏸</button>
+                    <button id="gmut-pause" class="gmut-btn" aria-label="暂停" aria-pressed="false">⏸</button>
                 </div>
                 <div class="canvas-container"><canvas id="gene-mutation-canvas"></canvas></div>
                 <div id="gmut-info" class="gmut-info" aria-live="polite"></div>
@@ -2719,7 +4374,7 @@
             <div class="about-doc" id="about-license-content"></div>
         </section>
 
-        <!-- ═══════════════ About · 更新日志（自动同步 README.md 的更新日志段落） ═══════════════ -->
+        <!-- ═══════════════ About · 更新日志 ═══════════════ -->
         <section id="page-changelog" class="page" aria-label="更新日志">
             <div class="about-doc" id="about-changelog-content"></div>
         </section>
@@ -2760,9 +4415,9 @@
             <div class="footer-brand">
                 <div class="footer-logo">
                     <div class="logo-icon"><i data-lucide="flask-conical"></i></div>
-                    <span>工科实验室</span>
+                    <span>星序 Astra</span>
                 </div>
-                <p class="footer-desc">「星序 Astra」项目下的交互式可视化多学科实验子站，覆盖数学、物理、化学、算法、生物五大领域。</p>
+                <p class="footer-desc">「星序 Astra」项目下的工科实验室星系，覆盖数学、物理、化学、算法、生物、地球与宇宙科学、数据科学、信息技术、材料、工程与人文可视化。</p>
             </div>
             <div class="footer-links">
                 <div class="footer-col">
@@ -2772,6 +4427,12 @@
                     <a href="#chemistry" data-page="chemistry">化学实验</a>
                     <a href="#algorithms" data-page="algorithms">算法可视化</a>
                     <a href="#biology" data-page="biology">生物实验</a>
+                    <a href="#cosmos" data-page="cosmos">地球与宇宙</a>
+                    <a href="#datascience" data-page="datascience">数据科学</a>
+                    <a href="#infotech" data-page="infotech">信息技术</a>
+                    <a href="#materials" data-page="materials">材料微观</a>
+                    <a href="#humanities" data-page="humanities">人文可视化</a>
+                    <a href="#engineering" data-page="engineering">工程应用</a>
                 </div>
                 <div class="footer-col">
                     <h4>关于</h4>
@@ -2780,11 +4441,11 @@
                 </div>
             </div>
             <div class="footer-bottom">
-                <span>&copy; 2026 工科实验室 · 「星序 Astra」项目子站</span>
+                <span>&copy; 2026 星序 Astra · 工科实验室星系</span>
                 <p class="footer-credit">Made by <a href="javascript:void(0)" class="footer-author-link" onclick="document.getElementById('qr-modal').classList.add('active')">Falling-feather</a>.</p>
                 <div class="running-time-footer" id="running-time-footer">
                     <p class="running-time-text">
-                        本站已在随时准备跑路的状态下以极其不稳定的方式运行了
+                        星序 Astra 已陪伴学习探索
                         <span id="rt-days">0</span> 天
                         <span id="rt-hours">0</span> 小时
                         <span id="rt-minutes">0</span> 分
@@ -2807,34 +4468,40 @@
     <!-- lucide: 本地优先，CDN 回退，确保图标在弱网环境下正常显示 -->
     <script src="shared/js/lucide.min.js?v=20260417d"></script>
     <script>if(typeof lucide==='undefined'){var s=document.createElement('script');s.src='https://unpkg.com/lucide@0.454.0/dist/umd/lucide.js';document.head.appendChild(s);}</script>
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/ScrollTrigger.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/ScrollTrigger.min.js" onload="if(window.initScrollAnimations)window.initScrollAnimations()"></script>
 
     <!-- Application Scripts: Shared -->
-    <script src="shared/js/config.js?v=20260427v51b"></script>
+    <script src="shared/js/config.js?v=20260618materialsP1"></script>
     <script src="shared/js/learning-progress.js?v=20260422a"></script>
     <script src="shared/js/back-to-top.js?v=20260424rr"></script>
     <script src="shared/js/fab-trigger.js?v=20260528v61g"></script>
     <script src="shared/js/touch-gestures.js?v=20260418a"></script>
-    <script src="shared/js/module-selector.js?v=20260528v61f"></script>
-    <script src="shared/js/experiment-guide.js?v=20260423w"></script>
+    <script src="shared/js/module-selector.js?v=20260618publicCleanP1"></script>
+    <script src="shared/js/experiment-guide.js?v=20260618publicCleanP1"></script>
     <script src="shared/js/experiment-export.js?v=20260528v61f"></script>
-    <script src="shared/js/quiz-data.js?v=20260422v"></script>
-    <script src="shared/js/experiment-quiz.js?v=20260418e"></script>
+    <script src="shared/js/quiz-data.js?v=20260618refsP1"></script>
+    <script src="shared/js/experiment-quiz.js?v=20260606fix1"></script>
     <script src="shared/js/experiment-favorites.js?v=20260423q"></script>
     <script src="shared/js/experiment-rating.js?v=20260418g"></script>
-    <script src="shared/js/router.js?v=20260528v61j"></script>
-    <script src="shared/js/scroll-animations.js?v=20260417d"></script>
-    <script src="shared/js/cards.js?v=20260417d"></script>
+    <script src="shared/js/router.js?v=20260618fabLayerP1"></script>
+    <script src="shared/js/scroll-animations.js?v=20260618crossCanvasP1"></script>
+    <script src="shared/js/cards.js?v=20260618publicCleanP1"></script>
     <script src="shared/js/common.js?v=20260417d"></script>
     <!-- Scripts: Home -->
-    <script src="pages/home/home.js?v=20260424v44a"></script>
-    <script src="pages/planets/planets.js?v=20260427v51b"></script>
+    <script src="pages/home/home.js?v=20260605v62f"></script>
+    <script src="pages/planets/planets.js?v=20260618crossCanvasP1"></script>
+    <script src="pages/cosmos/earth-sun.js?v=20260618publicCleanP1"></script>
+    <script src="pages/datascience/linear-regression.js?v=20260618dataP2"></script>
+    <script src="pages/infotech/network-layers.js?v=20260618publicCleanP1"></script>
+    <script src="pages/materials/materials-lab.js?v=20260618materialsP1"></script>
+    <script src="pages/humanities/text-lab.js?v=20260618humanP3"></script>
+    <script src="pages/engineering/bridge-truss.js?v=20260618engP2"></script>
     <!-- Scripts: Bootstrap (before deferred modules for fast homepage boot) -->
     <script src="shared/js/global-search.js?v=20260424v45a"></script>
     <script src="shared/js/keyboard-shortcuts.js?v=20260424v45b"></script>
     <script src="shared/js/related-experiments.js?v=20260424v45c"></script>
-    <script src="shared/js/main.js?v=20260424v45c"></script>
+    <script src="shared/js/main.js?v=20260618materialsP1"></script>
     <!-- Scripts: Subject modules (deferred — download in parallel, execute after core) -->
     <script defer src="pages/mathematics/mathematics.js"></script>
     <script defer src="pages/mathematics/calculus.js"></script>
@@ -2851,7 +4518,14 @@
     <script defer src="pages/mathematics/sequences.js"></script>
     <script defer src="pages/mathematics/function-properties.js"></script>
     <script defer src="pages/mathematics/exp-log.js"></script>
+    <script defer src="pages/mathematics/binomial-theorem.js"></script>
+    <script defer src="pages/mathematics/statistics-regression.js"></script>
+    <script defer src="pages/mathematics/modeling-numerical.js?v=20260618mathModelP1"></script>
+    <script defer src="pages/mathematics/spatial-vector.js"></script>
+    <script defer src="pages/mathematics/derivative-application.js?v=20260606fix1"></script>
     <script defer src="pages/physics/physics.js"></script>
+    <script defer src="pages/physics/gas-laws.js?v=20260618publicClean1"></script>
+    <script defer src="pages/physics/thermodynamics.js?v=20260618thermoP1"></script>
     <script defer src="pages/physics/electromagnetic.js"></script>
     <script defer src="pages/physics/waves.js"></script>
     <script defer src="pages/physics/relativity.js"></script>
@@ -2868,43 +4542,59 @@
     <script defer src="pages/physics/force-composition.js?v=20260424v46a"></script>
     <script defer src="pages/physics/momentum-conservation.js?v=20260424v46c"></script>
     <script defer src="pages/physics/charged-particle.js"></script>
+    <script defer src="pages/physics/atomic-physics.js?v=20260618publicClean1"></script>
     <script defer src="pages/physics/physics-zoom.js"></script>
-    <script defer src="pages/chemistry/periodic-table.js"></script>
+    <script defer src="pages/chemistry/periodic-table.js?v=20260618ptNames1"></script>
     <script defer src="pages/chemistry/molecular-structure.js?v=20260424v45e"></script>
+    <script defer src="pages/chemistry/hybrid-orbitals.js?v=20260618hybFix1"></script>
+    <script defer src="pages/chemistry/crystal-structures.js?v=20260617crystalP2"></script>
     <script defer src="pages/chemistry/chemical-reactions.js?v=20260424v45g"></script>
-    <script defer src="pages/chemistry/chemical-equilibrium.js"></script>
-    <script defer src="pages/chemistry/electrochemistry.js"></script>
+    <script defer src="pages/chemistry/chemical-equilibrium.js?v=20260606chem1"></script>
+    <script defer src="pages/chemistry/electrochemistry.js?v=20260606chem1"></script>
     <script defer src="pages/chemistry/chemical-bond.js?v=20260424v45h"></script>
     <script defer src="pages/chemistry/organic-chemistry.js?v=20260424v45i"></script>
-    <script defer src="pages/chemistry/reaction-rate.js"></script>
-    <script defer src="pages/chemistry/solution-ionization.js"></script>
+    <script defer src="pages/chemistry/reaction-rate.js?v=20260618rateP1"></script>
+    <script defer src="pages/chemistry/solution-ionization.js?v=20260618ionP1"></script>
     <script defer src="pages/chemistry/ionic-reaction.js"></script>
-    <script defer src="pages/chemistry/redox.js"></script>
+    <script defer src="pages/chemistry/redox.js?v=20260618redoxP1"></script>
     <script defer src="pages/chemistry/atomic-structure.js"></script>
+    <script defer src="pages/chemistry/element-compounds.js?v=20260530v62a"></script>
+    <script defer src="pages/chemistry/intermolecular-forces.js?v=20260617gasP1b"></script>
+    <script defer src="pages/chemistry/virtual-experiments.js?v=20260618refsP1"></script>
     <script defer src="pages/algorithms/algorithms.js"></script>
     <script defer src="pages/algorithms/search-algorithms.js"></script>
+    <script defer src="pages/algorithms/hash-tables.js?v=20260617bstP1b"></script>
+    <script defer src="pages/algorithms/bst-avl.js?v=20260617bstP1b"></script>
     <script defer src="pages/algorithms/graph-algo.js"></script>
+    <script defer src="pages/algorithms/mst-compare.js?v=20260618mstP1"></script>
+    <script defer src="pages/algorithms/greedy-scheduling.js?v=20260618refsP1"></script>
     <script defer src="pages/algorithms/data-structures.js"></script>
     <script defer src="pages/algorithms/sorting-compare.js"></script>
     <script defer src="pages/algorithms/recursion-vis.js"></script>
-    <script defer src="pages/algorithms/dynamic-programming.js"></script>
-    <script defer src="pages/algorithms/string-matching.js"></script>
+    <script defer src="pages/algorithms/dynamic-programming.js?v=20260618algoTextP1"></script>
+    <script defer src="pages/algorithms/string-matching.js?v=20260618algoTextP1"></script>
     <script defer src="pages/biology/biology.js?v=20260416b"></script>
-    <script defer src="pages/biology/cell-structure.js?v=20260422z"></script>
+    <script defer src="pages/biology/cell-structure.js?v=20260617gasP1b"></script>
     <script defer src="pages/biology/dna-helix.js?v=20260416b"></script>
-    <script defer src="pages/biology/photosynthesis.js?v=20260416b"></script>
+    <script defer src="pages/biology/photosynthesis.js?v=20260618photoSourceP1d"></script>
     <script defer src="pages/biology/genetics.js?v=20260416b"></script>
-    <script defer src="pages/biology/mitosis.js?v=20260416b"></script>
-    <script defer src="pages/biology/neural-regulation.js?v=20260416b"></script>
-    <script defer src="pages/biology/immune-system.js?v=20260423a"></script>
+    <script defer src="pages/biology/mitosis.js?v=20260617gasP1b"></script>
+    <script defer src="pages/biology/neural-regulation.js?v=20260618neuralP1"></script>
+    <script defer src="pages/biology/immune-system.js?v=20260618immuneP2"></script>
     <script defer src="pages/biology/ecosystem.js?v=20260423a"></script>
     <script defer src="pages/biology/biology-zoom.js?v=20260416b"></script>
-    <script defer src="pages/biology/meiosis.js?v=20260416b"></script>
-    <script defer src="pages/biology/gene-expression.js?v=20260416b"></script>
-    <script defer src="pages/biology/cellular-respiration.js?v=20260423a"></script>
-    <script defer src="pages/biology/substance-transport.js?v=20260416b"></script>
-    <script defer src="pages/biology/gene-mutation.js?v=20260416b"></script>
-    <script defer src="pages/about/about.js?v=20260528v61d"></script>
+    <script defer src="pages/biology/meiosis.js?v=20260617gasP1b"></script>
+    <script defer src="pages/biology/gene-expression.js?v=20260618genexpP1"></script>
+    <script defer src="pages/biology/cellular-respiration.js?v=20260618cellRespSourceP1"></script>
+    <script defer src="pages/biology/substance-transport.js?v=20260618transportSourceP1"></script>
+    <script defer src="pages/biology/gene-mutation.js?v=20260618gmutP3"></script>
+    <script defer src="pages/biology/enzyme-properties.js?v=20260618enzymeSourceP1b"></script>
+    <script defer src="pages/biology/homeostasis.js?v=20260618homeostasisP1"></script>
+    <script defer src="pages/biology/humoral-regulation.js?v=20260618humoralP2"></script>
+    <script defer src="pages/biology/population-community.js?v=20260618popcommP1"></script>
+    <script defer src="pages/biology/material-cycles.js?v=20260618cyclesP1"></script>
+    <script defer src="pages/biology/gene-engineering.js?v=20260618gengP1"></script>
+    <script defer src="pages/about/about.js?v=20260618publicCleanP1"></script>
 
     <!-- v4.5-α1 全局搜索浮层 -->
     <div class="gsearch-overlay" id="global-search-overlay" role="dialog" aria-modal="true" aria-label="全局实验搜索">

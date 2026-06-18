@@ -383,7 +383,7 @@ const Meiosis = {
                 </div>
                 <div class="meio-info__block">
                     <div class="meio-info__sub">染色体变化</div>
-                    <div id="meio-chr-info" class="meio-info__val">2n → n</div>
+                    <div id="meio-chr-info" class="meio-info__val">减 I 后 2n → n</div>
                 </div>
                 <div class="meio-info__block">
                     <div class="meio-info__sub">关键概念</div>
@@ -407,7 +407,16 @@ const Meiosis = {
         if (nameEl) nameEl.textContent = phaseNames[this.phase] || '';
         if (descEl) descEl.textContent = this.phases[this.phase]?.desc || '';
         if (chrEl) {
-            const chrInfo = this.phase <= 3 ? '2n(同源染色体) → n' : 'n(姐妹染色单体分离)';
+            const chrInfo = [
+                '2n，已复制；同源染色体联会',
+                '2n，同源染色体成对排列',
+                '同源染色体分离，减 I 后染色体数减半',
+                '减 I 完成：每个子细胞为 n，染色体仍含姐妹染色单体',
+                'n，准备第二次分裂',
+                'n，染色体排列在赤道板',
+                '姐妹染色单体分离',
+                '形成 4 个 n 配子'
+            ][this.phase] || '';
             chrEl.textContent = chrInfo;
         }
     },

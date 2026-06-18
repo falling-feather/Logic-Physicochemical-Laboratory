@@ -189,7 +189,7 @@ const CellStructure = {
               desc: '单层膜囊泡，内含 60 多种酸性水解酶(最适 pH≈5)，消化衰老细胞器和外来异物，是细胞内的"消化车间"。' },
             { id: 'centrosome', name: '中心体', x: .60, y: .69, rx: .03, ry: .03,
               color: 'rgba(79,168,163,0.2)', border: '#4fa8a3',
-              desc: '由两个互相垂直的中心粒(9×3微管排列)和周围基质组成。在有丝分裂时形成纺锤体，牵引染色体分离。动物细胞特有。' },
+              desc: '由两个互相垂直的中心粒(9×3微管排列)和周围基质组成。在有丝分裂时形成纺锤体，牵引染色体分离。典型动物细胞常见；高等植物细胞通常没有中心粒。' },
             { id: 'ribosome', name: '核糖体', x: .55, y: .22, rx: .015, ry: .015,
               color: 'rgba(255,255,255,0.35)', border: '#aaa',
               desc: '由 rRNA 和蛋白质构成的大小两个亚基(60S+40S)。游离核糖体合成胞内蛋白，附着核糖体合成分泌蛋白。无膜结构。' }
@@ -200,7 +200,7 @@ const CellStructure = {
         return [
             { id: 'wall', name: '细胞壁', x: .5, y: .5, rx: .47, ry: .45,
               color: 'rgba(77,158,126,0.04)', border: '#4d9e7e',
-              desc: '主要成分纤维素微纤丝，通过胞间连丝(plasmodesmata)连通相邻细胞。全透性，提供机械支持和保护。植物细胞特有。' },
+              desc: '主要成分纤维素微纤丝，通过胞间连丝(plasmodesmata)连通相邻细胞。全透性，提供机械支持和保护。植物细胞常见结构。' },
             { id: 'membrane', name: '细胞膜', x: .5, y: .5, rx: .43, ry: .41,
               color: 'rgba(91,141,206,0.06)', border: '#5b8dce',
               desc: '紧贴细胞壁内侧的磷脂双分子层半透膜，控制物质进出。' },
@@ -212,10 +212,10 @@ const CellStructure = {
               desc: '双层核膜包裹，内含核仁和染色质。核孔允许大分子通过，是遗传信息的控制中心。' },
             { id: 'chloroplast', name: '叶绿体', x: .26, y: .40, rx: .06, ry: .035,
               color: 'rgba(58,158,143,0.2)', border: '#3a9e8f',
-              desc: '双层膜结构。内含类囊体(thylakoid)堆叠成基粒(grana)，基粒间由基质类囊体相连。基质(stroma)含 DNA、核糖体和淀粉粒。光合作用场所。' },
+              desc: '双层膜结构。内含类囊体(thylakoid)堆叠成基粒(grana)，基粒间由基质类囊体相连。基质(stroma)含 DNA、核糖体和淀粉粒。绿色植物进行光合作用的细胞常见，并非所有植物细胞都含有。' },
             { id: 'chloroplast', name: '叶绿体', x: .72, y: .44, rx: .055, ry: .032,
               color: 'rgba(58,158,143,0.2)', border: '#3a9e8f', hl: true,
-              desc: '双层膜结构。类囊体堆叠成基粒，基质含 DNA 和核糖体。光合作用的场所。植物细胞特有。' },
+              desc: '双层膜结构。类囊体堆叠成基粒，基质含 DNA 和核糖体。绿色植物进行光合作用的细胞常见，并非所有植物细胞都含有。' },
             { id: 'mito', name: '线粒体', x: .30, y: .58, rx: .055, ry: .03,
               color: 'rgba(196,121,58,0.15)', border: '#c4793a',
               desc: '双层膜结构，内膜折叠形成嵴。有氧呼吸产生 ATP。' },
@@ -955,7 +955,7 @@ const CellStructure = {
                     <div class="cellstr-info__desc" id="cellstr-type-desc">\u6709\u4e2d\u5fc3\u4f53\uff0c\u65e0\u7ec6\u80de\u58c1\u3001\u53f6\u7eff\u4f53\u548c\u5927\u6db2\u6ce1</div>
                 </div>
                 <div class="cellstr-info__block">
-                    <div class="cellstr-info__sub">\u7279\u6709\u7ed3\u6784</div>
+                    <div class="cellstr-info__sub">\u5e38\u89c1/\u7279\u5f81\u7ed3\u6784</div>
                     <div class="cellstr-info__val" id="cellstr-unique">\u4e2d\u5fc3\u4f53</div>
                     <div class="cellstr-info__desc" id="cellstr-unique-desc">\u4e0e\u7ec6\u80de\u5206\u88c2\u6709\u5173\uff0c\u53d1\u51fa\u7eba\u9524\u4e1d</div>
                 </div>
@@ -973,12 +973,12 @@ const CellStructure = {
         if (!typeEl) return;
         if (this.isPlant) {
             typeEl.textContent = '\u690d\u7269\u7ec6\u80de';
-            descEl.textContent = '\u6709\u7ec6\u80de\u58c1\u3001\u53f6\u7eff\u4f53\u548c\u5927\u6db2\u6ce1\uff0c\u65e0\u4e2d\u5fc3\u4f53';
-            uniqEl.textContent = '\u7ec6\u80de\u58c1\u3001\u53f6\u7eff\u4f53\u3001\u5927\u6db2\u6ce1';
-            uniqDescEl.textContent = '\u7ec6\u80de\u58c1\u63d0\u4f9b\u652f\u6301\uff0c\u53f6\u7eff\u4f53\u8fdb\u884c\u5149\u5408\u4f5c\u7528\uff0c\u5927\u6db2\u6ce1\u7ef4\u6301\u6e17\u900f\u538b';
+            descEl.textContent = '\u690d\u7269\u7ec6\u80de\u5e38\u6709\u7ec6\u80de\u58c1\u548c\u5927\u6db2\u6ce1\uff0c\u7eff\u8272\u7ec4\u7ec7\u7ec6\u80de\u5e38\u542b\u53f6\u7eff\u4f53';
+            uniqEl.textContent = '\u7ec6\u80de\u58c1\u3001\u53f6\u7eff\u4f53(\u7eff\u8272\u7ec4\u7ec7)\u3001\u5927\u6db2\u6ce1';
+            uniqDescEl.textContent = '\u7ec6\u80de\u58c1\u63d0\u4f9b\u652f\u6301\uff1b\u7eff\u8272\u7ec4\u7ec7\u4e2d\u7684\u53f6\u7eff\u4f53\u8fdb\u884c\u5149\u5408\u4f5c\u7528\uff1b\u5927\u6db2\u6ce1\u7ef4\u6301\u6e17\u900f\u538b';
         } else {
             typeEl.textContent = '\u52a8\u7269\u7ec6\u80de';
-            descEl.textContent = '\u6709\u4e2d\u5fc3\u4f53\uff0c\u65e0\u7ec6\u80de\u58c1\u3001\u53f6\u7eff\u4f53\u548c\u5927\u6db2\u6ce1';
+            descEl.textContent = '\u5178\u578b\u52a8\u7269\u7ec6\u80de\u5e38\u6709\u4e2d\u5fc3\u4f53\uff0c\u65e0\u7ec6\u80de\u58c1\u3001\u53f6\u7eff\u4f53\u548c\u5927\u6db2\u6ce1';
             uniqEl.textContent = '\u4e2d\u5fc3\u4f53';
             uniqDescEl.textContent = '\u4e0e\u7ec6\u80de\u5206\u88c2\u6709\u5173\uff0c\u53d1\u51fa\u7eba\u9524\u4e1d';
         }

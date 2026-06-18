@@ -40,6 +40,12 @@
     #nav-search-trigger { padding: 6px; }
 }
 
+@media (max-width: 480px) {
+    #nav-search-trigger {
+        display: none;
+    }
+}
+
 /* 遮罩 */
 .gsearch-overlay {
     position: fixed;

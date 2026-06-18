@@ -139,6 +139,24 @@ const PeriodicTable = {
         [118,'Og','\u9feb',294,'noble',7,18,'[Rn]5f\u00b9\u20746d\u00b9\u20706s\u00b27p\u2076',0,157,null,null],
     ],
 
+    // Mainland Simplified Chinese names, cross-checked by atomic number.
+    // Kept separate from the property table so a copied row cannot silently shift names.
+    mainlandNames: [
+        null,
+        '氢', '氦', '锂', '铍', '硼', '碳', '氮', '氧', '氟', '氖',
+        '钠', '镁', '铝', '硅', '磷', '硫', '氯', '氩', '钾', '钙',
+        '钪', '钛', '钒', '铬', '锰', '铁', '钴', '镍', '铜', '锌',
+        '镓', '锗', '砷', '硒', '溴', '氪', '铷', '锶', '钇', '锆',
+        '铌', '钼', '锝', '钌', '铑', '钯', '银', '镉', '铟', '锡',
+        '锑', '碲', '碘', '氙', '铯', '钡', '镧', '铈', '镨', '钕',
+        '钷', '钐', '铕', '钆', '铽', '镝', '钬', '铒', '铥', '镱',
+        '镥', '铪', '钽', '钨', '铼', '锇', '铱', '铂', '金', '汞',
+        '铊', '铅', '铋', '钋', '砹', '氡', '钫', '镭', '锕', '钍',
+        '镤', '铀', '镎', '钚', '镅', '锔', '锫', '锎', '锿', '镄',
+        '钔', '锘', '铹', '\u{2CB3B}', '\u{2CB4A}', '\u{2CB73}', '\u{2CB5B}', '\u{2CB76}', '鿏', '\u{2B7FC}',
+        '\u{2CB2D}', '鿔', '鿭', '\u{2B4E7}', '镆', '\u{2B7F7}', '鿬', '鿫'
+    ],
+
     selectedElement: null,
     _listeners: [],
     mode: 'standard', // standard | electronegativity | radius
@@ -148,6 +166,7 @@ const PeriodicTable = {
     init() {
         const container = document.getElementById('periodic-table-grid');
         if (!container) return;
+        this._normalizeElementNames();
         this.buildTable(container);
         this.buildLegend();
         this.bindSearch();
@@ -160,6 +179,15 @@ const PeriodicTable = {
         // Click overlay to close
         const overlay = document.getElementById('pt-detail-overlay');
         if (overlay) this._on(overlay, 'click', () => this.closeDetail());
+    },
+
+    _normalizeElementNames() {
+        if (this._namesNormalized) return;
+        this.elements.forEach((element) => {
+            const expectedName = this.mainlandNames[element[0]];
+            if (expectedName) element[2] = expectedName;
+        });
+        this._namesNormalized = true;
     },
 
     destroy() {

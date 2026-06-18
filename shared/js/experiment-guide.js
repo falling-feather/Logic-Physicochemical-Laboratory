@@ -2,11 +2,14 @@
 // Shows first-time operation hints when user opens an experiment.
 // Tracks seen status in localStorage. Provides a "?" re-open button.
 
-const ExperimentGuide = {
+var ExperimentGuide = {
     _storageKey: 'englab-guide-seen',
     _overlay: null,
     _helpBtn: null,
     _currentModule: null,
+    _moduleAliases: {
+        complex: 'complex-numbers',
+    },
 
     // ── Guide data per subject (generic) ──
     _subjectGuides: {
@@ -112,14 +115,14 @@ const ExperimentGuide = {
                 { icon: 'play', text: '默认自动播放粒子流动，演示底物→产物转化过程' },
                 { icon: 'sliders-horizontal', text: '可调节速度滑块加快/减慢动画进度' },
                 { icon: 'bar-chart-2', text: '右侧面板实时显示当前阶段场所、底物、产物、ATP 产量' },
-                { icon: 'book-open', text: '面板汇总三阶段总览：1 葡萄糖 ≈ 38 ATP（人教版必修1）' }
+                { icon: 'book-open', text: '面板汇总三阶段总览：高中教材常用估算约 38 ATP；现代常见真核细胞约 30-32 ATP，受穿梭系统和条件影响' }
             ]
         },
         'photosynthesis': {
             title: '光合作用操作指南',
             steps: [
                 { icon: 'mouse-pointer-click', text: '顶部按钮切换三种模式：反应模拟 / 光合曲线 / 呼吸对比' },
-                { icon: 'play', text: '反应模拟点击「开始模拟」观察 CO₂ + H₂O 在类囊体/基质中转化为 O₂ + ATP + 葡萄糖' },
+                { icon: 'play', text: '反应模拟点击「开始模拟」观察光反应与 Calvin 循环（光不直接依赖反应）的物质和能量转化' },
                 { icon: 'sliders-horizontal', text: '调节光照强度 / 温度 / CO₂ 浓度三滑块，观察对反应速率的影响' },
                 { icon: 'bar-chart-2', text: '光合曲线模式呈现 Michaelis-Menten 速率-光强曲线及温度修正' },
                 { icon: 'book-open', text: '呼吸对比模式找出补偿点 / 饱和点（人教版必修1 第五章）' }
@@ -160,9 +163,9 @@ const ExperimentGuide = {
             steps: [
                 { icon: 'mouse-pointer-click', text: '示例反应 N₂ + 3H₂ ⇌ 2NH₃（放热），点击「开始」反应趋向平衡' },
                 { icon: 'plus', text: '7 个扰动按钮：加 N₂ / 加 H₂ / 移除 NH₃ / 升温 / 降温 / 加压 / 减压' },
-                { icon: 'bar-chart-2', text: '右侧曲线实时展示三组分浓度变化与平衡常数 K_c 演化' },
+                { icon: 'bar-chart-2', text: '右侧曲线实时展示三组分浓度变化；K_c 只随温度改变，浓度/压强/催化剂不改变 K_c' },
                 { icon: 'thermometer', text: '升温→平衡向吸热方向（逆反应）移动；加压→平衡向气体分子数减少的方向移动' },
-                { icon: 'book-open', text: '勒夏特列原理：平衡总是向减弱外界扰动的方向移动（人教版选必一第2章）' }
+                { icon: 'book-open', text: '勒夏特列原理：平衡总是向减弱外界扰动的方向移动；催化剂只改变达到平衡的快慢，不改变平衡位置' }
             ]
         },
         'electrochemistry': {
@@ -172,7 +175,7 @@ const ExperimentGuide = {
                 { icon: 'play', text: '播放/暂停按钮控制电子在外电路 + 离子在溶液中的迁移动画' },
                 { icon: 'zap', text: '原电池：Zn 失电子（负极氧化），Cu²⁺ 得电子（正极还原），E°=1.10 V' },
                 { icon: 'zap', text: '电解池：阳极氧化（2Cl⁻−2e⁻→Cl₂↑），阴极还原（Cu²⁺+2e⁻→Cu）' },
-                { icon: 'book-open', text: '判断电极口诀「正得负失」（原电池）/「阴还阳氧」（电解池）— 人教版选必一第4章' }
+                { icon: 'book-open', text: '原电池负极为阳极、正极为阴极；电解池阳极接电源正极、阴极接负极。阳离子向阴极附近、阴离子向阳极附近维持电中性' }
             ]
         },
         'chemical-bond': {
@@ -215,6 +218,26 @@ const ExperimentGuide = {
                 { icon: 'book-open', text: '玻尔模型展示分层 K-L-M-N 与跃迁吸/放光（人教版必修一第4章 / 选必二第1章）' }
             ]
         },
+        'element-compounds': {
+            title: '元素化合物操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '顶部 2 模式：价-类二维图（物质转化网络）/ 焰色反应（金属焰色火焰模拟）' },
+                { icon: 'list', text: '二维图模式选择元素 Na/Fe/Al/Cl/N/S，横轴=物质类别、纵轴=化合价' },
+                { icon: 'circle', text: '点击图中物质节点，绿色箭头变金色高亮其参与的所有转化反应' },
+                { icon: 'book-open', text: '信息面板列出方程式、反应条件与现象；横向转化多为复分解、纵向转化必为氧化还原' },
+                { icon: 'flame', text: '焰色反应模式：选金属看特征焰色与谱线（人教版必修一第3章 / 必修二第3章）' }
+            ]
+        },
+        'intermolecular-forces': {
+            title: '分子间力与氢键操作指南',
+            steps: [
+                { icon: 'mouse-pointer-click', text: '顶部 2 模式：沸点趋势（四个主族氢化物沸点折线）/ 氢键模型（分子氢键网络动画）' },
+                { icon: 'line-chart', text: '沸点模式：点击图例按钮可单独显示/隐藏某一族，对比趋势' },
+                { icon: 'circle-dot', text: '点击折线上的数据点，查看该氢化物沸点与主要分子间作用力' },
+                { icon: 'triangle-alert', text: 'NH₃ / H₂O / HF 被黄环标记为“氢键反常”高点；ⅣA 族无氢键作参照线' },
+                { icon: 'book-open', text: '氢键模式：选水/HF/氨观察 X—H···Y 虚线氢键与实线共价键（选必二第2章）' }
+            ]
+        },
         'molecular-structure': {
             title: '分子结构操作指南',
             steps: [
@@ -242,7 +265,7 @@ const ExperimentGuide = {
                 { icon: 'sliders-horizontal', text: '浓度滑块调节 c（mol/L），实时计算 pH 与电离度 α' },
                 { icon: 'eye', text: '画布粒子可视化：强电解质完全电离（无原分子），弱电解质 ⇌ 平衡状态' },
                 { icon: 'play', text: '速度 / 暂停按钮控制粒子动画；鼠标悬停显示离子标签' },
-                { icon: 'book-open', text: '弱酸 Ka、弱碱 Kb 反映电离程度；NaHCO₃ 因 HCO₃⁻ 水解溶液呈碱性（人教版选必一第3章）' }
+                { icon: 'book-open', text: '弱酸 Ka、弱碱 Kb 反映电离程度；HCO₃⁻ 为两性物种，水解强于电离使 NaHCO₃ 溶液呈弱碱性；pH+pOH=14 限定 25°C 水溶液' }
             ]
         },
         'trigonometry': {
@@ -252,7 +275,7 @@ const ExperimentGuide = {
                 { icon: 'sliders-horizontal', text: '拖动 trig-angle 滑块（0°~360°）观察单位圆上的动点与右侧波形同步生成' },
                 { icon: 'play', text: '点击「自动播放」按钮启用角度自动扫动，trig-speed 滑块控制每秒扫过角度' },
                 { icon: 'corner-up-right', text: '快捷预设：30°/45°/60°/90°/180°/270° 一键定位特殊角，配合「特殊角」按钮显示精确值（如 sin30°=1/2）' },
-                { icon: 'book-open', text: '掌握诱导公式与单位圆几何意义，理解 sinθ=y、cosθ=x、tanθ=y/x（人教版必修一第5章）' }
+                { icon: 'book-open', text: '掌握诱导公式与单位圆几何意义，理解 sinθ=y、cosθ=x、tanθ=y/x（高中数学相关内容）' }
             ]
         },
         'probability': {
@@ -262,7 +285,7 @@ const ExperimentGuide = {
                 { icon: 'play', text: 'prob-play-btn 启动连续随机试验，prob-reset-btn 清空重新开始' },
                 { icon: 'plus-circle', text: '+1 按钮单次试验便于观察个例；+1000 按钮快速积累大样本对比理论概率' },
                 { icon: 'sliders-horizontal', text: 'prob-speed 滑块调节动画速率，画布柱状图实时显示频率分布' },
-                { icon: 'book-open', text: '理解大数定律：试验次数 n→∞ 时，频率 f → 理论概率 P；硬币 P=0.5、骰子各点 P=1/6（人教版必修二第10章）' }
+                { icon: 'book-open', text: '理解大数定律：试验次数 n→∞ 时，频率 f → 理论概率 P；硬币 P=0.5、骰子各点 P=1/6（高中数学/选择性必修相关内容）' }
             ]
         },
         'vector-ops': {
@@ -272,7 +295,7 @@ const ExperimentGuide = {
                 { icon: 'move', text: '直接在画布上拖拽 A、B 向量端点改变方向与模长，结果向量与公式实时更新' },
                 { icon: 'bar-chart-2', text: 'vecops-result 区显示坐标分量、模 |V|、夹角 cosθ 等数值' },
                 { icon: 'eye', text: '加减法看几何路径（首尾相连），数量积 A·B=|A||B|cosθ（标量），投影 = (A·B)/|B|' },
-                { icon: 'book-open', text: '向量是高考解析几何与立体几何工具：垂直⇔A·B=0，共线⇔A=λB（人教版必修二第6章）' }
+                { icon: 'book-open', text: '向量是高考解析几何与立体几何工具：垂直⇔A·B=0，共线⇔A=λB（高中数学相关内容）' }
             ]
         },
         'sequences': {
@@ -282,7 +305,7 @@ const ExperimentGuide = {
                 { icon: 'sliders-horizontal', text: '调节首项 a₁、公差 d（或公比 q）、项数 n 滑块，画布柱状图实时绘出 aₙ' },
                 { icon: 'mouse-pointer-2', text: '鼠标悬停柱条高亮显示对应 (n, aₙ) 数值，便于读取具体项' },
                 { icon: 'eye', text: '观察等差数列线性增长 vs 等比数列指数变化（|q|>1 时爆炸式增长）' },
-                { icon: 'book-open', text: '等差通项 aₙ=a₁+(n−1)d，等比通项 aₙ=a₁·qⁿ⁻¹；前 n 项和 Sₙ 公式见教育面板（人教版选必二第4章）' }
+                { icon: 'book-open', text: '等差通项 aₙ=a₁+(n−1)d，等比通项 aₙ=a₁·qⁿ⁻¹；前 n 项和 Sₙ 公式见教育面板（高中数学/选择性必修相关内容）' }
             ]
         },
         'inequality': {
@@ -292,7 +315,7 @@ const ExperimentGuide = {
                 { icon: 'eye', text: '画布显示三条约束直线交叉围成的可行域（多边形），半平面阴影表示不等式方向' },
                 { icon: 'sliders-horizontal', text: '勾选「显示目标函数」后，ineq-obj 滑块平移目标函数 z=ax+by 的等高线，找最大/最小值' },
                 { icon: 'corner-up-right', text: '最优解通常出现在可行域的顶点（线性规划基本定理）' },
-                { icon: 'book-open', text: '一元二次不等式：解集与抛物线开口/判别式有关；线性规划是高考重点应用题型（人教版必修一/选必二）' }
+                { icon: 'book-open', text: '一元二次不等式：解集与抛物线开口/判别式有关；线性规划是高中数学/选择性必修相关应用题型' }
             ]
         },
         'conic-sections': {
@@ -302,7 +325,7 @@ const ExperimentGuide = {
                 { icon: 'sliders-horizontal', text: '滑块 conic-a / conic-b 控制椭圆/双曲线半轴；conic-p 控制抛物线焦准距' },
                 { icon: 'eye', text: '画布动态描绘曲线轨迹，红色焦点、橙色准线、蓝色离心率几何意义同步可视化' },
                 { icon: 'bar-chart-2', text: '右侧 conic-info 实时显示标准方程、离心率 e=c/a、焦点坐标、渐近线（双曲线）等' },
-                { icon: 'book-open', text: '椭圆 0<e<1、双曲线 e>1、抛物线 e=1；统一定义：到焦点距离/到准线距离=e（人教版选必一第3章）' }
+                { icon: 'book-open', text: '椭圆 0<e<1、双曲线 e>1、抛物线 e=1；统一定义：到焦点距离/到准线距离=e（高中数学/选择性必修相关内容）' }
             ]
         },
         'function-properties': {
@@ -312,7 +335,7 @@ const ExperimentGuide = {
                 { icon: 'mouse-pointer-click', text: '.fp-func-btn 切换不同函数（一次/二次/三次/绝对值/sin/exp/log 等）观察性质表现' },
                 { icon: 'sliders-horizontal', text: '单调性模式下，调整 fp-int-a / fp-int-b 区间输入框（或拖拽画布上的菱形标记）框选研究区间' },
                 { icon: 'eye', text: '画布以颜色高亮单调增/减区间、奇偶对称轴、周期 T；fp-info 给出严谨的数学判定' },
-                { icon: 'book-open', text: '判定：单调性看 f(x₁)−f(x₂) 符号；奇函数 f(−x)=−f(x) 关于原点对称；偶函数 f(−x)=f(x) 关于 y 轴对称（人教版必修一第3章）' }
+                { icon: 'book-open', text: '判定：单调性看 f(x₁)−f(x₂) 符号；奇函数 f(−x)=−f(x) 关于原点对称；偶函数 f(−x)=f(x) 关于 y 轴对称（高中数学相关内容）' }
             ]
         },
         'set-operations': {
@@ -322,7 +345,7 @@ const ExperimentGuide = {
                 { icon: 'edit-3', text: 'setops-input-a / setops-input-b 输入集合 A、B 元素（如 1,2,3）；setops-input-u 设置全集 U' },
                 { icon: 'eye', text: '画布维恩图 (Venn) 高亮当前运算结果区域，深色填充表示属于结果集' },
                 { icon: 'bar-chart-2', text: 'setops-result 区显示运算结果集合 + 元素个数；setops-edu 给出公式与运算律' },
-                { icon: 'book-open', text: '德摩根律：(A∪B)ᶜ=Aᶜ∩Bᶜ、(A∩B)ᶜ=Aᶜ∪Bᶜ；分配律 A∩(B∪C)=(A∩B)∪(A∩C)（人教版必修一第1章）' }
+                { icon: 'book-open', text: '德摩根律：(A∪B)ᶜ=Aᶜ∩Bᶜ、(A∩B)ᶜ=Aᶜ∪Bᶜ；分配律 A∩(B∪C)=(A∩B)∪(A∩C)（高中数学相关内容）' }
             ]
         },
         'permutation-combination': {
@@ -332,7 +355,7 @@ const ExperimentGuide = {
                 { icon: 'sliders-horizontal', text: 'permcomb-n 滑块设置元素总数 n，permcomb-r 滑块设置抽取数 r（杨辉三角自动生成行）' },
                 { icon: 'eye', text: '画布枚举或图示所有排列/组合方案，pc-info 同步显示公式 P(n,r)=n!/(n−r)!、C(n,r)=n!/(r!(n−r)!) 与具体值' },
                 { icon: 'grid', text: '杨辉三角模式：每个数等于上方两数之和，第 n 行就是 (a+b)ⁿ 的展开系数 C(n,0)…C(n,n)' },
-                { icon: 'book-open', text: '关键区分：排列考虑顺序（如班长副班长）、组合不考虑顺序（如选 r 人代表）；二项式定理是高考重点（人教版选必三第6章）' }
+                { icon: 'book-open', text: '关键区分：排列考虑顺序（如班长副班长）、组合不考虑顺序（如选 r 人代表）；二项式定理是高中数学/选择性必修相关重点' }
             ]
         },
         'exp-log': {
@@ -342,7 +365,47 @@ const ExperimentGuide = {
                 { icon: 'mouse-pointer-click', text: '3 个 .el-toggle 复选框分别开关 y=aˣ（指数）、y=logₐx（对数）、y=x（镜像参考线）' },
                 { icon: 'eye', text: '画布同步绘制两条曲线，关于 y=x 严格对称即印证「指数与对数互为反函数」' },
                 { icon: 'bar-chart-2', text: '滑动 a 越过 1：a>1 指数递增、对数递增；0<a<1 指数递减、对数递减；a=1 退化为常数函数（不构成函数）' },
-                { icon: 'book-open', text: '关键性质：aˣ⋅aʸ=aˣ⁺ʸ；logₐ(MN)=logₐM+logₐN；换底公式 logₐb=lnb/lna（人教版必修一第4章）' }
+                { icon: 'book-open', text: '关键性质：aˣ⋅aʸ=aˣ⁺ʸ；logₐ(MN)=logₐM+logₐN；换底公式 logₐb=lnb/lna（高中数学相关内容）' }
+            ]
+        },
+        'binomial-theorem': {
+            title: '二项式定理操作指南',
+            steps: [
+                { icon: 'sliders-horizontal', text: '#bt-n 滑块（0~12）调整指数 n，#bt-n-val 实时显示；5 个 .bt-preset 一键切到 2/3/5/8/12，杨辉三角随之逐行变化' },
+                { icon: 'mouse-pointer-click', text: '点击三角形「内部」数字单元格：绿色箭头从上一行两个「肩」指向它，底部公式演示 C(n,k)=C(n−1,k−1)+C(n−1,k)' },
+                { icon: 'play', text: '#bt-anim-btn「逐行生成」从顶端 1 开始逐行向下生长，直观感受帕斯卡递推如何构造整张三角' },
+                { icon: 'eye', text: '取消「显示展开式各项」可隐藏 (a+b)ⁿ 通项；信息面板同步展示系数序列、系数和 2ⁿ、最大（中间）项系数' },
+                { icon: 'book-open', text: '通项 T_{k+1}=C(n,k)·aⁿ⁻ᵏ·bᵏ；系数对称 C(n,k)=C(n,n−k)；ΣC(n,k)=2ⁿ、交错和为 0（高中数学/选择性必修相关内容）' }
+            ]
+        },
+        'statistics-regression': {
+            title: '统计与回归操作指南',
+            steps: [
+                { icon: 'layout-grid', text: '顶部 2 个 .sr-mode-btn 切换「线性回归」（散点+最小二乘）与「统计分布」（直方图+正态曲线）两种模式' },
+                { icon: 'sliders-horizontal', text: '回归模式：调样本量 n、噪声强度、真实斜率；红线为最小二乘回归直线，橙色竖线为残差 eᵢ=yᵢ−ŷᵢ' },
+                { icon: 'activity', text: '观察 r 与 R²：加大噪声→散点变散、|r| 下降、残差变长；回归直线始终过黄色中心点 (x̄, ȳ)' },
+                { icon: 'bar-chart-3', text: '分布模式：调 σ 与分组数，蓝色直方图为频率/组距，红色为正态密度曲线；勾选 3σ 区间看分层阴影' },
+                { icon: 'book-open', text: 'b̂=Σ(xᵢ−x̄)(yᵢ−ȳ)/Σ(xᵢ−x̄)²、â=ȳ−b̂x̄；3σ 原则 68.3%/95.4%/99.7%（高中数学/选择性必修统计相关内容）' }
+            ]
+        },
+        'spatial-vector': {
+            title: '空间向量操作指南',
+            steps: [
+                { icon: 'sliders-horizontal', text: '上方 6 个 .sv-slider 分别调节向量 a=(x,y,z) 与 b=(x,y,z) 的三个分量（范围 −5~5），画布实时重绘' },
+                { icon: 'move-3d', text: '在画布上拖拽可旋转 3D 视角（偏航 yaw + 俯仰 pitch），从不同角度理解空间结构；勾选「自动旋转」可持续旋转' },
+                { icon: 'check-square', text: '勾选「a+b」显示平行四边形法则；勾选「a×b」显示向量积（始终垂直于 a,b 所在平面，右手定则）' },
+                { icon: 'activity', text: '勾选「投影」显示 a 在 b 上的投影向量；信息面板同步计算模长、数量积、夹角 θ、垂直判定' },
+                { icon: 'book-open', text: 'a·b=|a||b|cosθ；a⊥b ⇔ a·b=0；|a×b| = 以 a,b 为邻边的平行四边形面积（高中数学/选择性必修相关内容）' }
+            ]
+        },
+        'derivative-application': {
+            title: '导数应用操作指南',
+            steps: [
+                { icon: 'function-square', text: '顶部 .da-fbtn 切换 4 个示例函数（三次/四次/正弦），观察不同函数的导数、单调性与极值' },
+                { icon: 'move-horizontal', text: '拖动画布或调 #da-x0 滑块移动切点 x₀，红色切线随之变化，信息面板实时显示 f′(x₀) 斜率与切线方程' },
+                { icon: 'palette', text: '勾选「单调性着色」：曲线绿色段表 f′>0 递增、红色段表 f′<0 递减，直观联系导数符号与升降' },
+                { icon: 'circle-dot', text: '勾选「极值点」标记 f′=0 处：黄点为极大值、蓝点为极小值；勾选「导函数 f′(x)」叠加紫色虚线对照' },
+                { icon: 'book-open', text: 'f′(x₀)=切线斜率；f′>0递增、f′<0递减；极值点处 f′=0 且左右变号（高中数学/选择性必修相关内容）' }
             ]
         },
         'geometry': {
@@ -352,7 +415,7 @@ const ExperimentGuide = {
                 { icon: 'sliders-horizontal', text: '仿射模式：调整 geo-tx/ty 平移、geo-sx/sy 缩放、geo-rot 旋转角、geo-shear 错切，画布同步显示原始与变换后图形' },
                 { icon: 'play', text: '#geo-animate-btn 自动播放变换过程，可观察连续变化下的轨迹（旋转 + 缩放 = 螺线）' },
                 { icon: 'eye', text: '三角形模式：拖拽顶点调整三角形，画布动态绘制四心，geo-edu 同步显示坐标与几何意义' },
-                { icon: 'book-open', text: '仿射变换矩阵 [[a,b],[c,d]]+(tx,ty) 可表达 2D 所有线性变换；四心是初等几何核心定理（人教版必修二第6章）' }
+                { icon: 'book-open', text: '仿射变换矩阵 [[a,b],[c,d]]+(tx,ty) 可表达 2D 所有线性变换；四心是初等几何核心定理（高中数学相关内容）' }
             ]
         },
         'complex-numbers': {
@@ -362,7 +425,7 @@ const ExperimentGuide = {
                 { icon: 'edit-3', text: 'ops 模式：cx-z1-re/im、cx-z2-re/im 输入复数实/虚部；.cx-op-btn 选择 +、−、×、÷，画布显示复平面向量与平行四边形法则' },
                 { icon: 'sliders-horizontal', text: 'roots：cx-root-n 滑块（n=2~12）设次数，画布动画演示 n 次单位根均匀分布在单位圆并构成正多边形；cx-roots-anim 一键播放' },
                 { icon: 'play', text: 'euler 模式：cx-theta 滑块或 cx-euler-anim 演示 e^(iθ)=cosθ+isinθ；θ=π 时即著名公式 e^(iπ)+1=0' },
-                { icon: 'book-open', text: '复数 z=a+bi 几何即向量；模 |z|=√(a²+b²)、辐角 arg(z)=arctan(b/a)；棣莫弗 (cosθ+isinθ)ⁿ=cos(nθ)+isin(nθ)（人教版必修二第7章）' }
+                { icon: 'book-open', text: '复数 z=a+bi 几何即向量；模 |z|=√(a²+b²)、辐角 arg(z)=arctan(b/a)；棣莫弗 (cosθ+isinθ)ⁿ=cos(nθ)+isin(nθ)（高中数学相关内容）' }
             ]
         },
         'solid-geometry': {
@@ -372,7 +435,7 @@ const ExperimentGuide = {
                 { icon: 'sliders-horizontal', text: '#sg-cross 滑块控制水平截面位置，#sg-cross-val 显示当前 z 坐标；可观察截面形状随高度的变化（圆柱→圆，圆锥→圆缩小到点）' },
                 { icon: 'play', text: '#sg-speed 调旋转速度，#sg-pause 暂停/继续 3D 旋转动画；鼠标拖拽画布也可手动旋转视角' },
                 { icon: 'eye', text: '画布以 3D 透视投影显示几何体，正面线段实线、背面虚线，截面平面以半透明色高亮' },
-                { icon: 'book-open', text: '欧拉公式 V−E+F=2（凸多面体顶点−棱+面=2）；正多面体仅有 5 种（柏拉图体）；旋转体侧面积 S=2πrl（人教版必修二第8章）' }
+                { icon: 'book-open', text: '欧拉公式 V−E+F=2（凸多面体顶点−棱+面=2）；正多面体仅有 5 种（柏拉图体）；旋转体侧面积 S=2πrl（高中数学立体几何相关内容）' }
             ]
         },
         'circuit-analysis': {
@@ -648,20 +711,20 @@ const ExperimentGuide = {
         'cellular-respiration': {
             title: '细胞呼吸操作指南',
             steps: [
-                { icon: 'mouse-pointer-click', text: '#cell-resp-controls 内的 .cellresp-btn 切换三阶段：糖酵解（细胞质基质，1 葡萄糖 → 2 丙酮酸 + 2ATP + 2NADH，无需 O₂）/ 柠檬酸循环（线粒体基质，2 丙酮酸 → 6CO₂ + 2ATP + 8NADH + 2FADH₂）/ 电子传递链（线粒体内膜，NADH/FADH₂ + O₂ → 34ATP + H₂O）' },
+                { icon: 'mouse-pointer-click', text: '#cell-resp-controls 内的 .cellresp-btn 切换三阶段：糖酵解（细胞质基质，1 葡萄糖 → 2 丙酮酸 + 2ATP + 2NADH，无需 O₂）/ 柠檬酸循环（线粒体基质，2 丙酮酸 → 6CO₂ + 2ATP + 8NADH + 2FADH₂）/ 电子传递链（线粒体内膜，NADH/FADH₂ + O₂ → 约34ATP + H₂O，高中教材近似）' },
                 { icon: 'eye', text: '#cell-resp-canvas 上动态绘制对应细胞器场所（细胞质基质 / 线粒体基质 / 内膜嵴），底物分子流动 → 能量载体（NADH/ATP）生成的全过程' },
-                { icon: 'info', text: '#cellresp-stage-display 显示当前阶段名称，#cellresp-stage-loc 显示反应场所，#cellresp-atp-info 累计能量产出（最终约 38 ATP/葡萄糖）' },
-                { icon: 'gauge', text: '同步对比：糖酵解 = 2 ATP（厌氧也行）、柠檬酸 = 2 ATP、电子传递链 = 34 ATP（氧化磷酸化贡献最大，依赖 O₂ 作终末电子受体）' },
-                { icon: 'book-open', text: '人教版必修 1 第 5 章：有氧呼吸总反应 C₆H₁₂O₆ + 6O₂ + 6H₂O → 6CO₂ + 12H₂O + 能量(38 ATP)；无氧呼吸（发酵）只有糖酵解阶段，产物为乳酸（动物/乳酸菌）或乙醇+CO₂（酵母菌），仅释放 2 ATP' }
+                { icon: 'info', text: '#cellresp-stage-display 显示当前阶段名称，#cellresp-stage-loc 显示反应场所，#cellresp-atp-info 显示高中教材常用近似与现代真核细胞常见产量差异' },
+                { icon: 'gauge', text: '同步对比：糖酵解 = 2 ATP（厌氧也行）、柠檬酸 = 2 ATP、电子传递链约 34 ATP 是高中教材近似；现代真核常见约 30-32 ATP' },
+                { icon: 'book-open', text: '人教版必修 1 第 5 章常用约 38 ATP 估算；现代产量受 NADH 穿梭系统、膜泄漏和细胞条件影响。无氧呼吸（发酵）只有糖酵解阶段，仅释放 2 ATP' }
             ]
         },
         'substance-transport': {
             title: '物质运输操作指南',
             steps: [
-                { icon: 'mouse-pointer-click', text: '#substance-transport-controls 内的 .strans-btn 切换四种跨膜运输方式：自由扩散（O₂/CO₂/H₂O 顺浓度，无载体无 ATP）/ 协助扩散（葡萄糖入红细胞，需载体不耗能）/ 主动运输（Na⁺-K⁺ 泵逆浓度，需载体+ATP）/ 胞吞胞吐（大分子囊泡进出）' },
+                { icon: 'mouse-pointer-click', text: '#substance-transport-controls 内的 .strans-btn 切换四种跨膜运输方式：自由扩散（O₂/CO₂ 顺浓度，无载体无 ATP）/ 协助扩散（葡萄糖入红细胞，需载体不耗能）/ 主动运输（Na⁺-K⁺ 泵逆浓度，需载体+ATP）/ 胞吞胞吐（大分子囊泡进出）' },
                 { icon: 'eye', text: '#substance-transport-canvas 动态展示磷脂双分子层、嵌入的载体蛋白构象变化、ATP 水解释能（主动运输模式下可见 ATP→ADP+Pi）、囊泡形成与融合' },
                 { icon: 'info', text: '#strans-mode-display 实时显示当前方式名称，#strans-mode-desc 显示其特征（顺/逆浓度、是否需载体、是否耗能）' },
-                { icon: 'gauge', text: '一表对比：自由扩散+协助扩散 = 被动运输（顺浓度，不耗能，差别在是否需载体）；主动运输+胞吞胞吐 = 需要细胞代谢能量（ATP）' },
+                { icon: 'gauge', text: '一表对比：自由扩散+协助扩散+渗透 = 被动过程（顺浓度/水势梯度，不耗能）；水跨膜可少量直接扩散，快速运输常经水通道蛋白' },
                 { icon: 'book-open', text: '人教版必修 1 第 4 章：细胞膜的流动镶嵌模型（磷脂双分子层 + 蛋白质 + 多糖），运输方式由分子大小、极性、浓度梯度共同决定；胞吞胞吐体现膜的流动性，是大分子（如蛋白质、多糖）进出细胞的唯一方式' }
             ]
         },
@@ -718,8 +781,10 @@ const ExperimentGuide = {
 
     // Force show (from "?" button)
     showForCurrent() {
-        if (!this._currentModule) return;
-        this._show(this._currentModule.page, this._currentModule.moduleId);
+        const current = this._currentModule || this._inferCurrentModule();
+        if (!current) return;
+        this._currentModule = current;
+        this._show(current.page, current.moduleId);
     },
 
     // Show help button when an experiment is open
@@ -739,7 +804,9 @@ const ExperimentGuide = {
     // ── Internal ──
 
     _show(page, moduleId) {
-        const guide = this._experimentGuides[moduleId] || this._subjectGuides[page];
+        this._overlay = document.querySelector('#experiment-guide-overlay') || this._overlay;
+        const guideId = this._resolveModuleId(moduleId);
+        const guide = this._experimentGuides[guideId] || this._subjectGuides[page];
         if (!guide || !this._overlay) return;
 
         const card = this._overlay.querySelector('.guide-card');
@@ -758,18 +825,33 @@ const ExperimentGuide = {
         if (this._overlay) this._overlay.classList.remove('active');
     },
 
+    _inferCurrentModule() {
+        const activeModule = document.querySelector('[data-module].module-active');
+        const moduleId = activeModule ? activeModule.getAttribute('data-module') : '';
+        if (!moduleId) return null;
+
+        const hash = window.location.hash.replace(/^#/, '');
+        let page = hash.includes('/') ? hash.split('/')[0] : '';
+        if (!page) {
+            const activePage = document.querySelector('.page-section.active[id^="page-"]');
+            page = activePage ? activePage.id.replace(/^page-/, '') : '';
+        }
+
+        return page ? { page, moduleId } : null;
+    },
+
     _renderCard(guide) {
         const stepsHTML = guide.steps.map((step, i) => `
             <div class="guide-step">
                 <div class="guide-step__number">${i + 1}</div>
                 <div class="guide-step__icon"><i data-lucide="${step.icon}"></i></div>
-                <div class="guide-step__text">${step.text}</div>
+                <div class="guide-step__text">${this._escapeHtml(this._publicGuideText(step.text))}</div>
             </div>
         `).join('');
 
         return `
             <div class="guide-card__header">
-                <div class="guide-card__title">${guide.title}</div>
+                <div class="guide-card__title">${this._escapeHtml(guide.title)}</div>
                 <div class="guide-card__subtitle">首次进入实验时显示，可通过右下角 ? 按钮重新查看</div>
             </div>
             <div class="guide-card__steps">${stepsHTML}</div>
@@ -777,7 +859,71 @@ const ExperimentGuide = {
         `;
     },
 
+    _publicGuideText(text) {
+        const labels = {
+            button: '对应按钮',
+            switch: '显示开关',
+            slider: '参数滑块',
+            speed: '速度滑块',
+            panel: '信息面板',
+            canvas: '画布',
+            input: '输入框',
+            preset: '预设按钮'
+        };
+        const controlPrefixes = [
+            'trig', 'prob', 'ineq', 'conic', 'fp', 'setops', 'permcomb', 'pc',
+            'el', 'bt', 'sr', 'sv', 'da', 'geo', 'cx', 'sg', 'circuit',
+            'wave', 'kin', 'proj', 'circ', 'optics', 'emi', 'ac', 'fc', 'mc',
+            'grav', 'em', 'cp', 'rel', 'energy', 'fluid', 'sortcmp', 'bs',
+            'tree', 'hash', 'sc', 'dp', 'strmatch', 'ds', 'recur', 'ga',
+            'sort', 'immune', 'eco', 'neural', 'cellresp', 'cell-resp',
+            'substance-transport', 'strans', 'meio', 'meiosis', 'genexp',
+            'gene-expression', 'gene-mutation', 'gmut'
+        ].join('|');
+
+        const labelFor = (token) => {
+            const value = String(token || '').toLowerCase();
+            if (value.includes('canvas')) return labels.canvas;
+            if (/(info|result|stats|edu|display|desc|loc|phase-name|phase-desc)/.test(value)) return labels.panel;
+            if (value.includes('speed')) return labels.speed;
+            if (/(input|target)/.test(value)) return labels.input;
+            if (/(preset|gen\b)/.test(value)) return labels.preset;
+            if (/(show|toggle|vectors|envelope|probe|lines|checkbox)/.test(value)) return labels.switch;
+            if (/(play|pause|reset|step|start|trigger|anim|animate|btn|button|mode|fbtn|op)/.test(value)) return labels.button;
+            return labels.slider;
+        };
+
+        return String(text ?? '')
+            .replace(/[（(]?\s*(?:HTML\s*中已有|JS\s*动态注入)\s*[）)]?/g, '')
+            .replace(/\[data-[^\]]+\]/gi, labels.preset)
+            .replace(/#[A-Za-z][A-Za-z0-9_-]*/g, (token) => labelFor(token))
+            .replace(/\.[A-Za-z][A-Za-z0-9_-]*(?:\[[^\]]+\])?/g, (token) => labelFor(token))
+            .replace(new RegExp(`\\b(?:${controlPrefixes})(?:-[A-Za-z0-9]+)+\\b`, 'g'), (token) => labelFor(token))
+            .replace(/\bautoPlay\b/g, '自动播放')
+            .replace(/\s{2,}/g, ' ')
+            .replace(/（\s*）/g, '')
+            .replace(/\/\s*\//g, '/')
+            .replace(/；\s*；/g, '；')
+            .replace(/：\s*；/g, '：')
+            .trim();
+    },
+
+    _escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    },
+
     _createOverlay() {
+        const existing = document.getElementById('experiment-guide-overlay');
+        if (existing) {
+            this._overlay = existing;
+            return;
+        }
+
         const overlay = document.createElement('div');
         overlay.className = 'experiment-guide-overlay';
         overlay.id = 'experiment-guide-overlay';
@@ -803,6 +949,12 @@ const ExperimentGuide = {
     },
 
     _createHelpButton() {
+        const existing = document.getElementById('experiment-guide-help');
+        if (existing) {
+            this._helpBtn = existing;
+            return;
+        }
+
         const btn = document.createElement('button');
         btn.className = 'experiment-guide-help-btn';
         btn.id = 'experiment-guide-help';
@@ -811,7 +963,8 @@ const ExperimentGuide = {
         btn.textContent = '?';
         btn.style.display = 'none';
 
-        btn.addEventListener('click', () => this.showForCurrent());
+        const guide = this;
+        btn.addEventListener('click', () => guide.showForCurrent());
         btn.addEventListener('click', () => {
             btn.classList.remove('is-rippling');
             void btn.offsetWidth;
@@ -837,7 +990,12 @@ const ExperimentGuide = {
         try {
             localStorage.setItem(this._storageKey, JSON.stringify([...set]));
         } catch { /* quota exceeded — degrade gracefully */ }
+    },
+
+    _resolveModuleId(moduleId) {
+        return this._moduleAliases[moduleId] || moduleId;
     }
 };
 
 window.ExperimentGuide = ExperimentGuide;
+globalThis.ExperimentGuide = ExperimentGuide;

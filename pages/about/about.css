@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
- * About 模块（开源协议 / 更新日志）—— 自动同步仓库 Markdown
+ * About 模块（开源协议 / 更新日志）
  * ═══════════════════════════════════════════════════════════════ */
 
 #page-license,
@@ -59,6 +59,12 @@ body:has(#page-changelog.active) .main-content {
     flex-wrap: wrap;
 }
 
+.about-doc__intro {
+    color: var(--text-3, #8a96b8);
+    margin: 0;
+    line-height: 1.7;
+}
+
 .about-doc__source code {
     background: rgba(0, 212, 255, 0.08);
     padding: 2px 8px;
@@ -115,6 +121,41 @@ body:has(#page-changelog.active) .main-content {
 }
 
 .about-doc__error p { margin: 6px 0; }
+
+.about-release-list {
+    display: grid;
+    gap: 18px;
+}
+
+.about-release {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 22px 24px;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.about-release__date {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 12px;
+    color: var(--accent-cyan, #00d4ff);
+    margin-bottom: 8px;
+}
+
+.about-release h2 {
+    margin: 0 0 12px;
+    color: var(--text-1, #f0f4ff);
+    font-size: 22px;
+    line-height: 1.3;
+}
+
+.about-release ul {
+    margin: 0;
+    padding-left: 1.2em;
+    color: var(--text-2, #c5d0e8);
+    line-height: 1.8;
+}
+
+.about-release li + li { margin-top: 6px; }
 
 /* ─── Markdown 渲染样式 ─── */
 .markdown-body {

@@ -382,6 +382,46 @@ const StringMatch = {
     }
 };
 
+StringMatch.updateEdu = function () {
+    let el = document.getElementById('strmatch-edu');
+    if (!el) {
+        const wrap = this.canvas?.closest('.demo-section');
+        if (!wrap) return;
+        el = document.createElement('div');
+        el.id = 'strmatch-edu';
+        el.className = 'strmatch-edu';
+        wrap.appendChild(el);
+    }
+
+    const step = this.steps[this.currentStep] || this.steps[0];
+    const m = this.pattern.length;
+    const n = this.text.length;
+    const found = step && step.found;
+    const sourceNote = '<p class="algo-source-note">参考资料：NIST Dictionary of Algorithms and Data Structures 的 Knuth-Morris-Pratt algorithm 条目。页面使用 LPS 表解释跳转思想，符号与教材中的 next / failure function 可能略有差异。</p>';
+
+    if (this.algo === 'kmp') {
+        el.innerHTML =
+            '<b>KMP 算法</b>：先用模式串构造 LPS 表，失配时让模式串跳到仍可能匹配的位置。' +
+            '<br><b>LPS 数组</b>（最长相等前后缀长度）：[' + this.lps.join(', ') + ']。' +
+            '<br>当 <code>text[i]</code> 与 <code>pattern[j]</code> 失配时，KMP 使用 <code>lps[j-1]</code> 决定新的 j，文本指针 i 不需要回退。' +
+            '<br>时间复杂度为 <code>O(n + m)</code>，空间复杂度为 <code>O(m)</code>。这里 n = ' + n + '，m = ' + m + '。' +
+            (found
+                ? '<br>匹配成功：模式串从文本位置 ' + step.pOffset + ' 开始出现。'
+                : '<br>对照暴力匹配可以看到：KMP 复用的是模式串自身的结构信息。') +
+            sourceNote;
+        return;
+    }
+
+    el.innerHTML =
+        '<b>暴力匹配</b>：把模式串依次对齐到文本的每个可能起点，再逐字符比较。' +
+        '<br>失配后，模式串回到开头，文本起点右移一位；这种方法实现直接，但会丢掉已经比较过的信息。' +
+        '<br>最坏时间复杂度为 <code>O(nm)</code>，这里 n = ' + n + '，m = ' + m + '。' +
+        (found
+            ? '<br>匹配成功：模式串从文本位置 ' + step.pOffset + ' 开始出现。'
+            : '<br>适合用来理解“为什么 KMP 要记录前后缀信息”。') +
+        sourceNote;
+};
+
 function initStringMatch() {
     StringMatch.init();
 }

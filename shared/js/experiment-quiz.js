@@ -7,6 +7,9 @@ const ExperimentQuiz = {
     _btn: null,
     _currentModule: null,
     _scoreKey: 'englab-quiz-scores',
+    _moduleAliases: {
+        complex: 'complex-numbers',
+    },
 
     init() {
         // Nothing to do globally — per-experiment show/hide handled by show()/hide()
@@ -14,10 +17,15 @@ const ExperimentQuiz = {
 
     /** Called by router onPageEnter — inject quiz button if data exists */
     show(moduleId) {
-        this._currentModule = moduleId;
-        if (!QUIZ_DATA || !QUIZ_DATA[moduleId] || QUIZ_DATA[moduleId].length === 0) return;
+        const quizModuleId = this._resolveModuleId(moduleId);
+        this._currentModule = quizModuleId;
+        if (typeof QUIZ_DATA === 'undefined' || !QUIZ_DATA[quizModuleId] || QUIZ_DATA[quizModuleId].length === 0) {
+            this._removeButton();
+            this._closeOverlay();
+            return;
+        }
 
-        this._injectButton(moduleId);
+        this._injectButton(quizModuleId);
     },
 
     /** Called by router onPageLeave — remove quiz button */
@@ -32,18 +40,29 @@ const ExperimentQuiz = {
 
     // ── Floating button ──
     _injectButton(moduleId) {
-        if (this._btn) return;
+        if (this._btn) {
+            this._btn.dataset.moduleId = moduleId;
+            return;
+        }
 
         const btn = document.createElement('button');
         btn.className = 'quiz-fab';
+        btn.dataset.moduleId = moduleId;
         btn.setAttribute('aria-label', '开始小测验');
         btn.setAttribute('title', '章节小测验');
         btn.innerHTML = '<i data-lucide="clipboard-check"></i><span>小测验</span>';
-        btn.addEventListener('click', () => this._startQuiz(moduleId));
+        btn.addEventListener('click', () => this._startQuiz(btn.dataset.moduleId));
         document.body.appendChild(btn);
         this._btn = btn;
 
         if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [btn] });
+    },
+
+    _removeButton() {
+        if (this._btn && this._btn.parentNode) {
+            this._btn.parentNode.removeChild(this._btn);
+        }
+        this._btn = null;
     },
 
     // ── Quiz flow ──
@@ -195,6 +214,13 @@ const ExperimentQuiz = {
         const d = document.createElement('div');
         d.textContent = s;
         return d.innerHTML;
+    },
+
+    _resolveModuleId(moduleId) {
+        if (typeof QUIZ_DATA !== 'undefined' && QUIZ_DATA[moduleId]) return moduleId;
+        const alias = this._moduleAliases[moduleId];
+        if (typeof QUIZ_DATA !== 'undefined' && alias && QUIZ_DATA[alias]) return alias;
+        return moduleId;
     }
 };
 

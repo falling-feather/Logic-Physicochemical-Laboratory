@@ -345,6 +345,59 @@ const DPVis = {
     }
 };
 
+DPVis.updateEdu = function () {
+    let el = document.getElementById('dp-edu');
+    if (!el) {
+        const wrap = this.canvas?.closest('.demo-section');
+        if (!wrap) return;
+        el = document.createElement('div');
+        el.id = 'dp-edu';
+        el.className = 'dp-edu';
+        wrap.appendChild(el);
+    }
+
+    const n = this.items.length;
+    const W = this.capacity;
+    const sourceNote = '<p class="algo-source-note">参考资料：OpenDSA《0/1 Knapsack Problem》。本页用小整数演示表格填充，适合观察状态定义、转移方程和回溯思路。</p>';
+
+    if (this.step >= this.maxStep) {
+        const optVal = this.dp[n][W];
+        const chosen = this.selectedItems.map(i => this.items[i].name).join(', ') || '无';
+        el.innerHTML =
+            '<b>DP 表填充完成</b>：最优价值 = ' + optVal + '，选择物品：[' + chosen + ']' +
+            '<br>共填充 ' + n + ' x ' + (W + 1) + ' = ' + (n * (W + 1)) + ' 个核心单元格；每格只比较“不取”和“取”两种情况。' +
+            '<br><b>回溯路径</b>：从 <code>dp[n][W]</code> 向上比较，若 <code>dp[i][j] !== dp[i-1][j]</code>，说明第 i 件物品被选中。' +
+            '<br>0/1 背包的每件物品只能选或不选一次；表格法的时间复杂度为 <code>O(nW)</code>，当容量 W 很大时仍要谨慎估算成本。' +
+            sourceNote;
+        return;
+    }
+
+    if (this.step > 0) {
+        const s = this.steps[this.step - 1];
+        const item = this.items[s.i - 1];
+        const takeValue = s.j >= item.w ? this.dp[s.i - 1][s.j - item.w] + item.v : null;
+        const skipValue = this.dp[s.i - 1][s.j];
+        el.innerHTML =
+            '<b>0/1 背包 · 动态规划</b>：正在填充 <code>dp[' + s.i + '][' + s.j + ']</code>' +
+            '<br>当前物品 ' + item.name + '：重量 = ' + item.w + '，价值 = ' + item.v + '；当前容量 j = ' + s.j + '。' +
+            '<br><b>状态转移</b>：<code>dp[i][j] = max(dp[i-1][j], dp[i-1][j-w_i] + v_i)</code>。' +
+            '<br>不取：' + skipValue + (takeValue === null
+                ? '；取：容量不足，所以沿用上一行结果。'
+                : '；取：' + takeValue + '，因此本格写入 ' + s.val + '。') +
+            '<br>DP 的关键是把重复子问题保存到表格里，避免指数级递归反复计算同一组 <code>(i, j)</code>。' +
+            sourceNote;
+        return;
+    }
+
+    el.innerHTML =
+        '<b>0/1 背包问题 · 动态规划</b>' +
+        '<br>' + n + ' 件物品，背包容量 W = ' + W + '。每件物品只能选择一次，目标是在不超过容量的前提下让总价值最大。' +
+        '<br><b>状态定义</b>：<code>dp[i][j]</code> 表示只看前 i 件物品、容量为 j 时能得到的最大价值。' +
+        '<br><b>转移方程</b>：若第 i 件物品放得下，就比较“不取它”和“取它”两种方案；若放不下，就沿用上一行结果。' +
+        '<br>点击“播放”或“单步”，观察表格如何逐格填充，以及最终如何从右下角回溯选中物品。' +
+        sourceNote;
+};
+
 function initDPVis() {
     DPVis.init();
 }

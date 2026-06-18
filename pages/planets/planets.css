@@ -1,351 +1,652 @@
-/* ===== Planets View — 沉浸式 3D 镂空星系导航大屏（v4.2.0-α4） ===== */
-
-/* v4.2.3 修复：仅在 active 时使用 relative 定位，否则继承 .page 的 absolute，
-   避免未激活时仍占据正常文档流，导致其他学科页面顶部出现大块空白。 */
-#page-planets.active {
-    position: relative;
-}
+/* ===== 星序顶层星系入口 · v6.2a ===== */
 
 #page-planets {
-    background: radial-gradient(ellipse at center, #001a1a 0%, #000508 70%, #000 100%);
-    overflow: hidden;
+    padding-top: 0 !important;
     min-height: 100vh;
+    overflow: hidden;
+    background: #05080d;
+    color: #edf6ff;
+    font-family: "Noto Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", Inter, system-ui, sans-serif;
+    letter-spacing: 0;
 }
 
-#page-planets .planets-canvas {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100vw;
+body.planets-scroll-locked {
+    overflow: hidden;
     height: 100vh;
+}
+
+body.planets-scroll-locked .site-footer {
+    display: none;
+}
+
+body.planets-scroll-locked .navbar {
+    display: none;
+}
+
+#page-planets.active {
+    display: block;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100vh;
+}
+
+#page-planets .planets-starfield {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    background:
+        radial-gradient(circle at 24% 24%, rgba(72, 132, 214, 0.18), transparent 34%),
+        radial-gradient(circle at 76% 42%, rgba(83, 220, 174, 0.12), transparent 32%),
+        linear-gradient(145deg, #05080d 0%, #09111d 50%, #06090f 100%);
+}
+
+#page-planets .planets-atlas {
+    position: relative;
     z-index: 1;
-    cursor: grab;
+    min-height: 100vh;
+    padding: 24px 32px 30px;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 18px;
+    background:
+        linear-gradient(rgba(120, 184, 255, 0.026) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(120, 184, 255, 0.026) 1px, transparent 1px);
+    background-size: 54px 54px;
 }
 
-#page-planets .planets-canvas:active {
-    cursor: grabbing;
-}
-
-/* HUD 角标（左上 / 右上 / 左下 / 右下） */
-#page-planets .planets-hud {
-    position: fixed;
-    z-index: 5;
+#page-planets .planets-atlas::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
     pointer-events: none;
-    color: #3aa9ff;
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    font-size: 0.72rem;
-    letter-spacing: 0.12em;
-    text-shadow: 0 0 8px rgba(58,169,255,0.5);
-    line-height: 1.6;
-    opacity: 0.7;
+    background:
+        radial-gradient(circle at calc(52% + var(--mouse-x, 0px)) calc(47% + var(--mouse-y, 0px)), rgba(130, 174, 226, 0.15), transparent 30%),
+        linear-gradient(90deg, rgba(255,255,255,0.038), transparent 20%, transparent 80%, rgba(255,255,255,0.032));
 }
 
-#page-planets .planets-hud--tl { top: 80px; left: 24px; }
-#page-planets .planets-hud--tr { top: 80px; right: 24px; text-align: right; }
-#page-planets .planets-hud--bl { bottom: 24px; left: 24px; }
-#page-planets .planets-hud--br { bottom: 24px; right: 24px; text-align: right; }
-
-#page-planets .planets-hud .blink {
-    animation: planetsBlink 1.4s ease-in-out infinite;
-}
-
-@keyframes planetsBlink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.25; }
-}
-
-/* v5.0：chrome 错峰入场动画（HUD / 标题 / 返回键） */
-@keyframes planetsChromeIn {
-    from { opacity: 0; transform: translateY(-6px); }
-    to   { opacity: var(--planets-chrome-opacity, 1); transform: translateY(0); }
-}
-#page-planets.planets-entering .planets-title { animation: planetsChromeIn 0.7s ease-out 0.10s both; }
-#page-planets.planets-entering .planets-hud--tl { animation: planetsChromeIn 0.7s ease-out 0.25s both; --planets-chrome-opacity: 0.7; }
-#page-planets.planets-entering .planets-hud--tr { animation: planetsChromeIn 0.7s ease-out 0.30s both; --planets-chrome-opacity: 0.7; }
-#page-planets.planets-entering .planets-hud--bl { animation: planetsChromeIn 0.7s ease-out 0.40s both; --planets-chrome-opacity: 0.7; }
-#page-planets.planets-entering .planets-hud--br { animation: planetsChromeIn 0.7s ease-out 0.45s both; --planets-chrome-opacity: 0.7; }
-#page-planets.planets-entering .planets-back { animation: planetsChromeIn 0.7s ease-out 0.55s both; }
-
-/* v5.0：减动偏好——跳过 chrome 入场动画与闪烁黄点 */
-@media (prefers-reduced-motion: reduce) {
-    #page-planets.planets-entering .planets-title,
-    #page-planets.planets-entering .planets-hud--tl,
-    #page-planets.planets-entering .planets-hud--tr,
-    #page-planets.planets-entering .planets-hud--bl,
-    #page-planets.planets-entering .planets-hud--br,
-    #page-planets.planets-entering .planets-back {
-        animation: none !important;
-        opacity: var(--planets-chrome-opacity, 1);
-        transform: none;
-    }
-    #page-planets .planets-hud .blink { animation: none; }
-    .planets-entry::before { animation: none; }
-}
-
-/* 标题 + 提示 */
-#page-planets .planets-title {
-    position: fixed;
-    top: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 5;
-    text-align: center;
-    color: #d4ecff;
-    font-family: var(--font-display);
-    font-size: 1.6rem;
-    letter-spacing: 0.4em;
-    text-shadow: 0 0 12px rgba(58,169,255,0.6);
+#page-planets .planets-atlas::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
     pointer-events: none;
+    background: repeating-linear-gradient(0deg, transparent, transparent 4px, rgba(255,255,255,0.014) 5px);
+    opacity: 0.38;
 }
 
-#page-planets .planets-subtitle {
-    margin-top: 6px;
-    font-size: 0.7rem;
-    letter-spacing: 0.3em;
-    color: #3aa9ff;
-    opacity: 0.6;
+#page-planets .planets-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 48px;
 }
 
-/* v4.4-α7：subject 模式下的面包屑导航 */
-#page-planets .planets-crumb-row {
+#page-planets .planets-mark {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
+    color: #edf6ff;
+    text-decoration: none;
+}
+
+#page-planets .planets-mark__symbol {
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background:
+        linear-gradient(135deg, rgba(120, 184, 255, 0.18), rgba(103, 242, 172, 0.10)),
+        rgba(7, 14, 24, 0.84);
+    border: 1px solid rgba(160, 196, 240, 0.22);
+    box-shadow: inset 0 0 18px rgba(120, 184, 255, 0.12), 0 0 26px rgba(120, 184, 255, 0.10);
+    font-weight: 800;
+}
+
+#page-planets .planets-mark__text {
+    display: grid;
+    gap: 2px;
+}
+
+#page-planets .planets-mark__text strong {
+    font-size: 1.02rem;
+    font-weight: 760;
+}
+
+#page-planets .planets-mark__text span {
+    font-size: 0.78rem;
+    color: #aab8ca;
+}
+
+#page-planets .planets-hero {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(250px, 0.54fr) minmax(660px, 1.46fr);
+    gap: 22px;
+    align-items: center;
+}
+
+#page-planets .planets-intro {
+    align-self: center;
+    max-width: 390px;
+}
+
+#page-planets .planets-intro h1 {
+    margin: 0;
+    font-size: clamp(4.2rem, 8vw, 7.4rem);
+    line-height: 1;
+    font-weight: 780;
+    letter-spacing: 0;
+    text-shadow: 0 0 36px rgba(120, 184, 255, 0.38);
+}
+
+#page-planets .planets-intro p {
+    margin: 24px 0 0;
+    max-width: 28rem;
+    color: #aab8ca;
+    font-size: 1.02rem;
+    line-height: 1.9;
+}
+
+#page-planets .planets-stage {
+    position: relative;
+    min-height: 640px;
+    height: calc(100vh - 120px);
+    max-height: 800px;
+    border-radius: 8px;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+#page-planets .planets-stage-halo {
+    position: absolute;
+    inset: 50%;
+    translate: -50% -50%;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+#page-planets .planets-stage-halo--outer {
+    width: min(76vw, 790px);
+    height: min(76vw, 790px);
+    border: 1px solid rgba(154, 186, 220, 0.12);
+    box-shadow: 0 0 100px rgba(120, 184, 255, 0.07), inset 0 0 100px rgba(103, 242, 172, 0.035);
+    animation: planetsSlowSpin 56s linear infinite;
+}
+
+#page-planets .planets-stage-halo--inner {
+    width: min(47vw, 500px);
+    height: min(47vw, 500px);
+    border: 1px dashed rgba(154, 186, 220, 0.18);
+    box-shadow: inset 0 0 60px rgba(120, 184, 255, 0.08);
+    animation: planetsSlowSpin 42s linear reverse infinite;
+}
+
+#page-planets .planets-stage-crosshair {
+    position: absolute;
+    inset: 18px;
+    opacity: 0.26;
+    pointer-events: none;
+    background:
+        linear-gradient(90deg, transparent 0 49.9%, rgba(160, 196, 240, 0.16) 49.9% 50.1%, transparent 50.1%),
+        linear-gradient(0deg, transparent 0 49.9%, rgba(160, 196, 240, 0.16) 49.9% 50.1%, transparent 50.1%);
+}
+
+#page-planets .planets-lines {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0.76;
+}
+
+#page-planets .planets-line {
+    fill: none;
+    stroke: rgba(154, 186, 220, 0.15);
+    stroke-width: 1.15;
+}
+
+#page-planets .planets-line--orbit {
+    stroke-dasharray: 5 9;
+}
+
+#page-planets .planets-line--tilt {
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: rotate(-13deg);
+    stroke: rgba(103, 242, 172, 0.13);
+}
+
+#page-planets .planets-line--axis {
+    stroke: rgba(154, 186, 220, 0.11);
+}
+
+#page-planets .planets-beacon {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    translate: -50% -50%;
+    width: 92px;
+    height: 92px;
+    display: grid;
+    place-items: center;
+    color: rgba(237, 246, 255, 0.64);
+    pointer-events: none;
+}
+
+#page-planets .planets-beacon span {
+    position: absolute;
+    inset: 16px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(237, 246, 255, 0.70), rgba(120, 184, 255, 0.20) 38%, transparent 70%);
+    box-shadow: 0 0 46px rgba(120, 184, 255, 0.28);
+}
+
+#page-planets .planets-beacon strong {
+    position: relative;
+    font-size: 0.66rem;
+    font-weight: 720;
+    color: rgba(237, 246, 255, 0.72);
+}
+
+#page-planets .planets-galaxy {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 240px;
+    height: 240px;
+    border: 0;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    cursor: pointer;
+    filter: saturate(1);
+    will-change: transform;
+}
+
+#page-planets .planets-galaxy:focus-visible {
+    outline: 2px solid rgba(101, 228, 240, 0.82);
+    outline-offset: 5px;
+}
+
+#page-planets .planets-galaxy-glow {
+    position: absolute;
+    inset: 18px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(120, 184, 255, 0.18), transparent 70%);
+    filter: blur(7px);
+    pointer-events: none;
+}
+
+#page-planets .planets-galaxy-glow--green {
+    background: radial-gradient(circle, rgba(103, 242, 172, 0.18), transparent 70%);
+}
+
+#page-planets .planets-galaxy-glow--amber {
+    background: radial-gradient(circle, rgba(242, 200, 107, 0.18), transparent 70%);
+}
+
+#page-planets .planets-galaxy-orbit {
+    position: absolute;
+    inset: 16px;
+    border-radius: 50%;
+    border: 1px solid rgba(154, 186, 220, 0.18);
+    transform: rotateX(66deg) rotateZ(-18deg);
+    pointer-events: none;
+}
+
+#page-planets .planets-galaxy-orbit--two {
+    inset: -26px;
+    border-color: rgba(242, 200, 107, 0.11);
+    transform: rotateX(68deg) rotateZ(22deg);
+}
+
+#page-planets .planets-galaxy-disc {
+    position: relative;
+    width: 166px;
+    height: 166px;
+    border-radius: 50%;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 52% 50%, rgba(237, 246, 255, 0.98) 0 4%, rgba(120, 184, 255, 0.78) 8%, transparent 12%),
+        conic-gradient(from 25deg, transparent 0 11%, rgba(120, 184, 255, 0.72) 18%, transparent 25%, rgba(237, 246, 255, 0.66) 36%, transparent 48%, rgba(101, 228, 240, 0.38) 60%, transparent 76%, rgba(120, 184, 255, 0.62) 88%, transparent 100%),
+        radial-gradient(circle, rgba(120, 184, 255, 0.15), transparent 68%);
+    box-shadow: 0 0 50px rgba(120, 184, 255, 0.33), inset 0 0 26px rgba(255, 255, 255, 0.08);
+    animation: planetsDiscSpin 26s linear infinite;
+}
+
+#page-planets .planets-galaxy-disc--code {
+    background:
+        radial-gradient(circle at 52% 50%, rgba(237, 246, 255, 0.98) 0 4%, rgba(103, 242, 172, 0.76) 9%, transparent 13%),
+        conic-gradient(from -70deg, transparent 0 11%, rgba(103, 242, 172, 0.70) 17%, transparent 26%, rgba(101, 228, 240, 0.52) 38%, transparent 52%, rgba(242, 200, 107, 0.42) 65%, transparent 78%, rgba(103, 242, 172, 0.62) 90%, transparent 100%),
+        radial-gradient(circle, rgba(103, 242, 172, 0.14), transparent 68%);
+    box-shadow: 0 0 52px rgba(103, 242, 172, 0.30), inset 0 0 26px rgba(255, 255, 255, 0.08);
+}
+
+#page-planets .planets-galaxy-disc--roadmap {
+    background:
+        radial-gradient(circle at 52% 50%, rgba(255, 250, 230, 0.95) 0 4%, rgba(242, 200, 107, 0.72) 9%, transparent 13%),
+        conic-gradient(from 135deg, transparent 0 12%, rgba(242, 200, 107, 0.66) 18%, transparent 28%, rgba(255, 159, 110, 0.46) 42%, transparent 56%, rgba(184, 241, 255, 0.36) 70%, transparent 82%, rgba(242, 200, 107, 0.58) 92%, transparent 100%),
+        radial-gradient(circle, rgba(242, 200, 107, 0.14), transparent 68%);
+    box-shadow: 0 0 52px rgba(242, 200, 107, 0.26), inset 0 0 26px rgba(255, 255, 255, 0.08);
+}
+
+#page-planets .planets-galaxy-core {
+    position: absolute;
+    inset: 50%;
+    width: 34px;
+    height: 34px;
+    translate: -50% -50%;
+    border-radius: 50%;
+    background: #f8fbff;
+    box-shadow: 0 0 24px currentColor, 0 0 54px currentColor;
+    color: rgba(120, 184, 255, 0.72);
+}
+
+#page-planets .planets-galaxy-disc--code .planets-galaxy-core {
+    color: rgba(103, 242, 172, 0.66);
+}
+
+#page-planets .planets-galaxy-disc--roadmap .planets-galaxy-core {
+    color: rgba(242, 200, 107, 0.66);
+}
+
+#page-planets .planets-cluster-dot {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--s);
+    height: var(--s);
+    translate: -50% -50%;
+    transform: rotate(var(--a)) translateX(var(--r));
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: 0 0 10px var(--c);
+    opacity: var(--o);
+}
+
+#page-planets .planets-galaxy-label {
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 12px);
+    translate: -50% 0;
+    display: grid;
+    gap: 5px;
+    width: 180px;
+    text-align: center;
+    color: #edf6ff;
+}
+
+#page-planets .planets-galaxy-label strong {
     font-size: 1.05rem;
-    letter-spacing: 0.18em;
+    font-weight: 760;
+}
+
+#page-planets .planets-galaxy-label span {
+    color: #aab8ca;
+    font-size: 0.78rem;
+}
+
+#page-planets .planets-galaxy::after {
+    content: "";
+    position: absolute;
+    inset: 42px;
+    border-radius: 50%;
+    border: 1px solid rgba(237, 246, 255, 0);
+    transition: inset 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+#page-planets .planets-galaxy:hover::after,
+#page-planets .planets-galaxy.is-selected::after {
+    inset: 22px;
+    border-color: rgba(237, 246, 255, 0.27);
+    box-shadow: 0 0 56px rgba(120, 184, 255, 0.18);
+}
+
+#page-planets .planets-galaxy--code:hover::after,
+#page-planets .planets-galaxy--code.is-selected::after {
+    box-shadow: 0 0 56px rgba(103, 242, 172, 0.18);
+}
+
+#page-planets .planets-galaxy--roadmap:hover::after,
+#page-planets .planets-galaxy--roadmap.is-selected::after {
+    box-shadow: 0 0 56px rgba(242, 200, 107, 0.18);
+}
+
+#page-planets .planets-stage.has-open-menu .planets-galaxy:not(.is-selected) {
+    opacity: 0.56;
+}
+
+#page-planets .planets-stage.has-open-menu .planets-galaxy-label {
+    opacity: 0;
+    transform: translateY(4px);
+}
+
+#page-planets .planets-menu {
+    position: absolute;
+    z-index: 40;
+    right: 28px;
+    bottom: 30px;
+    width: min(360px, calc(100% - 56px));
+    padding: 20px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, rgba(10, 22, 36, 0.72), rgba(6, 12, 21, 0.56));
+    border: 1px solid rgba(151, 182, 215, 0.16);
+    box-shadow: 0 20px 70px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    opacity: 0;
+    transform: translateY(12px);
+    pointer-events: none;
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+
+#page-planets .planets-menu.is-open {
+    opacity: 1;
+    transform: translateY(0);
     pointer-events: auto;
 }
 
-#page-planets .planets-crumb {
-    color: rgba(212, 232, 255, 0.85);
-    background: transparent;
-    border: 0;
-    padding: 4px 6px;
-    font-family: var(--font-display);
-    font-size: inherit;
-    letter-spacing: inherit;
-    text-shadow: 0 0 8px rgba(58,169,255,0.4);
-    cursor: default;
-    transition: color var(--duration-fast, 150ms) ease, text-shadow var(--duration-fast, 150ms) ease;
-}
-
-#page-planets .planets-crumb--root {
-    cursor: pointer;
-    color: rgba(58, 169, 255, 0.95);
-}
-
-#page-planets .planets-crumb--root:hover,
-#page-planets .planets-crumb--root:focus-visible {
-    color: #3aa9ff;
-    text-shadow: 0 0 12px rgba(58,169,255,0.75);
-    outline: none;
-}
-
-#page-planets .planets-crumb--galaxy {
-    cursor: pointer;
-    color: rgba(190, 220, 255, 0.95);
-    background: transparent;
-    border: 0;
-    font: inherit;
-    padding: 4px 6px;
-}
-
-#page-planets .planets-crumb--galaxy:hover,
-#page-planets .planets-crumb--galaxy:focus-visible {
-    color: #ffffff;
-    text-shadow: 0 0 12px rgba(255,255,255,0.6);
-    outline: none;
-}
-
-#page-planets .planets-crumb--subject {
-    font-weight: 600;
-    color: #d4ecff;
-    text-shadow: 0 0 12px rgba(58,169,255,0.6);
-}
-
-#page-planets .planets-crumb--exp {
-    color: rgba(58, 169, 255, 0.85);
-    font-size: 0.92em;
-    letter-spacing: 0.14em;
-}
-
-#page-planets .planets-crumb-sep {
-    color: rgba(58, 169, 255, 0.55);
-    font-size: 1.1em;
-    line-height: 1;
-}
-
-#page-planets .planets-crumb-sep--exp {
-    opacity: 0;
-    transition: opacity var(--duration-normal, 220ms) ease;
-}
-
-@media (max-width: 640px) {
-    #page-planets .planets-crumb-row {
-        font-size: 0.85rem;
-        gap: 6px;
-    }
-    #page-planets .planets-crumb { padding: 3px 4px; }
-}
-
-/* 返回按钮 */
-#page-planets .planets-back {
-    position: fixed;
-    top: 24px;
-    left: 24px;
-    z-index: 10;
-    padding: 8px 16px;
-    background: rgba(0,18,40,0.6);
-    border: 1px solid rgba(58,169,255,0.4);
-    border-radius: 6px;
-    color: #3aa9ff;
-    font-family: var(--font-mono, monospace);
-    font-size: 0.8rem;
-    letter-spacing: 0.15em;
-    cursor: pointer;
-    text-decoration: none;
-    transition: all 0.2s ease;
-    box-shadow: 0 0 12px rgba(58,169,255,0.2);
-}
-
-#page-planets .planets-back:hover {
-    background: rgba(0,40,90,0.7);
-    box-shadow: 0 0 24px rgba(58,169,255,0.5);
-    transform: translateY(-1px);
-}
-
-/* 学科信息卡（hover 时显示在右下） */
-#page-planets .planets-info {
-    position: fixed;
-    right: 24px;
-    bottom: 80px;
-    z-index: 5;
-    min-width: 240px;
-    padding: 16px 20px;
-    background: rgba(0,18,40,0.85);
-    border: 1px solid rgba(58,169,255,0.4);
-    border-left: 3px solid #3aa9ff;
-    border-radius: 8px;
-    color: #d4ecff;
-    font-family: var(--font-mono, monospace);
-    box-shadow: 0 0 24px rgba(58,169,255,0.25);
-    opacity: 0;
-    transform: translateX(20px);
-    pointer-events: none;
-    transition: opacity 0.25s ease, transform 0.25s ease;
-}
-
-#page-planets .planets-info--visible {
-    opacity: 1;
-    transform: translateX(0);
-}
-
-#page-planets .planets-info__label {
-    font-size: 0.65rem;
-    letter-spacing: 0.3em;
-    color: #3aa9ff;
-    margin-bottom: 4px;
-    opacity: 0.7;
-}
-
-#page-planets .planets-info__name {
-    font-size: 1.4rem;
-    font-weight: 700;
-    margin-bottom: 8px;
-    text-shadow: 0 0 8px rgba(58,169,255,0.4);
-}
-
-#page-planets .planets-info__desc {
-    font-size: 0.78rem;
-    line-height: 1.5;
-    color: #a8c5e8;
-    margin-bottom: 8px;
-}
-
-#page-planets .planets-info__hint {
-    font-size: 0.65rem;
-    letter-spacing: 0.2em;
-    color: #3aa9ff;
-    opacity: 0.6;
-}
-
-/* 首页入口按钮 */
-.planets-entry {
+#page-planets .planets-menu__close {
     position: absolute;
-    z-index: 12;
-    bottom: 80px;
-    right: 32px;
-    padding: 10px 18px;
-    background: rgba(0,18,40,0.7);
-    border: 1px solid rgba(58,169,255,0.4);
+    top: 10px;
+    right: 10px;
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(151, 182, 215, 0.14);
     border-radius: 6px;
-    color: #3aa9ff;
-    font-family: var(--font-mono, monospace);
-    font-size: 0.78rem;
-    letter-spacing: 0.18em;
+    background: rgba(9, 18, 30, 0.62);
     cursor: pointer;
-    text-decoration: none;
-    transition: all 0.25s ease;
-    box-shadow: 0 0 12px rgba(58,169,255,0.2);
-    display: inline-flex;
-    align-items: center;
+    color: #aab8ca;
+    font-size: 1.1rem;
+}
+
+#page-planets .planets-menu__close:hover,
+#page-planets .planets-menu__close:focus-visible {
+    color: #edf6ff;
+    outline: none;
+}
+
+#page-planets .planets-menu__state {
+    display: block;
+    color: #65e4f0;
+    font-size: 0.76rem;
+    font-weight: 720;
+}
+
+#page-planets .planets-menu h2 {
+    margin: 10px 0 0;
+    font-size: 1.65rem;
+    line-height: 1.2;
+    font-weight: 780;
+}
+
+#page-planets .planets-menu p {
+    margin: 12px 0 18px;
+    color: #aab8ca;
+    line-height: 1.72;
+    font-size: 0.92rem;
+}
+
+#page-planets .planets-module-menu {
+    display: flex;
+    flex-wrap: wrap;
     gap: 8px;
 }
 
-.planets-entry:hover {
-    background: rgba(0,40,90,0.75);
-    box-shadow: 0 0 24px rgba(58,169,255,0.5);
-    transform: translateY(-2px);
-    border-color: #3aa9ff;
+#page-planets .planets-module-link {
+    min-height: 34px;
+    padding: 8px 11px;
+    border-radius: 7px;
+    border: 1px solid rgba(151, 182, 215, 0.16);
+    background: rgba(120, 184, 255, 0.08);
+    color: #e6f2ff;
+    text-decoration: none;
+    font-size: 0.86rem;
 }
 
-.planets-entry::before {
-    content: '◉';
-    font-size: 1rem;
-    animation: planetsBlink 1.4s ease-in-out infinite;
+#page-planets .planets-module-link--planned {
+    flex: 1 1 150px;
+    min-height: 58px;
+    display: grid;
+    align-content: center;
+    gap: 5px;
+    background: rgba(242, 200, 107, 0.075);
+    border-color: rgba(242, 200, 107, 0.16);
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-    #page-planets .planets-title {
-        font-size: 1.1rem;
-        letter-spacing: 0.3em;
+#page-planets .planets-module-link__meta {
+    display: block;
+    color: #f2c86b;
+    font-size: 0.72rem;
+    line-height: 1.2;
+}
+
+#page-planets .planets-module-link:hover,
+#page-planets .planets-module-link:focus-visible {
+    border-color: rgba(101, 228, 240, 0.38);
+    background: rgba(101, 228, 240, 0.11);
+    outline: none;
+}
+
+#page-planets .planets-module-link--planned:hover,
+#page-planets .planets-module-link--planned:focus-visible {
+    border-color: rgba(242, 200, 107, 0.36);
+    background: rgba(242, 200, 107, 0.12);
+}
+
+@keyframes planetsSlowSpin {
+    to { rotate: 360deg; }
+}
+
+@keyframes planetsDiscSpin {
+    to { rotate: 360deg; }
+}
+
+@media (max-width: 1040px) {
+    #page-planets {
+        overflow-y: auto;
     }
-    #page-planets .planets-subtitle {
-        font-size: 0.62rem;
-        letter-spacing: 0.22em;
+
+    #page-planets .planets-atlas {
+        padding: 20px 18px 24px;
     }
-    #page-planets .planets-hud {
-        font-size: 0.62rem;
-        letter-spacing: 0.08em;
-        line-height: 1.5;
-        opacity: 0.6;
+
+    #page-planets .planets-hero {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        align-items: stretch;
     }
-    #page-planets .planets-hud--tl { top: 68px; left: 12px; }
-    #page-planets .planets-hud--tr { top: 68px; right: 12px; }
-    #page-planets .planets-hud--bl { bottom: 14px; left: 12px; }
-    #page-planets .planets-hud--br { bottom: 14px; right: 12px; }
-    #page-planets .planets-info {
-        right: 12px;
-        left: 12px;
-        bottom: 12px;
-        min-width: 0;
-        padding: 12px 14px;
-        transform: translateY(20px);
+
+    #page-planets .planets-intro {
+        max-width: 640px;
     }
-    #page-planets .planets-info--visible {
-        transform: translateY(0);
+
+    #page-planets .planets-stage {
+        min-height: 590px;
+        height: 66vh;
     }
-    #page-planets .planets-info__name { font-size: 1.15rem; }
-    #page-planets .planets-info__desc { font-size: 0.72rem; }
-    #page-planets .planets-back {
-        top: 12px;
-        left: 12px;
-        font-size: 0.68rem;
-        padding: 6px 12px;
+}
+
+@media (max-width: 720px) {
+    #page-planets .planets-intro h1 {
+        font-size: 3.6rem;
     }
-    .planets-entry {
-        bottom: 60px;
-        right: 16px;
+
+    #page-planets .planets-intro p {
+        margin-top: 16px;
+        font-size: 0.95rem;
+        line-height: 1.78;
+    }
+
+    #page-planets .planets-stage {
+        min-height: 560px;
+        height: 560px;
+    }
+
+    #page-planets .planets-stage-halo--outer {
+        width: 460px;
+        height: 460px;
+    }
+
+    #page-planets .planets-stage-halo--inner {
+        width: 305px;
+        height: 305px;
+    }
+
+    #page-planets .planets-galaxy {
+        width: 172px;
+        height: 172px;
+    }
+
+    #page-planets .planets-galaxy-disc {
+        width: 116px;
+        height: 116px;
+    }
+
+    #page-planets .planets-galaxy-label {
+        top: calc(100% + 8px);
+        width: 136px;
+    }
+
+    #page-planets .planets-galaxy-label strong {
+        font-size: 0.92rem;
+    }
+
+    #page-planets .planets-galaxy-label span {
         font-size: 0.7rem;
+    }
+
+    #page-planets .planets-beacon {
+        width: 70px;
+        height: 70px;
+    }
+
+    #page-planets .planets-menu {
+        left: 14px;
+        right: 14px;
+        bottom: 14px;
+        width: auto;
+        padding: 16px;
+    }
+
+    #page-planets .planets-menu h2 {
+        font-size: 1.35rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #page-planets *,
+    #page-planets *::before,
+    #page-planets *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
     }
 }

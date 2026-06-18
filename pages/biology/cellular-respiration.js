@@ -10,9 +10,9 @@ const CellularResp = {
     autoPlay: true,
     speed: 1,
     stages: [
-        { name: '\u7CD6\u916F\u89E3', loc: '\u7EC6\u80DE\u8D28\u57FA\u8D28', input: 'C\u2086H\u2081\u2082O\u2086', output: '2 \u4E19\u916E\u9178 + 2ATP + 2NADH', color: 'rgba(100,200,100,0.8)' },
+        { name: '\u7CD6\u9175\u89E3', loc: '\u7EC6\u80DE\u8D28\u57FA\u8D28', input: 'C\u2086H\u2081\u2082O\u2086', output: '2 \u4E19\u916E\u9178 + 2ATP + 2NADH', color: 'rgba(100,200,100,0.8)' },
         { name: '\u67E0\u6AAC\u9178\u5FAA\u73AF', loc: '\u7EBF\u7C92\u4F53\u57FA\u8D28', input: '2 \u4E19\u916E\u9178', output: '6CO\u2082 + 2ATP + 8NADH + 2FADH\u2082', color: 'rgba(255,180,50,0.8)' },
-        { name: '\u7535\u5B50\u4F20\u9012\u94FE', loc: '\u7EBF\u7C92\u4F53\u5185\u819C', input: '10NADH + 2FADH\u2082 + O\u2082', output: '34ATP + H\u2082O', color: 'rgba(100,150,255,0.8)' }
+        { name: '\u7535\u5B50\u4F20\u9012\u94FE', loc: '\u7EBF\u7C92\u4F53\u5185\u819C', input: '10NADH + 2FADH\u2082 + O\u2082', output: 'ATP（氧化磷酸化，产量会变动） + H\u2082O', color: 'rgba(100,150,255,0.8)' }
     ],
     particles: [],
 
@@ -370,7 +370,7 @@ const CellularResp = {
         ctx.font = 'bold ' + (fs + 5) + 'px ' + CF.mono;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(255,200,50,0.8)';
-        ctx.fillText('34 ATP', complexes[4].x, H * 0.75);
+        ctx.fillText('ATP 产出', complexes[4].x, H * 0.75);
 
         // O2 + H+ -> H2O
         ctx.font = fs + 'px ' + CF.mono;
@@ -400,7 +400,7 @@ const CellularResp = {
         const el = document.getElementById('cellresp-info');
         if (!el) return;
         el.innerHTML = `
-            <div class="cellresp-info__hd">📘 细胞呼吸知识点</div>
+            <div class="cellresp-info__hd">细胞呼吸知识点</div>
             <div class="cellresp-info__grid">
                 <div class="cellresp-info__block">
                     <div class="cellresp-info__sub">当前阶段</div>
@@ -411,17 +411,18 @@ const CellularResp = {
                     <div class="cellresp-info__sub">三阶段总览</div>
                     <div class="cellresp-info__row"><span class="cellresp-info__key" style="--c:#64c864">糖酵解</span> C₆H₁₂O₆ → 2丙酮酸 + 2ATP + 2NADH</div>
                     <div class="cellresp-info__row"><span class="cellresp-info__key" style="--c:#ffb432">柠檬酸循环</span> 2丙酮酸 → 6CO₂ + 2ATP + 8NADH + 2FADH₂</div>
-                    <div class="cellresp-info__row"><span class="cellresp-info__key" style="--c:#6496ff">电子传递链</span> NADH/FADH₂ + O₂ → 34ATP + H₂O</div>
+                    <div class="cellresp-info__row"><span class="cellresp-info__key" style="--c:#6496ff">电子传递链</span> NADH/FADH₂ + O₂ → ATP + H₂O（氧化磷酸化，产量会变动）</div>
                 </div>
                 <div class="cellresp-info__block">
                     <div class="cellresp-info__sub">能量产出</div>
-                    <div id="cellresp-atp-info" class="cellresp-info__val">总计约38个ATP / 1分子葡萄糖</div>
+                    <div id="cellresp-atp-info" class="cellresp-info__val">教材估算可用 34/38 ATP；真实产量随系统变化</div>
                 </div>
                 <div class="cellresp-info__block">
-                    <div class="cellresp-info__sub">💡 知识要点</div>
-                    <div class="cellresp-info__note">有氧呼吸总反应式：C₆H₁₂O₆ + 6O₂ + 6H₂O → 6CO₂ + 12H₂O + 能量(38ATP)。糖酵解不需要O₂，在无氧条件下可转为发酵。</div>
+                    <div class="cellresp-info__sub">知识要点</div>
+                    <div class="cellresp-info__note">有氧呼吸总反应式常写作：C₆H₁₂O₆ + 6O₂ → 6CO₂ + 6H₂O + 能量。34/38 ATP 是便于计算的教材近似；实际 ATP 产量会受物种、电子穿梭系统、质子泵效率和中间产物用途影响。O₂ 是电子传递链末端电子受体，最终与 H⁺ 结合生成水；糖酵解不需要 O₂，无氧条件下常通过发酵再生 NAD⁺。</div>
                 </div>
             </div>
+            <div class="cellresp-info__source">参考 OpenStax Biology 2e 7.4 Oxidative Phosphorylation 与 7.5 Metabolism without Oxygen；本页数值用于学习模型，不用于真实细胞能量收支计算。</div>
         `;
     },
 

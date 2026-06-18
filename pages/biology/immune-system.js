@@ -79,15 +79,25 @@ const ImmuneSystem = {
                 r: 13, type: 'neutrophil', target: null, engulfing: false
             });
         } else {
-            for (let i = 0; i < 2; i++) {
+            const adaptiveCells = [
+                { x: 0.09, y: 0.28, type: 'bcell' },
+                { x: 0.14, y: 0.72, type: 'bcell' },
+                { x: 0.08, y: 0.48, type: 'thelper' },
+                { x: 0.17, y: 0.58, type: 'tkiller' }
+            ];
+            adaptiveCells.forEach(cell => {
                 this.immuneCells.push({
-                    x: rnd(0.05, 0.15), y: rnd(0.3, 0.7),
-                    vx: 0.0003, vy: (Math.random() - 0.5) * 0.0002,
-                    r: 13, type: 'bcell', prodTimer: 0, abProduced: 0
+                    x: cell.x, y: cell.y,
+                    vx: cell.type === 'tkiller' ? 0.0006 : cell.type === 'thelper' ? 0.0004 : 0.0003,
+                    vy: cell.type === 'bcell' ? (Math.random() - 0.5) * 0.00012 : 0,
+                    r: cell.type === 'tkiller' ? 14 : cell.type === 'thelper' ? 12 : 13,
+                    type: cell.type,
+                    target: null,
+                    attacking: false,
+                    prodTimer: 0,
+                    abProduced: 0
                 });
-            }
-            this.immuneCells.push({ x: 0.06, y: 0.4, vx: 0.0004, vy: 0, r: 12, type: 'thelper' });
-            this.immuneCells.push({ x: 0.08, y: 0.6, vx: 0.0006, vy: 0, r: 14, type: 'tkiller', target: null, attacking: false });
+            });
         }
         this.updateInfo();
     },
@@ -100,8 +110,12 @@ const ImmuneSystem = {
         document.querySelectorAll('.immune-mode-btn').forEach(btn => {
             if (!btn.dataset.mode) return;
             this._on(btn, 'click', () => {
-                document.querySelectorAll('.immune-mode-btn[data-mode]').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.immune-mode-btn[data-mode]').forEach(b => {
+                    b.classList.remove('active');
+                    b.setAttribute('aria-pressed', 'false');
+                });
                 btn.classList.add('active');
+                btn.setAttribute('aria-pressed', 'true');
                 this.mode = btn.dataset.mode;
                 this.time = 0; this.resetSimulation();
             });
@@ -145,52 +159,54 @@ const ImmuneSystem = {
         if (!el) return;
         if (this.mode === 'innate') {
             el.innerHTML = `
-                <div class="imm-info__hd">📘 非特异性免疫 — 第一/二道防线</div>
+                <div class="imm-info__hd">先天免疫 / 非特异性免疫</div>
                 <div class="imm-info__grid">
                     <div class="imm-info__block">
-                        <div class="imm-info__sub">巨噬细胞</div>
-                        <div class="imm-info__val">吞噬作用</div>
-                        <div class="imm-info__desc">伪足包裹 → 吞噬体 + 溶酶体 → 消化分解病原体</div>
+                        <div class="imm-info__sub">识别方式</div>
+                        <div class="imm-info__val">PRR 识别 PAMP</div>
+                        <div class="imm-info__desc">巨噬细胞、树突状细胞等用模式识别受体识别病原体常见分子模式，启动炎症和吞噬。</div>
                     </div>
                     <div class="imm-info__block">
-                        <div class="imm-info__sub">中性粒细胞</div>
-                        <div class="imm-info__val">快速趋化</div>
-                        <div class="imm-info__desc">血液中最多的白细胞，快速迁移至感染部位</div>
+                        <div class="imm-info__sub">快速应答</div>
+                        <div class="imm-info__val">屏障、炎症、吞噬、补体</div>
+                        <div class="imm-info__desc">皮肤和黏膜先阻挡；病原体进入后，中性粒细胞和巨噬细胞可迁移到感染部位并吞噬病原体。</div>
                     </div>
                     <div class="imm-info__block">
-                        <div class="imm-info__sub">关键过程</div>
-                        <div class="imm-info__row"><span class="imm-info__key" style="--c:#e5c07b">炎症信号</span> 受损细胞释放组胺等趋化因子，吸引更多免疫细胞</div>
-                        <div class="imm-info__row"><span class="imm-info__key" style="--c:var(--accent-teal,#3a9e8f)">物理屏障</span> 皮肤/黏膜构成第一道防线，阻止病原体入侵</div>
+                        <div class="imm-info__sub">桥接适应性免疫</div>
+                        <div class="imm-info__row"><span class="imm-info__key" style="--c:#e5c07b">树突状细胞</span>吞噬并呈递抗原，迁移到淋巴结激活 T 细胞。</div>
+                        <div class="imm-info__row"><span class="imm-info__key" style="--c:var(--accent-teal,#3a9e8f)">细胞因子</span>协调炎症、发热、白细胞募集和后续免疫协作。</div>
                     </div>
                     <div class="imm-info__block">
-                        <div class="imm-info__sub">💡 知识要点</div>
-                        <div class="imm-info__note">非特异性免疫不具有记忆性，对各种病原体均有效。包括第一道防线（皮肤/黏膜）和第二道防线（体液中杀菌物质及吞噬细胞）。</div>
+                        <div class="imm-info__sub">模型边界</div>
+                        <div class="imm-info__note">画布强调“快速识别与清除”这一主线；未完整呈现补体级联、干扰素、NK 细胞和不同组织微环境。</div>
                     </div>
-                </div>`;
+                </div>
+                <div class="imm-info__source">资料依据：OpenStax Biology 2e 42.1 Innate Immune Response。</div>`;
         } else {
             el.innerHTML = `
-                <div class="imm-info__hd">📘 特异性免疫 — 第三道防线</div>
+                <div class="imm-info__hd">适应性免疫 / 特异性免疫</div>
                 <div class="imm-info__grid">
                     <div class="imm-info__block">
                         <div class="imm-info__sub">体液免疫</div>
-                        <div class="imm-info__val" style="color:#b48eed">B 细胞 → 浆细胞</div>
-                        <div class="imm-info__desc">B细胞识别抗原 → 增殖分化为浆细胞 → 产生抗体</div>
+                        <div class="imm-info__val" style="color:#b48eed">B 细胞 → 浆细胞 → 抗体</div>
+                        <div class="imm-info__desc">B 细胞经抗原识别和辅助信号后克隆扩增，浆细胞分泌抗体，抗体可中和、标记或协助补体清除病原体。</div>
                     </div>
                     <div class="imm-info__block">
                         <div class="imm-info__sub">细胞免疫</div>
-                        <div class="imm-info__val" style="color:#4d9e7e">T 细胞 → 效应T细胞</div>
-                        <div class="imm-info__desc">效应T细胞接触靶细胞 → 释放穿孔素 → 诱导细胞凋亡</div>
+                        <div class="imm-info__val" style="color:#4d9e7e">CD8 T 细胞清除异常细胞</div>
+                        <div class="imm-info__desc">细胞毒性 T 细胞识别呈递异常抗原的靶细胞，可诱导病毒感染细胞或肿瘤细胞凋亡。</div>
                     </div>
                     <div class="imm-info__block">
-                        <div class="imm-info__sub">关键分子</div>
-                        <div class="imm-info__row"><span class="imm-info__key" style="--c:#4d9e7e">T 辅助 (Th)</span> 识别抗原呈递 → 分泌淋巴因子 → 激活 B/T 细胞</div>
-                        <div class="imm-info__row"><span class="imm-info__key" style="--c:#e5c07b">抗体 (Ig)</span> Y 形免疫球蛋白，与抗原特异性结合 → 标记 → 补体激活</div>
+                        <div class="imm-info__sub">协作节点</div>
+                        <div class="imm-info__row"><span class="imm-info__key" style="--c:#4d9e7e">CD4 辅助 T 细胞</span>识别 MHC II-抗原复合物，帮助 B 细胞和其他 T 细胞充分激活。</div>
+                        <div class="imm-info__row"><span class="imm-info__key" style="--c:#e5c07b">免疫记忆</span>部分 B/T 细胞成为记忆细胞，再次遇到同一抗原时反应更快更强。</div>
                     </div>
                     <div class="imm-info__block">
-                        <div class="imm-info__sub">💡 知识要点</div>
-                        <div class="imm-info__note">特异性免疫产生免疫记忆，二次应答更快更强（免疫接种原理）。体液免疫主要针对细胞外病原体，细胞免疫主要针对胞内寄生物。</div>
+                        <div class="imm-info__sub">模型边界</div>
+                        <div class="imm-info__note">图中把复杂激活网络压缩为 B 细胞、辅助 T 细胞、杀伤 T 细胞和抗体的协作关系；真实免疫应答还受抗原呈递、共刺激、细胞因子和免疫耐受调控。</div>
                     </div>
-                </div>`;
+                </div>
+                <div class="imm-info__source">资料依据：OpenStax Biology 2e 42.2 Adaptive Immune Response 与 42.3 Antibodies。</div>`;
         }
     },
 
@@ -466,14 +482,14 @@ const ImmuneSystem = {
                 ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + 2 * Math.cos(a - 0.5), ty + 2 * Math.sin(a - 0.5));
                 ctx.moveTo(tx, ty); ctx.lineTo(tx + 2 * Math.cos(a + 0.5), ty + 2 * Math.sin(a + 0.5)); ctx.stroke();
             }
-            this._lbl(ix, iy, ic.r, 'B细胞');
+            this._lbl(ix, iy, ic.r, 'B细胞', -10, 12);
         } else if (ic.type === 'thelper') {
             ctx.fillStyle = 'rgba(77,158,126,0.15)';
             ctx.beginPath(); ctx.arc(ix, iy, ic.r, 0, Math.PI * 2); ctx.fill();
             ctx.strokeStyle = 'rgba(77,158,126,0.3)'; ctx.lineWidth = 1.5; ctx.stroke();
             ctx.fillStyle = 'rgba(77,158,126,0.75)'; ctx.font = (Math.max(14, Math.min(22, this.W * 0.018)) - 3) + 'px ' + CF.mono;
             ctx.textAlign = 'center'; ctx.fillText('CD4', ix, iy + 2);
-            this._lbl(ix, iy, ic.r, 'Th');
+            this._lbl(ix, iy, ic.r, 'Th', -18, -18);
         } else if (ic.type === 'tkiller') {
             ctx.fillStyle = 'rgba(77,158,126,0.2)';
             ctx.beginPath(); ctx.arc(ix, iy, ic.r, 0, Math.PI * 2); ctx.fill();
@@ -486,14 +502,14 @@ const ImmuneSystem = {
                 ctx.beginPath(); ctx.arc(ix, iy, ic.r + 3, 0, Math.PI * 2); ctx.stroke();
                 ctx.restore();
             }
-            this._lbl(ix, iy, ic.r, 'Tc');
+            this._lbl(ix, iy, ic.r, 'Tc', 16, 12);
         }
         if (hover) ctx.restore();
     },
 
-    _lbl(x, y, r, t) {
+    _lbl(x, y, r, t, dx = 0, dy = 11) {
         this.ctx.fillStyle = 'rgba(255,255,255,0.7)'; this.ctx.font = Math.max(14, Math.min(22, this.W * 0.018)) + 'px ' + CF.sans;
-        this.ctx.textAlign = 'center'; this.ctx.fillText(t, x, y + r + 11);
+        this.ctx.textAlign = 'center'; this.ctx.fillText(t, x + dx, y + r + dy);
     },
 
     _drawAb(ax, ay, bound) {

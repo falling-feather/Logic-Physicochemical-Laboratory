@@ -124,6 +124,15 @@ int main(int argc, char* argv[]) {
         {"Access-Control-Allow-Headers", "Content-Type"}
     });
 
+    // Keep project notes out of the public website surface.
+    auto deny_project_notes = [](const httplib::Request&, httplib::Response& res) {
+        res.status = 404;
+        res.set_content(R"({"error":"404","message":"Not Found"})", "application/json");
+    };
+    svr.Get(R"(/(doc|muban|server)(/.*)?)", deny_project_notes);
+    svr.Get(R"(/(.*/)?README\.md)", deny_project_notes);
+    svr.Get(R"(/\.(git|github|vscode|agents|codex)(/.*)?)", deny_project_notes);
+
     // ─── API: Health check ───
     svr.Get("/api/health", [](const httplib::Request&, httplib::Response& res) {
         res.set_content(R"({"status":"ok","server":"englab-cpp"})", "application/json");

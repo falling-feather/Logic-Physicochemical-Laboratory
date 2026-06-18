@@ -256,11 +256,11 @@ const ChemEquilibrium = {
             const dir = this.equilibrium ? '平衡态' : (this.concNH3 < 0.5 ? '正向移动中' : '逆向移动中');
             eduEl.innerHTML = `<div class="chem-hd"><span class="chem-tag">${dir}</span>化学平衡知识点</div>
 <div class="chem-row"><span class="chem-key">平衡状态</span>正反应速率 = 逆反应速率，各组分浓度不再改变（动态平衡）</div>
-<div class="chem-row"><span class="chem-key chem-key--purple">平衡常数</span>K<sub>c</sub> = [NH₃]²/([N₂][H₂]³) = ${Kc} — 温度不变时 K 值恒定</div>
+<div class="chem-row"><span class="chem-key chem-key--purple">平衡常数</span>K<sub>c</sub> = [NH₃]²/([N₂][H₂]³) = ${Kc} — 只随温度改变；浓度、压强、催化剂不改变 K</div>
 <div class="chem-row"><span class="chem-key chem-key--amber">勒夏特列原理</span>改变条件 → 平衡向减弱该改变的方向移动（"削弱但不消除"）</div>
 <div class="chem-row"><span class="chem-key">浓度影响</span>增大反应物浓度 → 正移；减小生成物浓度 → 正移；反之逆移</div>
-<div class="chem-row"><span class="chem-key">温度与压强</span>升温 → 向吸热方向移动；增压 → 向气体体积减小方向移动（此反应正向）</div>
-<div class="chem-note">💡 人教版选择性必修1：N₂ + 3H₂ ⇌ 2NH₃ 为放热反应(ΔH<0)，正向体积减小。点击按钮扰动平衡观察响应</div>`;
+<div class="chem-row"><span class="chem-key">温度与压强</span>升温 → 向吸热方向移动且 K 改变；增压 → 向气体体积减小方向移动（此反应正向），但 K 不变</div>
+<div class="chem-note">💡 人教版选择性必修1：N₂ + 3H₂ ⇌ 2NH₃ 为放热反应(ΔH<0)，正向体积减小。催化剂只缩短达到平衡的时间，不改变平衡位置或 K。点击按钮扰动平衡观察响应</div>`;
         }
     },
 

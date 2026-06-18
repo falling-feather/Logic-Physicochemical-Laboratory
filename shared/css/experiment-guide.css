@@ -141,7 +141,7 @@
     position: fixed;
     bottom: calc(80px + env(safe-area-inset-bottom, 0px));
     right: 24px;
-    z-index: 9000;
+    z-index: 9060;
     width: 40px;
     height: 40px;
     display: flex;

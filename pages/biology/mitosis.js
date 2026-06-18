@@ -3,7 +3,7 @@
 
 const Mitosis = {
     canvas: null, ctx: null, W: 0, H: 0,
-    phase: 0,          // 0=interphase, 1=prophase, 2=metaphase, 3=anaphase, 4=telophase, 5=cytokinesis
+    phase: 0,          // 0=cell-cycle interphase, 1=prophase, 2=metaphase, 3=anaphase, 4=telophase, 5=cytokinesis
     phaseProgress: 0,  // 0-1 within current phase
     animating: false,
     animId: 0,
@@ -13,7 +13,7 @@ const Mitosis = {
     _resizeObs: null,
 
     phases: [
-        { name: '\u95f4\u671f (Interphase)', desc: 'DNA\u590d\u5236\uff0c\u7ec6\u80de\u751f\u957f\uff0c\u67d3\u8272\u8d28\u677e\u6563' },
+        { name: '\u95f4\u671f\uff08\u7ec6\u80de\u5468\u671f\u51c6\u5907\uff09', desc: 'DNA\u590d\u5236\u3001\u7ec6\u80de\u751f\u957f\uff1b\u5c5e\u4e8e\u7ec6\u80de\u5468\u671f\uff0c\u4e0d\u5c5e\u4e8e\u6709\u4e1d\u5206\u88c2\u671f\u672c\u8eab' },
         { name: '\u524d\u671f (Prophase)', desc: '\u67d3\u8272\u8d28\u7f29\u5408\u6210\u67d3\u8272\u4f53\uff0c\u7eba\u9524\u4f53\u5f62\u6210\uff0c\u6838\u819c\u89e3\u4f53' },
         { name: '\u4e2d\u671f (Metaphase)', desc: '\u67d3\u8272\u4f53\u6392\u5217\u5728\u8d64\u9053\u677f\u4e0a\uff0c\u7eba\u9524\u4e1d\u8fde\u63a5\u7740\u4e1d\u7c92' },
         { name: '\u540e\u671f (Anaphase)', desc: '\u7740\u4e1d\u7c92\u5206\u88c2\uff0c\u59d0\u59b9\u67d3\u8272\u5355\u4f53\u5206\u5f00\uff0c\u79fb\u5411\u4e24\u6781' },
@@ -526,8 +526,8 @@ const Mitosis = {
             <div class="mito-edu-info__grid">
                 <div class="mito-edu-info__block">
                     <div class="mito-edu-info__sub">当前阶段</div>
-                    <div id="mito-edu-phase" class="mito-edu-info__val">间期 (Interphase)</div>
-                    <div id="mito-edu-desc" class="mito-edu-info__desc">DNA复制，细胞生长，染色质松散</div>
+                    <div id="mito-edu-phase" class="mito-edu-info__val">间期（细胞周期准备）</div>
+                    <div id="mito-edu-desc" class="mito-edu-info__desc">DNA复制、细胞生长；属于细胞周期，不属于有丝分裂期本身</div>
                 </div>
                 <div class="mito-edu-info__block">
                     <div class="mito-edu-info__sub">染色体变化</div>
@@ -535,7 +535,7 @@ const Mitosis = {
                 </div>
                 <div class="mito-edu-info__block">
                     <div class="mito-edu-info__sub">各时期关键事件</div>
-                    <div class="mito-edu-info__row"><span class="mito-edu-info__key" style="--c:#3a9e8f">间期</span> DNA复制、蛋白质合成，为分裂做准备</div>
+                    <div class="mito-edu-info__row"><span class="mito-edu-info__key" style="--c:#3a9e8f">间期</span> 细胞周期准备阶段：DNA复制、蛋白质合成，为分裂做准备</div>
                     <div class="mito-edu-info__row"><span class="mito-edu-info__key" style="--c:#e06c75">前期</span> 染色质→染色体，纺锤体形成，核膜解体</div>
                     <div class="mito-edu-info__row"><span class="mito-edu-info__key" style="--c:#c678dd">中期</span> 染色体排列在赤道板上，纺锤丝连接着丝粒</div>
                     <div class="mito-edu-info__row"><span class="mito-edu-info__key" style="--c:#e5c07b">后期</span> 着丝粒分裂，姐妹染色单体分开移向两极</div>
@@ -544,7 +544,7 @@ const Mitosis = {
                 </div>
                 <div class="mito-edu-info__block">
                     <div class="mito-edu-info__sub">💡 知识要点</div>
-                    <div class="mito-edu-info__note">有丝分裂保证了亲代与子代细胞遗传信息的一致性。DNA复制一次，细胞分裂一次，子细胞染色体数=母细胞。动物细胞由中心体发出星射线形成纺锤体，植物细胞由细胞两极发出纺锤丝形成纺锤体。</div>
+                    <div class="mito-edu-info__note">有丝分裂保证了亲代与子代细胞遗传信息的一致性。DNA复制在间期完成；随后有丝分裂与胞质分裂使子细胞染色体数=母细胞。典型动物细胞由中心体发出星射线形成纺锤体，植物细胞由细胞两极发出纺锤丝形成纺锤体。</div>
                 </div>
             </div>
         `;

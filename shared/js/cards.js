@@ -8,9 +8,11 @@ function initExperimentCards() {
         const accent = CONFIG.accentColors[category];
 
         container.innerHTML = CONFIG.experiments[category].map(exp => {
+            const meta = getCardLearningMeta(category, exp);
             const variantClass = exp.variant === 'featured' ? 'card--featured'
                 : exp.variant === 'upcoming' ? 'card--upcoming'
                 : '';
+            const subjectLabel = CONFIG.pages?.[category]?.label || category;
 
             const statusLabel = exp.variant === 'featured' ? '推荐体验'
                 : exp.variant === 'upcoming' ? '即将推出'
@@ -21,8 +23,16 @@ function initExperimentCards() {
                     <div class="card-icon">
                         <i data-lucide="${exp.icon}"></i>
                     </div>
-                    <h3 class="card-title">${exp.title}</h3>
-                    <p class="card-desc">${exp.description}</p>
+                    <div class="card-meta">
+                        <span>${escapeCardHtml(subjectLabel)}</span>
+                        <span>${escapeCardHtml(statusLabel)}</span>
+                    </div>
+                    <h3 class="card-title">${escapeCardHtml(exp.title)}</h3>
+                    <p class="card-desc">${escapeCardHtml(exp.description)}</p>
+                    <div class="card-learning">
+                        <span>学习目标</span>
+                        <p>${escapeCardHtml(meta.task)}</p>
+                    </div>
                     <span class="card-status card-status--${exp.variant}">${statusLabel}</span>
                 </div>
             `;
@@ -30,6 +40,24 @@ function initExperimentCards() {
 
         if (typeof lucide !== 'undefined') lucide.createIcons();
     });
+}
+
+function getCardLearningMeta(category, exp) {
+    const learning = CONFIG.learningDesign || {};
+    const subject = learning.subjects ? learning.subjects[category] : null;
+    const focus = learning.focus ? learning.focus[exp.id] : null;
+    return {
+        task: focus?.task || `观察 ${exp.title} 中参数变化与结论的对应关系。`
+    };
+}
+
+function escapeCardHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 let _openExpBusy = false;
