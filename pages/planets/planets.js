@@ -3,8 +3,8 @@
 (function () {
     const GALAXIES = {
         englab: {
-            title: '工科实验室',
-            copy: '进入工科实验室后，再选择数学、物理、化学、算法或生物。',
+            title: '工科试验室',
+            copy: '进入工科试验室后，再选择数学、物理、化学、算法或生物。',
             modules: [
                 ['总览', '#home'],
                 ['数学', '#mathematics'],
@@ -28,10 +28,11 @@
             orbit: { rx: 250, ry: 132, phase: 0, speed: 0.000045, dir: 1 }
         },
         frontier: {
-            title: '未来星图',
+            title: '未来星系',
             state: '学习方向',
-            copy: '跨学科入口已经开放：从宇宙、工程、数据、信息技术、材料与人文文本进入不同的学习实验。',
+            copy: '跨学科入口由未来星系独立承载：先进入星系总览，再选择二级知识方向。',
             modules: [
+                { label: '未来星系总览', href: '#frontier', meta: '星系坐标 · 二级目录' },
                 { label: '地球与宇宙科学', href: '#cosmos', meta: '季节变化 · 太阳高度' },
                 { label: '工程应用', href: '#engineering', meta: '桥梁受力 · 入门实验' },
                 { label: '数据科学与 AI', href: '#datascience', meta: '线性回归 · 模型训练' },

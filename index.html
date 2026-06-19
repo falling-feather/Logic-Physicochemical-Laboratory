@@ -1,52 +1,56 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="星序 Astra - 交互式可视化多学科学习平台，集成工科实验室与代码空间两大子站，涵盖数学、物理、化学、算法、生物与多语言代码执行追踪">
+    <meta name="description" content="星序 Astra - 交互式可视化多学科学习平台，集成工科试验室、代码空间与未来星系，涵盖数理化生、算法、跨学科探索与多语言代码执行追踪">
     <meta name="theme-color" content="#08090e">
     <title>星序 Astra - 多学科可视化学习平台</title>
     <link rel="icon" href="UI/favicon.ico" sizes="16x16 32x32 48x48" type="image/x-icon">
     <link rel="icon" href="UI/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="UI/apple-touch-icon.png">
 
-    <!-- Resource Hints -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preconnect" href="https://unpkg.com">
-    <link rel="preconnect" href="https://cdn.jsdelivr.net">
-    <!-- Preload critical external scripts -->
-    <link rel="preload" href="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js" as="script">
-
-    <!-- Fonts (non-blocking) -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap"></noscript>
+    <!-- External fonts load after app boot on deployed origins only; localhost must not wait on CDN. -->
+    <script>
+        (function () {
+            var isLocalhost = location.hostname === 'localhost' ||
+                location.hostname === '127.0.0.1' ||
+                location.hostname === '::1';
+            if (isLocalhost) return;
+            window.addEventListener('load', function () {
+                var link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap';
+                document.head.appendChild(link);
+            }, { once: true });
+        })();
+    </script>
 
     <!-- CSS: Shared -->
     <link rel="stylesheet" href="shared/css/tokens.css?v=20260424ss">
-    <link rel="stylesheet" href="shared/css/base.css?v=20260417f">
+    <link rel="stylesheet" href="shared/css/base.css?v=20260619v63FrontierLifecycleP1">
     <link rel="stylesheet" href="shared/css/typography.css?v=20260526v61c">
-    <link rel="stylesheet" href="shared/css/navbar.css?v=20260424v44e">
+    <link rel="stylesheet" href="shared/css/navbar.css?v=20260619v63AsyncGsapP1">
     <link rel="stylesheet" href="shared/css/page-layout.css?v=20260606v62e">
-    <link rel="stylesheet" href="shared/css/cards.css?v=20260618publicCleanP1">
-    <link rel="stylesheet" href="shared/css/module-selector.css?v=20260618publicCleanP1">
-    <link rel="stylesheet" href="shared/css/experiment-guide.css?v=20260618publicCleanP1">
+    <link rel="stylesheet" href="shared/css/cards.css?v=20260619v63FrontierLifecycleP1">
+    <link rel="stylesheet" href="shared/css/module-selector.css?v=20260619v63FrontierLifecycleP1">
+    <link rel="stylesheet" href="shared/css/experiment-guide.css?v=20260619v63FrontierLifecycleP1">
     <link rel="stylesheet" href="shared/css/experiment-export.css?v=20260424v44a">
     <link rel="stylesheet" href="shared/css/experiment-quiz.css?v=20260422z">
     <link rel="stylesheet" href="shared/css/experiment-favorites.css?v=20260424oo">
     <link rel="stylesheet" href="shared/css/experiment-rating.css?v=20260422z">
-    <link rel="stylesheet" href="pages/about/about.css?v=20260618publicCleanP1">
+    <link rel="stylesheet" href="pages/about/about.css?v=20260619v63FrontierLifecycleP1">
     <link rel="stylesheet" href="shared/css/back-to-top.css?v=20260424oo">
-    <link rel="stylesheet" href="shared/css/fab-trigger.css?v=20260618publicCleanP1">
+    <link rel="stylesheet" href="shared/css/fab-trigger.css?v=20260619v63FrontierLifecycleP1">
     <!-- CSS: Pages -->
     <link rel="stylesheet" href="pages/home/home.css?v=20260605v62e">
-    <link rel="stylesheet" href="pages/planets/planets.css?v=20260618crossCanvasP1">
-    <link rel="stylesheet" href="pages/cosmos/cosmos.css?v=20260618publicCleanP1">
-    <link rel="stylesheet" href="pages/datascience/datascience.css?v=20260618dataP2">
-    <link rel="stylesheet" href="pages/infotech/infotech.css?v=20260618publicCleanP1">
-    <link rel="stylesheet" href="pages/materials/materials.css?v=20260618materialsP1">
-    <link rel="stylesheet" href="pages/humanities/humanities.css?v=20260618humanP3">
-    <link rel="stylesheet" href="pages/engineering/engineering.css?v=20260618engP2">
+    <link rel="stylesheet" href="pages/planets/planets.css?v=20260619v63FrontierLifecycleP1">
+    <link rel="stylesheet" href="pages/cosmos/cosmos.css?v=20260619v63AsyncGsapP1">
+    <link rel="stylesheet" href="pages/datascience/datascience.css?v=20260619v63AsyncGsapP1">
+    <link rel="stylesheet" href="pages/infotech/infotech.css?v=20260619v63AsyncGsapP1">
+    <link rel="stylesheet" href="pages/materials/materials.css?v=20260619v63AsyncGsapP1">
+    <link rel="stylesheet" href="pages/humanities/humanities.css?v=20260619v63AsyncGsapP1">
+    <link rel="stylesheet" href="pages/engineering/engineering.css?v=20260619v63AsyncGsapP1">
     <link rel="stylesheet" href="pages/mathematics/mathematics.css?v=20260618mathModelP1">
     <link rel="stylesheet" href="pages/physics/physics.css?v=20260618thermoP1">
     <link rel="stylesheet" href="pages/chemistry/chemistry.css?v=20260618ionP1">
@@ -58,7 +62,7 @@
     <link rel="stylesheet" href="shared/css/related-experiments.css?v=20260424v45c">
     <link rel="stylesheet" href="shared/css/experiment-polish.css?v=20260526v61c">
     <!-- CSS: Responsive (must be last) -->
-    <link rel="stylesheet" href="shared/css/responsive.css?v=20260606v62e">
+    <link rel="stylesheet" href="shared/css/responsive.css?v=20260619v63FrontierLifecycleP1">
 
     <!-- Loading Screen (inline — zero dependency, shows immediately) -->
     <style id="loading-screen-styles">
@@ -76,6 +80,16 @@
       .loader-text{margin-top:28px;color:rgba(180,200,230,.6);font-family:'Inter',system-ui,sans-serif;font-size:13px;letter-spacing:3px;text-transform:uppercase}
       .loader-bar{margin-top:14px;width:160px;height:2px;background:rgba(91,141,206,.12);border-radius:1px;overflow:hidden}
       .loader-bar-fill{height:100%;width:5%;background:linear-gradient(90deg,rgba(91,141,206,.7),rgba(130,190,255,.85));border-radius:1px;transition:width .4s cubic-bezier(.4,0,.2,1)}
+      html[data-boot-galaxy="astra"] #loading-screen{background:#070d12}
+      html[data-boot-galaxy="astra"] .loader-planet{background:radial-gradient(circle at 35% 35%,#61d7c7,#1d6570 62%,#0b2830);box-shadow:0 0 40px rgba(97,215,199,.2),inset -6px -6px 16px rgba(0,0,0,.5)}
+      html[data-boot-galaxy="astra"] .loader-ring{border-top-color:rgba(97,215,199,.5)}
+      html[data-boot-galaxy="astra"] .loader-bar{background:rgba(97,215,199,.13)}
+      html[data-boot-galaxy="astra"] .loader-bar-fill{background:linear-gradient(90deg,rgba(97,215,199,.72),rgba(171,235,223,.86))}
+      html[data-boot-galaxy="frontier"] #loading-screen{background:#090907}
+      html[data-boot-galaxy="frontier"] .loader-planet{background:radial-gradient(circle at 35% 35%,#d6b76f,#5d4721 62%,#191104);box-shadow:0 0 40px rgba(214,183,111,.22),inset -6px -6px 16px rgba(0,0,0,.52)}
+      html[data-boot-galaxy="frontier"] .loader-ring{border-top-color:rgba(214,183,111,.52)}
+      html[data-boot-galaxy="frontier"] .loader-bar{background:rgba(214,183,111,.13)}
+      html[data-boot-galaxy="frontier"] .loader-bar-fill{background:linear-gradient(90deg,rgba(214,183,111,.72),rgba(250,225,157,.86))}
       @keyframes lp-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
       @keyframes lp-spin{to{transform:rotate(360deg)}}
     </style>
@@ -100,6 +114,22 @@
             protocol: location.protocol,
             secureContext: !!window.isSecureContext
         };
+        window.__astraBoot = (function () {
+            var raw = (location.hash || '#planets').slice(1).split('/')[0] || 'planets';
+            var frontierPages = ['frontier', 'cosmos', 'engineering', 'datascience', 'infotech', 'materials', 'humanities'];
+            var englabPages = ['home', 'mathematics', 'physics', 'chemistry', 'algorithms', 'biology', 'license', 'changelog'];
+            var galaxy = frontierPages.indexOf(raw) > -1 ? 'frontier' : (englabPages.indexOf(raw) > -1 ? 'englab' : 'astra');
+            var labels = {
+                astra: '正在进入星序',
+                englab: '正在进入工科试验室',
+                frontier: '正在进入未来星系'
+            };
+            document.documentElement.dataset.bootGalaxy = galaxy;
+            if (document.body) document.body.dataset.bootGalaxy = galaxy;
+            var text = document.querySelector('.loader-text');
+            if (text) text.textContent = labels[galaxy] || labels.astra;
+            return { page: raw, galaxy: galaxy };
+        })();
         try {
             var raw = JSON.parse(localStorage.getItem('englab-cache-meta') || '{}');
             raw.visitCount = (raw.visitCount || 0) + 1;
@@ -166,13 +196,19 @@
     <!-- ═══════════════ Navigation ═══════════════ -->
     <nav class="navbar navbar--transparent" id="navbar">
         <div class="nav-container">
-            <a href="#planets" class="nav-logo" data-page="planets" title="返回星序星系大屏">
+            <a href="#home" class="nav-logo nav-logo--englab" data-page="home" title="返回工科试验室首页">
                 <div class="logo-icon">
                     <i data-lucide="flask-conical"></i>
                 </div>
-                <span class="logo-text desktop-only">星序</span>
+                <span class="logo-text desktop-only">工科试验室</span>
             </a>
-            <div class="nav-menu">
+            <a href="#frontier" class="nav-logo nav-logo--frontier" data-page="frontier" title="返回未来星系总览">
+                <div class="logo-icon logo-icon--frontier">
+                    <i data-lucide="sparkles"></i>
+                </div>
+                <span class="logo-text desktop-only">未来星系</span>
+            </a>
+            <div class="nav-menu nav-menu--englab" data-galaxy-nav="englab">
                 <a href="#home" class="nav-item active" data-page="home">
                     <i data-lucide="home"></i>
                     <span>首页</span>
@@ -202,6 +238,41 @@
                     <span>搜索</span>
                     <span class="gsearch-kbd">Ctrl K</span>
                 </button>
+                <div class="nav-indicator"></div>
+            </div>
+            <div class="nav-menu nav-menu--frontier" data-galaxy-nav="frontier">
+                <a href="#frontier" class="nav-item" data-page="frontier">
+                    <i data-lucide="sparkles"></i>
+                    <span>总览</span>
+                </a>
+                <a href="#cosmos" class="nav-item" data-page="cosmos">
+                    <i data-lucide="globe-2"></i>
+                    <span>宇宙</span>
+                </a>
+                <a href="#engineering" class="nav-item" data-page="engineering">
+                    <i data-lucide="construction"></i>
+                    <span>工程</span>
+                </a>
+                <a href="#datascience" class="nav-item" data-page="datascience">
+                    <i data-lucide="scatter-chart"></i>
+                    <span>数据</span>
+                </a>
+                <a href="#infotech" class="nav-item" data-page="infotech">
+                    <i data-lucide="network"></i>
+                    <span>信息</span>
+                </a>
+                <a href="#materials" class="nav-item" data-page="materials">
+                    <i data-lucide="layers-3"></i>
+                    <span>材料</span>
+                </a>
+                <a href="#humanities" class="nav-item" data-page="humanities">
+                    <i data-lucide="book-open"></i>
+                    <span>人文</span>
+                </a>
+                <a href="#planets" class="nav-item nav-item--galaxy" data-page="planets">
+                    <i data-lucide="orbit"></i>
+                    <span>星序</span>
+                </a>
                 <div class="nav-indicator"></div>
             </div>
         </div>
@@ -247,8 +318,8 @@
                     <div class="star-body">
                         <div class="planet-surface"></div>
                         <div class="planet-highlight"></div>
-                        <h1 class="star-title" data-text="工科实验室">工科实验室</h1>
-                        <span class="star-subtitle">Engineering Lab · 86 Experiments</span>
+                        <h1 class="star-title" data-text="工科试验室">工科试验室</h1>
+                        <span class="star-subtitle">Engineering Lab · 88 Experiments</span>
                     </div>
                     <div class="star-eyes-container" aria-hidden="true">
                         <div class="star-eyes">
@@ -267,7 +338,7 @@
                     <div class="tagline-cursor"></div>
                 </div>
 
-                <a href="#planets" class="home-galaxy-cta" data-page="planets" aria-label="进入星系目录大屏" hidden style="display:none">
+                <a href="#planets" class="home-galaxy-cta" data-page="planets" aria-label="进入星系目录大屏">
                     <span class="home-galaxy-cta__icon" aria-hidden="true">
                         <i data-lucide="orbit"></i>
                     </span>
@@ -389,7 +460,7 @@
                             <strong>ASTRA</strong>
                         </div>
 
-                        <button class="planets-galaxy planets-galaxy--eng" type="button" data-galaxy="englab" aria-label="进入工科实验室星系二级菜单">
+                        <button class="planets-galaxy planets-galaxy--eng" type="button" data-galaxy="englab" aria-label="进入工科试验室星系二级菜单">
                             <span class="planets-galaxy-glow"></span>
                             <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
                             <span class="planets-galaxy-orbit planets-galaxy-orbit--two"></span>
@@ -397,7 +468,7 @@
                                 <span class="planets-galaxy-core"></span>
                             </span>
                             <span class="planets-galaxy-label">
-                                <strong>工科实验室</strong>
+                                <strong>工科试验室</strong>
                                 <span>Engineering Lab</span>
                             </span>
                         </button>
@@ -415,7 +486,7 @@
                             </span>
                         </button>
 
-                        <button class="planets-galaxy planets-galaxy--roadmap" type="button" data-galaxy="frontier" aria-label="查看未来星图学习方向">
+                        <button class="planets-galaxy planets-galaxy--roadmap" type="button" data-galaxy="frontier" aria-label="查看未来星系学习方向">
                             <span class="planets-galaxy-glow planets-galaxy-glow--amber"></span>
                             <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
                             <span class="planets-galaxy-orbit planets-galaxy-orbit--two"></span>
@@ -423,7 +494,7 @@
                                 <span class="planets-galaxy-core"></span>
                             </span>
                             <span class="planets-galaxy-label">
-                                <strong>未来星图</strong>
+                                <strong>未来星系</strong>
                                 <span>Roadmap</span>
                             </span>
                         </button>
@@ -431,7 +502,7 @@
                         <aside class="planets-menu" id="planets-menu" aria-live="polite" aria-label="星系二级菜单">
                             <button class="planets-menu__close" type="button" data-close-menu aria-label="关闭二级菜单">×</button>
                             <span class="planets-menu__state" id="planets-menu-state">进入星系</span>
-                            <h2 id="planets-menu-title">工科实验室</h2>
+                            <h2 id="planets-menu-title">工科试验室</h2>
                             <p id="planets-menu-copy">选择学科后进入该星系自己的二级内容。</p>
                             <nav class="planets-module-menu" id="planets-module-menu" aria-label="二级模块"></nav>
                         </aside>
@@ -440,15 +511,97 @@
             </div>
         </section>
 
-        <section id="page-cosmos" class="page cosmos-page" aria-label="地球与宇宙科学">
-            <div class="page-hero">
-                <div class="page-hero__text">
-                    <span class="page-hero__label page-hero__label--sky">Earth & Space</span>
-                    <h1 class="page-hero__title">地球与宇宙科学</h1>
-                    <p class="page-hero__desc">从地轴倾角、太阳直射点和昼长变化入手，理解季节为什么出现，以及同一天不同纬度接收太阳辐射为何不同。</p>
+        <section id="page-frontier" class="page frontier-page frontier-overview-page" aria-label="未来星系总览" data-galaxy="frontier">
+            <div class="frontier-overview">
+                <header class="frontier-overview__hero">
+                    <div class="frontier-overview__copy">
+                        <h1>未来星系</h1>
+                        <p>跨学科内容先回到星系总览，再进入二级知识方向。每个方向提供自己的学习坐标、专题入口、实验台和来源回查，不再把星系总览分散塞进单个学科页。</p>
+                    </div>
+                    <div class="frontier-overview__orbital" aria-hidden="true">
+                        <span class="frontier-overview__ring frontier-overview__ring--outer"></span>
+                        <span class="frontier-overview__ring frontier-overview__ring--inner"></span>
+                        <span class="frontier-overview__node frontier-overview__node--cosmos"></span>
+                        <span class="frontier-overview__node frontier-overview__node--engineering"></span>
+                        <span class="frontier-overview__node frontier-overview__node--data"></span>
+                        <span class="frontier-overview__node frontier-overview__node--info"></span>
+                        <span class="frontier-overview__node frontier-overview__node--materials"></span>
+                        <span class="frontier-overview__node frontier-overview__node--humanities"></span>
+                    </div>
+                </header>
+
+                <section class="frontier-overview__map" aria-label="未来星系二级知识目录">
+                    <a class="frontier-overview-card frontier-overview-card--cosmos" href="#cosmos" data-page="cosmos">
+                        <span>01</span>
+                        <strong>地球与宇宙</strong>
+                        <p>季节变化、太阳高度和昼长趋势。</p>
+                        <em>进入二级总览</em>
+                    </a>
+                    <a class="frontier-overview-card frontier-overview-card--engineering" href="#engineering" data-page="engineering">
+                        <span>02</span>
+                        <strong>工程应用</strong>
+                        <p>桁架受力、荷载路径和静力平衡。</p>
+                        <em>进入二级总览</em>
+                    </a>
+                    <a class="frontier-overview-card frontier-overview-card--data" href="#datascience" data-page="datascience">
+                        <span>03</span>
+                        <strong>数据科学</strong>
+                        <p>线性回归、残差和模型边界。</p>
+                        <em>进入二级总览</em>
+                    </a>
+                    <a class="frontier-overview-card frontier-overview-card--info" href="#infotech" data-page="infotech">
+                        <span>04</span>
+                        <strong>信息技术</strong>
+                        <p>网络分层、封装和逐跳传递。</p>
+                        <em>进入二级总览</em>
+                    </a>
+                    <a class="frontier-overview-card frontier-overview-card--materials" href="#materials" data-page="materials">
+                        <span>05</span>
+                        <strong>材料微观</strong>
+                        <p>晶体结构、晶粒边界和性能趋势。</p>
+                        <em>进入二级总览</em>
+                    </a>
+                    <a class="frontier-overview-card frontier-overview-card--humanities" href="#humanities" data-page="humanities">
+                        <span>06</span>
+                        <strong>人文可视化</strong>
+                        <p>词频、上下文、共现与原文回读。</p>
+                        <em>进入二级总览</em>
+                    </a>
+                </section>
+
+                <section class="frontier-overview__levels" aria-label="未来星系学习层级">
+                    <div>
+                        <span>Galaxy</span>
+                        <strong>未来星系总览</strong>
+                        <p>只负责跨学科方向选择和星系级学习坐标。</p>
+                    </div>
+                    <div>
+                        <span>Subject</span>
+                        <strong>二级学科总览</strong>
+                        <p>每个方向先说明任务、边界、来源和专题路线。</p>
+                    </div>
+                    <div>
+                        <span>Topic</span>
+                        <strong>专题与实验台</strong>
+                        <p>具体交互内容继续按模型、操作、判读拆分。</p>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+        <section id="page-cosmos" class="page frontier-page cosmos-page" aria-label="地球与宇宙科学" data-galaxy="frontier">
+            <div class="frontier-hero">
+                <div class="frontier-hero__text">
+                    <span class="frontier-hero__label frontier-hero__label--sky">Earth & Space</span>
+                    <h1 class="frontier-hero__title">地球与宇宙科学</h1>
+                    <p class="frontier-hero__desc">从地轴倾角、太阳直射点和昼长变化入手，理解季节为什么出现，以及同一天不同纬度接收太阳辐射为何不同。</p>
+                    <div class="frontier-hero__actions">
+                        <a class="frontier-hero__button frontier-hero__button--primary" href="#frontier-cosmos-lab">开始实验</a>
+                        <a class="frontier-hero__button" href="#frontier" data-page="frontier">星系总览</a>
+                    </div>
                 </div>
-                <div class="page-hero__visual">
-                    <canvas id="hero-canvas-cosmos" class="page-hero__canvas" role="img" aria-label="地球绕太阳运行与地轴倾角装饰动画"></canvas>
+                <div class="frontier-hero__visual">
+                    <canvas id="hero-canvas-cosmos" class="frontier-hero__canvas" role="img" aria-label="地球绕太阳运行与地轴倾角装饰动画"></canvas>
                 </div>
             </div>
 
@@ -478,7 +631,7 @@
                     </div>
                 </section>
 
-                <section class="cosmos-lab" aria-labelledby="earth-sun-title">
+                <section id="frontier-cosmos-lab" class="cosmos-lab" aria-labelledby="earth-sun-title">
                     <div class="cosmos-lab__header">
                         <div>
                             <span class="cosmos-lab__eyebrow">Sun Path Model</span>
@@ -561,24 +714,29 @@
                 <section class="cosmos-reference" aria-label="参考资料">
                     <span class="cosmos-reference__eyebrow">References</span>
                     <h2>参考资料</h2>
-                    <p>本页采用 NASA 对季节成因的说明，并参考 NOAA 太阳位置计算资料中对太阳高度、日出日落、大气折射和近似误差的边界提示。NOAA 页面说明其计算器不再维护，因此本页只使用其公开的计算说明和误差范围提示。</p>
+                    <p>本页采用 NASA 对季节成因的说明，并参考 NASA/JPL 的季节卫星图示与 NOAA 太阳位置计算资料中对太阳高度、日出日落、大气折射和近似误差的边界提示。NOAA 页面说明其计算器不再维护，因此本页只使用其公开的计算说明和误差范围提示。</p>
                     <div class="cosmos-reference__links">
                         <a href="https://spaceplace.nasa.gov/seasons/en/" target="_blank" rel="noopener">NASA Space Place · Seasons</a>
+                        <a href="https://www.jpl.nasa.gov/edu/resources/gallery/the-change-of-seasons-views-from-space/" target="_blank" rel="noopener">NASA/JPL · The Change of Seasons</a>
                         <a href="https://gml.noaa.gov/grad/solcalc/calcdetails.html" target="_blank" rel="noopener">NOAA GML · Solar Calculation Details</a>
                     </div>
                 </section>
             </div>
         </section>
 
-        <section id="page-datascience" class="page datascience-page" aria-label="数据科学与 AI">
-            <div class="page-hero">
-                <div class="page-hero__text">
-                    <span class="page-hero__label page-hero__label--data">Data & AI</span>
-                    <h1 class="page-hero__title">数据科学与 AI</h1>
-                    <p class="page-hero__desc">从特征、标签、损失函数和参数训练开始，理解一个模型怎样把散点数据转化为可解释的预测线。</p>
+        <section id="page-datascience" class="page frontier-page datascience-page" aria-label="数据科学与 AI" data-galaxy="frontier">
+            <div class="frontier-hero">
+                <div class="frontier-hero__text">
+                    <span class="frontier-hero__label frontier-hero__label--data">Data & AI</span>
+                    <h1 class="frontier-hero__title">数据科学与 AI</h1>
+                    <p class="frontier-hero__desc">从特征、标签、损失函数和参数训练开始，理解一个模型怎样把散点数据转化为可解释的预测线。</p>
+                    <div class="frontier-hero__actions">
+                        <a class="frontier-hero__button frontier-hero__button--primary" href="#frontier-datascience-lab">开始实验</a>
+                        <a class="frontier-hero__button" href="#frontier" data-page="frontier">星系总览</a>
+                    </div>
                 </div>
-                <div class="page-hero__visual">
-                    <canvas id="hero-canvas-datascience" class="page-hero__canvas" role="img" aria-label="数据科学线性模型装饰动画"></canvas>
+                <div class="frontier-hero__visual">
+                    <canvas id="hero-canvas-datascience" class="frontier-hero__canvas" role="img" aria-label="数据科学线性模型装饰动画"></canvas>
                 </div>
             </div>
 
@@ -637,7 +795,7 @@
                     </div>
                 </section>
 
-                <section class="datascience-lab" aria-labelledby="linear-regression-title">
+                <section id="frontier-datascience-lab" class="datascience-lab" aria-labelledby="linear-regression-title">
                     <div class="datascience-lab__header">
                         <div>
                             <span class="datascience-lab__eyebrow">Regression Model</span>
@@ -739,7 +897,7 @@
                     <h2>参考资料</h2>
                     <p>本页依据开放统计教材对最小二乘线、残差、SSE、残差图和样本范围的说明，并参考机器学习教材中“特征、标签、权重、偏置、MSE 和异常点”的表述；实现层面对应普通最小二乘线性模型。</p>
                     <div class="datascience-reference__links">
-                        <a href="https://openstax.org/books/introductory-statistics-2e/pages/12-3-the-regression-equation" target="_blank" rel="noopener">OpenStax · Regression Equation</a>
+                        <a href="https://openstax.org/books/introductory-statistics-2e/pages/12-3-the-regression-equation" target="_blank" rel="noopener">OpenStax Statistics · Regression</a>
                         <a href="https://developers.google.com/machine-learning/crash-course/linear-regression" target="_blank" rel="noopener">Google ML Crash Course · Linear Regression</a>
                         <a href="https://developers.google.com/machine-learning/crash-course/linear-regression/loss" target="_blank" rel="noopener">Google ML Crash Course · Loss</a>
                         <a href="https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LinearRegression.html" target="_blank" rel="noopener">scikit-learn · LinearRegression</a>
@@ -748,15 +906,19 @@
             </div>
         </section>
 
-        <section id="page-infotech" class="page infotech-page" aria-label="信息技术基础">
-            <div class="page-hero">
-                <div class="page-hero__text">
-                    <span class="page-hero__label page-hero__label--info">Information Technology</span>
-                    <h1 class="page-hero__title">信息技术基础</h1>
-                    <p class="page-hero__desc">从一次网页请求出发，观察域名解析、TCP 分段、IPv6 包头和逐跳转发怎样协同，把浏览器里的操作送到服务器。</p>
+        <section id="page-infotech" class="page frontier-page infotech-page" aria-label="信息技术基础" data-galaxy="frontier">
+            <div class="frontier-hero">
+                <div class="frontier-hero__text">
+                    <span class="frontier-hero__label frontier-hero__label--info">Information Technology</span>
+                    <h1 class="frontier-hero__title">信息技术基础</h1>
+                    <p class="frontier-hero__desc">从一次网页请求出发，观察域名解析、TCP 分段、IPv6 包头和逐跳转发怎样协同，把浏览器里的操作送到服务器。</p>
+                    <div class="frontier-hero__actions">
+                        <a class="frontier-hero__button frontier-hero__button--primary" href="#frontier-infotech-lab">开始实验</a>
+                        <a class="frontier-hero__button" href="#frontier" data-page="frontier">星系总览</a>
+                    </div>
                 </div>
-                <div class="page-hero__visual">
-                    <canvas id="hero-canvas-infotech" class="page-hero__canvas" role="img" aria-label="网络分层与数据包路径装饰动画"></canvas>
+                <div class="frontier-hero__visual">
+                    <canvas id="hero-canvas-infotech" class="frontier-hero__canvas" role="img" aria-label="网络分层与数据包路径装饰动画"></canvas>
                 </div>
             </div>
 
@@ -809,7 +971,7 @@
                     </article>
                 </section>
 
-                <section class="infotech-lab" aria-labelledby="network-layers-title">
+                <section id="frontier-infotech-lab" class="infotech-lab" aria-labelledby="network-layers-title">
                     <div class="infotech-lab__header">
                         <div>
                             <span class="infotech-lab__eyebrow">Packet Journey</span>
@@ -894,7 +1056,7 @@
                     <h2>参考资料</h2>
                     <p>本页的 DNS 查询模型、HTTP/2 帧与流、TCP 字节流和 IPv6 头部/最小链路 MTU，参考 IETF RFC 原文。页面数值用于教学近似，不等同于抓包工具中的完整协议开销。</p>
                     <div class="infotech-reference__links">
-                        <a href="https://www.rfc-editor.org/rfc/rfc1034.html" target="_blank" rel="noopener">IETF RFC 1034 · DNS Concepts</a>
+                        <a href="https://www.rfc-editor.org/rfc/rfc1034.html" target="_blank" rel="noopener">IETF RFC 1034 · Domain Names</a>
                         <a href="https://www.rfc-editor.org/rfc/rfc9113.html" target="_blank" rel="noopener">IETF RFC 9113 · HTTP/2</a>
                         <a href="https://www.rfc-editor.org/rfc/rfc9293.html" target="_blank" rel="noopener">IETF RFC 9293 · TCP</a>
                         <a href="https://www.rfc-editor.org/rfc/rfc8200.html" target="_blank" rel="noopener">IETF RFC 8200 · IPv6</a>
@@ -903,15 +1065,19 @@
             </div>
         </section>
 
-        <section id="page-materials" class="page materials-page" aria-label="材料与微观结构">
-            <div class="page-hero">
-                <div class="page-hero__text">
-                    <span class="page-hero__label page-hero__label--materials">Materials</span>
-                    <h1 class="page-hero__title">材料与微观结构</h1>
-                    <p class="page-hero__desc">从晶胞、堆积方式和晶粒边界开始，看见微米尺度的结构怎样影响材料的强度、延展性和加工表现。</p>
+        <section id="page-materials" class="page frontier-page materials-page" aria-label="材料与微观结构" data-galaxy="frontier">
+            <div class="frontier-hero">
+                <div class="frontier-hero__text">
+                    <span class="frontier-hero__label frontier-hero__label--materials">Materials</span>
+                    <h1 class="frontier-hero__title">材料与微观结构</h1>
+                    <p class="frontier-hero__desc">从晶胞、堆积方式和晶粒边界开始，看见微米尺度的结构怎样影响材料的强度、延展性和加工表现。</p>
+                    <div class="frontier-hero__actions">
+                        <a class="frontier-hero__button frontier-hero__button--primary" href="#frontier-materials-lab">开始实验</a>
+                        <a class="frontier-hero__button" href="#frontier" data-page="frontier">星系总览</a>
+                    </div>
                 </div>
-                <div class="page-hero__visual">
-                    <canvas id="hero-canvas-materials" class="page-hero__canvas" role="img" aria-label="材料晶体结构与晶粒纹理装饰动画"></canvas>
+                <div class="frontier-hero__visual">
+                    <canvas id="hero-canvas-materials" class="frontier-hero__canvas" role="img" aria-label="材料晶体结构与晶粒纹理装饰动画"></canvas>
                 </div>
             </div>
 
@@ -993,7 +1159,7 @@
                     </div>
                 </section>
 
-                <section class="materials-lab" aria-labelledby="materials-lab-title">
+                <section id="frontier-materials-lab" class="materials-lab" aria-labelledby="materials-lab-title">
                     <div class="materials-lab__header">
                         <div>
                             <span class="materials-lab__eyebrow">Microstructure Lab</span>
@@ -1077,7 +1243,7 @@
                     <h2>参考资料</h2>
                     <p>本页的晶胞、配位数和堆积效率参考开放化学教材；晶粒尺寸与强度的关系采用入门级相对趋势，并保留 Hall-Petch 经验模型、统计分散性和纳米尺度偏离。</p>
                     <div class="materials-reference__links">
-                        <a href="https://openstax.org/books/chemistry-2e/pages/10-6-lattice-structures-in-crystalline-solids" target="_blank" rel="noopener">OpenStax · Crystal Structures</a>
+                        <a href="https://openstax.org/books/chemistry-2e/pages/10-6-lattice-structures-in-crystalline-solids" target="_blank" rel="noopener">OpenStax Chemistry · Lattice Structures</a>
                         <a href="https://arxiv.org/abs/2209.04891" target="_blank" rel="noopener">Gu, Stiles & El-Awady · Hall-Petch Statistics</a>
                         <a href="https://arxiv.org/abs/2402.11798" target="_blank" rel="noopener">Dangwal et al. · Hall-Petch Breaks</a>
                     </div>
@@ -1085,15 +1251,19 @@
             </div>
         </section>
 
-        <section id="page-humanities" class="page humanities-page" aria-label="语言与人文可视化">
-            <div class="page-hero">
-                <div class="page-hero__text">
-                    <span class="page-hero__label page-hero__label--humanities">Humanities</span>
-                    <h1 class="page-hero__title">语言与人文可视化</h1>
-                    <p class="page-hero__desc">把文本拆成词项、上下文和共现关系，学习如何用图表提出回读问题，而不是让数字替代解释。</p>
+        <section id="page-humanities" class="page frontier-page humanities-page" aria-label="语言与人文可视化" data-galaxy="frontier">
+            <div class="frontier-hero">
+                <div class="frontier-hero__text">
+                    <span class="frontier-hero__label frontier-hero__label--humanities">Humanities</span>
+                    <h1 class="frontier-hero__title">语言与人文可视化</h1>
+                    <p class="frontier-hero__desc">把文本拆成词项、上下文和共现关系，学习如何用图表提出回读问题，而不是让数字替代解释。</p>
+                    <div class="frontier-hero__actions">
+                        <a class="frontier-hero__button frontier-hero__button--primary" href="#frontier-humanities-lab">开始实验</a>
+                        <a class="frontier-hero__button" href="#frontier" data-page="frontier">星系总览</a>
+                    </div>
                 </div>
-                <div class="page-hero__visual">
-                    <canvas id="hero-canvas-humanities" class="page-hero__canvas" role="img" aria-label="文本词项弧线与共现网络装饰动画"></canvas>
+                <div class="frontier-hero__visual">
+                    <canvas id="hero-canvas-humanities" class="frontier-hero__canvas" role="img" aria-label="文本词项弧线与共现网络装饰动画"></canvas>
                 </div>
             </div>
 
@@ -1157,7 +1327,7 @@
                     </div>
                 </section>
 
-                <section class="humanities-lab" aria-labelledby="humanities-lab-title">
+                <section id="frontier-humanities-lab" class="humanities-lab" aria-labelledby="humanities-lab-title">
                     <div class="humanities-lab__header">
                         <div>
                             <span class="humanities-lab__eyebrow">Text Reading Lab</span>
@@ -1248,25 +1418,30 @@
                 <section class="humanities-reference" aria-label="参考资料">
                     <span class="humanities-reference__eyebrow">References</span>
                     <h2>参考资料</h2>
-                    <p>本页参考 Voyant Tools 对 Corpus Terms、Contexts 和 Links 的工具说明；史料阅读提示采用美国国会图书馆面向学生的观察、反思、提问与继续探究流程；词频边界参考信息检索教材中对 term frequency、stop words 与 bag-of-words 的说明。</p>
+                    <p>本页参考 Voyant Tools 对 Corpus Terms、Contexts 和 Links 的工具说明；史料阅读提示采用美国国会图书馆面向学生的观察、反思、提问与继续探究流程；文本编码边界参考 TEI P5 Guidelines；词频边界参考信息检索教材中对 term frequency、stop words 与 bag-of-words 的说明。</p>
                     <div class="humanities-reference__links">
-                        <a href="https://voyant-tools.org/docs/" target="_blank" rel="noopener">Voyant Tools Help</a>
+                        <a href="https://voyant-tools.org/docs/#!/guide/tools" target="_blank" rel="noopener">Voyant Tools · Tool Guide</a>
                         <a href="https://www.loc.gov/programs/teachers/getting-started-with-primary-sources/guides/" target="_blank" rel="noopener">Library of Congress · Primary Sources</a>
+                        <a href="https://tei-c.org/guidelines/p5/" target="_blank" rel="noopener">TEI P5 Guidelines</a>
                         <a href="https://nlp.stanford.edu/IR-book/html/htmledition/term-frequency-and-weighting-1.html" target="_blank" rel="noopener">Stanford IR Book · Term Frequency</a>
                     </div>
                 </section>
             </div>
         </section>
 
-        <section id="page-engineering" class="page engineering-page" aria-label="工程应用">
-            <div class="page-hero">
-                <div class="page-hero__text">
-                    <span class="page-hero__label page-hero__label--amber">Engineering</span>
-                    <h1 class="page-hero__title">工程应用</h1>
-                    <p class="page-hero__desc">把物理、数学和材料知识放进真实结构问题：从桥梁桁架受力开始，理解荷载路径、支座反力和杆件拉压。</p>
+        <section id="page-engineering" class="page frontier-page engineering-page" aria-label="工程应用" data-galaxy="frontier">
+            <div class="frontier-hero">
+                <div class="frontier-hero__text">
+                    <span class="frontier-hero__label frontier-hero__label--amber">Engineering</span>
+                    <h1 class="frontier-hero__title">工程应用</h1>
+                    <p class="frontier-hero__desc">把物理、数学和材料知识放进真实结构问题：从桥梁桁架受力开始，理解荷载路径、支座反力和杆件拉压。</p>
+                    <div class="frontier-hero__actions">
+                        <a class="frontier-hero__button frontier-hero__button--primary" href="#frontier-engineering-lab">开始实验</a>
+                        <a class="frontier-hero__button" href="#frontier" data-page="frontier">星系总览</a>
+                    </div>
                 </div>
-                <div class="page-hero__visual">
-                    <canvas id="hero-canvas-engineering" class="page-hero__canvas" role="img" aria-label="工程应用桁架结构装饰动画"></canvas>
+                <div class="frontier-hero__visual">
+                    <canvas id="hero-canvas-engineering" class="frontier-hero__canvas" role="img" aria-label="工程应用桁架结构装饰动画"></canvas>
                 </div>
             </div>
 
@@ -1325,7 +1500,7 @@
                     </div>
                 </section>
 
-                <section class="engineering-lab" aria-labelledby="bridge-truss-title">
+                <section id="frontier-engineering-lab" class="engineering-lab" aria-labelledby="bridge-truss-title">
                     <div class="engineering-lab__header">
                         <div>
                             <span class="engineering-lab__eyebrow">Interactive Structure</span>
@@ -1405,12 +1580,13 @@
                 <section class="engineering-reference" aria-label="参考资料">
                     <span class="engineering-reference__eyebrow">References</span>
                     <h2>参考资料</h2>
-                    <p>本页的桁架概念、节点法、整体平衡、零力杆和拉压符号说明参考开放静力学教材；页面数值用于课堂观察，不等同于真实桥梁设计验算。</p>
+                    <p>本页的桁架概念、节点法、整体平衡、零力杆和拉压符号说明参考开放静力学教材，并用 OpenStax 静态平衡示例补充整体受力平衡语境；页面数值用于课堂观察，不等同于真实桥梁设计验算。</p>
                     <div class="engineering-reference__links">
                         <a href="https://engineeringstatics.org/Chapter_06-trusses.html" target="_blank" rel="noopener">Engineering Statics · Trusses</a>
                         <a href="https://engineeringstatics.org/method-of-joints.html" target="_blank" rel="noopener">Engineering Statics · Method of Joints</a>
-                        <a href="https://engineeringstatics.org/Chapter_05.html" target="_blank" rel="noopener">Engineering Statics · Equilibrium</a>
+                        <a href="https://openstax.org/books/university-physics-volume-1/pages/12-2-examples-of-static-equilibrium" target="_blank" rel="noopener">OpenStax University Physics · Static Equilibrium</a>
                         <a href="https://engineeringstatics.org/Chapter_06-trusses.html#subsection-110" target="_blank" rel="noopener">Engineering Statics · Zero-Force Members</a>
+                        <a href="https://engineeringstatics.org/Chapter_05.html" target="_blank" rel="noopener">Engineering Statics · Equilibrium</a>
                     </div>
                 </section>
             </div>
@@ -4415,37 +4591,32 @@
             <div class="footer-brand">
                 <div class="footer-logo">
                     <div class="logo-icon"><i data-lucide="flask-conical"></i></div>
-                    <span>星序 Astra</span>
+                    <span>工科试验室</span>
                 </div>
-                <p class="footer-desc">「星序 Astra」项目下的工科实验室星系，覆盖数学、物理、化学、算法、生物、地球与宇宙科学、数据科学、信息技术、材料、工程与人文可视化。</p>
+                <p class="footer-desc">工科试验室专注数学、物理、化学、算法与生物五大学科的可视化学习。</p>
             </div>
             <div class="footer-links">
                 <div class="footer-col">
-                    <h4>学科探索</h4>
+                    <h4>工科试验室</h4>
                     <a href="#mathematics" data-page="mathematics">数学可视化</a>
                     <a href="#physics" data-page="physics">物理演示</a>
                     <a href="#chemistry" data-page="chemistry">化学实验</a>
                     <a href="#algorithms" data-page="algorithms">算法可视化</a>
                     <a href="#biology" data-page="biology">生物实验</a>
-                    <a href="#cosmos" data-page="cosmos">地球与宇宙</a>
-                    <a href="#datascience" data-page="datascience">数据科学</a>
-                    <a href="#infotech" data-page="infotech">信息技术</a>
-                    <a href="#materials" data-page="materials">材料微观</a>
-                    <a href="#humanities" data-page="humanities">人文可视化</a>
-                    <a href="#engineering" data-page="engineering">工程应用</a>
                 </div>
                 <div class="footer-col">
                     <h4>关于</h4>
+                    <a href="#planets" data-page="planets">返回星序总览</a>
                     <a href="#license" data-page="license">开源协议</a>
                     <a href="#changelog" data-page="changelog">更新日志</a>
                 </div>
             </div>
             <div class="footer-bottom">
-                <span>&copy; 2026 星序 Astra · 工科实验室星系</span>
+                <span>&copy; 2026 工科试验室</span>
                 <p class="footer-credit">Made by <a href="javascript:void(0)" class="footer-author-link" onclick="document.getElementById('qr-modal').classList.add('active')">Falling-feather</a>.</p>
                 <div class="running-time-footer" id="running-time-footer">
                     <p class="running-time-text">
-                        星序 Astra 已陪伴学习探索
+                        工科试验室已陪伴学习探索
                         <span id="rt-days">0</span> 天
                         <span id="rt-hours">0</span> 小时
                         <span id="rt-minutes">0</span> 分
@@ -4453,6 +4624,28 @@
                     </p>
                 </div>
             </div>
+        </div>
+    </footer>
+
+    <footer class="frontier-footer" id="frontier-footer" aria-label="未来星系页脚" hidden>
+        <div class="frontier-footer__container">
+            <div class="frontier-footer__brand">
+                <span class="frontier-footer__mark" aria-hidden="true"><i data-lucide="sparkles"></i></span>
+                <div>
+                    <strong>未来星系</strong>
+                    <p>星序下属的跨学科探索星系，承载地球与宇宙、工程、数据、信息、材料与人文可视化等二级知识方向。</p>
+                </div>
+            </div>
+            <nav class="frontier-footer__links" aria-label="未来星系二级目录">
+                <a href="#frontier" data-page="frontier">未来星系总览</a>
+                <a href="#cosmos" data-page="cosmos">地球与宇宙</a>
+                <a href="#engineering" data-page="engineering">工程应用</a>
+                <a href="#datascience" data-page="datascience">数据科学</a>
+                <a href="#infotech" data-page="infotech">信息技术</a>
+                <a href="#materials" data-page="materials">材料微观</a>
+                <a href="#humanities" data-page="humanities">人文可视化</a>
+                <a href="#planets" data-page="planets">返回星序总览</a>
+            </nav>
         </div>
     </footer>
 
@@ -4464,137 +4657,30 @@
         </div>
     </div>
 
-    <!-- External Libraries (pinned versions) -->
-    <!-- lucide: 本地优先，CDN 回退，确保图标在弱网环境下正常显示 -->
-    <script src="shared/js/lucide.min.js?v=20260417d"></script>
-    <script>if(typeof lucide==='undefined'){var s=document.createElement('script');s.src='https://unpkg.com/lucide@0.454.0/dist/umd/lucide.js';document.head.appendChild(s);}</script>
-    <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/ScrollTrigger.min.js" onload="if(window.initScrollAnimations)window.initScrollAnimations()"></script>
+    <!-- Application Scripts: minimal boot path -->
+    <script src="shared/js/config.js?v=20260619v63AsyncGsapP1"></script>
+    <script src="shared/js/router.js?v=20260619v63FrontierLifecycleP1"></script>
+    <script src="shared/js/main.js?v=20260619v63FrontierLifecycleP1"></script>
+    <script>
+        (function () {
+            try {
+                if (new URLSearchParams(location.search).get('noDeferred') === '1') return;
+            } catch (e) {}
 
-    <!-- Application Scripts: Shared -->
-    <script src="shared/js/config.js?v=20260618materialsP1"></script>
-    <script src="shared/js/learning-progress.js?v=20260422a"></script>
-    <script src="shared/js/back-to-top.js?v=20260424rr"></script>
-    <script src="shared/js/fab-trigger.js?v=20260528v61g"></script>
-    <script src="shared/js/touch-gestures.js?v=20260418a"></script>
-    <script src="shared/js/module-selector.js?v=20260618publicCleanP1"></script>
-    <script src="shared/js/experiment-guide.js?v=20260618publicCleanP1"></script>
-    <script src="shared/js/experiment-export.js?v=20260528v61f"></script>
-    <script src="shared/js/quiz-data.js?v=20260618refsP1"></script>
-    <script src="shared/js/experiment-quiz.js?v=20260606fix1"></script>
-    <script src="shared/js/experiment-favorites.js?v=20260423q"></script>
-    <script src="shared/js/experiment-rating.js?v=20260418g"></script>
-    <script src="shared/js/router.js?v=20260618fabLayerP1"></script>
-    <script src="shared/js/scroll-animations.js?v=20260618crossCanvasP1"></script>
-    <script src="shared/js/cards.js?v=20260618publicCleanP1"></script>
-    <script src="shared/js/common.js?v=20260417d"></script>
-    <!-- Scripts: Home -->
-    <script src="pages/home/home.js?v=20260605v62f"></script>
-    <script src="pages/planets/planets.js?v=20260618crossCanvasP1"></script>
-    <script src="pages/cosmos/earth-sun.js?v=20260618publicCleanP1"></script>
-    <script src="pages/datascience/linear-regression.js?v=20260618dataP2"></script>
-    <script src="pages/infotech/network-layers.js?v=20260618publicCleanP1"></script>
-    <script src="pages/materials/materials-lab.js?v=20260618materialsP1"></script>
-    <script src="pages/humanities/text-lab.js?v=20260618humanP3"></script>
-    <script src="pages/engineering/bridge-truss.js?v=20260618engP2"></script>
-    <!-- Scripts: Bootstrap (before deferred modules for fast homepage boot) -->
-    <script src="shared/js/global-search.js?v=20260424v45a"></script>
-    <script src="shared/js/keyboard-shortcuts.js?v=20260424v45b"></script>
-    <script src="shared/js/related-experiments.js?v=20260424v45c"></script>
-    <script src="shared/js/main.js?v=20260618materialsP1"></script>
-    <!-- Scripts: Subject modules (deferred — download in parallel, execute after core) -->
-    <script defer src="pages/mathematics/mathematics.js"></script>
-    <script defer src="pages/mathematics/calculus.js"></script>
-    <script defer src="pages/mathematics/geometry.js"></script>
-    <script defer src="pages/mathematics/complex-numbers.js"></script>
-    <script defer src="pages/mathematics/trigonometry.js"></script>
-    <script defer src="pages/mathematics/set-operations.js"></script>
-    <script defer src="pages/mathematics/probability.js"></script>
-    <script defer src="pages/mathematics/vector-ops.js"></script>
-    <script defer src="pages/mathematics/inequality.js"></script>
-    <script defer src="pages/mathematics/conic-sections.js"></script>
-    <script defer src="pages/mathematics/solid-geometry.js"></script>
-    <script defer src="pages/mathematics/permutation-combination.js"></script>
-    <script defer src="pages/mathematics/sequences.js"></script>
-    <script defer src="pages/mathematics/function-properties.js"></script>
-    <script defer src="pages/mathematics/exp-log.js"></script>
-    <script defer src="pages/mathematics/binomial-theorem.js"></script>
-    <script defer src="pages/mathematics/statistics-regression.js"></script>
-    <script defer src="pages/mathematics/modeling-numerical.js?v=20260618mathModelP1"></script>
-    <script defer src="pages/mathematics/spatial-vector.js"></script>
-    <script defer src="pages/mathematics/derivative-application.js?v=20260606fix1"></script>
-    <script defer src="pages/physics/physics.js"></script>
-    <script defer src="pages/physics/gas-laws.js?v=20260618publicClean1"></script>
-    <script defer src="pages/physics/thermodynamics.js?v=20260618thermoP1"></script>
-    <script defer src="pages/physics/electromagnetic.js"></script>
-    <script defer src="pages/physics/waves.js"></script>
-    <script defer src="pages/physics/relativity.js"></script>
-    <script defer src="pages/physics/fluid-dynamics.js?v=20260424v46e"></script>
-    <script defer src="pages/physics/optics.js"></script>
-    <script defer src="pages/physics/kinematics.js"></script>
-    <script defer src="pages/physics/projectile.js"></script>
-    <script defer src="pages/physics/circular-motion.js"></script>
-    <script defer src="pages/physics/energy-conservation.js?v=20260424v46b"></script>
-    <script defer src="pages/physics/circuit-analysis.js"></script>
-    <script defer src="pages/physics/electromagnetic-induction.js"></script>
-    <script defer src="pages/physics/alternating-current.js"></script>
-    <script defer src="pages/physics/gravitation.js?v=20260424v46d"></script>
-    <script defer src="pages/physics/force-composition.js?v=20260424v46a"></script>
-    <script defer src="pages/physics/momentum-conservation.js?v=20260424v46c"></script>
-    <script defer src="pages/physics/charged-particle.js"></script>
-    <script defer src="pages/physics/atomic-physics.js?v=20260618publicClean1"></script>
-    <script defer src="pages/physics/physics-zoom.js"></script>
-    <script defer src="pages/chemistry/periodic-table.js?v=20260618ptNames1"></script>
-    <script defer src="pages/chemistry/molecular-structure.js?v=20260424v45e"></script>
-    <script defer src="pages/chemistry/hybrid-orbitals.js?v=20260618hybFix1"></script>
-    <script defer src="pages/chemistry/crystal-structures.js?v=20260617crystalP2"></script>
-    <script defer src="pages/chemistry/chemical-reactions.js?v=20260424v45g"></script>
-    <script defer src="pages/chemistry/chemical-equilibrium.js?v=20260606chem1"></script>
-    <script defer src="pages/chemistry/electrochemistry.js?v=20260606chem1"></script>
-    <script defer src="pages/chemistry/chemical-bond.js?v=20260424v45h"></script>
-    <script defer src="pages/chemistry/organic-chemistry.js?v=20260424v45i"></script>
-    <script defer src="pages/chemistry/reaction-rate.js?v=20260618rateP1"></script>
-    <script defer src="pages/chemistry/solution-ionization.js?v=20260618ionP1"></script>
-    <script defer src="pages/chemistry/ionic-reaction.js"></script>
-    <script defer src="pages/chemistry/redox.js?v=20260618redoxP1"></script>
-    <script defer src="pages/chemistry/atomic-structure.js"></script>
-    <script defer src="pages/chemistry/element-compounds.js?v=20260530v62a"></script>
-    <script defer src="pages/chemistry/intermolecular-forces.js?v=20260617gasP1b"></script>
-    <script defer src="pages/chemistry/virtual-experiments.js?v=20260618refsP1"></script>
-    <script defer src="pages/algorithms/algorithms.js"></script>
-    <script defer src="pages/algorithms/search-algorithms.js"></script>
-    <script defer src="pages/algorithms/hash-tables.js?v=20260617bstP1b"></script>
-    <script defer src="pages/algorithms/bst-avl.js?v=20260617bstP1b"></script>
-    <script defer src="pages/algorithms/graph-algo.js"></script>
-    <script defer src="pages/algorithms/mst-compare.js?v=20260618mstP1"></script>
-    <script defer src="pages/algorithms/greedy-scheduling.js?v=20260618refsP1"></script>
-    <script defer src="pages/algorithms/data-structures.js"></script>
-    <script defer src="pages/algorithms/sorting-compare.js"></script>
-    <script defer src="pages/algorithms/recursion-vis.js"></script>
-    <script defer src="pages/algorithms/dynamic-programming.js?v=20260618algoTextP1"></script>
-    <script defer src="pages/algorithms/string-matching.js?v=20260618algoTextP1"></script>
-    <script defer src="pages/biology/biology.js?v=20260416b"></script>
-    <script defer src="pages/biology/cell-structure.js?v=20260617gasP1b"></script>
-    <script defer src="pages/biology/dna-helix.js?v=20260416b"></script>
-    <script defer src="pages/biology/photosynthesis.js?v=20260618photoSourceP1d"></script>
-    <script defer src="pages/biology/genetics.js?v=20260416b"></script>
-    <script defer src="pages/biology/mitosis.js?v=20260617gasP1b"></script>
-    <script defer src="pages/biology/neural-regulation.js?v=20260618neuralP1"></script>
-    <script defer src="pages/biology/immune-system.js?v=20260618immuneP2"></script>
-    <script defer src="pages/biology/ecosystem.js?v=20260423a"></script>
-    <script defer src="pages/biology/biology-zoom.js?v=20260416b"></script>
-    <script defer src="pages/biology/meiosis.js?v=20260617gasP1b"></script>
-    <script defer src="pages/biology/gene-expression.js?v=20260618genexpP1"></script>
-    <script defer src="pages/biology/cellular-respiration.js?v=20260618cellRespSourceP1"></script>
-    <script defer src="pages/biology/substance-transport.js?v=20260618transportSourceP1"></script>
-    <script defer src="pages/biology/gene-mutation.js?v=20260618gmutP3"></script>
-    <script defer src="pages/biology/enzyme-properties.js?v=20260618enzymeSourceP1b"></script>
-    <script defer src="pages/biology/homeostasis.js?v=20260618homeostasisP1"></script>
-    <script defer src="pages/biology/humoral-regulation.js?v=20260618humoralP2"></script>
-    <script defer src="pages/biology/population-community.js?v=20260618popcommP1"></script>
-    <script defer src="pages/biology/material-cycles.js?v=20260618cyclesP1"></script>
-    <script defer src="pages/biology/gene-engineering.js?v=20260618gengP1"></script>
-    <script defer src="pages/about/about.js?v=20260618publicCleanP1"></script>
+            function requestActiveGalaxySupport() {
+                if (window.Router && typeof Router.loadActiveGalaxySupport === 'function') {
+                    Router.loadActiveGalaxySupport();
+                }
+            }
+
+            setTimeout(requestActiveGalaxySupport, 320);
+            window.addEventListener('hashchange', function () {
+                setTimeout(requestActiveGalaxySupport, 80);
+            });
+        })();
+    </script>
+    <!-- Page scripts are loaded on demand by Router. -->
+    <!-- Subject experiment scripts are loaded on demand by ModuleSelector. -->
 
     <!-- v4.5-α1 全局搜索浮层 -->
     <div class="gsearch-overlay" id="global-search-overlay" role="dialog" aria-modal="true" aria-label="全局实验搜索">

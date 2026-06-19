@@ -1,14 +1,19 @@
 /* ===== Engineering Applications ===== */
 
-.engineering-page .page-hero__label--amber {
+.engineering-page {
+    --frontier-accent: #d8a348;
+    --frontier-accent-rgb: 216, 163, 72;
+}
+
+.engineering-page .frontier-hero__label--amber {
     color: #d8a348;
 }
 
-.engineering-page .page-hero {
+.engineering-page .frontier-hero {
     display: grid !important;
 }
 
-.engineering-page .page-hero__canvas {
+.engineering-page .frontier-hero__canvas {
     opacity: 0.72;
 }
 

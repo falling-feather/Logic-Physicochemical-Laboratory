@@ -173,6 +173,7 @@
             const ctx = this.ctx;
             const w = this.canvas.clientWidth;
             const h = this.canvas.clientHeight;
+            if (w <= 0 || h <= 0) return;
             ctx.clearRect(0, 0, w, h);
 
             const compact = w < 720;
@@ -586,7 +587,8 @@
         },
 
         _roundRect(ctx, x, y, w, h, r) {
-            const radius = Math.min(r, w / 2, h / 2);
+            if (w <= 0 || h <= 0) return;
+            const radius = Math.max(0, Math.min(r, w / 2, h / 2));
             ctx.beginPath();
             ctx.moveTo(x + radius, y);
             ctx.arcTo(x + w, y, x + w, y + h, radius);

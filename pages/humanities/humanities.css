@@ -1,14 +1,19 @@
 /* ===== Humanities Text Visualization ===== */
 
-.humanities-page .page-hero {
+.humanities-page {
+    --frontier-accent: #7ed7c1;
+    --frontier-accent-rgb: 126, 215, 193;
+}
+
+.humanities-page .frontier-hero {
     display: grid !important;
 }
 
-.humanities-page .page-hero__label--humanities {
+.humanities-page .frontier-hero__label--humanities {
     color: #7ed7c1;
 }
 
-.humanities-page .page-hero__canvas {
+.humanities-page .frontier-hero__canvas {
     opacity: 0.8;
 }
 

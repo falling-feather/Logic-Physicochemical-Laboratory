@@ -420,7 +420,9 @@ body.planets-scroll-locked .navbar {
 }
 
 #page-planets .planets-stage.has-open-menu .planets-galaxy:not(.is-selected) {
-    opacity: 0.56;
+    opacity: 0.22;
+    filter: blur(1px) saturate(0.68);
+    pointer-events: none;
 }
 
 #page-planets .planets-stage.has-open-menu .planets-galaxy-label {
@@ -436,9 +438,11 @@ body.planets-scroll-locked .navbar {
     width: min(360px, calc(100% - 56px));
     padding: 20px;
     border-radius: 8px;
-    background: linear-gradient(180deg, rgba(10, 22, 36, 0.72), rgba(6, 12, 21, 0.56));
-    border: 1px solid rgba(151, 182, 215, 0.16);
-    box-shadow: 0 20px 70px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    background: linear-gradient(180deg, rgba(10, 22, 36, 0.94), rgba(6, 12, 21, 0.9));
+    border: 1px solid rgba(151, 182, 215, 0.24);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(16px) saturate(1.15);
+    -webkit-backdrop-filter: blur(16px) saturate(1.15);
     opacity: 0;
     transform: translateY(12px);
     pointer-events: none;

@@ -58,6 +58,39 @@
     opacity: 0.8;
 }
 
+.navbar .nav-logo--frontier,
+.navbar .nav-menu--frontier {
+    display: none;
+}
+
+.navbar--frontier {
+    background: rgba(6, 9, 16, 0.88);
+    border-bottom-color: rgba(242, 200, 107, 0.18);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+}
+
+.navbar--frontier .nav-logo--englab,
+.navbar--frontier .nav-menu--englab {
+    display: none;
+}
+
+.navbar--frontier .nav-logo--frontier,
+.navbar--frontier .nav-menu--frontier {
+    display: flex;
+}
+
+.navbar--frontier .nav-container {
+    max-width: 1180px;
+}
+
+.navbar--frontier .nav-item.active {
+    color: #f2c86b;
+}
+
+.navbar--frontier .nav-indicator {
+    background: linear-gradient(90deg, #f2c86b, #65e4f0);
+}
+
 .logo-icon {
     width: 28px;
     height: 28px;
@@ -67,6 +100,11 @@
     background: var(--accent-blue);
     border-radius: var(--radius-sm);
     clip-path: polygon(0 0, 100% 0, 100% 75%, 75% 100%, 0 100%);
+}
+
+.logo-icon--frontier {
+    background: linear-gradient(135deg, #f2c86b, #65e4f0);
+    box-shadow: 0 0 18px rgba(242, 200, 107, 0.22);
 }
 
 .logo-icon i {

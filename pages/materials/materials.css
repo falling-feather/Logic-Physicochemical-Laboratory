@@ -1,14 +1,19 @@
 /* ===== Materials & Microstructure ===== */
 
-.materials-page .page-hero {
+.materials-page {
+    --frontier-accent: #e0b56a;
+    --frontier-accent-rgb: 224, 181, 106;
+}
+
+.materials-page .frontier-hero {
     display: grid !important;
 }
 
-.materials-page .page-hero__label--materials {
+.materials-page .frontier-hero__label--materials {
     color: #e0b56a;
 }
 
-.materials-page .page-hero__canvas {
+.materials-page .frontier-hero__canvas {
     opacity: 0.78;
 }
 

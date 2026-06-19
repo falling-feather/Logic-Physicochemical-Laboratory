@@ -62,7 +62,9 @@
             this.render();
         },
 
-        destroy() {},
+        destroy() {
+            if (this._boundResize) window.removeEventListener('resize', this._boundResize);
+        },
 
         render() {
             this._syncControls();

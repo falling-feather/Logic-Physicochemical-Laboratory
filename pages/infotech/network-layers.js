@@ -77,6 +77,7 @@
         destroy() {
             if (this.rafId) cancelAnimationFrame(this.rafId);
             this.rafId = 0;
+            if (this._boundResize) window.removeEventListener('resize', this._boundResize);
         },
 
         render() {

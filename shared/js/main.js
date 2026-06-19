@@ -1,4 +1,4 @@
-// ===== Main Application Bootstrap =====
+﻿// ===== Main Application Bootstrap =====
 
 function initApp() {
     if (window.__loadProgress) window.__loadProgress(30);
@@ -37,6 +37,12 @@ function initApp() {
 
     // 1h. Initialize keyboard shortcuts (v4.5-α2)
     if (typeof KeyboardShortcuts !== 'undefined') KeyboardShortcuts.init();
+
+    // 1i. Render future-galaxy learning frames from CONFIG.learningDesign
+    if (typeof FrontierLearning !== 'undefined') {
+        const frontierPage = (location.hash || '').slice(1).split('/')[0];
+        FrontierLearning.init(frontierPage);
+    }
 
     // 2. Homepage init moved to Router.onPageEnter('home') for lazy loading
 
@@ -181,12 +187,25 @@ function initBackToTop() {
 // ===== Footer Visibility =====
 function updateFooterVisibility() {
     const footer = document.getElementById('site-footer');
-    if (!footer) return;
+    const frontierFooter = document.getElementById('frontier-footer');
+    if (!footer && !frontierFooter) return;
 
-    // Hide footer on home page, show on content pages
+    const frontierPages = new Set(['frontier', 'cosmos', 'engineering', 'datascience', 'infotech', 'materials', 'humanities']);
+    const sync = () => {
+        const active = document.querySelector('.page.active');
+        const page = active && active.id ? active.id.replace(/^page-/, '') : 'planets';
+        const showFrontier = frontierPages.has(page);
+        const showEnglab = page !== 'home' && page !== 'planets' && !showFrontier;
+        if (footer) footer.style.display = showEnglab ? '' : 'none';
+        if (frontierFooter) {
+            frontierFooter.hidden = !showFrontier;
+            frontierFooter.classList.toggle('is-visible', showFrontier);
+        }
+    };
+
+    // Hide or switch footers according to the active galaxy shell.
     const observer = new MutationObserver(() => {
-        const homePage = document.getElementById('page-home');
-        footer.style.display = homePage && homePage.classList.contains('active') ? 'none' : '';
+        sync();
     });
 
     observer.observe(document.querySelector('.main-content'), {
@@ -197,69 +216,121 @@ function updateFooterVisibility() {
     });
 
     // Initial check
-    const homePage = document.getElementById('page-home');
-    footer.style.display = homePage && homePage.classList.contains('active') ? 'none' : '';
+    sync();
 }
 
 window.updateFooterVisibility = updateFooterVisibility;
 
-const ENGLAB_ASSET_VERSION = '20260618materialsP1';
-const HTTP_FALLBACK_ASSETS = [
+const ENGLAB_ASSET_VERSION = '20260619v63FrontierLifecycleP1';
+const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',
-    './shared/css/tokens.css?v=' + ENGLAB_ASSET_VERSION,
-    './shared/css/base.css?v=' + ENGLAB_ASSET_VERSION,
-    './shared/css/typography.css?v=' + ENGLAB_ASSET_VERSION,
-    './shared/css/navbar.css?v=' + ENGLAB_ASSET_VERSION,
-    './shared/css/page-layout.css?v=' + ENGLAB_ASSET_VERSION,
-    './shared/css/cards.css?v=' + ENGLAB_ASSET_VERSION,
-    './shared/css/module-selector.css?v=' + ENGLAB_ASSET_VERSION,
-    './shared/css/responsive.css?v=' + ENGLAB_ASSET_VERSION,
-    './pages/home/home.css?v=' + ENGLAB_ASSET_VERSION,
-    './shared/js/lucide.min.js?v=' + ENGLAB_ASSET_VERSION,
-    './shared/js/config.js?v=' + ENGLAB_ASSET_VERSION,
-    './shared/js/module-selector.js?v=' + ENGLAB_ASSET_VERSION,
+    './shared/css/tokens.css?v=20260424ss',
+    './shared/css/base.css?v=20260619v63FrontierLifecycleP1',
+    './shared/css/typography.css?v=20260526v61c',
+    './shared/css/navbar.css?v=20260619v63AsyncGsapP1',
+    './shared/css/page-layout.css?v=20260606v62e',
+    './shared/css/responsive.css?v=20260619v63FrontierLifecycleP1',
+    './shared/js/lucide.min.js?v=20260417d',
+    './shared/js/config.js?v=20260619v63AsyncGsapP1',
     './shared/js/router.js?v=' + ENGLAB_ASSET_VERSION,
-    './shared/js/scroll-animations.js?v=' + ENGLAB_ASSET_VERSION,
-    './shared/js/cards.js?v=' + ENGLAB_ASSET_VERSION,
-    './shared/js/common.js?v=' + ENGLAB_ASSET_VERSION,
-    './shared/js/main.js?v=' + ENGLAB_ASSET_VERSION,
-    './pages/home/home.js?v=' + ENGLAB_ASSET_VERSION,
-    './pages/planets/planets.css?v=' + ENGLAB_ASSET_VERSION,
-    './pages/planets/planets.js?v=' + ENGLAB_ASSET_VERSION,
-    './pages/cosmos/cosmos.css?v=' + ENGLAB_ASSET_VERSION,
-    './pages/cosmos/earth-sun.js?v=' + ENGLAB_ASSET_VERSION,
-    './pages/datascience/datascience.css?v=' + ENGLAB_ASSET_VERSION,
-    './pages/datascience/linear-regression.js?v=' + ENGLAB_ASSET_VERSION,
-    './pages/infotech/infotech.css?v=' + ENGLAB_ASSET_VERSION,
-    './pages/infotech/network-layers.js?v=' + ENGLAB_ASSET_VERSION,
-    './pages/materials/materials.css?v=' + ENGLAB_ASSET_VERSION,
-    './pages/materials/materials-lab.js?v=' + ENGLAB_ASSET_VERSION,
-    './pages/humanities/humanities.css?v=' + ENGLAB_ASSET_VERSION,
-    './pages/humanities/text-lab.js?v=' + ENGLAB_ASSET_VERSION,
-    './pages/engineering/engineering.css?v=' + ENGLAB_ASSET_VERSION,
-    './pages/engineering/bridge-truss.js?v=' + ENGLAB_ASSET_VERSION
+    './shared/js/main.js?v=' + ENGLAB_ASSET_VERSION
 ];
+
+const GALAXY_HTTP_FALLBACK_ASSETS = {
+    astra: [
+        './pages/planets/planets.css?v=20260619v63FrontierLifecycleP1',
+        './pages/planets/planets.js?v=20260619v63AsyncGsapP1'
+    ],
+    englab: [
+        './shared/css/cards.css?v=20260619v63FrontierLifecycleP1',
+        './shared/css/module-selector.css?v=20260619v63FrontierLifecycleP1',
+        './shared/css/experiment-guide.css?v=20260619v63FrontierLifecycleP1',
+        './shared/css/experiment-export.css?v=20260424v44a',
+        './shared/css/experiment-quiz.css?v=20260422z',
+        './shared/css/experiment-favorites.css?v=20260424oo',
+        './shared/css/experiment-rating.css?v=20260422z',
+        './shared/css/experiment-polish.css?v=20260526v61c',
+        './pages/home/home.css?v=20260605v62e',
+        './pages/mathematics/mathematics.css?v=20260618mathModelP1',
+        './pages/physics/physics.css?v=20260618thermoP1',
+        './pages/chemistry/chemistry.css?v=20260618ionP1',
+        './pages/algorithms/algorithms.css?v=20260618algoTextP1',
+        './pages/biology/biology.css?v=20260618neuralP1',
+        './shared/js/module-selector.js?v=20260619v63StartupLazyP1',
+        './shared/js/experiment-guide.js?v=20260619v63FrontierLifecycleP1',
+        './shared/js/experiment-export.js?v=20260528v61f',
+        './shared/js/quiz-data.js?v=20260618refsP1',
+        './shared/js/experiment-quiz.js?v=20260606fix1',
+        './shared/js/experiment-favorites.js?v=20260423q',
+        './shared/js/experiment-rating.js?v=20260418g',
+        './shared/js/global-search.js?v=20260424v45a',
+        './shared/js/keyboard-shortcuts.js?v=20260424v45b',
+        './shared/js/related-experiments.js?v=20260424v45c',
+        './pages/home/home.js?v=20260619v63StartupLazyP1'
+    ],
+    frontier: [
+        './shared/js/frontier-learning.js?v=20260619v63FrontierLifecycleP1',
+        './shared/js/scroll-animations.js?v=20260619v63FrontierLifecycleP1',
+        './shared/js/cards.js?v=20260619v63FrontierLifecycleP1',
+        './shared/js/common.js?v=20260417d',
+        './pages/cosmos/cosmos.css?v=20260619v63AsyncGsapP1',
+        './pages/cosmos/earth-sun.js?v=20260619v63FrontierLifecycleP1',
+        './pages/datascience/datascience.css?v=20260619v63AsyncGsapP1',
+        './pages/datascience/linear-regression.js?v=20260619v63FrontierLifecycleP1',
+        './pages/infotech/infotech.css?v=20260619v63AsyncGsapP1',
+        './pages/infotech/network-layers.js?v=20260619v63FrontierLifecycleP1',
+        './pages/materials/materials.css?v=20260619v63AsyncGsapP1',
+        './pages/materials/materials-lab.js?v=20260619v63AsyncGsapP1',
+        './pages/humanities/humanities.css?v=20260619v63AsyncGsapP1',
+        './pages/humanities/text-lab.js?v=20260618humanP3',
+        './pages/engineering/engineering.css?v=20260619v63AsyncGsapP1',
+        './pages/engineering/bridge-truss.js?v=20260619v63FrontierLifecycleP1'
+    ]
+};
+
+function getFallbackGalaxy() {
+    if (typeof Router !== 'undefined' && typeof Router.getActiveGalaxy === 'function') {
+        return Router.getActiveGalaxy();
+    }
+    if (window.__astraBoot && window.__astraBoot.galaxy) return window.__astraBoot.galaxy;
+    const hash = (window.location.hash || '#planets').slice(1).split('/')[0];
+    const frontierPages = ['frontier', 'cosmos', 'engineering', 'datascience', 'infotech', 'materials', 'humanities'];
+    const coursePages = ['home', 'mathematics', 'physics', 'chemistry', 'algorithms', 'biology', 'license', 'changelog'];
+    if (frontierPages.includes(hash)) return 'frontier';
+    if (coursePages.includes(hash)) return 'englab';
+    return 'astra';
+}
+
+function getFallbackAssetsForGalaxy(galaxy) {
+    const group = GALAXY_HTTP_FALLBACK_ASSETS[galaxy] || GALAXY_HTTP_FALLBACK_ASSETS.astra;
+    return Array.from(new Set(CORE_HTTP_FALLBACK_ASSETS.concat(group)));
+}
 
 function updateCacheDiagnostics(patch) {
     window.__englabCache = window.__englabCache || {};
     Object.assign(window.__englabCache, patch || {});
     try {
-        const raw = JSON.parse(localStorage.getItem('englab-cache-diagnostics') || '{}');
+        const raw = JSON.parse(window.localStorage && window.localStorage.getItem('englab-cache-diagnostics') || '{}');
         const next = Object.assign(raw, patch || {}, { updatedAt: Date.now() });
-        localStorage.setItem('englab-cache-diagnostics', JSON.stringify(next));
+        if (window.localStorage) {
+            window.localStorage.setItem('englab-cache-diagnostics', JSON.stringify(next));
+        }
     } catch (_) {}
 }
 
-function warmHttpCacheFallback() {
+function warmHttpCacheFallback(galaxy) {
+    const targetGalaxy = galaxy || getFallbackGalaxy();
+    const assets = getFallbackAssetsForGalaxy(targetGalaxy);
     updateCacheDiagnostics({
         cacheMode: 'http-fallback',
         transport: 'browser-http-cache',
-        swRegistered: false
+        swRegistered: false,
+        warmedGalaxy: targetGalaxy
     });
 
     const runWarmup = function () {
-        Promise.all(HTTP_FALLBACK_ASSETS.map(function (url) {
+        Promise.all(assets.map(function (url) {
             return fetch(url, {
                 credentials: 'same-origin',
                 cache: 'force-cache'
@@ -273,6 +344,7 @@ function warmHttpCacheFallback() {
             updateCacheDiagnostics({
                 warmedAssetCount: warmedUrls.length,
                 warmedAssetUrls: warmedUrls.slice(0, 12),
+                warmedGalaxy: targetGalaxy,
                 lastWarmupAt: Date.now()
             });
         });
@@ -285,6 +357,14 @@ function warmHttpCacheFallback() {
     }
 }
 
+window.warmGalaxyCache = function (galaxy) {
+    if (!galaxy) return;
+    if (!window.__warmedGalaxies) window.__warmedGalaxies = {};
+    if (window.__warmedGalaxies[galaxy]) return;
+    window.__warmedGalaxies[galaxy] = true;
+    warmHttpCacheFallback(galaxy);
+};
+
 function registerServiceWorker() {
     if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
 
@@ -292,7 +372,8 @@ function registerServiceWorker() {
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
     let forcedMode = null;
     try {
-        forcedMode = new URLSearchParams(location.search).get('cacheMode') || localStorage.getItem('englab-force-cache-mode');
+        forcedMode = new URLSearchParams(location.search).get('cacheMode') ||
+            (window.localStorage && window.localStorage.getItem('englab-force-cache-mode'));
     } catch (_) {}
 
     const supportsSW = 'serviceWorker' in navigator;

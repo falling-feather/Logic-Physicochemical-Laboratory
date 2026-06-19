@@ -1,14 +1,19 @@
 /* ===== Information Technology Foundations ===== */
 
-.infotech-page .page-hero {
+.infotech-page {
+    --frontier-accent: #5ee0d8;
+    --frontier-accent-rgb: 94, 224, 216;
+}
+
+.infotech-page .frontier-hero {
     display: grid !important;
 }
 
-.infotech-page .page-hero__label--info {
+.infotech-page .frontier-hero__label--info {
     color: #5ee0d8;
 }
 
-.infotech-page .page-hero__canvas {
+.infotech-page .frontier-hero__canvas {
     opacity: 0.76;
 }
 

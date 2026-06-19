@@ -1,14 +1,19 @@
 /* ===== Earth & Space Science ===== */
 
-.cosmos-page .page-hero {
+.cosmos-page {
+    --frontier-accent: #74b9ff;
+    --frontier-accent-rgb: 116, 185, 255;
+}
+
+.cosmos-page .frontier-hero {
     display: grid !important;
 }
 
-.cosmos-page .page-hero__label--sky {
+.cosmos-page .frontier-hero__label--sky {
     color: #74b9ff;
 }
 
-.cosmos-page .page-hero__canvas {
+.cosmos-page .frontier-hero__canvas {
     opacity: 0.76;
 }
 

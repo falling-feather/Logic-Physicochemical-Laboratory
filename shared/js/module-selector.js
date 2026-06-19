@@ -8,6 +8,110 @@ const ModuleSelector = {
     _sidebars: {},      // { pageName: sidebar DOM element }
     _sidebarOpen: {},   // { pageName: bool }
     _swipeBackCtrls: {}, // { pageName: SwipeBack controller }
+    _scriptPromises: {},
+    _moduleScripts: {
+        // Mathematics
+        'function-graph': 'pages/mathematics/mathematics.js',
+        'calculus': 'pages/mathematics/calculus.js',
+        'geometry': 'pages/mathematics/geometry.js',
+        'complex': 'pages/mathematics/complex-numbers.js',
+        'trigonometry': 'pages/mathematics/trigonometry.js',
+        'set-operations': 'pages/mathematics/set-operations.js',
+        'probability': 'pages/mathematics/probability.js',
+        'vector-ops': 'pages/mathematics/vector-ops.js',
+        'inequality': 'pages/mathematics/inequality.js',
+        'conic-sections': 'pages/mathematics/conic-sections.js',
+        'solid-geometry': 'pages/mathematics/solid-geometry.js',
+        'permutation-combination': 'pages/mathematics/permutation-combination.js',
+        'sequences': 'pages/mathematics/sequences.js',
+        'function-properties': 'pages/mathematics/function-properties.js',
+        'exp-log': 'pages/mathematics/exp-log.js',
+        'binomial-theorem': 'pages/mathematics/binomial-theorem.js',
+        'statistics-regression': 'pages/mathematics/statistics-regression.js',
+        'modeling-numerical': 'pages/mathematics/modeling-numerical.js?v=20260618mathModelP1',
+        'spatial-vector': 'pages/mathematics/spatial-vector.js',
+        'derivative-application': 'pages/mathematics/derivative-application.js?v=20260606fix1',
+
+        // Physics
+        'mechanics': 'pages/physics/physics.js',
+        'gas-laws': 'pages/physics/gas-laws.js?v=20260618publicClean1',
+        'thermodynamics': 'pages/physics/thermodynamics.js?v=20260618thermoP1',
+        'electromagnetism': 'pages/physics/electromagnetic.js',
+        'waves': 'pages/physics/waves.js',
+        'relativity': 'pages/physics/relativity.js',
+        'fluid-dynamics': 'pages/physics/fluid-dynamics.js?v=20260424v46e',
+        'optics': 'pages/physics/optics.js',
+        'kinematics': 'pages/physics/kinematics.js',
+        'projectile': 'pages/physics/projectile.js',
+        'circular-motion': 'pages/physics/circular-motion.js',
+        'energy-conservation': 'pages/physics/energy-conservation.js?v=20260424v46b',
+        'circuit-analysis': 'pages/physics/circuit-analysis.js',
+        'em-induction': 'pages/physics/electromagnetic-induction.js',
+        'alternating-current': 'pages/physics/alternating-current.js',
+        'gravitation': 'pages/physics/gravitation.js?v=20260424v46d',
+        'force-composition': 'pages/physics/force-composition.js?v=20260424v46a',
+        'momentum-conservation': 'pages/physics/momentum-conservation.js?v=20260424v46c',
+        'charged-particle': 'pages/physics/charged-particle.js',
+        'atomic-physics': 'pages/physics/atomic-physics.js?v=20260618publicClean1',
+
+        // Chemistry
+        'periodic-table': 'pages/chemistry/periodic-table.js?v=20260618ptNames1',
+        'molecular-structure': 'pages/chemistry/molecular-structure.js?v=20260424v45e',
+        'hybrid-orbitals': 'pages/chemistry/hybrid-orbitals.js?v=20260618hybFix1',
+        'crystal-structures': 'pages/chemistry/crystal-structures.js?v=20260617crystalP2',
+        'reactions': 'pages/chemistry/chemical-reactions.js?v=20260424v45g',
+        'chemical-equilibrium': 'pages/chemistry/chemical-equilibrium.js?v=20260606chem1',
+        'electrochemistry': 'pages/chemistry/electrochemistry.js?v=20260606chem1',
+        'chemical-bond': 'pages/chemistry/chemical-bond.js?v=20260424v45h',
+        'organic-chemistry': 'pages/chemistry/organic-chemistry.js?v=20260424v45i',
+        'reaction-rate': 'pages/chemistry/reaction-rate.js?v=20260618rateP1',
+        'solution-ionization': 'pages/chemistry/solution-ionization.js?v=20260618ionP1',
+        'ionic-reaction': 'pages/chemistry/ionic-reaction.js',
+        'redox': 'pages/chemistry/redox.js?v=20260618redoxP1',
+        'atomic-structure': 'pages/chemistry/atomic-structure.js',
+        'element-compounds': 'pages/chemistry/element-compounds.js?v=20260530v62a',
+        'intermolecular-forces': 'pages/chemistry/intermolecular-forces.js?v=20260617gasP1b',
+        'experiments': 'pages/chemistry/virtual-experiments.js?v=20260618refsP1',
+
+        // Algorithms
+        'sorting': 'pages/algorithms/algorithms.js',
+        'searching': 'pages/algorithms/search-algorithms.js',
+        'hash-tables': 'pages/algorithms/hash-tables.js?v=20260617bstP1b',
+        'bst-avl': 'pages/algorithms/bst-avl.js?v=20260617bstP1b',
+        'graph': 'pages/algorithms/graph-algo.js',
+        'mst-compare': 'pages/algorithms/mst-compare.js?v=20260618mstP1',
+        'greedy-scheduling': 'pages/algorithms/greedy-scheduling.js?v=20260618refsP1',
+        'data-structures': 'pages/algorithms/data-structures.js',
+        'sorting-compare': 'pages/algorithms/sorting-compare.js',
+        'recursion-vis': 'pages/algorithms/recursion-vis.js',
+        'dynamic-programming': 'pages/algorithms/dynamic-programming.js?v=20260618algoTextP1',
+        'string-matching': 'pages/algorithms/string-matching.js?v=20260618algoTextP1',
+
+        // Biology
+        'cell-structure': 'pages/biology/cell-structure.js?v=20260617gasP1b',
+        'dna': 'pages/biology/dna-helix.js?v=20260416b',
+        'photosynthesis': 'pages/biology/photosynthesis.js?v=20260618photoSourceP1d',
+        'enzyme-properties': 'pages/biology/enzyme-properties.js?v=20260618enzymeSourceP1b',
+        'homeostasis': 'pages/biology/homeostasis.js?v=20260618homeostasisP1',
+        'humoral-regulation': 'pages/biology/humoral-regulation.js?v=20260618humoralP2',
+        'genetics': 'pages/biology/genetics.js?v=20260416b',
+        'mitosis': 'pages/biology/mitosis.js?v=20260617gasP1b',
+        'meiosis': 'pages/biology/meiosis.js?v=20260617gasP1b',
+        'gene-expression': 'pages/biology/gene-expression.js?v=20260618genexpP1',
+        'gene-engineering': 'pages/biology/gene-engineering.js?v=20260618gengP1',
+        'cellular-respiration': 'pages/biology/cellular-respiration.js?v=20260618cellRespSourceP1',
+        'substance-transport': 'pages/biology/substance-transport.js?v=20260618transportSourceP1',
+        'gene-mutation': 'pages/biology/gene-mutation.js?v=20260618gmutP3',
+        'neural-regulation': 'pages/biology/neural-regulation.js?v=20260618neuralP1',
+        'immune-system': 'pages/biology/immune-system.js?v=20260618immuneP2',
+        'population-community': 'pages/biology/population-community.js?v=20260618popcommP1',
+        'material-cycles': 'pages/biology/material-cycles.js?v=20260618cyclesP1',
+        'ecosystem': 'pages/biology/ecosystem.js?v=20260423a'
+    },
+    _pageEnhancementScripts: {
+        physics: ['pages/physics/physics-zoom.js'],
+        biology: ['pages/biology/biology.js?v=20260416b', 'pages/biology/biology-zoom.js?v=20260416b']
+    },
 
     _getExperimentGuide() {
         if (window.ExperimentGuide) return window.ExperimentGuide;
@@ -452,6 +556,59 @@ const ModuleSelector = {
 
     // ── Lazy Module Initialization ──
     // Only initialize a module when it is first opened.
+    _loadScript(src) {
+        if (!src) return Promise.resolve();
+        if (this._scriptPromises[src]) return this._scriptPromises[src];
+
+        this._scriptPromises[src] = new Promise((resolve, reject) => {
+            const plainSrc = src.split('?')[0];
+            const existing = Array.from(document.scripts).find(script => {
+                const current = script.getAttribute('src') || '';
+                return current === src || current.split('?')[0] === plainSrc;
+            });
+
+            if (existing && existing.dataset.moduleLoaderLoaded === 'true') {
+                resolve();
+                return;
+            }
+            if (existing && !existing.dataset.moduleLoaderSrc) {
+                resolve();
+                return;
+            }
+
+            const script = existing || document.createElement('script');
+            if (!existing) {
+                script.src = src;
+                script.async = true;
+                script.dataset.moduleLoaderSrc = src;
+                document.body.appendChild(script);
+            }
+
+            script.addEventListener('load', () => {
+                script.dataset.moduleLoaderLoaded = 'true';
+                resolve();
+            }, { once: true });
+
+            script.addEventListener('error', () => {
+                delete this._scriptPromises[src];
+                reject(new Error(`Failed to load ${src}`));
+            }, { once: true });
+        });
+
+        return this._scriptPromises[src];
+    },
+
+    _loadModuleAssets(page, moduleId) {
+        const scripts = [];
+        if (this._moduleScripts[moduleId]) scripts.push(this._moduleScripts[moduleId]);
+        if (this._pageEnhancementScripts[page]) scripts.push(...this._pageEnhancementScripts[page]);
+
+        return scripts.reduce(
+            (chain, src) => chain.then(() => this._loadScript(src)),
+            Promise.resolve()
+        );
+    },
+
     _initModule(page, moduleId) {
         const key = `${page}:${moduleId}`;
         if (this._initialized[key]) {
@@ -568,11 +725,15 @@ const ModuleSelector = {
 
         const initFn = initMap[moduleId];
         if (initFn) {
-            // Small delay to ensure DOM is visible and has layout before init
             const runInit = (attempt = 0) => {
+                if (this.activeModule[page] !== moduleId) return;
                 const initialized = initFn();
                 if (initialized === false && attempt < 20) {
                     setTimeout(() => runInit(attempt + 1), 100);
+                    return;
+                }
+                if (initialized === false) {
+                    console.warn('[ModuleSelector] init function unavailable after script load:', moduleId);
                     return;
                 }
                 this._initialized[key] = true;
@@ -584,7 +745,11 @@ const ModuleSelector = {
                 }
                 this._showModuleTools(page, moduleId);
             };
-            setTimeout(() => runInit(), 50);
+            this._loadModuleAssets(page, moduleId)
+                .then(() => setTimeout(() => runInit(), 50))
+                .catch(error => {
+                    console.warn('[ModuleSelector] failed to load module assets:', moduleId, error);
+                });
         }
     },
 

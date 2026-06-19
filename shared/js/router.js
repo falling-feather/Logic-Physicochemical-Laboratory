@@ -7,6 +7,88 @@ const Router = {
     _queuedNavigation: null,
     _pageEnterComplete: true,
     _runningTimeId: null,
+    _hashReconcileId: null,
+    _pendingModule: null,
+    _pendingAnchor: null,
+    _lastAppliedAnchor: null,
+    _pageScriptPromises: {},
+    _galaxySupportPromises: {},
+    frontierPages: ['frontier', 'cosmos', 'engineering', 'datascience', 'infotech', 'materials', 'humanities'],
+    coursePages: ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology'],
+    _activeGalaxy: null,
+    _galaxyCacheKey: 'astra-galaxy-cache-meta',
+    _galaxyCacheVersion: '20260619v63FrontierLifecycleP1',
+    _galaxyPageMap: {
+        planets: 'astra',
+        home: 'englab',
+        mathematics: 'englab',
+        physics: 'englab',
+        chemistry: 'englab',
+        algorithms: 'englab',
+        biology: 'englab',
+        frontier: 'frontier',
+        cosmos: 'frontier',
+        engineering: 'frontier',
+        datascience: 'frontier',
+        infotech: 'frontier',
+        materials: 'frontier',
+        humanities: 'frontier',
+        license: 'englab',
+        changelog: 'englab'
+    },
+    courseSupportScripts: [
+        'shared/js/lucide.min.js?v=20260417d',
+        'shared/js/module-selector.js?v=20260619v63StartupLazyP1'
+    ],
+    galaxySupportScripts: {
+        astra: [
+            'shared/js/lucide.min.js?v=20260417d'
+        ],
+        englab: [
+            'shared/js/learning-progress.js?v=20260422a',
+            'shared/js/back-to-top.js?v=20260424rr',
+            'shared/js/fab-trigger.js?v=20260528v61g',
+            'shared/js/touch-gestures.js?v=20260418a',
+            'shared/js/experiment-guide.js?v=20260619v63FrontierLifecycleP1',
+            'shared/js/experiment-export.js?v=20260528v61f',
+            'shared/js/quiz-data.js?v=20260618refsP1',
+            'shared/js/experiment-quiz.js?v=20260606fix1',
+            'shared/js/experiment-favorites.js?v=20260423q',
+            'shared/js/experiment-rating.js?v=20260418g',
+            'shared/js/global-search.js?v=20260424v45a',
+            'shared/js/keyboard-shortcuts.js?v=20260424v45b',
+            'shared/js/related-experiments.js?v=20260424v45c'
+        ],
+        frontier: [
+            'shared/js/lucide.min.js?v=20260417d',
+            'shared/js/frontier-learning.js?v=20260619v63FrontierLifecycleP1',
+            'shared/js/scroll-animations.js?v=20260619v63FrontierLifecycleP1'
+        ]
+    },
+    pageScripts: {
+        home: 'pages/home/home.js?v=20260619v63StartupLazyP1',
+        planets: 'pages/planets/planets.js?v=20260619v63AsyncGsapP1',
+        cosmos: 'pages/cosmos/earth-sun.js?v=20260619v63FrontierLifecycleP1',
+        datascience: 'pages/datascience/linear-regression.js?v=20260619v63FrontierLifecycleP1',
+        infotech: 'pages/infotech/network-layers.js?v=20260619v63FrontierLifecycleP1',
+        materials: 'pages/materials/materials-lab.js?v=20260619v63AsyncGsapP1',
+        humanities: 'pages/humanities/text-lab.js?v=20260618humanP3',
+        engineering: 'pages/engineering/bridge-truss.js?v=20260619v63FrontierLifecycleP1',
+        license: 'pages/about/about.js?v=20260619v63FrontierLifecycleP1',
+        changelog: 'pages/about/about.js?v=20260619v63FrontierLifecycleP1'
+    },
+    pageReadyChecks: {
+        home: () => typeof window.initHome === 'function',
+        planets: () => typeof window.initPlanets === 'function',
+        cosmos: () => typeof window.initCosmosSeasons === 'function',
+        datascience: () => typeof window.initLinearRegressionLab === 'function',
+        infotech: () => typeof window.initNetworkLayersLab === 'function',
+        materials: () => typeof window.initMaterialsLab === 'function',
+        humanities: () => typeof window.initHumanitiesLab === 'function',
+        engineering: () => typeof window.initBridgeTruss === 'function',
+        license: () => typeof window.initLicense === 'function',
+        changelog: () => typeof window.initChangelog === 'function'
+    },
     // Store origin point for radial wipe (set by selectModule or default center)
     transitionOrigin: { x: 50, y: 50 },
 
@@ -23,13 +105,22 @@ const Router = {
                 const page = item.dataset.page;
                 if (page) {
                     // If already on this page, reset to gallery view (back to experiment list)
-                    if (page === this.currentPage && document.querySelector('.page.active')) {
+                    if (page === this.currentPage && this._isActivePage(page)) {
+                        this._pendingModule = null;
+                        this._pendingAnchor = null;
+                        this._lastAppliedAnchor = null;
                         if (page !== 'home' && typeof ModuleSelector !== 'undefined' && ModuleSelector.activeModule[page]) {
                             ModuleSelector.closeModule(page);
+                        }
+                        if (window.location.hash.slice(1) !== page) {
+                            history.pushState(null, '', `#${page}`);
                         }
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                         return;
                     }
+                    this._pendingModule = null;
+                    this._pendingAnchor = null;
+                    this._lastAppliedAnchor = null;
                     // Use nav item center as transition origin
                     const rect = item.getBoundingClientRect();
                     this.transitionOrigin = {
@@ -46,6 +137,7 @@ const Router = {
         const initialPage = parsedInit.page;
         this.currentPage = initialPage;
         this._pendingModule = parsedInit.moduleId;
+        this._pendingAnchor = parsedInit.anchorId || null;
 
         // Ensure the correct page has 'active' class (HTML defaults to planets v6.1.0-alpha5)
         if (initialPage !== 'planets') {
@@ -64,38 +156,246 @@ const Router = {
         //       否则 HTML 默认的 .navbar--transparent 不会被替换为 .navbar--hidden。
         const initNavbar = document.getElementById('navbar');
         if (initNavbar) {
+            const isFrontier = this._isFrontierPage(initialPage);
             initNavbar.classList.toggle('navbar--transparent', initialPage === 'home');
             initNavbar.classList.toggle('navbar--hidden', initialPage === 'planets');
+            initNavbar.classList.toggle('navbar--frontier', isFrontier);
         }
+        this._toggleGalaxyFooters(initialPage);
+        this._syncGalaxyRuntime(initialPage);
         this.onPageEnter(initialPage);
 
         // Show running time footer for non-home pages
-        this._toggleRunningTime(initialPage !== 'home' && initialPage !== 'planets');
+        this._toggleRunningTime(this._usesEnglabFooter(initialPage));
 
         window.addEventListener('hashchange', () => this.handleHash());
 
         // Handle popstate (back/forward)
         window.addEventListener('popstate', () => this.handleHash());
+
+        this._startHashReconcile();
     },
 
     /**
-     * 解析 hash，支持 "subject/experiment" 深链接格式。
-     * 返回 { page, moduleId }，moduleId 为 null 表示未指定。
+     * 解析 hash，支持 "subject/experiment" 深链接与未来星系页内锚点。
+     * 返回 { page, moduleId, anchorId }，moduleId 与 anchorId 均可为空。
      */
     _parseHash() {
         const raw = (window.location.hash || '').slice(1);
-        if (!raw) return { page: 'planets', moduleId: null };
+        if (!raw) return { page: 'planets', moduleId: null, anchorId: null };
+        const anchorPage = this._pageForFrontierAnchor(raw);
+        if (anchorPage) return { page: anchorPage, moduleId: null, anchorId: raw };
         const idx = raw.indexOf('/');
-        if (idx === -1) return { page: raw, moduleId: null };
-        return { page: raw.slice(0, idx), moduleId: raw.slice(idx + 1) || null };
+        if (idx === -1) return { page: raw, moduleId: null, anchorId: null };
+        return { page: raw.slice(0, idx), moduleId: raw.slice(idx + 1) || null, anchorId: null };
+    },
+
+    _pageForFrontierAnchor(anchorId) {
+        if (!anchorId || !anchorId.startsWith('frontier-')) return null;
+        return this.frontierPages.find((page) => anchorId.startsWith(`frontier-${page}-`)) || null;
+    },
+
+    _galaxyForPage(page) {
+        return this._galaxyPageMap[page] || 'englab';
+    },
+
+    getActiveGalaxy() {
+        return this._activeGalaxy || this._galaxyForPage(this.currentPage);
+    },
+
+    _readCookieValue(name) {
+        try {
+            const prefix = `${encodeURIComponent(name)}=`;
+            const item = document.cookie.split('; ').find((entry) => entry.startsWith(prefix));
+            return item ? decodeURIComponent(item.slice(prefix.length)) : null;
+        } catch (e) {
+            return null;
+        }
+    },
+
+    _writeCookieValue(name, value) {
+        try {
+            const maxAge = 60 * 60 * 24 * 180;
+            document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Max-Age=${maxAge}; Path=/; SameSite=Lax`;
+        } catch (e) {}
+    },
+
+    _readGalaxyCacheMeta() {
+        const fallback = {
+            version: this._galaxyCacheVersion,
+            loadedGalaxies: {},
+            visits: {}
+        };
+        try {
+            const stored = window.localStorage && window.localStorage.getItem(this._galaxyCacheKey);
+            const raw = JSON.parse(stored || this._readCookieValue(this._galaxyCacheKey) || '{}');
+            if (raw.version !== this._galaxyCacheVersion) {
+                return fallback;
+            }
+            raw.loadedGalaxies = raw.loadedGalaxies || {};
+            raw.visits = raw.visits || {};
+            return raw;
+        } catch (e) {
+            return fallback;
+        }
+    },
+
+    _writeGalaxyCacheMeta(meta) {
+        try {
+            const value = JSON.stringify(meta);
+            if (window.localStorage) {
+                window.localStorage.setItem(this._galaxyCacheKey, value);
+            }
+            this._writeCookieValue(this._galaxyCacheKey, value);
+        } catch (e) {}
+    },
+
+    _markGalaxyLoaded(galaxy, page) {
+        const meta = this._readGalaxyCacheMeta();
+        const now = Date.now();
+        meta.lastGalaxy = galaxy;
+        meta.lastPage = page;
+        meta.updatedAt = now;
+        meta.loadedGalaxies[galaxy] = {
+            firstLoadedAt: meta.loadedGalaxies[galaxy] && meta.loadedGalaxies[galaxy].firstLoadedAt || now,
+            lastLoadedAt: now
+        };
+        meta.visits[galaxy] = (meta.visits[galaxy] || 0) + 1;
+        this._writeGalaxyCacheMeta(meta);
+        window.__astraGalaxyCache = meta;
+        if (typeof window.warmGalaxyCache === 'function') {
+            window.warmGalaxyCache(galaxy);
+        }
+    },
+
+    loadActiveGalaxySupport() {
+        return this._loadGalaxySupport(this.getActiveGalaxy(), this.currentPage);
+    },
+
+    _loadGalaxySupport(galaxy, page) {
+        try {
+            if (new URLSearchParams(location.search).get('noDeferred') === '1') {
+                return Promise.resolve();
+            }
+        } catch (e) {}
+
+        const scripts = this.galaxySupportScripts[galaxy] || [];
+        if (!scripts.length) {
+            this._bootGalaxySupport(galaxy, page);
+            return Promise.resolve();
+        }
+
+        if (!this._galaxySupportPromises[galaxy]) {
+            this._galaxySupportPromises[galaxy] = scripts.reduce(
+                (chain, src) => chain.then(() => this._loadScriptOnce(src, 'routerGalaxyScript', galaxy)),
+                Promise.resolve()
+            ).catch((error) => {
+                delete this._galaxySupportPromises[galaxy];
+                throw error;
+            });
+        }
+
+        return this._galaxySupportPromises[galaxy].then(() => {
+            this._bootGalaxySupport(galaxy, page);
+        });
+    },
+
+    _bootGalaxySupport(galaxy) {
+        const current = this.currentPage;
+        if (this._galaxyForPage(current) !== galaxy) return;
+
+        if (typeof lucide !== 'undefined') {
+            try { lucide.createIcons(); } catch (e) {}
+        }
+
+        if (galaxy === 'englab') {
+            if (typeof ExperimentGuide !== 'undefined') ExperimentGuide.init();
+            if (typeof ExperimentExport !== 'undefined') ExperimentExport.init();
+            if (typeof ExperimentQuiz !== 'undefined') ExperimentQuiz.init();
+            if (typeof ExperimentFavorites !== 'undefined') ExperimentFavorites.init();
+            if (typeof ExperimentRating !== 'undefined') ExperimentRating.init();
+            if (typeof LearningProgress !== 'undefined') LearningProgress.init();
+            if (typeof GlobalSearch !== 'undefined') GlobalSearch.init();
+            if (typeof KeyboardShortcuts !== 'undefined') KeyboardShortcuts.init();
+
+            const isCoursePage = this.coursePages.includes(current);
+            if (typeof BackToTop !== 'undefined') {
+                if (isCoursePage) BackToTop.show(); else BackToTop.hide();
+            }
+            if (typeof FabTrigger !== 'undefined') {
+                if (isCoursePage) FabTrigger.show(); else FabTrigger.hide();
+            }
+            return;
+        }
+
+        if (galaxy === 'frontier') {
+            if (typeof FrontierLearning !== 'undefined') FrontierLearning.init(current);
+            if (typeof window.initScrollAnimations === 'function') window.initScrollAnimations();
+            if (current !== 'home' && current !== 'planets' && typeof window.initPageScrollAnimations === 'function') {
+                window.initPageScrollAnimations(current);
+            }
+            if (current !== 'home' && current !== 'planets' && typeof window.initHeroVisual === 'function') {
+                window.initHeroVisual(current);
+            }
+        }
+    },
+
+    _syncGalaxyRuntime(page) {
+        const nextGalaxy = this._galaxyForPage(page);
+        const previousGalaxy = this._activeGalaxy;
+        if (previousGalaxy && previousGalaxy !== nextGalaxy) {
+            this._unloadGalaxyRuntime(previousGalaxy, nextGalaxy);
+        }
+        this._activeGalaxy = nextGalaxy;
+        document.documentElement.dataset.activeGalaxy = nextGalaxy;
+        document.body.dataset.activeGalaxy = nextGalaxy;
+        this._markGalaxyLoaded(nextGalaxy, page);
+        this._loadGalaxySupport(nextGalaxy, page).catch((error) => {
+            console.warn('[Router] galaxy support load failed:', nextGalaxy, error);
+        });
+    },
+
+    _unloadGalaxyRuntime(previousGalaxy, nextGalaxy) {
+        try {
+            window.dispatchEvent(new CustomEvent('astra:galaxy-unload', {
+                detail: { previousGalaxy, nextGalaxy }
+            }));
+        } catch (e) {}
+
+        if (previousGalaxy === 'englab' && typeof ModuleSelector !== 'undefined' && ModuleSelector.activeModule) {
+            this.coursePages.forEach((subject) => {
+                if (ModuleSelector.activeModule[subject] && typeof ModuleSelector.closeModule === 'function') {
+                    try { ModuleSelector.closeModule(subject); } catch (e) {}
+                }
+            });
+            try {
+                if (typeof BackToTop !== 'undefined') BackToTop.hide();
+                if (typeof FabTrigger !== 'undefined') FabTrigger.hide();
+            } catch (e) {}
+        }
+
+        if (previousGalaxy === 'frontier') {
+            if (typeof FrontierLearning !== 'undefined' && typeof FrontierLearning.destroy === 'function') {
+                try { FrontierLearning.destroy(); } catch (e) {}
+            }
+            if (typeof destroyAllHeroVisuals === 'function') {
+                try { destroyAllHeroVisuals(); } catch (e) {}
+            }
+        }
     },
 
     handleHash() {
         const parsed = this._parseHash();
         const page = parsed.page;
         this._pendingModule = parsed.moduleId;
-        // 同 page 但深链接变化：直接调 ModuleSelector，不重走转场
-        if (page === this.currentPage && document.querySelector('.page.active')) {
+        this._pendingAnchor = parsed.anchorId || null;
+        if (!this._pendingAnchor) this._lastAppliedAnchor = null;
+        // 同 page 但深链接或页内锚点变化：直接处理，不重走转场
+        if (page === this.currentPage && this._isActivePage(page)) {
+            if (this._pendingAnchor) {
+                this._applyPendingAnchor();
+                return;
+            }
             this._applyPendingModule(page);
             return;
         }
@@ -107,7 +407,10 @@ const Router = {
             this._queueNavigation(page, animate);
             return;
         }
-        if (page === this.currentPage && document.querySelector('.page.active')) return;
+        if (page === this.currentPage && this._isActivePage(page)) {
+            if (this._pendingAnchor) this._applyPendingAnchor();
+            return;
+        }
         this.isTransitioning = true; // Set immediately to prevent race conditions
 
         const currentEl = document.querySelector('.page.active');
@@ -122,7 +425,7 @@ const Router = {
 
         // Update hash without triggering hashchange
         // 保留可能存在的深链接模块后缀（如 #physics/momentum-conservation）
-        const desiredHash = this._pendingModule ? `${page}/${this._pendingModule}` : page;
+        const desiredHash = this._pendingAnchor || (this._pendingModule ? `${page}/${this._pendingModule}` : page);
         if (window.location.hash.slice(1) !== desiredHash) {
             history.pushState(null, '', `#${desiredHash}`);
         }
@@ -134,23 +437,30 @@ const Router = {
         // v4.3：home 透明化；v4.4：planets 大屏完全隐藏顶栏（作为目录承载更沉浸）
         const navbar = document.getElementById('navbar');
         if (navbar) {
+            const isFrontier = this._isFrontierPage(page);
             navbar.classList.toggle('navbar--transparent', page === 'home');
             navbar.classList.toggle('navbar--hidden', page === 'planets');
+            navbar.classList.toggle('navbar--frontier', isFrontier);
         }
+        this._toggleGalaxyFooters(page);
 
         // Toggle running time footer
-        this._toggleRunningTime(page !== 'home' && page !== 'planets');
+        this._toggleRunningTime(this._usesEnglabFooter(page));
 
-        const prevPage = this.currentPage;
+        const prevPage = currentEl && currentEl.id
+            ? currentEl.id.replace(/^page-/, '')
+            : this.currentPage;
         this.currentPage = page;
 
         // Cleanup previous page modules
         this.onPageLeave(prevPage);
+        this._syncGalaxyRuntime(page);
 
         // Respect prefers-reduced-motion
         const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-        if (!animate || !currentEl || typeof gsap === 'undefined' || prefersReduced) {
+        const isDirectoryTransition = page === 'planets' || prevPage === 'planets';
+        if (!animate || isDirectoryTransition || !currentEl || typeof gsap === 'undefined' || prefersReduced) {
             // No animation (initial load, no GSAP, or reduced motion)
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             targetEl.classList.add('active');
@@ -173,6 +483,7 @@ const Router = {
             materials: 'rgba(224,181,106,0.12)',
             humanities: 'rgba(126,215,193,0.12)',
             engineering: 'rgba(216,163,72,0.12)',
+            frontier: 'rgba(242,200,107,0.12)',
             home: 'rgba(91,141,206,0.08)',
             planets: 'rgba(0,255,213,0.10)'
         };
@@ -221,7 +532,7 @@ const Router = {
             // animatePageContent will animate them in individually afterwards.
             if (page !== 'home' && page !== 'planets') {
                 const heroKids = targetEl.querySelectorAll(
-                    '.page-hero__eyebrow, .page-hero__title, .page-hero__desc, .page-hero__actions, .page-hero__visual'
+                    '.page-hero__eyebrow, .page-hero__label, .page-hero__title, .page-hero__desc, .page-hero__actions, .page-hero__visual, .frontier-hero__label, .frontier-hero__title, .frontier-hero__desc, .frontier-hero__visual'
                 );
                 if (heroKids.length) gsap.set(heroKids, { y: 15, opacity: 0 });
             }
@@ -256,6 +567,7 @@ const Router = {
         this._queuedNavigation = {
             page,
             moduleId: this._pendingModule,
+            anchorId: this._pendingAnchor,
             animate
         };
     },
@@ -271,13 +583,39 @@ const Router = {
         const next = this._queuedNavigation;
         this._queuedNavigation = null;
         this._pendingModule = next.moduleId;
+        this._pendingAnchor = next.anchorId || null;
 
-        if (next.page === this.currentPage && document.querySelector('.page.active')) {
+        if (next.page === this.currentPage && this._isActivePage(next.page)) {
+            if (this._pendingAnchor) {
+                this._applyPendingAnchor();
+                return;
+            }
             this._applyPendingModule(next.page);
             return;
         }
 
         setTimeout(() => this.navigateTo(next.page, next.animate), 0);
+    },
+
+    _startHashReconcile() {
+        if (this._hashReconcileId) return;
+        this._hashReconcileId = setInterval(() => {
+            if (this.isTransitioning) return;
+            const parsed = this._parseHash();
+            const page = parsed.page;
+            if (!document.getElementById(`page-${page}`)) return;
+            if (page === this.currentPage && this._isActivePage(page)) {
+                if (parsed.anchorId && parsed.anchorId !== this._lastAppliedAnchor) {
+                    this._pendingAnchor = parsed.anchorId;
+                    this._applyPendingAnchor();
+                }
+                return;
+            }
+
+            this._pendingModule = parsed.moduleId;
+            this._pendingAnchor = parsed.anchorId || null;
+            this.navigateTo(page, false);
+        }, 250);
     },
 
     // Staggered entry for page sub-elements
@@ -293,9 +631,9 @@ const Router = {
         }
 
         // Animate hero elements with stagger
-        const hero = pageEl.querySelector('.page-hero');
+        const hero = pageEl.querySelector('.page-hero, .frontier-hero');
         if (hero) {
-            const heroChildren = hero.querySelectorAll('.page-hero__eyebrow, .page-hero__title, .page-hero__desc, .page-hero__actions, .page-hero__visual');
+            const heroChildren = hero.querySelectorAll('.page-hero__eyebrow, .page-hero__label, .page-hero__title, .page-hero__desc, .page-hero__actions, .page-hero__visual, .frontier-hero__label, .frontier-hero__title, .frontier-hero__desc, .frontier-hero__visual');
             if (heroChildren.length) {
                 // Hero children are already pre-hidden (y:15, opacity:0) in Phase 3.
                 // Use gsap.to() to avoid re-setting the start state which would cause a flash.
@@ -318,6 +656,9 @@ const Router = {
             item.classList.remove('active');
             item.removeAttribute('aria-current');
         });
+        document.querySelectorAll('.nav-indicator').forEach(indicator => {
+            indicator.style.opacity = '0';
+        });
         const activeNav = document.querySelector(`.nav-item[data-page="${page}"]`);
         if (activeNav) {
             activeNav.classList.add('active');
@@ -329,9 +670,10 @@ const Router = {
     },
 
     moveIndicator(activeItem) {
-        const indicator = document.querySelector('.nav-indicator');
+        const indicator = activeItem && activeItem.parentElement
+            ? activeItem.parentElement.querySelector('.nav-indicator')
+            : null;
         if (!indicator || !activeItem) {
-            if (indicator) indicator.style.opacity = '0';
             return;
         }
 
@@ -344,7 +686,134 @@ const Router = {
         indicator.style.left = (itemRect.left - menuRect.left) + 'px';
     },
 
+    _isPageScriptReady(page) {
+        const check = this.pageReadyChecks[page];
+        return !check || check();
+    },
+
+    _loadScriptOnce(src, markerName, markerValue) {
+        if (!src) return Promise.resolve();
+        const key = markerName + ':' + src;
+        if (this._pageScriptPromises[key]) return this._pageScriptPromises[key];
+
+        this._pageScriptPromises[key] = new Promise((resolve, reject) => {
+            const plainSrc = src.split('?')[0];
+            const existing = Array.from(document.scripts).find(script => {
+                const current = script.getAttribute('src') || '';
+                return current === src || current.split('?')[0] === plainSrc;
+            });
+
+            if (existing && !existing.dataset[markerName]) {
+                resolve();
+                return;
+            }
+
+            const script = existing || document.createElement('script');
+            if (!existing) {
+                script.src = src;
+                script.async = true;
+                script.dataset[markerName] = markerValue || 'true';
+                document.body.appendChild(script);
+            }
+
+            script.addEventListener('load', () => resolve(), { once: true });
+            script.addEventListener('error', () => {
+                delete this._pageScriptPromises[key];
+                reject(new Error(`Failed to load script: ${src}`));
+            }, { once: true });
+        });
+
+        return this._pageScriptPromises[key];
+    },
+
+    _loadPageScript(page) {
+        const src = this.pageScripts[page];
+        if (!src || this._isPageScriptReady(page)) return Promise.resolve();
+        if (this._pageScriptPromises[src]) return this._pageScriptPromises[src];
+
+        this._pageScriptPromises[src] = new Promise((resolve, reject) => {
+            const plainSrc = src.split('?')[0];
+            const existing = Array.from(document.scripts).find(script => {
+                const current = script.getAttribute('src') || '';
+                return current === src || current.split('?')[0] === plainSrc;
+            });
+
+            if (existing && !existing.dataset.routerPageScript) {
+                resolve();
+                return;
+            }
+
+            const script = existing || document.createElement('script');
+            if (!existing) {
+                script.src = src;
+                script.async = true;
+                script.dataset.routerPageScript = page;
+                document.body.appendChild(script);
+            }
+
+            script.addEventListener('load', () => resolve(), { once: true });
+            script.addEventListener('error', () => {
+                delete this._pageScriptPromises[src];
+                reject(new Error(`Failed to load page script: ${src}`));
+            }, { once: true });
+        });
+
+        return this._pageScriptPromises[src];
+    },
+
+    _needsCourseSupport(page) {
+        return this.coursePages.includes(page) && typeof ModuleSelector === 'undefined';
+    },
+
+    _loadCourseSupport(page) {
+        if (!this.coursePages.includes(page)) return Promise.resolve();
+        return this.courseSupportScripts.reduce(
+            (chain, src) => chain.then(() => this._loadScriptOnce(src, 'routerSupportScript', page)),
+            Promise.resolve()
+        ).then(() => {
+            if (typeof ModuleSelector !== 'undefined' && !ModuleSelector.__routerSupportBooted) {
+                ModuleSelector.__routerSupportBooted = true;
+                ModuleSelector.__bootedAfterMinimalStart = true;
+                ModuleSelector.init();
+            }
+            if (typeof lucide !== 'undefined') {
+                try { lucide.createIcons(); } catch (e) {}
+            }
+        });
+    },
+
+    _ensurePageScript(page) {
+        const pageScriptReady = this._isPageScriptReady(page);
+        const needsCourseSupport = this._needsCourseSupport(page);
+        if (pageScriptReady && !needsCourseSupport) {
+            if (this.coursePages.includes(page)) this._loadCourseSupport(page);
+            return true;
+        }
+        try {
+            if (new URLSearchParams(location.search).get('noPageScript') === '1') return true;
+        } catch (e) {}
+        setTimeout(() => {
+            this._loadCourseSupport(page)
+                .then(() => this._loadPageScript(page))
+                .then(() => {
+                    if (this.currentPage === page && this._isActivePage(page)) {
+                        this.onPageEnter(page);
+                    }
+                })
+                .catch(error => {
+                    console.warn('[Router] page script load failed:', page, error);
+                });
+        }, 120);
+        return false;
+    },
+
     onPageEnter(page) {
+        if (!this._ensurePageScript(page)) {
+            this._pageEnterComplete = true;
+            this._flushQueuedNavigation();
+            return;
+        }
+
         // v6.1.0-alpha6 修复：home / planets 是「单屏锁定式」展示页，若沿用前一页的 scrollTop，
         // 加上 home-scroll-locked 后 body 高度被钉死在 100vh，旧滚动偏移会让首页卡在下方留黑框。
         // 用双阶段重置：同步置 0 + rAF 再置 0（覆盖 GSAP 转场结束后浏览器恢复滚动的边缘场景）。
@@ -420,6 +889,7 @@ const Router = {
 
         // 深链接：URL 形如 #physics/momentum-conservation 时，自动打开对应实验
         this._applyPendingModule(page);
+        this._applyPendingAnchor();
         this._pageEnterComplete = true;
         this._flushQueuedNavigation();
     },
@@ -445,9 +915,60 @@ const Router = {
         setTimeout(() => tryOpen(5), 0);
     },
 
+    _applyPendingAnchor() {
+        const anchorId = this._pendingAnchor;
+        if (!anchorId) return;
+        const target = document.getElementById(anchorId);
+        if (!target) return;
+        const context = target.previousElementSibling && target.previousElementSibling.classList.contains('frontier-section-context')
+            ? target.previousElementSibling
+            : null;
+        const scrollTarget = context || target;
+        this._lastAppliedAnchor = anchorId;
+        this._pendingAnchor = null;
+        setTimeout(() => {
+            try {
+                const offset = 88;
+                const rootStyle = document.documentElement.style;
+                const bodyStyle = document.body.style;
+                const previousRootBehavior = rootStyle.scrollBehavior;
+                const previousBodyBehavior = bodyStyle.scrollBehavior;
+                const align = () => {
+                    const top = Math.max(0, scrollTarget.getBoundingClientRect().top + window.pageYOffset - offset);
+                    const scroller = document.scrollingElement || document.documentElement;
+                    rootStyle.scrollBehavior = 'auto';
+                    bodyStyle.scrollBehavior = 'auto';
+                    window.scrollTo(0, top);
+                    if (scroller) scroller.scrollTop = top;
+                    document.documentElement.scrollTop = top;
+                    document.body.scrollTop = top;
+                };
+                requestAnimationFrame(align);
+                setTimeout(align, 80);
+                setTimeout(align, 220);
+                setTimeout(() => {
+                    rootStyle.scrollBehavior = previousRootBehavior;
+                    bodyStyle.scrollBehavior = previousBodyBehavior;
+                }, 260);
+                target.setAttribute('tabindex', '-1');
+                target.focus({ preventScroll: true });
+            } catch (e) { /* noop */ }
+        }, 0);
+    },
+
     onPageLeave(page) {
         if (page === 'home') {
             document.body.classList.remove('home-scroll-locked');
+        }
+
+        if (page !== 'home' && page !== 'planets' && typeof destroyHeroVisual === 'function') {
+            try { destroyHeroVisual(page); } catch (e) { /* ignore */ }
+        }
+
+        if (this._galaxyForPage(page) === 'frontier'
+            && typeof FrontierLearning !== 'undefined'
+            && typeof FrontierLearning.destroy === 'function') {
+            try { FrontierLearning.destroy(page); } catch (e) { /* ignore */ }
         }
 
         if (page === 'home') {
@@ -611,6 +1132,32 @@ const Router = {
                 clearInterval(this._runningTimeId);
                 this._runningTimeId = null;
             }
+        }
+    },
+
+    _isFrontierPage(page) {
+        return this.frontierPages.includes(page);
+    },
+
+    _isActivePage(page) {
+        const active = document.querySelector('.page.active');
+        return !!active && active.id === `page-${page}`;
+    },
+
+    _usesEnglabFooter(page) {
+        return page !== 'home' && page !== 'planets' && !this._isFrontierPage(page);
+    },
+
+    _toggleGalaxyFooters(page) {
+        const englabFooter = document.getElementById('site-footer');
+        const frontierFooter = document.getElementById('frontier-footer');
+        const showFrontier = this._isFrontierPage(page);
+        const showEnglab = this._usesEnglabFooter(page);
+
+        if (englabFooter) englabFooter.style.display = showEnglab ? '' : 'none';
+        if (frontierFooter) {
+            frontierFooter.hidden = !showFrontier;
+            frontierFooter.classList.toggle('is-visible', showFrontier);
         }
     }
 };

@@ -217,13 +217,13 @@ const CONFIG = {
         humanities: 'teal'
     },
 
-    // v5.0：星系拓扑 — 顶层是「多星系」选择，每个星系内含若干学科行星或跳转到外部子站
+    // v6.3：星系拓扑 — 星序总览只承载一级星系；各星系内部再组织二级知识目录
     galaxies: [
         {
             id: 'englab',
-            label: '工科实验室',
+            label: '工科试验室',
             tagline: 'ENGINEERING · LAB',
-            desc: '数学 · 物理 · 化学 · 算法 · 生物 五大学科 86 个可视化实验',
+            desc: '数学 · 物理 · 化学 · 算法 · 生物 五大学科 88 个可视化实验',
             color: '#3aa9ff',
             subjects: ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology']
         },
@@ -238,8 +238,8 @@ const CONFIG = {
         },
         {
             id: 'frontier',
-            label: '未来星图',
-            tagline: 'CROSS-DISCIPLINE · LEARNING MAP',
+            label: '未来星系',
+            tagline: 'FRONTIER · GALAXY',
             desc: '地球与宇宙科学 · 工程应用 · 数据科学与 AI · 信息技术 · 材料与人文可视化',
             color: '#f2c86b',
             subjects: ['cosmos', 'engineering', 'datascience', 'infotech', 'materials', 'humanities']
@@ -248,7 +248,7 @@ const CONFIG = {
 
     // v6.3：学习设计层 — 给画廊卡片、学科概览和后续星系扩展提供统一教学元数据
     learningDesign: {
-        updatedAt: '2026-06-18',
+        updatedAt: '2026-06-19',
         sourceNote: '学习内容参考高中课程主线与开放教材；拓展主题会说明模型假设、近似条件和适合的学习层级。',
         sources: [
             { label: 'OpenStax Chemistry 2e · Le Chatelier', url: 'https://openstax.org/books/chemistry-2e/pages/13-3-shifting-equilibria-le-chateliers-principle' },
@@ -327,7 +327,9 @@ const CONFIG = {
             { label: 'OpenDSA · 0/1 Knapsack Problem', url: 'https://opendsa-server.cs.vt.edu/ODSA/Books/Everything/html/Knapsack.html' },
             { label: 'NIST DADS · Knuth-Morris-Pratt Algorithm', url: 'https://xlinux.nist.gov/dads/HTML/knuthMorrisPratt.html' },
             { label: 'NASA Space Place · Seasons', url: 'https://spaceplace.nasa.gov/seasons/en/' },
+            { label: 'NASA/JPL · The Change of Seasons', url: 'https://www.jpl.nasa.gov/edu/resources/gallery/the-change-of-seasons-views-from-space/' },
             { label: 'NOAA GML · Solar Calculation Details', url: 'https://gml.noaa.gov/grad/solcalc/calcdetails.html' },
+            { label: 'OpenStax University Physics · Static Equilibrium', url: 'https://openstax.org/books/university-physics-volume-1/pages/12-2-examples-of-static-equilibrium' },
             { label: 'scikit-learn · LinearRegression', url: 'https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LinearRegression.html' },
             { label: 'IETF RFC 1034 · Domain Names', url: 'https://www.rfc-editor.org/rfc/rfc1034.html' },
             { label: 'IETF RFC 9113 · HTTP/2', url: 'https://www.rfc-editor.org/rfc/rfc9113.html' },
@@ -336,6 +338,7 @@ const CONFIG = {
             { label: 'Engineering Statics · Trusses', url: 'https://engineeringstatics.org/Chapter_06-trusses.html' },
             { label: 'Engineering Statics · Method of Joints', url: 'https://engineeringstatics.org/method-of-joints.html' },
             { label: 'Library of Congress · Primary Sources', url: 'https://www.loc.gov/programs/teachers/getting-started-with-primary-sources/guides/' },
+            { label: 'TEI P5 Guidelines', url: 'https://tei-c.org/guidelines/p5/' },
             { label: 'Voyant Tools · Tool Guide', url: 'https://voyant-tools.org/docs/#!/guide/tools' },
             { label: 'Stanford IR Book · Term Frequency', url: 'https://nlp.stanford.edu/IR-book/html/htmledition/term-frequency-and-weighting-1.html' },
             { label: 'Gu, Stiles & El-Awady · Hall-Petch Statistics', url: 'https://arxiv.org/abs/2209.04891' },
@@ -433,8 +436,10 @@ const CONFIG = {
             cosmos: {
                 overview: '地球与宇宙科学入口先聚焦太阳高度、昼长和季节变化，用可调纬度与日期把地轴倾角、昼夜更替和近似计算联系起来。',
                 teachingNote: '建议先区分“季节来自地轴倾角”和“地日距离变化”；太阳高度与日出日落数值用于理解趋势，实际观测会受大气折射、地形和天气影响。',
+                guardrail: '不要把四季简单归因于地日距离；本页呈现的是太阳高度、昼长和季节趋势，精确日出日落仍需回到 NOAA 计算说明。',
                 sources: [
                     { label: 'NASA Space Place · Seasons', url: 'https://spaceplace.nasa.gov/seasons/en/' },
+                    { label: 'NASA/JPL · The Change of Seasons', url: 'https://www.jpl.nasa.gov/edu/resources/gallery/the-change-of-seasons-views-from-space/' },
                     { label: 'NOAA GML · Solar Calculation Details', url: 'https://gml.noaa.gov/grad/solcalc/calcdetails.html' }
                 ],
                 roadmap: []
@@ -442,9 +447,11 @@ const CONFIG = {
             engineering: {
                 overview: '工程应用入口以 Warren 桁架为例，把荷载路径、支座反力、节点平衡和杆件拉压放在同一张结构图中观察。',
                 teachingNote: '建议先判断简单桁架假设是否成立，再画受力图，用整体平衡求反力、节点平衡求杆力；页面模型服务入门理解，不替代真实结构设计中的规范、材料和安全系数计算。',
+                guardrail: '不要把杆件拉压符号当成完整设计结论；简单桁架分析还需要确认二力杆、节点荷载和真实材料/稳定性边界。',
                 sources: [
                     { label: 'Engineering Statics · Trusses', url: 'https://engineeringstatics.org/Chapter_06-trusses.html' },
                     { label: 'Engineering Statics · Method of Joints', url: 'https://engineeringstatics.org/method-of-joints.html' },
+                    { label: 'OpenStax University Physics · Static Equilibrium', url: 'https://openstax.org/books/university-physics-volume-1/pages/12-2-examples-of-static-equilibrium' },
                     { label: 'Engineering Statics · Zero-Force Members', url: 'https://engineeringstatics.org/Chapter_06-trusses.html#subsection-110' },
                     { label: 'Engineering Statics · Equilibrium', url: 'https://engineeringstatics.org/Chapter_05.html' }
                 ],
@@ -453,6 +460,7 @@ const CONFIG = {
             datascience: {
                 overview: '数据科学与 AI 入口从线性回归开始，展示特征、标签、损失函数、训练轮次和残差如何共同影响一条预测直线。',
                 teachingNote: '建议先读懂特征、标签、斜率、截距和残差，再讨论模型能否外推；线性回归只能表达线性关系，样本偏差和异常值会改变结论。',
+                guardrail: '不要把回归线当作因果证明或样本外保证；预测前要检查散点形状、残差、异常点和自变量范围。',
                 sources: [
                     { label: 'OpenStax Statistics · Regression', url: 'https://openstax.org/books/introductory-statistics-2e/pages/12-3-the-regression-equation' },
                     { label: 'Google ML Crash Course · Linear Regression', url: 'https://developers.google.com/machine-learning/crash-course/linear-regression' },
@@ -464,6 +472,7 @@ const CONFIG = {
             infotech: {
                 overview: '信息技术入口用一次网页请求串起 DNS、TCP、IPv6 和逐跳转发，帮助学习者看到应用数据如何被分层封装和传递。',
                 teachingNote: '建议把“域名到地址”“可靠字节流”“网络包转发”和“链路帧承载”分开理解；页面字节数是教学近似，真实网络还会受到 TLS、MTU、拥塞控制和链路类型影响。',
+                guardrail: '不要把教学包头图等同于完整抓包；真实传输会受协议版本、加密层、MTU、重传和拥塞控制影响。',
                 sources: [
                     { label: 'IETF RFC 1034 · Domain Names', url: 'https://www.rfc-editor.org/rfc/rfc1034.html' },
                     { label: 'IETF RFC 9113 · HTTP/2', url: 'https://www.rfc-editor.org/rfc/rfc9113.html' },
@@ -475,6 +484,7 @@ const CONFIG = {
             materials: {
                 overview: '材料与微观结构入口从晶胞类型、配位数、堆积效率和晶粒边界出发，解释微观结构为什么会影响宏观性能。',
                 teachingNote: '建议把晶体结构和多晶晶粒分成两个尺度观察；晶粒细化常能提高强度，但纳米尺度、成分、相变、孔隙和加工历史都会改变实际表现。',
+                guardrail: '不要把 Hall-Petch 趋势无限外推；晶粒进入纳米尺度后，缺陷、晶界稳定性和加工历史可能改变强化方向。',
                 sources: [
                     { label: 'OpenStax Chemistry · Lattice Structures', url: 'https://openstax.org/books/chemistry-2e/pages/10-6-lattice-structures-in-crystalline-solids' },
                     { label: 'Gu, Stiles & El-Awady · Hall-Petch Statistics', url: 'https://arxiv.org/abs/2209.04891' },
@@ -485,9 +495,11 @@ const CONFIG = {
             humanities: {
                 overview: '语言与人文可视化入口把词频、关键词上下文和共现网络当作阅读辅助，帮助学习者提出回读问题，并把图表线索放回原文、出处和材料背景解释。',
                 teachingNote: '建议先说明分词、停用词和语料范围，再观察词项与上下文；词袋模型会弱化语序、语气和历史语境，解释时要补回材料背景。',
+                guardrail: '不要把词频或共现直接等同文本意义；数量线索必须回到原文、出处、语境和标注规则中解释。',
                 sources: [
                     { label: 'Voyant Tools · Tool Guide', url: 'https://voyant-tools.org/docs/#!/guide/tools' },
                     { label: 'Library of Congress · Primary Sources', url: 'https://www.loc.gov/programs/teachers/getting-started-with-primary-sources/guides/' },
+                    { label: 'TEI P5 Guidelines', url: 'https://tei-c.org/guidelines/p5/' },
                     { label: 'Stanford IR Book · Term Frequency', url: 'https://nlp.stanford.edu/IR-book/html/htmledition/term-frequency-and-weighting-1.html' }
                 ],
                 roadmap: []

@@ -114,6 +114,34 @@ function initPageScrollAnimations(page) {
     // Page hero visual — same reason as above, handled by animatePageContent.
 }
 
+const HeroVisualRuntime = {
+    frames: Object.create(null)
+};
+
+function requestHeroFrame(page, callback) {
+    HeroVisualRuntime.frames[page] = requestAnimationFrame(callback);
+}
+
+function destroyHeroVisual(page) {
+    if (!page) return;
+    const frame = HeroVisualRuntime.frames[page];
+    if (frame) cancelAnimationFrame(frame);
+    delete HeroVisualRuntime.frames[page];
+
+    const canvas = document.getElementById(`hero-canvas-${page}`);
+    if (canvas) {
+        delete canvas.dataset.initialized;
+        if (typeof canvas.getContext === 'function') {
+            const ctx = canvas.getContext('2d');
+            if (ctx) ctx.clearRect(0, 0, canvas.width || canvas.clientWidth, canvas.height || canvas.clientHeight);
+        }
+    }
+}
+
+function destroyAllHeroVisuals() {
+    Object.keys(HeroVisualRuntime.frames).forEach((page) => destroyHeroVisual(page));
+}
+
 // Hero visual animations (SVG/Canvas decorations)
 function initHeroVisual(page) {
     const canvas = document.getElementById(`hero-canvas-${page}`);
@@ -139,24 +167,24 @@ function initHeroVisual(page) {
     ctx.scale(dpr, dpr);
 
     const visuals = {
-        mathematics: () => drawLissajous(ctx, w, h),
-        physics: () => drawWaveInterference(ctx, w, h),
-        chemistry: () => drawMolecule(ctx, w, h),
-        algorithms: () => drawSortBars(ctx, w, h),
-        biology: () => drawDNAHelix(ctx, w, h),
-        cosmos: () => drawEarthOrbit(ctx, w, h),
-        datascience: () => drawDataRegression(ctx, w, h),
-        infotech: () => drawNetworkFlow(ctx, w, h),
-        materials: () => drawMaterialLattice(ctx, w, h),
-        humanities: () => drawTextConstellation(ctx, w, h),
-        engineering: () => drawEngineeringTruss(ctx, w, h)
+        mathematics: () => drawLissajous(page, ctx, w, h),
+        physics: () => drawWaveInterference(page, ctx, w, h),
+        chemistry: () => drawMolecule(page, ctx, w, h),
+        algorithms: () => drawSortBars(page, ctx, w, h),
+        biology: () => drawDNAHelix(page, ctx, w, h),
+        cosmos: () => drawEarthOrbit(page, ctx, w, h),
+        datascience: () => drawDataRegression(page, ctx, w, h),
+        infotech: () => drawNetworkFlow(page, ctx, w, h),
+        materials: () => drawMaterialLattice(page, ctx, w, h),
+        humanities: () => drawTextConstellation(page, ctx, w, h),
+        engineering: () => drawEngineeringTruss(page, ctx, w, h)
     };
 
     if (visuals[page]) visuals[page]();
 }
 
 // ── Lissajous curve for Mathematics ──
-function drawLissajous(ctx, w, h) {
+function drawLissajous(page, ctx, w, h) {
     const cx = w / 2, cy = h / 2;
     const scale = Math.min(w, h) * 0.35;
     let t = 0;
@@ -184,13 +212,13 @@ function drawLissajous(ctx, w, h) {
         ctx.fill();
 
         t += 0.008;
-        requestAnimationFrame(draw);
+        requestHeroFrame(page, draw);
     }
     draw();
 }
 
 // ── Wave interference for Physics ──
-function drawWaveInterference(ctx, w, h) {
+function drawWaveInterference(page, ctx, w, h) {
     let t = 0;
 
     function draw() {
@@ -217,13 +245,13 @@ function drawWaveInterference(ctx, w, h) {
         }
 
         t += 0.025;
-        requestAnimationFrame(draw);
+        requestHeroFrame(page, draw);
     }
     draw();
 }
 
 // ── Hexagonal molecule for Chemistry ──
-function drawMolecule(ctx, w, h) {
+function drawMolecule(page, ctx, w, h) {
     const cx = w / 2, cy = h / 2;
     const r = Math.min(w, h) * 0.12;
     let t = 0;
@@ -278,13 +306,13 @@ function drawMolecule(ctx, w, h) {
         });
 
         t += 0.01;
-        requestAnimationFrame(draw);
+        requestHeroFrame(page, draw);
     }
     draw();
 }
 
 // ── Decorative sort bars for Algorithms ──
-function drawSortBars(ctx, w, h) {
+function drawSortBars(page, ctx, w, h) {
     const barCount = 16;
     const barW = w / (barCount * 2);
     const heights = [];
@@ -323,7 +351,7 @@ function drawSortBars(ctx, w, h) {
         }
 
         t += 0.016;
-        requestAnimationFrame(draw);
+        requestHeroFrame(page, draw);
     }
     draw();
 }
@@ -331,9 +359,11 @@ function drawSortBars(ctx, w, h) {
 window.initScrollAnimations = initScrollAnimations;
 window.initPageScrollAnimations = initPageScrollAnimations;
 window.initHeroVisual = initHeroVisual;
+window.destroyHeroVisual = destroyHeroVisual;
+window.destroyAllHeroVisuals = destroyAllHeroVisuals;
 
 // ── DNA double helix for Biology ──
-function drawDNAHelix(ctx, w, h) {
+function drawDNAHelix(page, ctx, w, h) {
     let t = 0;
     const cx = w / 2;
     const amplitude = Math.min(w, h) * 0.18;
@@ -383,13 +413,13 @@ function drawDNAHelix(ctx, w, h) {
         }
 
         t += 0.012;
-        requestAnimationFrame(draw);
+        requestHeroFrame(page, draw);
     }
     draw();
 }
 
 // Regression scatter and fit for Data Science
-function drawDataRegression(ctx, w, h) {
+function drawDataRegression(page, ctx, w, h) {
     let t = 0;
     const points = [
         [0.12, 0.72], [0.23, 0.62], [0.34, 0.66], [0.45, 0.48],
@@ -440,14 +470,14 @@ function drawDataRegression(ctx, w, h) {
 
         ctx.restore();
         t += 0.018;
-        requestAnimationFrame(draw);
+        requestHeroFrame(page, draw);
     }
 
     draw();
 }
 
 // Packet route and layered envelope for Information Technology
-function drawNetworkFlow(ctx, w, h) {
+function drawNetworkFlow(page, ctx, w, h) {
     let t = 0;
     const nodes = [
         { x: 0.14, y: 0.62, r: 12 },
@@ -525,14 +555,14 @@ function drawNetworkFlow(ctx, w, h) {
         ctx.restore();
 
         t += 0.012;
-        requestAnimationFrame(draw);
+        requestHeroFrame(page, draw);
     }
 
     draw();
 }
 
 // Crystal lattice and grains for Materials
-function drawMaterialLattice(ctx, w, h) {
+function drawMaterialLattice(page, ctx, w, h) {
     const cx = w / 2;
     const cy = h / 2;
     let t = 0;
@@ -612,14 +642,14 @@ function drawMaterialLattice(ctx, w, h) {
         ctx.restore();
 
         t += 0.018;
-        requestAnimationFrame(draw);
+        requestHeroFrame(page, draw);
     }
 
     draw();
 }
 
 // Term nodes and context arcs for Humanities
-function drawTextConstellation(ctx, w, h) {
+function drawTextConstellation(page, ctx, w, h) {
     const terms = ['文本', '语境', '词项', '史料', '提问', '证据', '阅读', '关系'];
     const cx = w / 2;
     const cy = h / 2;
@@ -682,14 +712,14 @@ function drawTextConstellation(ctx, w, h) {
         ctx.restore();
 
         t += 0.018;
-        requestAnimationFrame(draw);
+        requestHeroFrame(page, draw);
     }
 
     draw();
 }
 
 // Earth orbit and axial tilt for Earth & Space Science
-function drawEarthOrbit(ctx, w, h) {
+function drawEarthOrbit(page, ctx, w, h) {
     let t = 0;
     const cx = w / 2;
     const cy = h / 2;
@@ -743,14 +773,14 @@ function drawEarthOrbit(ctx, w, h) {
 
         ctx.restore();
         t += 0.012;
-        requestAnimationFrame(draw);
+        requestHeroFrame(page, draw);
     }
 
     draw();
 }
 
 // Truss force path for Engineering
-function drawEngineeringTruss(ctx, w, h) {
+function drawEngineeringTruss(page, ctx, w, h) {
     let t = 0;
     const colorSteel = 'rgba(216,220,230,0.34)';
     const colorCompression = 'rgba(216,163,72,0.42)';
@@ -817,7 +847,7 @@ function drawEngineeringTruss(ctx, w, h) {
 
         ctx.restore();
         t += 0.024;
-        requestAnimationFrame(draw);
+        requestHeroFrame(page, draw);
     }
 
     draw();

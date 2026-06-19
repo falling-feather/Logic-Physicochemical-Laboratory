@@ -1,14 +1,19 @@
 /* ===== Data Science & AI ===== */
 
-.datascience-page .page-hero {
+.datascience-page {
+    --frontier-accent: #8aa7ff;
+    --frontier-accent-rgb: 138, 167, 255;
+}
+
+.datascience-page .frontier-hero {
     display: grid !important;
 }
 
-.datascience-page .page-hero__label--data {
+.datascience-page .frontier-hero__label--data {
     color: #8aa7ff;
 }
 
-.datascience-page .page-hero__canvas {
+.datascience-page .frontier-hero__canvas {
     opacity: 0.76;
 }
 
