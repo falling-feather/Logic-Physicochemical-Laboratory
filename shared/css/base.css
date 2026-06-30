@@ -73,20 +73,27 @@ img { max-width: 100%; display: block; }
 
 /* ── Page system (visibility based for GSAP) ── */
 .page {
+    display: none;
     visibility: hidden;
     opacity: 0;
     position: absolute;
     top: 0; left: 0;
     width: 100%;
-    min-height: 100vh;
+    min-height: 0;
+    height: 0;
+    overflow: hidden;
     pointer-events: none;
     will-change: opacity, transform;
 }
 
 .page.active {
+    display: block;
     visibility: visible;
     opacity: 1;
     position: relative;
+    min-height: 100vh;
+    height: auto;
+    overflow: visible;
     pointer-events: auto;
 }
 
@@ -426,47 +433,67 @@ a:focus:not(:focus-visible) {
 
 /* ── Frontier Galaxy Shell ── */
 .frontier-hero {
-    min-height: 390px;
-    max-width: 1180px;
-    margin: 0 auto;
-    padding: var(--space-12) var(--space-8) var(--space-8);
-    display: grid;
-    grid-template-columns: minmax(0, 0.92fr) minmax(280px, 0.78fr);
-    align-items: center;
-    gap: var(--space-8);
     position: relative;
+    isolation: isolate;
+    min-height: 430px;
+    width: min(1180px, calc(100% - var(--space-7)));
+    margin: var(--space-6) auto var(--space-8);
+    padding: clamp(var(--space-9), 7vh, var(--space-14)) clamp(var(--space-6), 4vw, var(--space-10)) var(--space-9);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(290px, 0.8fr);
+    align-items: center;
+    gap: clamp(var(--space-6), 5vw, var(--space-10));
     overflow: hidden;
-    border-bottom: 1px solid rgba(242, 200, 107, 0.14);
+    border: 1px solid rgba(var(--frontier-accent-rgb), 0.18);
+    border-radius: 18px;
     background:
-        linear-gradient(135deg, rgba(242, 200, 107, 0.08), transparent 32%),
-        radial-gradient(circle at 82% 18%, rgba(101, 228, 240, 0.10), transparent 30%),
-        rgba(6, 9, 16, 0.92);
+        radial-gradient(circle at 86% 14%, rgba(var(--frontier-accent-rgb), 0.18), transparent 44%),
+        radial-gradient(circle at 8% 92%, rgba(var(--frontier-accent-rgb), 0.06), transparent 40%),
+        linear-gradient(140deg, rgba(7, 11, 19, 0.95), rgba(3, 6, 12, 0.985));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        inset 0 0 64px rgba(var(--frontier-accent-rgb), 0.04),
+        0 30px 80px rgba(0, 0, 0, 0.42);
 }
 
 .frontier-hero::before {
-    content: "未来星系";
+    content: "";
     position: absolute;
-    top: var(--space-5);
-    left: var(--space-8);
-    font-size: var(--text-xs);
-    letter-spacing: 0;
-    color: rgba(242, 200, 107, 0.78);
-    font-family: var(--font-mono);
-    text-transform: uppercase;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        radial-gradient(1.5px 1.5px at 18% 26%, rgba(255, 255, 255, 0.55), transparent),
+        radial-gradient(1.5px 1.5px at 62% 18%, rgba(255, 255, 255, 0.4), transparent),
+        radial-gradient(1px 1px at 42% 70%, rgba(255, 255, 255, 0.45), transparent),
+        radial-gradient(1px 1px at 78% 58%, rgba(255, 255, 255, 0.3), transparent),
+        radial-gradient(1.5px 1.5px at 88% 82%, rgba(255, 255, 255, 0.35), transparent),
+        linear-gradient(rgba(var(--frontier-accent-rgb), 0.05) 1px, transparent 1px) 0 0 / 100% 46px,
+        linear-gradient(90deg, rgba(var(--frontier-accent-rgb), 0.05) 1px, transparent 1px) 0 0 / 46px 100%;
+    -webkit-mask-image: radial-gradient(ellipse at 72% 42%, #000 0 44%, rgba(0, 0, 0, 0.4) 72%, transparent 92%);
+            mask-image: radial-gradient(ellipse at 72% 42%, #000 0 44%, rgba(0, 0, 0, 0.4) 72%, transparent 92%);
+    opacity: 0.7;
 }
 
 .frontier-hero::after {
     content: "";
     position: absolute;
-    right: var(--space-8);
-    bottom: 0;
-    left: var(--space-8);
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(242, 200, 107, 0.28), transparent);
+    inset: 14px;
+    z-index: 2;
+    pointer-events: none;
+    background:
+        linear-gradient(rgba(var(--frontier-accent-rgb), 0.5) 0 0) 0 0 / 20px 1px no-repeat,
+        linear-gradient(rgba(var(--frontier-accent-rgb), 0.5) 0 0) 0 0 / 1px 20px no-repeat,
+        linear-gradient(rgba(var(--frontier-accent-rgb), 0.5) 0 0) 100% 0 / 20px 1px no-repeat,
+        linear-gradient(rgba(var(--frontier-accent-rgb), 0.5) 0 0) 100% 0 / 1px 20px no-repeat,
+        linear-gradient(rgba(var(--frontier-accent-rgb), 0.5) 0 0) 0 100% / 20px 1px no-repeat,
+        linear-gradient(rgba(var(--frontier-accent-rgb), 0.5) 0 0) 0 100% / 1px 20px no-repeat,
+        linear-gradient(rgba(var(--frontier-accent-rgb), 0.5) 0 0) 100% 100% / 20px 1px no-repeat,
+        linear-gradient(rgba(var(--frontier-accent-rgb), 0.5) 0 0) 100% 100% / 1px 20px no-repeat;
+    opacity: 0.7;
 }
 
 .frontier-hero__text {
-    padding-top: var(--space-7);
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
@@ -478,27 +505,49 @@ a:focus:not(:focus-visible) {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
-    color: rgba(242, 200, 107, 0.82);
+    align-self: flex-start;
+    padding: 5px 12px 5px 10px;
+    border: 1px solid rgba(var(--frontier-accent-rgb), 0.3);
+    border-left: 2px solid rgba(var(--frontier-accent-rgb), 0.85);
+    border-radius: 3px;
+    background: rgba(8, 14, 20, 0.5);
+    color: rgba(var(--frontier-accent-rgb), 0.95);
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     font-weight: 600;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
+    backdrop-filter: blur(8px);
+}
+
+.frontier-hero__label::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgb(var(--frontier-accent-rgb));
+    box-shadow: 0 0 10px 2px rgba(var(--frontier-accent-rgb), 0.6);
+    animation: frontierCorePulse 2.6s ease-in-out infinite;
 }
 
 .frontier-hero__title {
-    color: #fff7de;
+    color: #fff;
     font-family: var(--font-display);
-    font-size: var(--text-4xl);
-    font-weight: 700;
-    letter-spacing: 0;
-    line-height: 1.1;
+    font-size: clamp(2.4rem, 4.6vw, 3.6rem);
+    font-weight: 760;
+    letter-spacing: 0.01em;
+    line-height: 1.08;
+    text-shadow:
+        0 0 32px rgba(var(--frontier-accent-rgb), 0.32),
+        0 12px 40px rgba(0, 0, 0, 0.6);
 }
 
 .frontier-hero__desc {
-    max-width: 520px;
-    color: rgba(226, 232, 240, 0.72);
+    max-width: 540px;
+    color: rgba(226, 232, 240, 0.78);
     font-size: var(--text-base);
-    line-height: 1.75;
+    line-height: 1.78;
+    text-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 .frontier-hero__actions {
@@ -506,41 +555,45 @@ a:focus:not(:focus-visible) {
     flex-wrap: wrap;
     gap: var(--space-3);
     align-items: center;
+    margin-top: var(--space-2);
 }
 
 .frontier-hero__button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 42px;
+    min-height: 44px;
     padding: 0 var(--space-5);
-    border: 1px solid rgba(242, 200, 107, 0.24);
+    border: 1px solid rgba(var(--frontier-accent-rgb), 0.24);
     border-radius: 6px;
-    background: rgba(12, 15, 23, 0.58);
-    color: rgba(255, 247, 222, 0.76);
+    background: rgba(6, 12, 18, 0.5);
+    color: rgba(255, 255, 255, 0.8);
     font-size: var(--text-sm);
-    font-weight: 600;
+    font-weight: 650;
     text-decoration: none;
+    backdrop-filter: blur(10px);
     transition: transform var(--duration-fast) ease,
                 border-color var(--duration-fast) ease,
                 color var(--duration-fast) ease,
-                background var(--duration-fast) ease;
+                background var(--duration-fast) ease,
+                box-shadow var(--duration-fast) ease;
 }
 
 .frontier-hero__button:hover,
 .frontier-hero__button:focus-visible {
-    transform: translateY(-1px);
-    border-color: rgba(242, 200, 107, 0.58);
-    color: #fff7de;
-    background: rgba(23, 18, 9, 0.72);
+    transform: translateY(-2px);
+    border-color: rgba(var(--frontier-accent-rgb), 0.6);
+    color: #fff;
+    background: rgba(var(--frontier-accent-rgb), 0.12);
+    box-shadow: 0 0 24px rgba(var(--frontier-accent-rgb), 0.22);
     outline: none;
 }
 
 .frontier-hero__button--primary {
-    background: linear-gradient(135deg, rgba(242, 200, 107, 0.22), rgba(101, 228, 240, 0.12));
-    border-color: rgba(242, 200, 107, 0.48);
-    color: #fff7de;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+    border-color: rgba(var(--frontier-accent-rgb), 0.6);
+    background: linear-gradient(135deg, rgba(var(--frontier-accent-rgb), 0.26), rgba(var(--frontier-accent-rgb), 0.08));
+    color: #fff;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 22px rgba(var(--frontier-accent-rgb), 0.18);
 }
 
 @media (max-width: 640px) {
@@ -556,229 +609,531 @@ a:focus:not(:focus-visible) {
 }
 
 .frontier-hero__visual {
-    min-height: 230px;
+    position: relative;
+    z-index: 1;
+    min-height: 280px;
     display: flex;
     align-items: center;
     justify-content: center;
-    position: relative;
-    z-index: 1;
+}
+
+.frontier-hero__visual::before {
+    content: "";
+    position: absolute;
+    width: min(360px, 96%);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 1px solid rgba(var(--frontier-accent-rgb), 0.16);
+    box-shadow: inset 0 0 60px rgba(var(--frontier-accent-rgb), 0.06);
+}
+
+.frontier-hero__visual::after {
+    content: "";
+    position: absolute;
+    width: min(300px, 80%);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 1px dashed rgba(var(--frontier-accent-rgb), 0.2);
+    animation: frontierOrbitSpin 48s linear infinite;
 }
 
 .frontier-hero__canvas {
+    position: relative;
+    z-index: 1;
     width: 100%;
-    max-width: 320px;
+    max-width: 340px;
     aspect-ratio: 1;
-    opacity: 0.76;
+    opacity: 0.92;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .frontier-hero__visual::after,
+    .frontier-hero__label::before {
+        animation: none;
+    }
 }
 
 .frontier-overview-page {
     --frontier-accent: #f2c86b;
     --frontier-accent-rgb: 242, 200, 107;
+    --frontier-hero-sky: url("../../UI/future-galaxy/future-galaxy-hero-sky.png");
+    --frontier-hero-nebula: url("../../UI/future-galaxy/future-galaxy-hero-nebula.png");
+    --frontier-bg-shift-x: 0px;
+    --frontier-bg-shift-y: 0px;
+    --frontier-orbit-shift-x: 0px;
+    --frontier-orbit-shift-y: 0px;
+    --frontier-glow-x: 70%;
+    --frontier-glow-y: 42%;
+    position: relative;
+    isolation: isolate;
+    width: 100%;
+    height: 100vh;
     min-height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
     background:
-        radial-gradient(circle at 18% 14%, rgba(101, 228, 240, 0.12), transparent 28%),
-        radial-gradient(circle at 84% 18%, rgba(242, 200, 107, 0.14), transparent 34%),
-        linear-gradient(180deg, rgba(8, 11, 18, 0.98), rgba(3, 6, 11, 1));
+        radial-gradient(ellipse 72% 58% at 78% 44%, rgba(101, 228, 240, 0.10), transparent 68%),
+        radial-gradient(ellipse 48% 42% at 90% 68%, rgba(138, 167, 255, 0.08), transparent 72%),
+        #02050a;
+}
+
+.frontier-overview-page.active {
+    height: 100vh;
+    min-height: 100vh;
+    overflow: hidden;
+}
+
+.frontier-overview-page::before {
+    content: "";
+    position: absolute;
+    z-index: -2;
+    inset: -12%;
+    background:
+        linear-gradient(90deg, rgba(2, 5, 10, 0.18), rgba(2, 5, 10, 0.04) 38%, rgba(2, 5, 10, 0.02) 72%, rgba(2, 5, 10, 0.06) 100%),
+        linear-gradient(180deg, rgba(2, 5, 10, 0.06), rgba(2, 5, 10, 0.03) 62%, rgba(2, 5, 10, 0.80) 100%),
+        radial-gradient(ellipse 58% 52% at 82% 48%, rgba(101, 228, 240, 0.14), transparent 72%),
+        radial-gradient(ellipse 42% 38% at 92% 64%, rgba(138, 167, 255, 0.10), transparent 70%),
+        var(--frontier-hero-sky) 56% center / cover no-repeat;
+    transform: translate3d(var(--frontier-bg-shift-x), var(--frontier-bg-shift-y), 0) scale(1.12);
+    transform-origin: center;
+    will-change: transform;
+}
+
+.frontier-overview-page::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at var(--frontier-glow-x) var(--frontier-glow-y), rgba(101, 228, 240, 0.18), transparent 21%),
+        radial-gradient(circle at calc(var(--frontier-glow-x) - 22%) calc(var(--frontier-glow-y) + 28%), rgba(242, 200, 107, 0.10), transparent 24%),
+        radial-gradient(circle at 8% 36%, rgba(2, 5, 10, 0.74), transparent 34%),
+        radial-gradient(ellipse 36% 54% at 96% 50%, rgba(173, 226, 226, 0.06), transparent 72%),
+        linear-gradient(90deg, rgba(2, 5, 10, 0.28), transparent 46%, transparent 88%, rgba(2, 5, 10, 0.04) 100%),
+        linear-gradient(180deg, transparent 0, rgba(2, 5, 10, 0.16) 72%, #02050a 100%);
 }
 
 .frontier-overview {
-    width: min(1180px, calc(100% - var(--space-8)));
+    width: min(1380px, calc(100% - var(--space-8)));
+    height: calc(100vh - 4rem);
     margin: 0 auto;
-    padding: var(--space-12) 0 var(--space-10);
+    padding: 0;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
 }
 
 .frontier-overview__hero {
-    min-height: 360px;
+    position: relative;
+    isolation: isolate;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
     display: grid;
-    grid-template-columns: minmax(0, 0.86fr) minmax(280px, 0.7fr);
+    grid-template-columns: minmax(320px, 0.52fr) minmax(460px, 1fr);
     align-items: center;
-    gap: var(--space-8);
-    border-bottom: 1px solid rgba(242, 200, 107, 0.14);
+    gap: clamp(var(--space-5), 4vw, var(--space-10));
+    padding: clamp(var(--space-4), 4vh, var(--space-8)) 0;
+    overflow: hidden;
+}
+
+.frontier-overview__hero::before {
+    content: "";
+    position: absolute;
+    z-index: 0;
+    inset: -6% -2% -4% 16%;
+    pointer-events: none;
+    background: var(--frontier-hero-nebula) 58% center / cover no-repeat;
+    opacity: 0.58;
+    mix-blend-mode: screen;
+    transform: translate3d(var(--frontier-orbit-shift-x), var(--frontier-orbit-shift-y), 0) scale(1.08);
+    transform-origin: center;
+    will-change: transform;
+    mask-image: radial-gradient(ellipse at 58% 46%, #000 0 46%, rgba(0, 0, 0, 0.56) 64%, transparent 92%);
+    -webkit-mask-image: radial-gradient(ellipse at 58% 46%, #000 0 46%, rgba(0, 0, 0, 0.56) 64%, transparent 92%);
 }
 
 .frontier-overview__copy {
-    border-left: 2px solid rgba(242, 200, 107, 0.62);
-    padding-left: var(--space-6);
+    position: relative;
+    z-index: 1;
+    max-width: 560px;
+    padding: var(--space-5) 0 var(--space-5) var(--space-6);
+    border-left: 1px solid rgba(245, 218, 149, 0.42);
+    background: linear-gradient(90deg, rgba(2, 5, 10, 0.36), transparent);
+}
+
+.frontier-overview__copy::before {
+    content: "";
+    position: absolute;
+    left: -1px;
+    top: 8%;
+    width: 2px;
+    height: 38%;
+    background: linear-gradient(180deg, rgba(242, 200, 107, 0.95), rgba(101, 228, 240, 0.2));
+    box-shadow: 0 0 14px rgba(242, 200, 107, 0.55);
+}
+
+.frontier-overview__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+    padding: 5px 12px 5px 11px;
+    border: 1px solid rgba(242, 200, 107, 0.30);
+    border-left: 2px solid rgba(242, 200, 107, 0.85);
+    border-radius: 3px;
+    background: rgba(8, 14, 20, 0.5);
+    color: rgba(255, 240, 206, 0.92);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    backdrop-filter: blur(8px);
+}
+
+.frontier-overview__eyebrow::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #f2c86b;
+    box-shadow: 0 0 10px 2px rgba(242, 200, 107, 0.7);
+    animation: frontierCorePulse 2.6s ease-in-out infinite;
 }
 
 .frontier-overview__copy h1 {
     color: #fff7de;
     font-family: var(--font-display);
-    font-size: var(--text-5xl);
-    line-height: 1.05;
-    letter-spacing: 0;
+    font-size: clamp(2.9rem, 5.2vw, 5.3rem);
+    line-height: 1;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
     margin-bottom: var(--space-4);
+    text-shadow: 0 24px 68px rgba(0, 0, 0, 0.82), 0 0 40px rgba(242, 200, 107, 0.16);
 }
 
 .frontier-overview__copy p {
-    max-width: 620px;
-    color: rgba(226, 232, 240, 0.70);
+    max-width: 540px;
+    color: rgba(235, 241, 246, 0.78);
     font-size: var(--text-base);
-    line-height: 1.82;
+    line-height: 1.84;
+    text-shadow: 0 12px 28px rgba(0, 0, 0, 0.84);
+}
+
+.frontier-overview__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-top: var(--space-5);
+}
+
+.frontier-overview__button {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 var(--space-5);
+    border: 1px solid rgba(236, 224, 183, 0.22);
+    border-radius: 4px;
+    color: rgba(255, 247, 222, 0.82);
+    background: rgba(2, 8, 14, 0.46);
+    backdrop-filter: blur(12px);
+    font-size: var(--text-sm);
+    font-weight: 650;
+    text-decoration: none;
+    transition: transform var(--duration-fast) ease,
+                border-color var(--duration-fast) ease,
+                background var(--duration-fast) ease,
+                color var(--duration-fast) ease;
+}
+
+.frontier-overview__button:hover,
+.frontier-overview__button:focus-visible {
+    transform: translateY(-1px);
+    border-color: rgba(242, 200, 107, 0.58);
+    color: #fff7de;
+    background: rgba(11, 24, 30, 0.72);
+    outline: none;
+}
+
+.frontier-overview__button--primary {
+    border-color: rgba(242, 200, 107, 0.58);
+    background: rgba(242, 200, 107, 0.14);
+    color: #fff7de;
 }
 
 .frontier-overview__orbital {
     position: relative;
-    min-height: 300px;
-    border: 1px solid rgba(226, 232, 240, 0.10);
-    background:
-        linear-gradient(135deg, rgba(242, 200, 107, 0.07), rgba(101, 228, 240, 0.045)),
-        rgba(7, 11, 18, 0.58);
+    z-index: 1;
+    height: min(640px, calc(100vh - 9rem));
+    min-height: min(500px, calc(100vh - 10rem));
+    background: transparent;
+    overflow: visible;
+    isolation: isolate;
+    transform: translate3d(var(--frontier-orbit-shift-x), var(--frontier-orbit-shift-y), 0);
+    transform-origin: center;
+    will-change: transform;
+}
+
+.frontier-overview__orbital-tag {
+    position: absolute;
+    top: 2%;
+    right: 0;
+    z-index: 6;
+    max-width: calc(100% - 0.5rem);
+    padding: 4px 10px;
+    border: 1px solid rgba(173, 226, 226, 0.22);
+    border-top: 0;
+    border-right: 0;
+    color: rgba(198, 232, 236, 0.6);
+    font-family: var(--font-mono);
+    font-size: clamp(0.52rem, 0.9vw, 0.62rem);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+}
+
+.frontier-overview__canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    opacity: 0.82;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    will-change: opacity;
+}
+
+.frontier-overview__canvas--backdrop {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.frontier-overview__core {
+    position: absolute;
+    left: 52%;
+    top: 48%;
+    transform: translate(-50%, -50%);
+    z-index: 4;
+    width: clamp(104px, 11vw, 138px);
+    height: clamp(104px, 11vw, 138px);
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    gap: 1px;
+    padding: 0;
+    text-align: center;
+    border: 1px solid rgba(242, 200, 107, 0.42);
+    background:
+        radial-gradient(circle at 42% 36%, rgba(255, 244, 214, 0.34), transparent 46%),
+        radial-gradient(circle at 50% 54%, rgba(242, 200, 107, 0.34), rgba(101, 228, 240, 0.14) 56%, rgba(2, 8, 14, 0.94) 82%);
+    color: #fff7de;
+    box-shadow:
+        0 0 0 6px rgba(2, 8, 14, 0.3),
+        0 0 40px rgba(242, 200, 107, 0.4),
+        0 0 92px rgba(101, 228, 240, 0.22),
+        inset 0 0 30px rgba(255, 244, 214, 0.18);
+    backdrop-filter: blur(6px);
+    pointer-events: none;
+    animation: frontierCoreFloat 7s ease-in-out infinite;
+}
+
+.frontier-overview__core::before {
+    content: "";
+    position: absolute;
+    inset: -15px;
+    border-radius: 50%;
+    border: 1px dashed rgba(242, 200, 107, 0.36);
+    animation: frontierOrbitSpin 26s linear infinite;
+}
+
+.frontier-overview__core-label {
+    font-family: var(--font-display);
+    font-size: clamp(1.02rem, 1.5vw, 1.3rem);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    line-height: 1.05;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+}
+
+.frontier-overview__core-sub {
+    font-family: var(--font-mono);
+    font-size: 0.54rem;
+    letter-spacing: 0.3em;
+    text-indent: 0.3em;
+    color: rgba(255, 244, 214, 0.66);
+    text-transform: uppercase;
 }
 
 .frontier-overview__orbital::before,
 .frontier-overview__orbital::after {
     content: "";
     position: absolute;
-    inset: 50% auto auto 50%;
-    transform: translate(-50%, -50%);
-    border: 1px solid rgba(242, 200, 107, 0.20);
+    pointer-events: none;
 }
 
 .frontier-overview__orbital::before {
-    width: 72%;
-    height: 72%;
+    z-index: 0;
+    left: 52%;
+    top: 48%;
+    width: 86%;
+    height: 84%;
+    transform: translate(-50%, -50%);
+    background:
+        radial-gradient(circle at 50% 50%, rgba(242, 200, 107, 0.13), transparent 38%),
+        radial-gradient(circle at 50% 50%, rgba(101, 228, 240, 0.10), transparent 60%);
+    opacity: 0.9;
+    filter: blur(3px);
 }
 
 .frontier-overview__orbital::after {
-    width: 45%;
-    height: 45%;
-    border-color: rgba(101, 228, 240, 0.18);
-}
-
-.frontier-overview__ring {
-    position: absolute;
-    inset: 50% auto auto 50%;
-    width: 78%;
-    height: 38%;
-    border: 1px solid rgba(226, 232, 240, 0.13);
-    transform: translate(-50%, -50%) rotate(-10deg);
-}
-
-.frontier-overview__ring--inner {
-    width: 58%;
-    height: 28%;
-    transform: translate(-50%, -50%) rotate(18deg);
-    border-color: rgba(242, 200, 107, 0.16);
+    z-index: 0;
+    left: 52%;
+    top: 48%;
+    width: 94%;
+    height: 90%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 1px dashed rgba(173, 226, 226, 0.13);
+    opacity: 0.7;
 }
 
 .frontier-overview__node {
     position: absolute;
-    width: 12px;
-    height: 12px;
-    border: 1px solid rgba(255, 247, 222, 0.70);
-    background: rgba(242, 200, 107, 0.50);
-    box-shadow: 0 0 26px rgba(242, 200, 107, 0.34);
-}
-
-.frontier-overview__node--cosmos { left: 18%; top: 34%; background: rgba(116, 185, 255, 0.54); }
-.frontier-overview__node--engineering { left: 35%; top: 66%; }
-.frontier-overview__node--data { left: 52%; top: 28%; background: rgba(138, 167, 255, 0.54); }
-.frontier-overview__node--info { left: 68%; top: 58%; background: rgba(94, 224, 216, 0.54); }
-.frontier-overview__node--materials { left: 80%; top: 39%; }
-.frontier-overview__node--humanities { left: 45%; top: 48%; background: rgba(126, 215, 193, 0.54); }
-
-.frontier-overview__map {
+    z-index: 5;
+    width: clamp(56px, 5.4vw, 72px);
+    height: clamp(56px, 5.4vw, 72px);
+    transform: translate(-50%, -50%);
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-4);
-    margin-top: var(--space-8);
-}
-
-.frontier-overview-card {
-    min-height: 190px;
-    display: grid;
-    align-content: space-between;
-    gap: var(--space-3);
-    padding: var(--space-5);
-    color: inherit;
+    place-items: center;
+    border-radius: 50%;
+    border: 1px solid rgba(236, 246, 247, 0.26);
+    color: rgba(238, 246, 247, 0.95);
+    background:
+        radial-gradient(circle at 36% 30%, rgba(255, 255, 255, 0.22), transparent 44%),
+        radial-gradient(circle at 52% 56%, var(--node-color, rgba(242, 200, 107, 0.42)), rgba(2, 8, 14, 0.9) 78%);
+    box-shadow:
+        0 0 0 4px rgba(2, 8, 14, 0.34),
+        0 12px 32px rgba(0, 0, 0, 0.5),
+        0 0 22px var(--node-glow, rgba(242, 200, 107, 0.4));
     text-decoration: none;
-    border: 1px solid rgba(226, 232, 240, 0.10);
-    background:
-        linear-gradient(180deg, rgba(var(--frontier-card-rgb, 242, 200, 107), 0.10), rgba(7, 11, 18, 0.58)),
-        rgba(7, 11, 18, 0.72);
-    transition: transform var(--duration-fast) ease, border-color var(--duration-fast) ease, background var(--duration-fast) ease;
+    backdrop-filter: blur(2px);
+    animation: frontierNodeFloat var(--node-float-duration, 6.4s) ease-in-out infinite;
+    animation-delay: var(--node-float-delay, 0s);
+    transition: border-color var(--duration-fast) ease,
+                box-shadow var(--duration-fast) ease,
+                background var(--duration-fast) ease;
 }
 
-.frontier-overview-card:hover,
-.frontier-overview-card:focus-visible {
-    transform: translateY(-3px);
-    border-color: rgba(var(--frontier-card-rgb, 242, 200, 107), 0.42);
-    background:
-        linear-gradient(180deg, rgba(var(--frontier-card-rgb, 242, 200, 107), 0.14), rgba(7, 11, 18, 0.62)),
-        rgba(7, 11, 18, 0.78);
+.frontier-overview__node::before {
+    content: "";
+    position: absolute;
+    inset: 10%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.34), transparent 58%);
+    opacity: 0.72;
+    animation: frontierNodeShimmer 5.6s ease-in-out infinite;
+    animation-delay: var(--node-float-delay, 0s);
+    pointer-events: none;
 }
 
-.frontier-overview-card--cosmos { --frontier-card-rgb: 116, 185, 255; }
-.frontier-overview-card--engineering { --frontier-card-rgb: 216, 163, 72; }
-.frontier-overview-card--data { --frontier-card-rgb: 138, 167, 255; }
-.frontier-overview-card--info { --frontier-card-rgb: 94, 224, 216; }
-.frontier-overview-card--materials { --frontier-card-rgb: 224, 181, 106; }
-.frontier-overview-card--humanities { --frontier-card-rgb: 126, 215, 193; }
+.frontier-overview__node::after {
+    content: "";
+    position: absolute;
+    inset: -7px;
+    border-radius: 50%;
+    border: 1px solid var(--node-ring, rgba(242, 200, 107, 0.28));
+    opacity: 0.55;
+    animation: frontierNodeRingPulse 4.8s ease-in-out infinite;
+    animation-delay: var(--node-float-delay, 0s);
+    transition: opacity var(--duration-fast) ease, inset var(--duration-fast) ease;
+}
 
-.frontier-overview-card span {
-    width: max-content;
-    padding: 5px 8px;
-    color: rgba(var(--frontier-card-rgb, 242, 200, 107), 0.88);
-    border: 1px solid rgba(var(--frontier-card-rgb, 242, 200, 107), 0.24);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
+.frontier-overview__node span {
+    font-family: var(--font-sans);
+    font-size: clamp(0.82rem, 1vw, 0.96rem);
     font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.06em;
+    text-shadow: 0 1px 7px rgba(0, 0, 0, 0.7);
 }
 
-.frontier-overview-card strong {
-    color: #fff7de;
-    font-family: var(--font-display);
-    font-size: 1.28rem;
-    line-height: 1.25;
+.frontier-overview__node:hover,
+.frontier-overview__node:focus-visible {
+    animation-play-state: paused;
+    transform: translate(-50%, -50%) scale(1.12);
+    border-color: var(--node-glow, rgba(101, 228, 240, 0.7));
+    background:
+        radial-gradient(circle at 36% 30%, rgba(255, 255, 255, 0.3), transparent 44%),
+        radial-gradient(circle at 52% 56%, var(--node-color, rgba(242, 200, 107, 0.6)), rgba(4, 14, 18, 0.86) 76%);
+    box-shadow:
+        0 0 0 4px rgba(2, 8, 14, 0.4),
+        0 16px 42px rgba(0, 0, 0, 0.55),
+        0 0 36px var(--node-glow, rgba(101, 228, 240, 0.6));
+    color: #fff;
+    outline: none;
+    z-index: 7;
 }
 
-.frontier-overview-card p {
-    color: rgba(226, 232, 240, 0.64);
-    font-size: var(--text-sm);
-    line-height: 1.7;
+.frontier-overview__node:hover::after,
+.frontier-overview__node:focus-visible::after {
+    opacity: 0.9;
+    inset: -11px;
 }
 
-.frontier-overview-card em {
-    color: rgba(101, 228, 240, 0.78);
-    font-size: var(--text-xs);
-    font-style: normal;
+.frontier-overview__node--cosmos { left: 52%; top: 13%; --node-color: rgba(116, 185, 255, 0.5); --node-glow: rgba(116, 185, 255, 0.55); --node-ring: rgba(116, 185, 255, 0.3); --node-float-delay: 0s; --node-float-duration: 6.2s; }
+.frontier-overview__node--data { left: 82%; top: 29%; --node-color: rgba(138, 167, 255, 0.5); --node-glow: rgba(138, 167, 255, 0.55); --node-ring: rgba(138, 167, 255, 0.3); --node-float-delay: -1.4s; --node-float-duration: 5.8s; }
+.frontier-overview__node--materials { left: 82%; top: 67%; --node-color: rgba(224, 181, 106, 0.55); --node-glow: rgba(224, 181, 106, 0.6); --node-ring: rgba(224, 181, 106, 0.32); --node-float-delay: -2.6s; --node-float-duration: 6.6s; }
+.frontier-overview__node--engineering { left: 52%; top: 83%; --node-color: rgba(216, 163, 72, 0.55); --node-glow: rgba(216, 163, 72, 0.6); --node-ring: rgba(216, 163, 72, 0.32); --node-float-delay: -0.8s; --node-float-duration: 6.8s; }
+.frontier-overview__node--info { left: 22%; top: 67%; --node-color: rgba(94, 224, 216, 0.5); --node-glow: rgba(94, 224, 216, 0.58); --node-ring: rgba(94, 224, 216, 0.3); --node-float-delay: -2.1s; --node-float-duration: 5.9s; }
+.frontier-overview__node--humanities { left: 22%; top: 29%; --node-color: rgba(126, 215, 193, 0.5); --node-glow: rgba(126, 215, 193, 0.56); --node-ring: rgba(126, 215, 193, 0.3); --node-float-delay: -1.8s; --node-float-duration: 6.1s; }
+
+@media (prefers-reduced-motion: reduce) {
+    .frontier-overview__node,
+    .frontier-overview__node::before,
+    .frontier-overview__node::after {
+        animation: none;
+    }
 }
 
-.frontier-overview__levels {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-4);
-    margin-top: var(--space-6);
-    padding-top: var(--space-6);
-    border-top: 1px solid rgba(226, 232, 240, 0.10);
+@keyframes frontierCoreFloat {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.04); }
 }
 
-.frontier-overview__levels div {
-    border-left: 1px solid rgba(242, 200, 107, 0.30);
-    padding-left: var(--space-4);
+@keyframes frontierNodeFloat {
+    0%, 100% { transform: translate(-50%, -50%) translate3d(0, 0, 0) scale(1); }
+    35% { transform: translate(-50%, -50%) translate3d(2px, -5px, 0) scale(1.03); }
+    68% { transform: translate(-50%, -50%) translate3d(-2px, 4px, 0) scale(0.98); }
 }
 
-.frontier-overview__levels span {
-    display: block;
-    color: rgba(242, 200, 107, 0.74);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    margin-bottom: var(--space-2);
+@keyframes frontierNodeShimmer {
+    0%, 100% { opacity: 0.55; transform: rotate(0deg); }
+    50% { opacity: 0.92; transform: rotate(18deg); }
 }
 
-.frontier-overview__levels strong {
-    display: block;
-    color: rgba(255, 247, 222, 0.88);
-    font-size: var(--text-base);
-    margin-bottom: var(--space-2);
+@keyframes frontierNodeRingPulse {
+    0%, 100% { opacity: 0.42; transform: scale(1); }
+    50% { opacity: 0.78; transform: scale(1.06); }
 }
 
-.frontier-overview__levels p {
-    color: rgba(226, 232, 240, 0.58);
-    font-size: var(--text-sm);
-    line-height: 1.65;
+@keyframes frontierOrbitSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes frontierCorePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
 }
 
 .frontier-brief {
@@ -916,17 +1271,123 @@ a:focus:not(:focus-visible) {
     gap: var(--space-2);
 }
 
-.frontier-brief__sources a {
+.frontier-brief__source {
     color: rgba(101, 228, 240, 0.82);
     font-size: var(--text-sm);
     line-height: 1.45;
     text-decoration: none;
 }
 
-.frontier-brief__sources a:hover,
-.frontier-brief__sources a:focus-visible {
+.frontier-brief__sources a.frontier-brief__source:hover,
+.frontier-brief__sources a.frontier-brief__source:focus-visible {
     color: #65e4f0;
     text-decoration: underline;
+}
+
+.frontier-subject-overview {
+    max-width: 1180px;
+    margin: var(--space-6) auto;
+    padding: 0 var(--space-8);
+}
+
+.frontier-subject-overview__head {
+    max-width: 780px;
+    margin-bottom: var(--space-4);
+}
+
+.frontier-subject-overview__head > span {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: rgba(var(--frontier-accent-rgb), 0.88);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 760;
+}
+
+.frontier-subject-overview__head i {
+    width: 14px;
+    height: 14px;
+}
+
+.frontier-subject-overview__head h2 {
+    margin: var(--space-3) 0 var(--space-3);
+    color: #fff7de;
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    line-height: 1.18;
+}
+
+.frontier-subject-overview__head p {
+    margin: 0;
+    color: rgba(226, 232, 240, 0.66);
+    font-size: var(--text-sm);
+    line-height: 1.74;
+}
+
+.frontier-subject-overview__grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-3);
+}
+
+.frontier-subject-module {
+    min-width: 0;
+    min-height: 184px;
+    display: grid;
+    align-content: start;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border: 1px solid rgba(226, 232, 240, 0.10);
+    border-radius: var(--radius-default);
+    color: inherit;
+    text-decoration: none;
+    background:
+        radial-gradient(circle at 88% 12%, rgba(var(--frontier-accent-rgb), 0.13), transparent 36%),
+        rgba(255, 255, 255, 0.024);
+    transition: transform var(--duration-fast) ease,
+                border-color var(--duration-fast) ease,
+                background var(--duration-fast) ease;
+}
+
+.frontier-subject-module:hover,
+.frontier-subject-module:focus-visible {
+    transform: translateY(-2px);
+    border-color: rgba(var(--frontier-accent-rgb), 0.44);
+    background:
+        radial-gradient(circle at 88% 12%, rgba(var(--frontier-accent-rgb), 0.18), transparent 38%),
+        rgba(255, 255, 255, 0.034);
+    outline: none;
+}
+
+.frontier-subject-module__index {
+    width: fit-content;
+    padding: 4px 7px;
+    color: rgba(var(--frontier-accent-rgb), 0.92);
+    border: 1px solid rgba(var(--frontier-accent-rgb), 0.20);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 760;
+}
+
+.frontier-subject-module i {
+    width: 20px;
+    height: 20px;
+    color: rgba(var(--frontier-accent-rgb), 0.82);
+}
+
+.frontier-subject-module strong {
+    color: rgba(255, 247, 222, 0.92);
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    line-height: 1.22;
+}
+
+.frontier-subject-module p {
+    margin: 0;
+    color: rgba(226, 232, 240, 0.62);
+    font-size: var(--text-sm);
+    line-height: 1.58;
 }
 
 .frontier-anchor-section {
@@ -2552,37 +3013,97 @@ a:focus:not(:focus-visible) {
 
 @media (max-width: 768px) {
     .frontier-overview {
-        width: min(100% - var(--space-6), 680px);
-        padding-top: var(--space-9);
+        width: calc(100% - var(--space-6));
+        max-width: 680px;
+        height: calc(100vh - 4rem);
+        padding: 0;
+        align-items: center;
     }
 
     .frontier-overview__hero {
-        min-height: auto;
+        height: 100%;
+        min-height: 0;
         grid-template-columns: 1fr;
-        gap: var(--space-5);
-        padding-bottom: var(--space-6);
+        align-content: center;
+        gap: clamp(var(--space-3), 2.6vh, var(--space-5));
+        padding: var(--space-3) 0;
+    }
+
+    .frontier-overview__hero::before {
+        inset: -4% -22% 44% -8%;
+        opacity: 0.40;
+        background-position: 58% center;
+        mask-image: radial-gradient(ellipse at 54% 44%, #000 0 44%, rgba(0, 0, 0, 0.56) 58%, transparent 82%);
+        -webkit-mask-image: radial-gradient(ellipse at 54% 44%, #000 0 44%, rgba(0, 0, 0, 0.56) 58%, transparent 82%);
     }
 
     .frontier-overview__copy {
-        padding-left: var(--space-4);
+        max-width: 100%;
+        padding: var(--space-3) 0 var(--space-3) var(--space-4);
     }
 
     .frontier-overview__copy h1 {
-        font-size: var(--text-3xl);
+        font-size: clamp(2.55rem, 14vw, 4rem);
+        margin-bottom: var(--space-3);
+    }
+
+    .frontier-overview__copy p {
+        font-size: var(--text-sm);
+        line-height: 1.62;
     }
 
     .frontier-overview__orbital {
-        min-height: 220px;
+        height: min(46vh, 360px);
+        min-height: min(280px, 44vh);
         order: -1;
+        background-position: 58% center;
     }
 
-    .frontier-overview__map,
-    .frontier-overview__levels {
+    .frontier-overview__core {
+        width: clamp(84px, 24vw, 108px);
+        height: clamp(84px, 24vw, 108px);
+    }
+
+    .frontier-overview__core-label {
+        font-size: clamp(0.92rem, 4.6vw, 1.12rem);
+    }
+
+    .frontier-overview__node {
+        width: clamp(48px, 14vw, 60px);
+        height: clamp(48px, 14vw, 60px);
+    }
+
+    .frontier-overview__node span {
+        font-size: clamp(0.72rem, 3.4vw, 0.86rem);
+    }
+
+    .frontier-overview__eyebrow {
+        font-size: 0.62rem;
+        letter-spacing: 0.16em;
+    }
+
+    .frontier-overview__actions {
+        width: 100%;
+        gap: var(--space-2);
+        margin-top: var(--space-3);
+    }
+
+    .frontier-overview__button {
+        min-height: 40px;
+        flex: 1 1 140px;
+        padding: 0 var(--space-3);
+    }
+
+    .frontier-subject-overview {
+        padding: 0 var(--space-5);
+    }
+
+    .frontier-subject-overview__grid {
         grid-template-columns: 1fr;
     }
 
-    .frontier-overview-card {
-        min-height: 156px;
+    .frontier-subject-module {
+        min-height: auto;
     }
 
     .frontier-hero {

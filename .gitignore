@@ -1,5 +1,6 @@
 # Build outputs
 server/build/
+node_modules/
 
 # IDE
 .vscode/
@@ -11,6 +12,7 @@ Thumbs.db
 # Temp files
 *.tmp
 *~
+.codex-public-preview-*.log
 # Test screenshots
 test-screenshots/
 .commit-msg-*.txt

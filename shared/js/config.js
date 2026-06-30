@@ -438,9 +438,30 @@ const CONFIG = {
                 teachingNote: '建议先区分“季节来自地轴倾角”和“地日距离变化”；太阳高度与日出日落数值用于理解趋势，实际观测会受大气折射、地形和天气影响。',
                 guardrail: '不要把四季简单归因于地日距离；本页呈现的是太阳高度、昼长和季节趋势，精确日出日落仍需回到 NOAA 计算说明。',
                 sources: [
-                    { label: 'NASA Space Place · Seasons', url: 'https://spaceplace.nasa.gov/seasons/en/' },
-                    { label: 'NASA/JPL · The Change of Seasons', url: 'https://www.jpl.nasa.gov/edu/resources/gallery/the-change-of-seasons-views-from-space/' },
-                    { label: 'NOAA GML · Solar Calculation Details', url: 'https://gml.noaa.gov/grad/solcalc/calcdetails.html' }
+                    {
+                        label: 'NASA Space Place · Seasons',
+                        url: 'https://spaceplace.nasa.gov/seasons/en/',
+                        type: '机构',
+                        usage: '支撑四季来自地轴倾角而非地日距离的核心解释',
+                        localSummary: '用于说明季节变化与太阳照射角度、昼长变化相关，适合作为页面第一层概念依据。',
+                        boundary: 'NASA 科普解释不等同于本页太阳高度数值算法；具体日出日落仍需结合计算模型。'
+                    },
+                    {
+                        label: 'NASA/JPL · The Change of Seasons',
+                        url: 'https://www.jpl.nasa.gov/edu/resources/gallery/the-change-of-seasons-views-from-space/',
+                        type: '机构',
+                        usage: '支撑季节变化可视化和地球公转叙事',
+                        localSummary: '用于把地轴倾角和季节图像联系起来，帮助学习者理解宇宙页视觉叙事来源。',
+                        boundary: '图像材料用于概念和展示语境，不替代本页可调纬度、日期实验中的数值读数。'
+                    },
+                    {
+                        label: 'NOAA GML · Solar Calculation Details',
+                        url: 'https://gml.noaa.gov/grad/solcalc/calcdetails.html',
+                        type: '机构',
+                        usage: '支撑太阳高度、昼长和日出日落近似计算的边界说明',
+                        localSummary: '用于提示太阳位置计算依赖近似公式，并解释页面读数为何只能作为趋势学习。',
+                        boundary: '实际观测会受大气折射、海拔、地形和天气影响，页面不输出精密天文观测结论。'
+                    }
                 ],
                 roadmap: []
             },
@@ -449,11 +470,46 @@ const CONFIG = {
                 teachingNote: '建议先判断简单桁架假设是否成立，再画受力图，用整体平衡求反力、节点平衡求杆力；页面模型服务入门理解，不替代真实结构设计中的规范、材料和安全系数计算。',
                 guardrail: '不要把杆件拉压符号当成完整设计结论；简单桁架分析还需要确认二力杆、节点荷载和真实材料/稳定性边界。',
                 sources: [
-                    { label: 'Engineering Statics · Trusses', url: 'https://engineeringstatics.org/Chapter_06-trusses.html' },
-                    { label: 'Engineering Statics · Method of Joints', url: 'https://engineeringstatics.org/method-of-joints.html' },
-                    { label: 'OpenStax University Physics · Static Equilibrium', url: 'https://openstax.org/books/university-physics-volume-1/pages/12-2-examples-of-static-equilibrium' },
-                    { label: 'Engineering Statics · Zero-Force Members', url: 'https://engineeringstatics.org/Chapter_06-trusses.html#subsection-110' },
-                    { label: 'Engineering Statics · Equilibrium', url: 'https://engineeringstatics.org/Chapter_05.html' }
+                    {
+                        label: 'Engineering Statics · Trusses',
+                        url: 'https://engineeringstatics.org/Chapter_06-trusses.html',
+                        type: '教材',
+                        usage: '支撑简单桁架、二力杆和节点荷载假设',
+                        localSummary: '用于说明本页 Warren 桁架为何可以被简化为节点和杆件的入门模型。',
+                        boundary: '真实桥梁还涉及材料、连接、稳定、规范荷载和安全系数，不能由本页直接完成设计。'
+                    },
+                    {
+                        label: 'Engineering Statics · Method of Joints',
+                        url: 'https://engineeringstatics.org/method-of-joints.html',
+                        type: '教材',
+                        usage: '支撑节点法求杆件拉压的操作路径',
+                        localSummary: '用于解释从支座反力进入节点平衡，再判断杆件受拉或受压的学习流程。',
+                        boundary: '页面只模拟二维静定桁架；超静定、节点刚接和空间结构需要其他方法。'
+                    },
+                    {
+                        label: 'OpenStax University Physics · Static Equilibrium',
+                        url: 'https://openstax.org/books/university-physics-volume-1/pages/12-2-examples-of-static-equilibrium',
+                        type: '教材',
+                        usage: '支撑整体平衡和力矩平衡的基础定义',
+                        localSummary: '用于说明荷载、支座反力和力矩平衡如何构成工程页的第一层计算依据。',
+                        boundary: '教材平衡例题不覆盖结构规范验算；页面读数只能用于理解平衡关系。'
+                    },
+                    {
+                        label: 'Engineering Statics · Zero-Force Members',
+                        url: 'https://engineeringstatics.org/Chapter_06-trusses.html#subsection-110',
+                        type: '教材',
+                        usage: '支撑零力杆和受力路径的判读提醒',
+                        localSummary: '用于提示并非所有杆件在每种荷载情境下都承担明显轴力。',
+                        boundary: '零力杆判断依赖特定节点和荷载条件，本页不作为完整杆件优化工具。'
+                    },
+                    {
+                        label: 'Engineering Statics · Equilibrium',
+                        url: 'https://engineeringstatics.org/Chapter_05.html',
+                        type: '教材',
+                        usage: '支撑受力图、力平衡和力矩平衡的通用背景',
+                        localSummary: '用于把工程页的整体反力读数放回静力学基本方程中理解。',
+                        boundary: '平衡方程是必要条件，不足以证明真实结构安全或耐久。'
+                    }
                 ],
                 roadmap: []
             },
@@ -462,10 +518,38 @@ const CONFIG = {
                 teachingNote: '建议先读懂特征、标签、斜率、截距和残差，再讨论模型能否外推；线性回归只能表达线性关系，样本偏差和异常值会改变结论。',
                 guardrail: '不要把回归线当作因果证明或样本外保证；预测前要检查散点形状、残差、异常点和自变量范围。',
                 sources: [
-                    { label: 'OpenStax Statistics · Regression', url: 'https://openstax.org/books/introductory-statistics-2e/pages/12-3-the-regression-equation' },
-                    { label: 'Google ML Crash Course · Linear Regression', url: 'https://developers.google.com/machine-learning/crash-course/linear-regression' },
-                    { label: 'Google ML Crash Course · Loss', url: 'https://developers.google.com/machine-learning/crash-course/linear-regression/loss' },
-                    { label: 'scikit-learn · LinearRegression', url: 'https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LinearRegression.html' }
+                    {
+                        label: 'OpenStax Statistics · Regression',
+                        url: 'https://openstax.org/books/introductory-statistics-2e/pages/12-3-the-regression-equation',
+                        type: '教材',
+                        usage: '支撑回归方程、斜率、截距和残差的统计定义',
+                        localSummary: '用于把页面中的预测线和残差读数放回入门统计语境。',
+                        boundary: '相关和回归不等于因果；页面不提供真实业务预测或统计显著性检验。'
+                    },
+                    {
+                        label: 'Google ML Crash Course · Linear Regression',
+                        url: 'https://developers.google.com/machine-learning/crash-course/linear-regression',
+                        type: '工具文档',
+                        usage: '支撑机器学习语境下的特征、标签和线性模型表达',
+                        localSummary: '用于解释为什么数据科学页把样本点、模型参数和预测线放在同一实验台。',
+                        boundary: '页面只展示单变量线性入门模型，不代表完整 AI 系统或深度学习能力。'
+                    },
+                    {
+                        label: 'Google ML Crash Course · Loss',
+                        url: 'https://developers.google.com/machine-learning/crash-course/linear-regression/loss',
+                        type: '工具文档',
+                        usage: '支撑损失函数和训练反馈的解释',
+                        localSummary: '用于说明调参后损失变化如何帮助用户观察模型拟合程度。',
+                        boundary: '损失下降只说明训练样本上的拟合改善，不保证样本外表现或公平性。'
+                    },
+                    {
+                        label: 'scikit-learn · LinearRegression',
+                        url: 'https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LinearRegression.html',
+                        type: '工具文档',
+                        usage: '支撑线性回归 API 和工程实现边界',
+                        localSummary: '用于提示真实工具会以明确 API、参数和数据矩阵接口承载线性回归。',
+                        boundary: '本页不是 scikit-learn 的运行环境，也不暴露完整训练、验证和部署流程。'
+                    }
                 ],
                 roadmap: []
             },
@@ -474,33 +558,116 @@ const CONFIG = {
                 teachingNote: '建议把“域名到地址”“可靠字节流”“网络包转发”和“链路帧承载”分开理解；页面字节数是教学近似，真实网络还会受到 TLS、MTU、拥塞控制和链路类型影响。',
                 guardrail: '不要把教学包头图等同于完整抓包；真实传输会受协议版本、加密层、MTU、重传和拥塞控制影响。',
                 sources: [
-                    { label: 'IETF RFC 1034 · Domain Names', url: 'https://www.rfc-editor.org/rfc/rfc1034.html' },
-                    { label: 'IETF RFC 9113 · HTTP/2', url: 'https://www.rfc-editor.org/rfc/rfc9113.html' },
-                    { label: 'IETF RFC 9293 · TCP', url: 'https://www.rfc-editor.org/rfc/rfc9293.html' },
-                    { label: 'IETF RFC 8200 · IPv6', url: 'https://www.rfc-editor.org/rfc/rfc8200.html' }
+                    {
+                        label: 'IETF RFC 1034 · Domain Names',
+                        url: 'https://www.rfc-editor.org/rfc/rfc1034.html',
+                        type: '标准',
+                        usage: '支撑 DNS 将域名映射到资源记录的基础概念',
+                        localSummary: '用于解释信息页请求链路中“域名到地址”阶段的角色。',
+                        boundary: '页面不模拟完整递归解析、缓存策略、DNSSEC 或真实解析器行为。'
+                    },
+                    {
+                        label: 'IETF RFC 9113 · HTTP/2',
+                        url: 'https://www.rfc-editor.org/rfc/rfc9113.html',
+                        type: '标准',
+                        usage: '支撑应用层请求、帧和多路复用的概念边界',
+                        localSummary: '用于说明网页请求不是单一包，而会经历应用层协议组织。',
+                        boundary: '页面只展示分层入口，不实现 HTTP/2 帧细节、优先级或真实浏览器协商。'
+                    },
+                    {
+                        label: 'IETF RFC 9293 · TCP',
+                        url: 'https://www.rfc-editor.org/rfc/rfc9293.html',
+                        type: '标准',
+                        usage: '支撑可靠字节流、连接和传输层包头的解释',
+                        localSummary: '用于把请求数据与 TCP 连接、顺序和可靠传输概念联系起来。',
+                        boundary: '页面不模拟拥塞控制、重传、窗口缩放和真实网络抖动。'
+                    },
+                    {
+                        label: 'IETF RFC 8200 · IPv6',
+                        url: 'https://www.rfc-editor.org/rfc/rfc8200.html',
+                        type: '标准',
+                        usage: '支撑网络层寻址、逐跳转发和 IPv6 包头角色',
+                        localSummary: '用于解释信息页中路径节点和网络包转发的基础语义。',
+                        boundary: '页面不覆盖扩展头、路由策略、MTU 发现和链路层差异。'
+                    }
                 ],
                 roadmap: []
             },
             materials: {
-                overview: '材料与微观结构入口从晶胞类型、配位数、堆积效率和晶粒边界出发，解释微观结构为什么会影响宏观性能。',
-                teachingNote: '建议把晶体结构和多晶晶粒分成两个尺度观察；晶粒细化常能提高强度，但纳米尺度、成分、相变、孔隙和加工历史都会改变实际表现。',
+                overview: '材料与微观结构是未来星系的样板路线：从晶胞类型、配位数、堆积效率和晶粒边界出发，把微观结构、性能趋势、状态读数和可信回查串成完整交互路径。',
+                teachingNote: '建议按“进入、选择、观察、判读、回查”推进：先分清理想晶体结构和多晶晶粒两个尺度，再用实验台验证趋势并回到模型边界。',
                 guardrail: '不要把 Hall-Petch 趋势无限外推；晶粒进入纳米尺度后，缺陷、晶界稳定性和加工历史可能改变强化方向。',
                 sources: [
-                    { label: 'OpenStax Chemistry · Lattice Structures', url: 'https://openstax.org/books/chemistry-2e/pages/10-6-lattice-structures-in-crystalline-solids' },
-                    { label: 'Gu, Stiles & El-Awady · Hall-Petch Statistics', url: 'https://arxiv.org/abs/2209.04891' },
-                    { label: 'Dangwal et al. · Hall-Petch Breaks', url: 'https://arxiv.org/abs/2402.11798' }
+                    {
+                        label: 'OpenStax Chemistry · Lattice Structures',
+                        url: 'https://openstax.org/books/chemistry-2e/pages/10-6-lattice-structures-in-crystalline-solids',
+                        type: '教材',
+                        usage: '支撑晶胞、配位数和堆积效率的基础定义',
+                        localSummary: '用于说明 SC、BCC、FCC、HCP 等理想晶体结构的几何比较，不用于推断真实材料强度。',
+                        boundary: '教材结构模型默认理想晶体；实际合金还受缺陷、相组成和加工历史影响。'
+                    },
+                    {
+                        label: 'Gu, Stiles & El-Awady · Hall-Petch Statistics',
+                        url: 'https://arxiv.org/abs/2209.04891',
+                        type: '论文',
+                        usage: '支撑 Hall-Petch 趋势的统计边界提醒',
+                        localSummary: '用于提示晶粒尺寸与强度关系存在统计分散和样本依赖，页面只保留入门级趋势表达。',
+                        boundary: '不能把本页强度指数等同于实验屈服强度或工程选材结论。'
+                    },
+                    {
+                        label: 'Dangwal et al. · Hall-Petch Breaks',
+                        url: 'https://arxiv.org/abs/2402.11798',
+                        type: '论文',
+                        usage: '支撑纳米尺度和机制改变的不可外推提醒',
+                        localSummary: '用于解释 Hall-Petch 型趋势并非无限成立，纳米晶或复杂微结构中可能出现偏离。',
+                        boundary: '页面不模拟纳米晶、析出相、孔隙、相变和温度耦合等复杂机制。'
+                    }
                 ],
-                roadmap: []
+                roadmap: [
+                    '星序总览 -> 未来星系 -> 材料与微观结构',
+                    '专题地图 -> 视觉图谱 -> 可信审查',
+                    '晶体结构 -> 晶粒尺度 -> 性能趋势',
+                    '尺度桥 -> 判断链 -> 晶体/晶粒实验台',
+                    '状态读数 -> 来源索引 -> 模型边界'
+                ]
             },
             humanities: {
                 overview: '语言与人文可视化入口把词频、关键词上下文和共现网络当作阅读辅助，帮助学习者提出回读问题，并把图表线索放回原文、出处和材料背景解释。',
                 teachingNote: '建议先说明分词、停用词和语料范围，再观察词项与上下文；词袋模型会弱化语序、语气和历史语境，解释时要补回材料背景。',
                 guardrail: '不要把词频或共现直接等同文本意义；数量线索必须回到原文、出处、语境和标注规则中解释。',
                 sources: [
-                    { label: 'Voyant Tools · Tool Guide', url: 'https://voyant-tools.org/docs/#!/guide/tools' },
-                    { label: 'Library of Congress · Primary Sources', url: 'https://www.loc.gov/programs/teachers/getting-started-with-primary-sources/guides/' },
-                    { label: 'TEI P5 Guidelines', url: 'https://tei-c.org/guidelines/p5/' },
-                    { label: 'Stanford IR Book · Term Frequency', url: 'https://nlp.stanford.edu/IR-book/html/htmledition/term-frequency-and-weighting-1.html' }
+                    {
+                        label: 'Voyant Tools · Tool Guide',
+                        url: 'https://voyant-tools.org/docs/#!/guide/tools',
+                        type: '工具文档',
+                        usage: '支撑词频、上下文和共现视图作为阅读辅助工具',
+                        localSummary: '用于说明人文页图表的作用是提出回读线索，而不是替代文本解释。',
+                        boundary: '页面不接入 Voyant 在线服务，也不处理真实大型语料的清洗和标注问题。'
+                    },
+                    {
+                        label: 'Library of Congress · Primary Sources',
+                        url: 'https://www.loc.gov/programs/teachers/getting-started-with-primary-sources/guides/',
+                        type: '机构',
+                        usage: '支撑原始资料需要回到出处、语境和提问框架',
+                        localSummary: '用于提醒学习者：数量图表之后必须回读文本和材料背景。',
+                        boundary: '本页样本文本仅用于演示方法，不代表完整历史研究或文献校勘。'
+                    },
+                    {
+                        label: 'TEI P5 Guidelines',
+                        url: 'https://tei-c.org/guidelines/p5/',
+                        type: '标准',
+                        usage: '支撑文本标注、结构化文本和数字人文材料处理背景',
+                        localSummary: '用于提示文本可视化依赖清晰的文本结构和标注规则。',
+                        boundary: '页面不实现 TEI 编码器，也不输出可用于学术发布的完整标注文档。'
+                    },
+                    {
+                        label: 'Stanford IR Book · Term Frequency',
+                        url: 'https://nlp.stanford.edu/IR-book/html/htmledition/term-frequency-and-weighting-1.html',
+                        type: '教材',
+                        usage: '支撑词频和项权重作为信息检索线索的基础概念',
+                        localSummary: '用于解释词频为什么可以帮助发现文本线索，但需要结合语境解释。',
+                        boundary: '词频会弱化语序、修辞和历史语境，不能直接等同文本意义。'
+                    }
                 ],
                 roadmap: []
             }

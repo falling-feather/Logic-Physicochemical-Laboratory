@@ -144,12 +144,13 @@
     }
 
     .page-hero__visual {
-        min-height: 180px;
-        order: -1;
+        min-height: 104px;
+        order: 0;
     }
 
     .page-hero__canvas {
-        max-width: min(240px, 72vw);
+        max-width: min(128px, 40vw);
+        opacity: 0.52;
     }
 
     .page-hero__title {
@@ -196,8 +197,8 @@
     .orbit-path-5 { width: 370px; height: 222px; }
     .main-star { width: 170px; height: 170px; }
     .star-body { width: 100%; height: 100%; }
-    .star-title { font-size: 1.82rem; transform: translateY(-8px); }
-    .star-subtitle { font-size: 0.56rem; letter-spacing: 0.11em; }
+    .star-title { font-size: 1.5rem; transform: translateY(-12px); }
+    .star-subtitle { font-size: 0.52rem; letter-spacing: 0.16em; transform: translateY(-9px); }
     .satellite { width: 52px; height: 52px; }
     .satellite-label-container { bottom: -48px; width: 122px; }
     .satellite-label { font-size: 0.75rem; }
@@ -205,10 +206,6 @@
     .home-tagline p { font-size: 0.78rem; letter-spacing: 0.08em; }
     .hud-data { display: none; }
     .nebula { display: none; }
-    .home-page .planets-entry {
-        display: none;
-    }
-
     /* Sort controls */
     .sort-toolbar {
         flex-direction: column;
@@ -255,8 +252,8 @@
     .orbit-path-5 { width: 290px; height: 176px; }
     .main-star { width: 142px; height: 142px; }
     .star-body { width: 100%; height: 100%; }
-    .star-title { font-size: 1.48rem; transform: translateY(-7px); }
-    .star-subtitle { font-size: 0.44rem; letter-spacing: 0.06em; transform: translateY(-8px); }
+    .star-title { font-size: 1.3rem; transform: translateY(-11px); }
+    .star-subtitle { font-size: 0.46rem; letter-spacing: 0.12em; transform: translateY(-8px); }
     .satellite { width: 42px; height: 42px; }
     .satellite-icon i { width: 1.15rem; height: 1.15rem; }
     .satellite-label-container { bottom: -42px; width: 96px; }
@@ -269,11 +266,11 @@
     }
 
     .page-hero__visual {
-        min-height: 164px;
+        min-height: 104px;
     }
 
     .page-hero__canvas {
-        max-width: min(220px, 68vw);
+        max-width: min(128px, 40vw);
     }
 
     .page-hero__title {

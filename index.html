@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -28,29 +28,29 @@
 
     <!-- CSS: Shared -->
     <link rel="stylesheet" href="shared/css/tokens.css?v=20260424ss">
-    <link rel="stylesheet" href="shared/css/base.css?v=20260619v63FrontierLifecycleP1">
+    <link rel="stylesheet" href="shared/css/base.css?v=20260630mainV64">
     <link rel="stylesheet" href="shared/css/typography.css?v=20260526v61c">
-    <link rel="stylesheet" href="shared/css/navbar.css?v=20260619v63AsyncGsapP1">
+    <link rel="stylesheet" href="shared/css/navbar.css?v=20260630mainV64">
     <link rel="stylesheet" href="shared/css/page-layout.css?v=20260606v62e">
-    <link rel="stylesheet" href="shared/css/cards.css?v=20260619v63FrontierLifecycleP1">
-    <link rel="stylesheet" href="shared/css/module-selector.css?v=20260619v63FrontierLifecycleP1">
-    <link rel="stylesheet" href="shared/css/experiment-guide.css?v=20260619v63FrontierLifecycleP1">
+    <link rel="stylesheet" href="shared/css/cards.css?v=20260630mainV64">
+    <link rel="stylesheet" href="shared/css/module-selector.css?v=20260630mainV64">
+    <link rel="stylesheet" href="shared/css/experiment-guide.css?v=20260630mainV64">
     <link rel="stylesheet" href="shared/css/experiment-export.css?v=20260424v44a">
     <link rel="stylesheet" href="shared/css/experiment-quiz.css?v=20260422z">
     <link rel="stylesheet" href="shared/css/experiment-favorites.css?v=20260424oo">
     <link rel="stylesheet" href="shared/css/experiment-rating.css?v=20260422z">
-    <link rel="stylesheet" href="pages/about/about.css?v=20260619v63FrontierLifecycleP1">
+    <link rel="stylesheet" href="pages/about/about.css?v=20260630mainV64">
     <link rel="stylesheet" href="shared/css/back-to-top.css?v=20260424oo">
-    <link rel="stylesheet" href="shared/css/fab-trigger.css?v=20260619v63FrontierLifecycleP1">
+    <link rel="stylesheet" href="shared/css/fab-trigger.css?v=20260630mainV64">
     <!-- CSS: Pages -->
-    <link rel="stylesheet" href="pages/home/home.css?v=20260605v62e">
-    <link rel="stylesheet" href="pages/planets/planets.css?v=20260619v63FrontierLifecycleP1">
-    <link rel="stylesheet" href="pages/cosmos/cosmos.css?v=20260619v63AsyncGsapP1">
-    <link rel="stylesheet" href="pages/datascience/datascience.css?v=20260619v63AsyncGsapP1">
-    <link rel="stylesheet" href="pages/infotech/infotech.css?v=20260619v63AsyncGsapP1">
-    <link rel="stylesheet" href="pages/materials/materials.css?v=20260619v63AsyncGsapP1">
-    <link rel="stylesheet" href="pages/humanities/humanities.css?v=20260619v63AsyncGsapP1">
-    <link rel="stylesheet" href="pages/engineering/engineering.css?v=20260619v63AsyncGsapP1">
+    <link rel="stylesheet" href="pages/home/home.css?v=20260630mainV64">
+    <link rel="stylesheet" href="pages/planets/planets.css?v=20260630mainV64">
+    <link rel="stylesheet" href="pages/cosmos/cosmos.css?v=20260630mainV64">
+    <link rel="stylesheet" href="pages/datascience/datascience.css?v=20260630mainV64">
+    <link rel="stylesheet" href="pages/infotech/infotech.css?v=20260630mainV64">
+    <link rel="stylesheet" href="pages/materials/materials.css?v=20260630mainV64">
+    <link rel="stylesheet" href="pages/humanities/humanities.css?v=20260630mainV64">
+    <link rel="stylesheet" href="pages/engineering/engineering.css?v=20260630mainV64">
     <link rel="stylesheet" href="pages/mathematics/mathematics.css?v=20260618mathModelP1">
     <link rel="stylesheet" href="pages/physics/physics.css?v=20260618thermoP1">
     <link rel="stylesheet" href="pages/chemistry/chemistry.css?v=20260618ionP1">
@@ -62,7 +62,7 @@
     <link rel="stylesheet" href="shared/css/related-experiments.css?v=20260424v45c">
     <link rel="stylesheet" href="shared/css/experiment-polish.css?v=20260526v61c">
     <!-- CSS: Responsive (must be last) -->
-    <link rel="stylesheet" href="shared/css/responsive.css?v=20260619v63FrontierLifecycleP1">
+    <link rel="stylesheet" href="shared/css/responsive.css?v=20260630mainV64">
 
     <!-- Loading Screen (inline — zero dependency, shows immediately) -->
     <style id="loading-screen-styles">
@@ -318,8 +318,8 @@
                     <div class="star-body">
                         <div class="planet-surface"></div>
                         <div class="planet-highlight"></div>
-                        <h1 class="star-title" data-text="工科试验室">工科试验室</h1>
-                        <span class="star-subtitle">Engineering Lab · 88 Experiments</span>
+                        <h1 class="star-title" data-text="工科实验室">工科实验室</h1>
+                        <span class="star-subtitle">Engineering Lab</span>
                     </div>
                     <div class="star-eyes-container" aria-hidden="true">
                         <div class="star-eyes">
@@ -346,7 +346,7 @@
                         <span class="home-galaxy-cta__title">进入星系目录</span>
                         <span class="home-galaxy-cta__sub">SUBJECT · GALAXY · MAP</span>
                     </span>
-                    <span class="home-galaxy-cta__arrow" aria-hidden="true">›</span>
+                    <span class="home-galaxy-cta__arrow" aria-hidden="true">?</span>
                 </a>
 
                 <div class="orbit-path orbit-path-1"></div>
@@ -418,7 +418,6 @@
                         </div>
                     </div>
                 </div>
-                <a href="#planets" class="planets-entry" aria-label="返回星序多星系导航">返回星序</a>
             </div>
         </section>
 
@@ -440,7 +439,17 @@
                 <main class="planets-hero">
                     <section class="planets-intro" aria-labelledby="planets-main-title">
                         <h1 id="planets-main-title">星序</h1>
-                        <p>在深空中选择一座知识星系。进入之后，再展开它自己的学科与实验菜单。</p>
+                        <p>面向未来学习者的星系化学科探索平台。先选择一座知识星系，再沿二级目录进入实验、判读和可信回查。</p>
+                        <div class="planets-recommendation" aria-label="推荐学习主线">
+                            <span>推荐路径</span>
+                            <strong>从未来星系进入材料样板路线</strong>
+                            <p>星序总览 -> 未来星系 -> 材料微观 -> 晶体/晶粒实验台 -> 状态回查</p>
+                            <div class="planets-recommendation__actions">
+                                <a href="#frontier-frontier-route">学习主线</a>
+                                <a href="#frontier-materials-route">材料样板</a>
+                                <a href="#frontier">未来星系</a>
+                            </div>
+                        </div>
                     </section>
 
                     <section class="planets-stage" aria-label="星序星系图">
@@ -512,80 +521,40 @@
         </section>
 
         <section id="page-frontier" class="page frontier-page frontier-overview-page" aria-label="未来星系总览" data-galaxy="frontier">
+            <canvas id="hero-canvas-frontier" class="frontier-overview__canvas frontier-overview__canvas--backdrop" aria-hidden="true"></canvas>
             <div class="frontier-overview">
                 <header class="frontier-overview__hero">
-                    <div class="frontier-overview__copy">
+                    <div class="frontier-overview__copy" id="frontier-frontier-route">
+                        <span class="frontier-overview__eyebrow">Frontier Galaxy · 06 学科方向</span>
                         <h1>未来星系</h1>
-                        <p>跨学科内容先回到星系总览，再进入二级知识方向。每个方向提供自己的学习坐标、专题入口、实验台和来源回查，不再把星系总览分散塞进单个学科页。</p>
+                        <p>未来星系把六个跨学科方向收进同一张星图。在右侧星图中选择任意方向，即可进入该学科的总览与交互实验。</p>
                     </div>
-                    <div class="frontier-overview__orbital" aria-hidden="true">
-                        <span class="frontier-overview__ring frontier-overview__ring--outer"></span>
-                        <span class="frontier-overview__ring frontier-overview__ring--inner"></span>
-                        <span class="frontier-overview__node frontier-overview__node--cosmos"></span>
-                        <span class="frontier-overview__node frontier-overview__node--engineering"></span>
-                        <span class="frontier-overview__node frontier-overview__node--data"></span>
-                        <span class="frontier-overview__node frontier-overview__node--info"></span>
-                        <span class="frontier-overview__node frontier-overview__node--materials"></span>
-                        <span class="frontier-overview__node frontier-overview__node--humanities"></span>
+                    <div id="frontier-subject-map" class="frontier-overview__orbital" aria-label="未来星系交互星图">
+                        <span class="frontier-overview__orbital-tag" aria-hidden="true">Interactive Star Map</span>
+                        <div class="frontier-overview__core" aria-hidden="true">
+                            <span class="frontier-overview__core-label">未来星系</span>
+                            <span class="frontier-overview__core-sub">Frontier</span>
+                        </div>
+                        <a class="frontier-overview__node frontier-overview__node--cosmos" href="#cosmos" data-page="cosmos">
+                            <span>宇宙</span>
+                        </a>
+                        <a class="frontier-overview__node frontier-overview__node--engineering" href="#engineering" data-page="engineering">
+                            <span>工程</span>
+                        </a>
+                        <a class="frontier-overview__node frontier-overview__node--data" href="#datascience" data-page="datascience">
+                            <span>数据</span>
+                        </a>
+                        <a class="frontier-overview__node frontier-overview__node--info" href="#infotech" data-page="infotech">
+                            <span>信息</span>
+                        </a>
+                        <a class="frontier-overview__node frontier-overview__node--materials" href="#materials" data-page="materials">
+                            <span>材料</span>
+                        </a>
+                        <a class="frontier-overview__node frontier-overview__node--humanities" href="#humanities" data-page="humanities">
+                            <span>人文</span>
+                        </a>
                     </div>
                 </header>
-
-                <section class="frontier-overview__map" aria-label="未来星系二级知识目录">
-                    <a class="frontier-overview-card frontier-overview-card--cosmos" href="#cosmos" data-page="cosmos">
-                        <span>01</span>
-                        <strong>地球与宇宙</strong>
-                        <p>季节变化、太阳高度和昼长趋势。</p>
-                        <em>进入二级总览</em>
-                    </a>
-                    <a class="frontier-overview-card frontier-overview-card--engineering" href="#engineering" data-page="engineering">
-                        <span>02</span>
-                        <strong>工程应用</strong>
-                        <p>桁架受力、荷载路径和静力平衡。</p>
-                        <em>进入二级总览</em>
-                    </a>
-                    <a class="frontier-overview-card frontier-overview-card--data" href="#datascience" data-page="datascience">
-                        <span>03</span>
-                        <strong>数据科学</strong>
-                        <p>线性回归、残差和模型边界。</p>
-                        <em>进入二级总览</em>
-                    </a>
-                    <a class="frontier-overview-card frontier-overview-card--info" href="#infotech" data-page="infotech">
-                        <span>04</span>
-                        <strong>信息技术</strong>
-                        <p>网络分层、封装和逐跳传递。</p>
-                        <em>进入二级总览</em>
-                    </a>
-                    <a class="frontier-overview-card frontier-overview-card--materials" href="#materials" data-page="materials">
-                        <span>05</span>
-                        <strong>材料微观</strong>
-                        <p>晶体结构、晶粒边界和性能趋势。</p>
-                        <em>进入二级总览</em>
-                    </a>
-                    <a class="frontier-overview-card frontier-overview-card--humanities" href="#humanities" data-page="humanities">
-                        <span>06</span>
-                        <strong>人文可视化</strong>
-                        <p>词频、上下文、共现与原文回读。</p>
-                        <em>进入二级总览</em>
-                    </a>
-                </section>
-
-                <section class="frontier-overview__levels" aria-label="未来星系学习层级">
-                    <div>
-                        <span>Galaxy</span>
-                        <strong>未来星系总览</strong>
-                        <p>只负责跨学科方向选择和星系级学习坐标。</p>
-                    </div>
-                    <div>
-                        <span>Subject</span>
-                        <strong>二级学科总览</strong>
-                        <p>每个方向先说明任务、边界、来源和专题路线。</p>
-                    </div>
-                    <div>
-                        <span>Topic</span>
-                        <strong>专题与实验台</strong>
-                        <p>具体交互内容继续按模型、操作、判读拆分。</p>
-                    </div>
-                </section>
             </div>
         </section>
 
@@ -744,7 +713,7 @@
                 <section class="datascience-overview" aria-label="数据科学学习概览">
                     <div class="datascience-overview__copy">
                         <h2>从散点到模型</h2>
-                        <p>线性回归把一个或多个特征映射到预测值。入门时先看单特征模型 ŷ = b + wx：点到预测线的竖直距离是残差，普通最小二乘会寻找让残差平方和最小的直线。</p>
+                        <p>线性回归把一个或多个特征映射到预测值。入门时先看单特征模型 ? = b + wx：点到预测线的竖直距离是残差，普通最小二乘会寻找让残差平方和最小的直线。</p>
                     </div>
                     <div class="datascience-overview__metrics" aria-label="当前模块要点">
                         <div class="datascience-overview__metric">
@@ -753,7 +722,7 @@
                         </div>
                         <div class="datascience-overview__metric">
                             <span>输出</span>
-                            <strong>预测 ŷ</strong>
+                            <strong>预测 ?</strong>
                         </div>
                         <div class="datascience-overview__metric">
                             <span>目标</span>
@@ -775,17 +744,17 @@
                         <article class="datascience-model-card">
                             <span>01 · Data</span>
                             <h3>特征与标签</h3>
-                            <p>特征 x 是模型已知的输入，标签 y 是观测到的结果。预测值 ŷ 来自模型，不一定等于真实观测值 y。</p>
+                            <p>特征 x 是模型已知的输入，标签 y 是观测到的结果。预测值 ? 来自模型，不一定等于真实观测值 y。</p>
                         </article>
                         <article class="datascience-model-card">
                             <span>02 · Model</span>
                             <h3>权重与偏置</h3>
-                            <p>在 ŷ = b + wx 中，w 对应直线斜率，b 对应截距或偏置；训练过程调整这些参数，让预测更贴近数据。</p>
+                            <p>在 ? = b + wx 中，w 对应直线斜率，b 对应截距或偏置；训练过程调整这些参数，让预测更贴近数据。</p>
                         </article>
                         <article class="datascience-model-card">
                             <span>03 · Loss</span>
                             <h3>残差与平方损失</h3>
-                            <p>残差是 y - ŷ。把残差平方后求和得到 SSE，取平均得到 MSE；平方会放大较大的误差。</p>
+                            <p>残差是 y - ?。把残差平方后求和得到 SSE，取平均得到 MSE；平方会放大较大的误差。</p>
                         </article>
                         <article class="datascience-model-card">
                             <span>04 · Boundary</span>
@@ -872,7 +841,7 @@
                         <article class="datascience-interpretation__item">
                             <span>01</span>
                             <h3>变量代表什么</h3>
-                            <p>x 是特征，y 是标签，ŷ 是模型预测。斜率表示 x 每增加 1 个单位时，预测值平均改变多少；解释时必须回到具体场景。</p>
+                            <p>x 是特征，y 是标签，? 是模型预测。斜率表示 x 每增加 1 个单位时，预测值平均改变多少；解释时必须回到具体场景。</p>
                         </article>
                         <article class="datascience-interpretation__item">
                             <span>02</span>
@@ -887,7 +856,7 @@
                         <article class="datascience-interpretation__item">
                             <span>04</span>
                             <h3>预测能走多远</h3>
-                            <p>在样本 x 范围内预测通常更稳妥；向外延伸需要额外证据。相关关系不自动说明因果关系，R² 也不能替代背景解释。</p>
+                            <p>在样本 x 范围内预测通常更稳妥；向外延伸需要额外证据。相关关系不自动说明因果关系，R2 也不能替代背景解释。</p>
                         </article>
                     </div>
                 </section>
@@ -1068,11 +1037,14 @@
         <section id="page-materials" class="page frontier-page materials-page" aria-label="材料与微观结构" data-galaxy="frontier">
             <div class="frontier-hero">
                 <div class="frontier-hero__text">
-                    <span class="frontier-hero__label frontier-hero__label--materials">Materials</span>
+                    <span class="frontier-hero__label frontier-hero__label--materials">Materials · Sample Route</span>
                     <h1 class="frontier-hero__title">材料与微观结构</h1>
-                    <p class="frontier-hero__desc">从晶胞、堆积方式和晶粒边界开始，看见微米尺度的结构怎样影响材料的强度、延展性和加工表现。</p>
+                    <p class="frontier-hero__desc">未来星系的样板路线：从晶胞、堆积方式和晶粒边界开始，把微观结构、性能趋势、状态读数和模型边界组织成一条可持续深入的交互路径。</p>
                     <div class="frontier-hero__actions">
-                        <a class="frontier-hero__button frontier-hero__button--primary" href="#frontier-materials-lab">开始实验</a>
+                        <a class="frontier-hero__button frontier-hero__button--primary" href="#frontier-materials-route">查看样板航线</a>
+                        <a class="frontier-hero__button" href="#frontier-materials-topics">专题地图</a>
+                        <a class="frontier-hero__button" href="#frontier-materials-trust">可信审查</a>
+                        <a class="frontier-hero__button" href="#frontier-materials-lab">开始实验</a>
                         <a class="frontier-hero__button" href="#frontier" data-page="frontier">星系总览</a>
                     </div>
                 </div>
@@ -1082,6 +1054,509 @@
             </div>
 
             <div class="materials-shell">
+                <section id="frontier-materials-route" class="materials-route" aria-label="材料样板路线">
+                    <div class="materials-route__copy">
+                        <span>Sample Route</span>
+                        <h2>材料样板路线</h2>
+                        <p>本页先作为未来星系的样板级路径：控制文字密度，把长内容拆成可扫描的路线段，再用实验台把选择、观察、判读和回查串起来。</p>
+                    </div>
+                    <div class="materials-route__steps" aria-label="材料样板路线步骤">
+                        <article>
+                            <span>进入</span>
+                            <strong>材料学习地图</strong>
+                            <p>先说明晶胞、位错、晶界和加工历史属于不同尺度。</p>
+                        </article>
+                        <article>
+                            <span>选择</span>
+                            <strong>晶体与晶粒参数</strong>
+                            <p>通过晶体结构、晶粒尺寸和处理方式形成清晰变量。</p>
+                        </article>
+                        <article>
+                            <span>观察</span>
+                            <strong>图像与读数反馈</strong>
+                            <p>画布、读数卡和状态条同步反馈，避免只看静态说明。</p>
+                        </article>
+                        <article>
+                            <span>回查</span>
+                            <strong>来源与模型边界</strong>
+                            <p>把 Hall-Petch 趋势、纳米尺度偏离和真实材料条件前置。</p>
+                        </article>
+                    </div>
+                </section>
+
+                <section id="frontier-materials-topics" class="materials-topic-map" aria-label="材料专题层级">
+                    <div class="materials-topic-map__head">
+                        <span>Topic Layer</span>
+                        <h2>四个专题分支支撑一条样板路线</h2>
+                        <p>进入材料页后，不需要从长页中自行寻找重点。这里把页面拆成晶体结构、晶粒尺度、性能趋势和来源附录四个可跳转分支，每个分支都对应后续真实内容。</p>
+                    </div>
+                    <nav class="materials-topic-map__grid" aria-label="材料样板专题导航">
+                        <a class="materials-topic-card" href="#frontier-materials-topic-page-crystal">
+                            <span>01 · Crystal</span>
+                            <strong>晶体结构</strong>
+                            <p>比较 SC、BCC、FCC、HCP 的配位数、堆积效率和理想几何边界。</p>
+                            <em>查看专题页骨架</em>
+                        </a>
+                        <a class="materials-topic-card" href="#frontier-materials-topic-page-grain">
+                            <span>02 · Grain</span>
+                            <strong>晶粒尺度</strong>
+                            <p>把晶界、位错滑移和加工历史放在同一尺度桥中，避免跨尺度误读。</p>
+                            <em>查看专题页骨架</em>
+                        </a>
+                        <a class="materials-topic-card" href="#frontier-materials-topic-page-performance">
+                            <span>03 · Performance</span>
+                            <strong>性能趋势</strong>
+                            <p>用 Hall-Petch 型趋势训练判断，但把纳米尺度、相变和孔隙等边界前置。</p>
+                            <em>查看专题页骨架</em>
+                        </a>
+                        <a class="materials-topic-card" href="#frontier-materials-topic-page-source">
+                            <span>04 · Source</span>
+                            <strong>来源附录</strong>
+                            <p>公开来源可直接回查；专题资料按用途、边界和证据位置整理。</p>
+                            <em>查看专题页骨架</em>
+                        </a>
+                    </nav>
+                    <div class="materials-topic-map__proof" aria-label="材料样板路径摘要">
+                        <div>
+                            <span>三层导通</span>
+                            <strong>星序 -> 未来星系 -> 材料专题 -> 实验台</strong>
+                        </div>
+                        <div>
+                            <span>交互闭环</span>
+                            <strong>参数选择 -> 可视反馈 -> 状态读数 -> 来源回查</strong>
+                        </div>
+                        <div>
+                            <span>来源边界</span>
+                            <strong>来源说明不替代原始资料</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="frontier-materials-topic-pages" class="materials-topic-pages" aria-label="材料专题页骨架">
+                    <div class="materials-topic-pages__head">
+                        <span>Topic Pages</span>
+                        <h2>四条可迁移为独立路由的专题页骨架</h2>
+                    <p>这一层把“专题”从卡片摘要推进为页面级信息架构：每个专题都有首屏问题、交互核心、证据回查和后续拆页路径，方便后续拆成真实路由或教学卡片。</p>
+                    </div>
+                    <div class="materials-topic-pages__grid">
+                        <article id="frontier-materials-topic-page-crystal" class="materials-topic-page-card">
+                            <div class="materials-topic-page-card__head">
+                                <span>Page 01</span>
+                                <strong>晶体结构专题页</strong>
+                                <code>#frontier-materials-topic-page-crystal</code>
+                            </div>
+                            <p>把理想晶胞作为进入材料微观世界的第一扇门：先给出几何问题，再通过实验台切换结构，最后回到教材定义和模型边界。</p>
+                            <div class="materials-topic-page-card__layout" aria-label="晶体结构专题页结构">
+                                <span><b>首屏问题</b>不同晶胞为什么会有不同配位和堆积效率</span>
+                                <span><b>交互核心</b>SC、BCC、FCC、HCP 切换和读数同步</span>
+                                <span><b>证据回查</b>教材定义支撑理想几何，不推出真实合金强度</span>
+                            </div>
+                            <div class="materials-topic-page-card__actions">
+                                <a href="#frontier-materials-module-crystal">任务卡</a>
+                                <a href="#frontier-materials-deep-crystal">专题面板</a>
+                                <a href="#frontier-materials-lab">实验台</a>
+                            </div>
+                        </article>
+                        <article id="frontier-materials-topic-page-grain" class="materials-topic-page-card">
+                            <div class="materials-topic-page-card__head">
+                                <span>Page 02</span>
+                                <strong>晶粒尺度专题页</strong>
+                                <code>#frontier-materials-topic-page-grain</code>
+                            </div>
+                            <p>把晶界、位错和加工历史从一句结论拆成可观察路径，让用户理解“晶粒更细通常更强”不是无条件定律。</p>
+                            <div class="materials-topic-page-card__layout" aria-label="晶粒尺度专题页结构">
+                                <span><b>首屏问题</b>晶界为什么会改变位错滑移和相对强度</span>
+                                <span><b>交互核心</b>晶粒尺寸滑杆、晶界密度和趋势读数</span>
+                                <span><b>证据回查</b>统计趋势需要排除纳米晶、孔隙和相变等边界</span>
+                            </div>
+                            <div class="materials-topic-page-card__actions">
+                                <a href="#frontier-materials-module-grain">任务卡</a>
+                                <a href="#frontier-materials-deep-grain">专题面板</a>
+                                <a href="#frontier-materials-grain">尺度桥</a>
+                            </div>
+                        </article>
+                        <article id="frontier-materials-topic-page-performance" class="materials-topic-page-card">
+                            <div class="materials-topic-page-card__head">
+                                <span>Page 03</span>
+                                <strong>性能趋势专题页</strong>
+                                <code>#frontier-materials-topic-page-performance</code>
+                            </div>
+                            <p>把 Hall-Petch 型曲线转化为趋势判断训练：页面呈现相对指数、处理方式差异和不可外推警示，而不是伪装成工程预测。</p>
+                            <div class="materials-topic-page-card__layout" aria-label="性能趋势专题页结构">
+                                <span><b>首屏问题</b>趋势曲线能帮助判断什么，不能证明什么</span>
+                                <span><b>交互核心</b>处理方式切换、曲线警示区和状态读数</span>
+                                <span><b>证据回查</b>论文边界用于说明模型失效场景和统计限制</span>
+                            </div>
+                            <div class="materials-topic-page-card__actions">
+                                <a href="#frontier-materials-module-performance">任务卡</a>
+                                <a href="#frontier-materials-deep-performance">专题面板</a>
+                                <a href="#frontier-materials-performance">判断链</a>
+                            </div>
+                        </article>
+                        <article id="frontier-materials-topic-page-source" class="materials-topic-page-card">
+                            <div class="materials-topic-page-card__head">
+                                <span>Page 04</span>
+                                <strong>来源回查专题页</strong>
+                                <code>#frontier-materials-topic-page-source</code>
+                            </div>
+                            <p>把来源从页尾参考链接变成可阅读的信息页：说明每条资料支撑什么、不能推出什么，以及如何沿公开资料完成回查。</p>
+                            <div class="materials-topic-page-card__layout" aria-label="来源回查专题页结构">
+                                <span><b>首屏问题</b>哪些结论有来源支撑，哪些只是教学近似</span>
+                                <span><b>交互核心</b>普通模式外链、本地来源编号和来源附录</span>
+                                <span><b>证据回查</b>来源类型、用途、本地摘要和边界并列呈现</span>
+                            </div>
+                            <div class="materials-topic-page-card__actions">
+                                <a href="#frontier-materials-module-source">任务卡</a>
+                                <a href="#frontier-materials-deep-source">专题面板</a>
+                                <a href="#frontier-materials-source">来源附录</a>
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <section id="frontier-materials-modules" class="materials-topic-modules" aria-label="材料专题模块拆解">
+                    <div class="materials-topic-modules__head">
+                        <span>Module Layer</span>
+                        <h2>把四个专题拆成可操作的任务单元</h2>
+                        <p>专题地图解决“去哪里”，模块层解决“看什么、怎么操作、证据边界在哪里”。这层是后续独立专题页的蓝本，也让当前长页更像有组织的交互作品。</p>
+                    </div>
+                    <div class="materials-topic-modules__grid">
+                        <article id="frontier-materials-module-crystal" class="materials-topic-module">
+                            <div class="materials-topic-module__top">
+                                <span>01 · Crystal</span>
+                                <strong>晶体结构任务</strong>
+                            </div>
+                            <p>先看理想晶胞如何把抽象原子排列转为可见结构，再进入实验台切换 SC、BCC、FCC、HCP。</p>
+                            <ul>
+                                <li>看点：配位数、等效原子数、堆积效率。</li>
+                                <li>动作：点击晶体结构按钮，观察画布和读数同步变化。</li>
+                                <li>边界：理想晶胞不等于真实合金组织。</li>
+                            </ul>
+                            <a href="#frontier-materials-deep-crystal">进入专题面板</a>
+                        </article>
+                        <article id="frontier-materials-module-grain" class="materials-topic-module">
+                            <div class="materials-topic-module__top">
+                                <span>02 · Grain</span>
+                                <strong>晶粒尺度任务</strong>
+                            </div>
+                            <p>把“晶粒更细通常更强”拆成晶界数量、位错滑移和加工历史三步，避免把趋势说成绝对结论。</p>
+                            <ul>
+                                <li>看点：晶界密度与位错跨界阻力。</li>
+                                <li>动作：拖动晶粒尺寸滑杆，比较读数卡变化。</li>
+                                <li>边界：纳米晶、孔隙、相变会改变机制。</li>
+                            </ul>
+                            <a href="#frontier-materials-deep-grain">进入专题面板</a>
+                        </article>
+                        <article id="frontier-materials-module-performance" class="materials-topic-module">
+                            <div class="materials-topic-module__top">
+                                <span>03 · Performance</span>
+                                <strong>性能趋势任务</strong>
+                            </div>
+                            <p>用 Hall-Petch 型曲线训练“趋势判断”，但把相对指数、统计分散和不可外推区域明确展示出来。</p>
+                            <ul>
+                                <li>看点：相对强度指数与曲线警示区。</li>
+                                <li>动作：切换处理方式，比较快速凝固、再结晶和退火长大。</li>
+                                <li>边界：页面不输出真实工程强度。</li>
+                            </ul>
+                            <a href="#frontier-materials-deep-performance">进入专题面板</a>
+                        </article>
+                        <article id="frontier-materials-module-source" class="materials-topic-module">
+                            <div class="materials-topic-module__top">
+                                <span>04 · Source</span>
+                                <strong>来源回查任务</strong>
+                            </div>
+                            <p>把公开来源、教学用途和模型边界整理成本地附录，让学习者不用离开页面也能核对依据。</p>
+                            <ul>
+                                <li>看点：来源编号、类型、用途和边界。</li>
+                                <li>动作：回到来源索引核对资料边界。</li>
+                                <li>边界：来源支持教学近似，不替代工程规范。</li>
+                            </ul>
+                            <a href="#frontier-materials-deep-source">进入专题面板</a>
+                        </article>
+                    </div>
+                </section>
+
+                <section id="frontier-materials-deep-panels" class="materials-deep-panels" aria-label="材料专题深层面板">
+                    <div class="materials-deep-panels__head">
+                        <span>Deep Panels</span>
+                        <h2>四个准独立专题页，先以折叠面板落地</h2>
+                        <p>这层把任务卡继续展开成可讲述的专题页草图。每个面板都包含讲解脚本、交互反馈和拆页方向，后续可以直接迁移为独立页面。</p>
+                    </div>
+                    <nav class="materials-focus-rail" aria-label="材料深层专题页导航">
+                        <a href="#frontier-materials-deep-crystal">
+                            <span>01</span>
+                            <strong>晶体结构</strong>
+                        </a>
+                        <a href="#frontier-materials-deep-grain">
+                            <span>02</span>
+                            <strong>晶粒尺度</strong>
+                        </a>
+                        <a href="#frontier-materials-deep-performance">
+                            <span>03</span>
+                            <strong>性能趋势</strong>
+                        </a>
+                        <a href="#frontier-materials-deep-source">
+                            <span>04</span>
+                            <strong>来源回查</strong>
+                        </a>
+                    </nav>
+                    <div class="materials-deep-panels__list">
+                        <details id="frontier-materials-deep-crystal" class="materials-deep-panel" open>
+                            <summary>
+                                <span>01 · Crystal Focus</span>
+                                <strong>晶体结构专题页草图</strong>
+                                <em>几何定义 -> 控件切换 -> 读数回查</em>
+                            </summary>
+                            <div class="materials-deep-panel__body">
+                                <div>
+                                    <h3>讲解脚本</h3>
+                                    <ol>
+                                        <li>先说明本页讨论的是理想晶胞，不是显微组织照片。</li>
+                                        <li>切换 SC、BCC、FCC、HCP，观察配位数、等效原子数和堆积效率读数。</li>
+                                        <li>把理想几何结果回接到来源附录，而不是推出真实合金强度。</li>
+                                    </ol>
+                                </div>
+                                <div>
+                                    <h3>拆页方向</h3>
+                                    <ul>
+                                        <li>四种晶胞对比表。</li>
+                                        <li>晶胞画布状态说明。</li>
+                                        <li>教材定义与模型边界并排呈现。</li>
+                                    </ul>
+                                    <a href="#frontier-materials-lab">去实验台切换晶胞</a>
+                                </div>
+                            </div>
+                        </details>
+
+                        <details id="frontier-materials-deep-grain" class="materials-deep-panel">
+                            <summary>
+                                <span>02 · Grain Focus</span>
+                                <strong>晶粒尺度专题页草图</strong>
+                                <em>晶界数量 -> 位错阻碍 -> 加工历史</em>
+                            </summary>
+                            <div class="materials-deep-panel__body">
+                                <div>
+                                    <h3>讲解脚本</h3>
+                                    <ol>
+                                        <li>先用晶界网络示意图建立多晶材料的观察尺度。</li>
+                                        <li>拖动晶粒尺寸滑杆，比较晶界密度和相对强度指数。</li>
+                                        <li>补充加工历史提醒，避免把晶粒尺寸当作唯一变量。</li>
+                                    </ol>
+                                </div>
+                                <div>
+                                    <h3>拆页方向</h3>
+                                    <ul>
+                                        <li>晶界与位错的因果链。</li>
+                                        <li>细晶强化和异常晶粒的对照。</li>
+                                        <li>快速凝固、再结晶、退火的组织差异。</li>
+                                    </ul>
+                                    <a href="#frontier-materials-grain">去尺度桥查看晶界</a>
+                                </div>
+                            </div>
+                        </details>
+
+                        <details id="frontier-materials-deep-performance" class="materials-deep-panel">
+                            <summary>
+                                <span>03 · Performance Focus</span>
+                                <strong>性能趋势专题页草图</strong>
+                                <em>趋势曲线 -> 相对指数 -> 不可外推</em>
+                            </summary>
+                            <div class="materials-deep-panel__body">
+                                <div>
+                                    <h3>讲解脚本</h3>
+                                    <ol>
+                                        <li>先看趋势图，确认曲线服务于判断训练，不是工程预测。</li>
+                                        <li>切换处理方式，观察快速凝固、再结晶和退火长大的相对变化。</li>
+                                        <li>回到 Hall-Petch 边界，指出纳米晶和复杂组织的失效场景。</li>
+                                    </ol>
+                                </div>
+                                <div>
+                                    <h3>拆页方向</h3>
+                                    <ul>
+                                        <li>Hall-Petch 公式的教学解释。</li>
+                                        <li>异常区与不可外推案例。</li>
+                                        <li>相对指数和真实强度的区别。</li>
+                                    </ul>
+                                    <a href="#frontier-materials-performance">去判断链看边界</a>
+                                </div>
+                            </div>
+                        </details>
+
+                        <details id="frontier-materials-deep-source" class="materials-deep-panel">
+                            <summary>
+                                <span>04 · Source Focus</span>
+                                <strong>来源回查专题页草图</strong>
+                                <em>来源编号 -> 用途说明 -> 展示边界</em>
+                            </summary>
+                            <div class="materials-deep-panel__body">
+                                <div>
+                                    <h3>讲解脚本</h3>
+                                    <ol>
+                                        <li>先确认每条公开来源支撑的概念、模型或边界。</li>
+                                        <li>把来源、页面读数和不可推出结论放在同一条回查路径里。</li>
+                                        <li>用来源附录帮助学习者回到原始资料，而不是只停留在页面摘要。</li>
+                                    </ol>
+                                </div>
+                                <div>
+                                    <h3>拆页方向</h3>
+                                    <ul>
+                                        <li>可维护的来源清单。</li>
+                                        <li>教学近似与工程规范分层。</li>
+                                        <li>外部资料与页面模型边界检查。</li>
+                                    </ul>
+                                    <a href="#frontier-materials-source">去来源附录核对</a>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                </section>
+
+                <section id="frontier-materials-trust" class="materials-trust-ledger" aria-label="材料可信审查">
+                    <div class="materials-trust-ledger__head">
+                        <span>Trust Ledger</span>
+                        <h2>先说明能证明什么，再进入实验台</h2>
+                        <p>材料页把事实、教学近似、不能推出的结论和回查动作前置。这样学习者看到的不只是漂亮图像，而是一套可追溯、有边界的学习判断系统。</p>
+                    </div>
+                    <div class="materials-trust-ledger__grid">
+                        <article>
+                            <span>Fact</span>
+                            <strong>晶胞几何来自教材定义</strong>
+                            <p>配位数、等效原子数和堆积效率用于比较理想 SC、BCC、FCC、HCP 结构，来源指向开放化学教材。</p>
+                        </article>
+                        <article>
+                            <span>Approximation</span>
+                            <strong>强度指数只表达相对趋势</strong>
+                            <p>实验台用 Hall-Petch 型关系训练“细晶强化”的方向感，不把数值当作真实屈服强度。</p>
+                        </article>
+                        <article>
+                            <span>Boundary</span>
+                            <strong>纳米晶和复杂组织不可外推</strong>
+                            <p>相变、析出、孔隙、异常晶粒分布、温度和加工历史都可能改变机制，需要额外证据。</p>
+                        </article>
+                        <article>
+                            <span>Trace</span>
+                            <strong>状态读数与公开来源闭环</strong>
+                            <p>学习者可从读数卡回看控件、图像和来源说明，再跳回公开资料核对依据。</p>
+                        </article>
+                    </div>
+                </section>
+
+                <section id="frontier-materials-visuals" class="materials-visual-atlas" aria-label="材料微观视觉图谱">
+                    <div class="materials-visual-atlas__head">
+                        <span>Visual Atlas</span>
+                        <h2>三张自制示意图，把抽象尺度变成可见资产</h2>
+                        <p>本组图像是教学示意，不冒充真实显微照片。它们分别承担晶格、晶界和趋势曲线的视觉锚点，后续可作为专题讲解和材料专题拆页的统一资产来源。</p>
+                    </div>
+                    <div class="materials-visual-atlas__grid">
+                        <figure class="materials-visual-card materials-visual-card--crystal">
+                            <div class="materials-visual-card__art" aria-hidden="true">
+                                <svg viewBox="0 0 420 260" focusable="false">
+                                    <defs>
+                                        <radialGradient id="materials-atom-gold" cx="34%" cy="28%" r="70%">
+                                            <stop offset="0%" stop-color="#fff2c6"/>
+                                            <stop offset="52%" stop-color="#e0b56a"/>
+                                            <stop offset="100%" stop-color="#7c5a24"/>
+                                        </radialGradient>
+                                    </defs>
+                                    <rect width="420" height="260" rx="16" fill="#0a1018"/>
+                                    <g fill="none" stroke="#e0b56a" stroke-opacity="0.24" stroke-width="2">
+                                        <path d="M92 58h170l70 48v118H162l-70-48z"/>
+                                        <path d="M162 106h170"/>
+                                        <path d="M162 106v118"/>
+                                        <path d="M92 58l70 48"/>
+                                        <path d="M262 58l70 48"/>
+                                        <path d="M92 176l70 48"/>
+                                    </g>
+                                    <g fill="url(#materials-atom-gold)" stroke="#fff3c4" stroke-opacity="0.42" stroke-width="2">
+                                        <circle cx="92" cy="58" r="18"/>
+                                        <circle cx="262" cy="58" r="18"/>
+                                        <circle cx="162" cy="106" r="19"/>
+                                        <circle cx="332" cy="106" r="18"/>
+                                        <circle cx="92" cy="176" r="18"/>
+                                        <circle cx="262" cy="176" r="19"/>
+                                        <circle cx="162" cy="224" r="18"/>
+                                        <circle cx="332" cy="224" r="18"/>
+                                    </g>
+                                    <path d="M30 212c44-18 82-18 126 0s88 18 132 0 74-16 102-2" fill="none" stroke="#7ed7c1" stroke-width="4" stroke-linecap="round" stroke-opacity="0.72"/>
+                                </svg>
+                            </div>
+                            <figcaption>
+                                <span>Asset 01 · Crystal</span>
+                                <h3>理想晶胞示意</h3>
+                                <p>用规则晶格提示配位、堆积和理想结构，避免把晶胞图误读为真实材料截面。</p>
+                            </figcaption>
+                        </figure>
+
+                        <figure class="materials-visual-card materials-visual-card--grain">
+                            <div class="materials-visual-card__art" aria-hidden="true">
+                                <svg viewBox="0 0 420 260" focusable="false">
+                                    <defs>
+                                        <linearGradient id="materials-grain-sweep" x1="0%" x2="100%" y1="0%" y2="100%">
+                                            <stop offset="0%" stop-color="#1d2f32"/>
+                                            <stop offset="55%" stop-color="#18242d"/>
+                                            <stop offset="100%" stop-color="#32251b"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <rect width="420" height="260" rx="16" fill="url(#materials-grain-sweep)"/>
+                                    <g stroke="#f0d59b" stroke-width="3" stroke-opacity="0.42">
+                                        <path d="M22 36l72 52-18 82-54 56"/>
+                                        <path d="M94 88l86-60 70 72-20 72-154-2"/>
+                                        <path d="M250 100l76-66 72 48-36 98-132-8"/>
+                                        <path d="M180 28l70 72"/>
+                                        <path d="M326 34l36 146 34 56"/>
+                                        <path d="M76 170l66 62 88-60"/>
+                                        <path d="M230 172l76 64 56-56"/>
+                                    </g>
+                                    <g fill="rgba(126,215,193,0.18)" stroke="#7ed7c1" stroke-opacity="0.58" stroke-width="2">
+                                        <path d="M96 88l84-58 68 70-20 70-150-2z"/>
+                                        <path d="M252 102l74-64 68 46-34 94-130-8z"/>
+                                        <path d="M78 172l64 58 86-58z"/>
+                                        <path d="M232 174l74 60 54-54z"/>
+                                    </g>
+                                    <g fill="#f0d59b" opacity="0.8">
+                                        <circle cx="96" cy="88" r="4"/>
+                                        <circle cx="230" cy="170" r="4"/>
+                                        <circle cx="360" cy="180" r="4"/>
+                                        <circle cx="76" cy="170" r="4"/>
+                                    </g>
+                                </svg>
+                            </div>
+                            <figcaption>
+                                <span>Asset 02 · Grain</span>
+                                <h3>晶界网络示意</h3>
+                                <p>用多边形边界表达晶粒交界和尺度差异，帮助后续讨论位错跨界与加工历史。</p>
+                            </figcaption>
+                        </figure>
+
+                        <figure class="materials-visual-card materials-visual-card--trend">
+                            <div class="materials-visual-card__art" aria-hidden="true">
+                                <svg viewBox="0 0 420 260" focusable="false">
+                                    <rect width="420" height="260" rx="16" fill="#090f18"/>
+                                    <g stroke="#dfe7f3" stroke-opacity="0.16" stroke-width="1">
+                                        <path d="M64 44v168h300"/>
+                                        <path d="M64 178h300"/>
+                                        <path d="M64 144h300"/>
+                                        <path d="M64 110h300"/>
+                                        <path d="M64 76h300"/>
+                                    </g>
+                                    <path d="M72 202c42-46 70-75 110-91 52-22 96-20 152-16" fill="none" stroke="#e0b56a" stroke-width="7" stroke-linecap="round"/>
+                                    <path d="M72 202c42-46 70-75 110-91 52-22 96-20 152-16" fill="none" stroke="#fff2c6" stroke-width="2" stroke-linecap="round" stroke-opacity="0.78"/>
+                                    <path d="M314 76c18 7 34 24 48 48" fill="none" stroke="#ff8a7a" stroke-width="5" stroke-linecap="round" stroke-dasharray="8 10"/>
+                                    <circle cx="182" cy="111" r="8" fill="#7ed7c1"/>
+                                    <circle cx="314" cy="96" r="8" fill="#ffbf75"/>
+                                    <path d="M282 70h84v52h-84z" fill="rgba(255,138,122,0.08)" stroke="#ff8a7a" stroke-opacity="0.28"/>
+                                    <path d="M86 216h264" stroke="#7ed7c1" stroke-opacity="0.5" stroke-width="3" stroke-linecap="round"/>
+                                </svg>
+                            </div>
+                            <figcaption>
+                                <span>Asset 03 · Trend</span>
+                                <h3>强度趋势示意</h3>
+                                <p>用曲线和警示区表达 Hall-Petch 型趋势与不可外推边界，服务判读而非数值预测。</p>
+                            </figcaption>
+                        </figure>
+                    </div>
+                </section>
+
                 <section class="materials-overview" aria-label="材料微观结构学习概览">
                     <div class="materials-overview__copy">
                         <h2>从原子排列到宏观性能</h2>
@@ -1108,7 +1583,7 @@
                 </section>
 
                 <section class="materials-scales" aria-label="材料结构尺度桥接">
-                    <article class="materials-scale">
+                    <article id="frontier-materials-crystal" class="materials-scale">
                         <span>Unit Cell</span>
                         <h3>晶胞是理想几何</h3>
                         <p>配位数、等效原子数和堆积效率来自理想晶体模型，适合比较 SC、BCC、FCC、HCP 的原子排列差异。</p>
@@ -1118,7 +1593,7 @@
                         <h3>位错连接结构与塑性</h3>
                         <p>金属塑性变形常与位错滑移有关；晶体结构、滑移面和缺陷会共同影响材料是否容易变形。</p>
                     </article>
-                    <article class="materials-scale">
+                    <article id="frontier-materials-grain" class="materials-scale">
                         <span>Grain Boundary</span>
                         <h3>晶界会阻碍滑移</h3>
                         <p>平均晶粒更小时，晶界数量通常更多，位错跨越晶界更困难，因此微米级多晶金属常出现细晶强化趋势。</p>
@@ -1130,7 +1605,7 @@
                     </article>
                 </section>
 
-                <section class="materials-judgement" aria-label="材料模型判断路径">
+                <section id="frontier-materials-performance" class="materials-judgement" aria-label="材料模型判断路径">
                     <div class="materials-judgement__header">
                         <h2>把显微图像转成材料判断</h2>
                         <p>材料性能不能只从一张晶粒图或一个晶胞模型推出。更稳妥的读法，是先确认尺度，再追问位错、晶界和加工历史是否能支持你的解释。</p>
@@ -1238,7 +1713,7 @@
                     </div>
                 </section>
 
-                <section class="materials-reference" aria-label="参考资料">
+                <section id="frontier-materials-source" class="materials-reference" aria-label="参考资料">
                     <span class="materials-reference__eyebrow">References</span>
                     <h2>参考资料</h2>
                     <p>本页的晶胞、配位数和堆积效率参考开放化学教材；晶粒尺寸与强度的关系采用入门级相对趋势，并保留 Hall-Petch 经验模型、统计分散性和纳米尺度偏离。</p>
@@ -1621,8 +2096,8 @@
                                 <div class="preset-functions">
                                     <button class="btn btn--ghost btn--sm" onclick="setFunction('sin(x)',event)">sin(x)</button>
                                     <button class="btn btn--ghost btn--sm" onclick="setFunction('cos(x)',event)">cos(x)</button>
-                                    <button class="btn btn--ghost btn--sm" onclick="setFunction('x^2',event)">x²</button>
-                                    <button class="btn btn--ghost btn--sm" onclick="setFunction('x^3',event)">x³</button>
+                                    <button class="btn btn--ghost btn--sm" onclick="setFunction('x^2',event)">x2</button>
+                                    <button class="btn btn--ghost btn--sm" onclick="setFunction('x^3',event)">x3</button>
                                     <button class="btn btn--ghost btn--sm" onclick="setFunction('1/x',event)">1/x</button>
                                     <button class="btn btn--ghost btn--sm" onclick="setFunction('tan(x)',event)">tan(x)</button>
                                     <button class="btn btn--ghost btn--sm" onclick="setFunction('abs(x)',event)">|x|</button>
@@ -1677,12 +2152,12 @@
                             <button class="calc-mode-btn active" onclick="Calculus.setMode('derivative')">导数/切线</button>
                             <button class="calc-mode-btn" onclick="Calculus.setMode('integral')">定积分</button>
                         </div>
-                        <button class="btn btn--primary btn--sm" id="calc-animate-btn" onclick="Calculus.animate()">▶ 动画</button>
+                        <button class="btn btn--primary btn--sm" id="calc-animate-btn" onclick="Calculus.animate()">? 动画</button>
                     </div>
                     <div class="calc-presets" style="margin-bottom:var(--space-3)">
                         <button class="btn btn--ghost btn--sm" onclick="Calculus.setPreset('sin(x)')">sin(x)</button>
-                        <button class="btn btn--ghost btn--sm" onclick="Calculus.setPreset('x^2')">x²</button>
-                        <button class="btn btn--ghost btn--sm" onclick="Calculus.setPreset('x^3-3*x')">x³−3x</button>
+                        <button class="btn btn--ghost btn--sm" onclick="Calculus.setPreset('x^2')">x2</button>
+                        <button class="btn btn--ghost btn--sm" onclick="Calculus.setPreset('x^3-3*x')">x3?3x</button>
                         <button class="btn btn--ghost btn--sm" onclick="Calculus.setPreset('exp(-x^2)')">高斯</button>
                         <button class="btn btn--ghost btn--sm" onclick="Calculus.setPreset('1/(1+x^2)')">洛伦兹</button>
                         <button class="btn btn--ghost btn--sm" onclick="Calculus.setPreset('cos(x)*x')">x·cos(x)</button>
@@ -1789,12 +2264,12 @@
                         </div>
                         <div class="cx-inputs">
                             <div class="cx-input-group">
-                                <label style="color:#5b8dce">z₁:</label>
+                                <label style="color:#5b8dce">z?:</label>
                                 <input type="number" id="cx-z1-re" value="2" step="0.5"> +
                                 <input type="number" id="cx-z1-im" value="1" step="0.5"> i
                             </div>
                             <div class="cx-input-group">
-                                <label style="color:#8b6fc0">z₂:</label>
+                                <label style="color:#8b6fc0">z?:</label>
                                 <input type="number" id="cx-z2-re" value="-1" step="0.5"> +
                                 <input type="number" id="cx-z2-im" value="2" step="0.5"> i
                             </div>
@@ -1813,8 +2288,8 @@
                         <div class="cx-canvas-wrap">
                             <canvas id="complex-canvas" class="cx-canvas"></canvas>
                             <div class="cx-legend">
-                                <span class="cxl-z1">z₁</span>
-                                <span class="cxl-z2">z₂</span>
+                                <span class="cxl-z1">z?</span>
+                                <span class="cxl-z2">z?</span>
                                 <span class="cxl-result">结果 w</span>
                             </div>
                         </div>
@@ -1850,7 +2325,7 @@
                                 <button class="btn btn--ghost btn--sm trig-preset-btn" data-deg="270">270°</button>
                             </div>
                             <div class="trig-action-row">
-                                <button class="btn btn--primary btn--sm" id="trig-anim-btn">▶ 动画</button>
+                                <button class="btn btn--primary btn--sm" id="trig-anim-btn">? 动画</button>
                                 <div class="trig-speed-group">
                                     <label>速度:</label>
                                     <input type="range" id="trig-speed" min="0.2" max="4" step="0.1" value="1">
@@ -1877,14 +2352,14 @@
                     </div>
                 <div class="prob-controls">
                     <div class="prob-modes">
-                        <button class="prob-mode-btn active" data-mode="coin">🪙 抛硬币</button>
-                        <button class="prob-mode-btn" data-mode="dice">🎲 掷骰子</button>
+                        <button class="prob-mode-btn active" data-mode="coin">?? 抛硬币</button>
+                        <button class="prob-mode-btn" data-mode="dice">?? 掷骰子</button>
                     </div>
                     <div class="prob-actions">
-                        <button class="btn-primary" id="prob-play-btn">▶ 连续实验</button>
+                        <button class="btn-primary" id="prob-play-btn">? 连续实验</button>
                         <button class="btn-secondary" id="prob-add-btn">+100次</button>
                         <button class="btn-secondary" id="prob-add1k-btn">+1000次</button>
-                        <button class="btn-secondary" id="prob-reset-btn">↺ 重置</button>
+                        <button class="btn-secondary" id="prob-reset-btn">? 重置</button>
                     </div>
                     <div class="prob-speed-row">
                         <label>速度</label>
@@ -1913,10 +2388,10 @@
                     <div class="setops-ops-row">
                         <button class="setops-op-btn active" data-op="union">A ∪ B</button>
                         <button class="setops-op-btn" data-op="intersection">A ∩ B</button>
-                        <button class="setops-op-btn" data-op="differenceAB">A − B</button>
-                        <button class="setops-op-btn" data-op="differenceBA">B − A</button>
-                        <button class="setops-op-btn" data-op="complement">Aᶜ</button>
-                        <button class="setops-op-btn" data-op="symmetric">A ∆ B</button>
+                        <button class="setops-op-btn" data-op="differenceAB">A ? B</button>
+                        <button class="setops-op-btn" data-op="differenceBA">B ? A</button>
+                        <button class="setops-op-btn" data-op="complement">A?</button>
+                        <button class="setops-op-btn" data-op="symmetric">A ? B</button>
                     </div>
                     <div class="setops-inputs">
                         <label>A = {<input type="text" id="setops-input-a" value="1,2,3,4,5,6" size="14">}</label>
@@ -1946,7 +2421,7 @@
                 <div class="vecops-controls">
                     <div class="vecops-ops-row">
                         <button class="vecops-op-btn active" data-op="add">A + B</button>
-                        <button class="vecops-op-btn" data-op="sub">A − B</button>
+                        <button class="vecops-op-btn" data-op="sub">A ? B</button>
                         <button class="vecops-op-btn" data-op="dot">A · B</button>
                         <button class="vecops-op-btn" data-op="projection">proj<sub>B</sub> A</button>
                     </div>
@@ -2027,7 +2502,7 @@
                     <div class="sg-ctrl-right">
                         <label class="sg-label">截面 <input type="range" id="sg-cross" min="0" max="1" value="0.5" step="0.01"> <span id="sg-cross-val">50%</span></label>
                         <label class="sg-label">速度 <input type="range" id="sg-speed" min="0.2" max="3" value="1" step="0.1"></label>
-                        <button id="sg-pause" class="sg-pause-btn" aria-label="暂停">⏸</button>
+                        <button id="sg-pause" class="sg-pause-btn" aria-label="暂停">?</button>
                     </div>
                 </div>
                 <div class="canvas-container"><canvas id="solidgeom-canvas" aria-label="立体几何三维可视化画布"></canvas></div>
@@ -2087,7 +2562,7 @@
                 <div class="demo-section">
                     <div class="section-header">
                         <h3><i data-lucide="trending-up"></i> 指数与对数函数</h3>
-                        <p>调节底数 a，观察 y=aˣ 与 y=logₐx 的图像变化及互为反函数的对称关系</p>
+                        <p>调节底数 a，观察 y=a? 与 y=log?x 的图像变化及互为反函数的对称关系</p>
                     </div>
                     <div id="el-controls" class="el-controls"></div>
                     <div class="canvas-container">
@@ -2102,7 +2577,7 @@
                 <div class="demo-section">
                     <div class="section-header">
                         <h3><i data-lucide="pyramid"></i> 二项式定理</h3>
-                        <p>调节指数 n，观察杨辉三角逐行生长与 (a+b)ⁿ 展开式系数 C(n,k) 的联动；点击单元格演示帕斯卡递推</p>
+                        <p>调节指数 n，观察杨辉三角逐行生长与 (a+b)? 展开式系数 C(n,k) 的联动；点击单元格演示帕斯卡递推</p>
                     </div>
                     <div id="bt-controls" class="bt-controls"></div>
                     <div class="canvas-container">
@@ -2117,7 +2592,7 @@
                 <div class="demo-section">
                     <div class="section-header">
                         <h3><i data-lucide="scatter-chart"></i> 统计与回归</h3>
-                        <p>「线性回归」用最小二乘法拟合散点并计算相关系数 r / R²；「统计分布」展示频率直方图、均值方差标准差与正态曲线 3σ 原则</p>
+                        <p>「线性回归」用最小二乘法拟合散点并计算相关系数 r / R2；「统计分布」展示频率直方图、均值方差标准差与正态曲线 3σ 原则</p>
                     </div>
                     <div id="sr-controls" class="sr-controls"></div>
                     <div class="canvas-container">
@@ -2208,7 +2683,7 @@
                                     <div class="range-group">
                                         <input type="range" id="gravity-slider" class="range" min="0" max="2000" step="50" value="980">
                                         <span class="range-value" id="gravity-value">980</span>
-                                        <span class="range-unit">px/s²</span>
+                                        <span class="range-unit">px/s2</span>
                                     </div>
                                 </div>
                                 <div class="control-group">
@@ -2345,7 +2820,7 @@
                             <div class="em-controls">
                                 <div class="em-actions">
                                     <button class="btn btn--pos" id="em-add-pos">+ 正电荷</button>
-                                    <button class="btn btn--neg" id="em-add-neg">− 负电荷</button>
+                                    <button class="btn btn--neg" id="em-add-neg">? 负电荷</button>
                                 </div>
                                 <div class="em-actions">
                                     <button class="btn btn--ghost" id="em-clear">清空</button>
@@ -2386,7 +2861,7 @@
                     <div class="steps-panel">
                         <div class="step-item">
                             <span class="step-number">1</span>
-                            <p><strong>库仑定律</strong> — 电场强度 <em>E = kq/r²</em>，与电荷量成正比，与距离的平方成反比。</p>
+                            <p><strong>库仑定律</strong> — 电场强度 <em>E = kq/r2</em>，与电荷量成正比，与距离的平方成反比。</p>
                         </div>
                         <div class="step-item">
                             <span class="step-number">2</span>
@@ -2524,7 +2999,7 @@
                         </div>
                         <div class="step-item">
                             <span class="step-number">3</span>
-                            <p><strong>多普勒效应</strong> — 波源运动导致观测频率偏移，f' = f₀·v/(v∓v<sub>s</sub>)，超音速时形成马赫锥。</p>
+                            <p><strong>多普勒效应</strong> — 波源运动导致观测频率偏移，f' = f?·v/(v?v<sub>s</sub>)，超音速时形成马赫锥。</p>
                         </div>
                     </div>
                 </div>
@@ -2600,11 +3075,11 @@
                         </div>
                         <div class="step-item">
                             <span class="step-number">3</span>
-                            <p><strong>伯努利方程</strong> — P + ½ρv² = const，管道收窄处流速增大、压强降低（Venturi 效应）。</p>
+                            <p><strong>伯努利方程</strong> — P + ?ρv2 = const，管道收窄处流速增大、压强降低（Venturi 效应）。</p>
                         </div>
                         <div class="step-item">
                             <span class="step-number">4</span>
-                            <p><strong>连续性方程</strong> — A₁v₁ = A₂v₂，不可压缩流体的质量守恒要求截面积与流速成反比。</p>
+                            <p><strong>连续性方程</strong> — A?v? = A?v?，不可压缩流体的质量守恒要求截面积与流速成反比。</p>
                         </div>
                     </div>
                 </div>
@@ -2644,11 +3119,11 @@
                         </div>
                         <div class="step-item">
                             <span class="step-number">3</span>
-                            <p><strong>Snell 定律</strong> — n₁sinθ₁ = n₂sinθ₂，光从光密到光疏介质时，入射角超过临界角 θ<sub>c</sub> 发生全反射。</p>
+                            <p><strong>Snell 定律</strong> — n?sinθ? = n?sinθ?，光从光密到光疏介质时，入射角超过临界角 θ<sub>c</sub> 发生全反射。</p>
                         </div>
                         <div class="step-item">
                             <span class="step-number">4</span>
-                            <p><strong>棱镜色散</strong> — 不同波长折射率不同（Cauchy 方程 n(λ) = A + B/λ²），白光经三棱镜分解为连续光谱。</p>
+                            <p><strong>棱镜色散</strong> — 不同波长折射率不同（Cauchy 方程 n(λ) = A + B/λ2），白光经三棱镜分解为连续光谱。</p>
                         </div>
                         <div class="step-item">
                             <span class="step-number">5</span>
@@ -2656,7 +3131,7 @@
                         </div>
                         <div class="step-item">
                             <span class="step-number">6</span>
-                            <p><strong>偏振与 Malus 定律</strong> — 线偏振光通过检偶器 I = I₀cos²θ，两片正交偏振片之间插入 45° 中间片反而透光（偏振悖论）。</p>
+                            <p><strong>偏振与 Malus 定律</strong> — 线偏振光通过检偶器 I = I?cos2θ，两片正交偏振片之间插入 45° 中间片反而透光（偏振悖论）。</p>
                         </div>
                     </div>
                 </div>
@@ -2672,11 +3147,11 @@
                     <div class="demo-content">
                         <div class="kin-controls">
                             <div class="kin-param">
-                                <label>v₀ = <span id="kin-v0-val">2.0</span> m/s</label>
+                                <label>v? = <span id="kin-v0-val">2.0</span> m/s</label>
                                 <input type="range" id="kin-v0" min="-5" max="10" step="0.5" value="2">
                             </div>
                             <div class="kin-param">
-                                <label>a = <span id="kin-a-val">1.0</span> m/s²</label>
+                                <label>a = <span id="kin-a-val">1.0</span> m/s2</label>
                                 <input type="range" id="kin-a" min="-3" max="5" step="0.5" value="1">
                             </div>
                             <div class="kin-param">
@@ -2684,8 +3159,8 @@
                                 <input type="range" id="kin-t" min="0" max="8" step="0.05" value="0">
                             </div>
                             <div class="kin-action-row">
-                                <button class="btn btn--primary btn--sm" id="kin-play-btn">▶ 播放</button>
-                                <button class="btn btn--ghost btn--sm" id="kin-reset-btn">↺ 重置</button>
+                                <button class="btn btn--primary btn--sm" id="kin-play-btn">? 播放</button>
+                                <button class="btn btn--ghost btn--sm" id="kin-reset-btn">? 重置</button>
                             </div>
                         </div>
                         <div class="kin-canvas-wrap">
@@ -2707,7 +3182,7 @@
                     <div class="demo-content">
                         <div class="proj-controls">
                             <div class="proj-param">
-                                <label>v₀ = <span id="proj-v0-val">20</span> m/s</label>
+                                <label>v? = <span id="proj-v0-val">20</span> m/s</label>
                                 <input type="range" id="proj-v0" min="5" max="50" step="1" value="20">
                             </div>
                             <div class="proj-param">
@@ -2715,7 +3190,7 @@
                                 <input type="range" id="proj-angle" min="5" max="85" step="1" value="45">
                             </div>
                             <div class="proj-param">
-                                <label>g = <span id="proj-g-val">9.8</span> m/s²</label>
+                                <label>g = <span id="proj-g-val">9.8</span> m/s2</label>
                                 <input type="range" id="proj-g" min="1" max="20" step="0.1" value="9.8">
                             </div>
                             <div class="proj-preset-group">
@@ -2725,8 +3200,8 @@
                                 <button class="btn btn--ghost btn--sm proj-preset-btn" data-angle="75">75°</button>
                             </div>
                             <div class="proj-action-row">
-                                <button class="btn btn--primary btn--sm" id="proj-play-btn">▶ 发射</button>
-                                <button class="btn btn--ghost btn--sm" id="proj-reset-btn">↺ 重置</button>
+                                <button class="btn btn--primary btn--sm" id="proj-play-btn">? 发射</button>
+                                <button class="btn btn--ghost btn--sm" id="proj-reset-btn">? 重置</button>
                                 <div class="proj-time-group">
                                     <label>t:</label>
                                     <input type="range" id="proj-t" min="0" max="1" step="0.005" value="0">
@@ -2765,8 +3240,8 @@
                             <label class="checkbox-group"><input type="checkbox" id="circ-show-f" checked><span>向心力 F</span></label>
                         </div>
                         <div class="circ-btns">
-                            <button id="circ-play" class="primary-btn small">⏸ 暂停</button>
-                            <button id="circ-reset" class="primary-btn small">↺ 重置</button>
+                            <button id="circ-play" class="primary-btn small">? 暂停</button>
+                            <button id="circ-reset" class="primary-btn small">? 重置</button>
                         </div>
                     </div>
                     <div class="physics-canvas-wrap">
@@ -2786,8 +3261,8 @@
                     </div>
                     <div class="energy-controls">
                         <label>摩擦系数: <input type="range" id="energy-friction" min="0" max="0.3" value="0" step="0.01"></label>
-                        <button id="energy-play" class="primary-btn small">⏸ 暂停</button>
-                        <button id="energy-reset" class="primary-btn small">↺ 重置</button>
+                        <button id="energy-play" class="primary-btn small">? 暂停</button>
+                        <button id="energy-reset" class="primary-btn small">? 重置</button>
                     </div>
                     <div class="physics-canvas-wrap">
                         <canvas id="energy-canvas"></canvas>
@@ -2807,8 +3282,8 @@
                         <button class="circuit-mode-btn active" data-mode="series">串联</button>
                         <button class="circuit-mode-btn" data-mode="parallel">并联</button>
                         <label>V: <input type="range" id="circuit-voltage" min="1" max="24" value="12" step="1"><span id="circuit-voltage-val">12</span>V</label>
-                        <label>R₁: <input type="range" id="circuit-r1" min="1" max="20" value="4" step="1"><span id="circuit-r1-val">4</span>Ω</label>
-                        <label>R₂: <input type="range" id="circuit-r2" min="1" max="20" value="6" step="1"><span id="circuit-r2-val">6</span>Ω</label>
+                        <label>R?: <input type="range" id="circuit-r1" min="1" max="20" value="4" step="1"><span id="circuit-r1-val">4</span>Ω</label>
+                        <label>R?: <input type="range" id="circuit-r2" min="1" max="20" value="6" step="1"><span id="circuit-r2-val">6</span>Ω</label>
                         <button id="circuit-pause" class="primary-btn small">暂停</button>
                         <button id="circuit-reset" class="primary-btn small">重置</button>
                     </div>
@@ -2853,12 +3328,12 @@
                         </div>
                         <label class="ac-label">频率 <input type="range" id="ac-freq" min="10" max="120" value="50"><span id="ac-freq-val">50</span> Hz</label>
                         <label class="ac-label">φ <input type="range" id="ac-phase" min="-90" max="90" value="30"><span id="ac-phase-val">30</span>°</label>
-                        <label class="ac-label">N₁ <input type="range" id="ac-n1" min="20" max="200" value="100"><span id="ac-n1-val">100</span></label>
-                        <label class="ac-label">N₂ <input type="range" id="ac-n2" min="10" max="200" value="50"><span id="ac-n2-val">50</span></label>
+                        <label class="ac-label">N? <input type="range" id="ac-n1" min="20" max="200" value="100"><span id="ac-n1-val">100</span></label>
+                        <label class="ac-label">N? <input type="range" id="ac-n2" min="10" max="200" value="50"><span id="ac-n2-val">50</span></label>
                         <div class="ac-ctrl-right">
                             <input type="range" id="ac-speed" min="0.2" max="3" step="0.1" value="1" aria-label="速度">
-                            <button id="ac-pause" class="ac-pause-btn" aria-label="暂停">⏸</button>
-                            <button id="ac-reset" class="ac-pause-btn" aria-label="重置">↺</button>
+                            <button id="ac-pause" class="ac-pause-btn" aria-label="暂停">?</button>
+                            <button id="ac-reset" class="ac-pause-btn" aria-label="重置">?</button>
                         </div>
                     </div>
                     <div class="canvas-container"><canvas id="ac-canvas" role="img" aria-label="交变电流可视化：波形、相量图与变压器"></canvas></div>
@@ -2944,7 +3419,7 @@
                         <div class="step-item">
                             <div class="step-number">1</div>
                             <div class="step-content">
-                                <p><strong>量子化能级</strong> — 氢原子玻尔模型给出 Eₙ=-13.6/n² eV，能级离散；它是历史模型，不代表真实电子轨道。</p>
+                                <p><strong>量子化能级</strong> — 氢原子玻尔模型给出 E?=-13.6/n2 eV，能级离散；它是历史模型，不代表真实电子轨道。</p>
                             </div>
                         </div>
                         <div class="step-item">
@@ -3018,17 +3493,17 @@
                     </div>
                     <div class="demo-content">
                         <div class="mol-controls">
-                            <button class="mol-select-btn active" data-mol="H2O">H₂O 水</button>
-                            <button class="mol-select-btn" data-mol="CO2">CO₂</button>
-                            <button class="mol-select-btn" data-mol="CH4">CH₄ 甲烷</button>
-                            <button class="mol-select-btn" data-mol="NH3">NH₃ 氨</button>
-                            <button class="mol-select-btn" data-mol="C2H4">C₂H₄ 乙烯</button>
-                            <button class="mol-select-btn" data-mol="C2H2">C₂H₂ 乙炔</button>
-                            <button class="mol-select-btn" data-mol="C6H6">C₆H₆ 苯</button>
+                            <button class="mol-select-btn active" data-mol="H2O">H?O 水</button>
+                            <button class="mol-select-btn" data-mol="CO2">CO?</button>
+                            <button class="mol-select-btn" data-mol="CH4">CH? 甲烷</button>
+                            <button class="mol-select-btn" data-mol="NH3">NH? 氨</button>
+                            <button class="mol-select-btn" data-mol="C2H4">C?H? 乙烯</button>
+                            <button class="mol-select-btn" data-mol="C2H2">C?H? 乙炔</button>
+                            <button class="mol-select-btn" data-mol="C6H6">C?H? 苯</button>
                             <button class="mol-select-btn" data-mol="HCHO">HCHO 甲醛</button>
-                            <button class="mol-select-btn" data-mol="H2S">H₂S 硫化氢</button>
-                            <button class="mol-select-btn" data-mol="CH3COOH">CH₃COOH 乙酸</button>
-                            <button class="mol-select-btn" data-mol="C2H5OH">C₂H₅OH 乙醇</button>
+                            <button class="mol-select-btn" data-mol="H2S">H?S 硫化氢</button>
+                            <button class="mol-select-btn" data-mol="CH3COOH">CH?COOH 乙酸</button>
+                            <button class="mol-select-btn" data-mol="C2H5OH">C?H?OH 乙醇</button>
                             <button class="mol-select-btn" data-mol="HCl">HCl</button>
                         </div>
                         <div class="mol-canvas-wrap">
@@ -3038,7 +3513,7 @@
                             <button class="btn-primary" id="mol-auto-rotate">自动旋转</button>
                             <button class="btn-secondary" id="mol-reset">重置视角</button>
                         </div>
-                        <p class="mol-hint">💡 拖拽旋转 · 滚轮缩放 · 切换观察/测量/杂化轨道模式</p>
+                        <p class="mol-hint">?? 拖拽旋转 · 滚轮缩放 · 切换观察/测量/杂化轨道模式</p>
                         <div id="mol-info"></div>
                     </div>
                 </div>
@@ -3049,7 +3524,7 @@
                 <div class="demo-section">
                     <div class="section-header">
                         <h2>杂化轨道理论 <span class="subtitle">VSEPR 与 σ/π 键</span></h2>
-                        <p>从电子域数出发，联动判断 sp、sp²、sp³ 杂化、分子形状和典型键角</p>
+                        <p>从电子域数出发，联动判断 sp、sp2、sp3 杂化、分子形状和典型键角</p>
                     </div>
                     <div class="steps-panel">
                         <h3 class="steps-panel__title">判断顺序：Lewis 结构 → 电子域 → 杂化方式 → 分子形状</h3>
@@ -3060,7 +3535,7 @@
                             </li>
                             <li class="step-item">
                                 <div class="step-number">2</div>
-                                <div class="step-content"><p><strong>再配杂化</strong> — 2/3/4 个电子域通常对应 sp/sp²/sp³，与直线、平面三角、四面体电子域几何相连。</p></div>
+                                <div class="step-content"><p><strong>再配杂化</strong> — 2/3/4 个电子域通常对应 sp/sp2/sp3，与直线、平面三角、四面体电子域几何相连。</p></div>
                             </li>
                             <li class="step-item">
                                 <div class="step-number">3</div>
@@ -3122,7 +3597,7 @@
                             <canvas id="rxn-canvas" class="rxn-canvas"></canvas>
                         </div>
                         <div class="rxn-actions">
-                            <button class="btn-primary" id="rxn-play">▶ 开始反应</button>
+                            <button class="btn-primary" id="rxn-play">? 开始反应</button>
                             <button class="btn-secondary" id="rxn-reset">重置</button>
                             <div class="rxn-speed">
                                 <label>速度:</label>
@@ -3147,29 +3622,29 @@
                     </div>
                 <div class="cheq-controls">
                     <div class="cheq-actions">
-                        <button class="btn-primary" id="cheq-start">▶ 开始</button>
-                        <button class="btn-secondary" id="cheq-reset">↺ 重置</button>
+                        <button class="btn-primary" id="cheq-start">? 开始</button>
+                        <button class="btn-secondary" id="cheq-reset">? 重置</button>
                     </div>
                     <div class="cheq-perturb">
                         <span class="cheq-label">浓度:</span>
-                        <button class="btn-secondary" id="cheq-add-n2">+N₂</button>
-                        <button class="btn-secondary" id="cheq-add-h2">+H₂</button>
-                        <button class="btn-secondary" id="cheq-rm-nh3">−NH₃</button>
+                        <button class="btn-secondary" id="cheq-add-n2">+N?</button>
+                        <button class="btn-secondary" id="cheq-add-h2">+H?</button>
+                        <button class="btn-secondary" id="cheq-rm-nh3">?NH?</button>
                     </div>
                     <div class="cheq-perturb">
                         <span class="cheq-label">条件:</span>
-                        <button class="btn-secondary" id="cheq-heat">🔥 升温</button>
-                        <button class="btn-secondary" id="cheq-cool">❄️ 降温</button>
-                        <button class="btn-secondary" id="cheq-press-up">⬆ 加压</button>
-                        <button class="btn-secondary" id="cheq-press-down">⬇ 减压</button>
+                        <button class="btn-secondary" id="cheq-heat">?? 升温</button>
+                        <button class="btn-secondary" id="cheq-cool">?? 降温</button>
+                        <button class="btn-secondary" id="cheq-press-up">? 加压</button>
+                        <button class="btn-secondary" id="cheq-press-down">? 减压</button>
                     </div>
                 </div>
                 <div class="chem-canvas-wrap">
                     <canvas id="cheq-canvas"></canvas>
                 </div>
                 <div class="cheq-info">
-                    <p id="cheq-status">⏳ 点击“开始”观察反应</p>
-                    <p id="cheq-conc-display">[N₂]=1.000  [H₂]=3.000  [NH₃]=0.000</p>
+                    <p id="cheq-status">? 点击“开始”观察反应</p>
+                    <p id="cheq-conc-display">[N?]=1.000  [H?]=3.000  [NH?]=0.000</p>
                     <p id="cheq-temp-display">T=450°C  P=1.0atm  Kc=0.5000</p>
                 </div>
                 <div id="cheq-edu" class="cheq-edu"></div>
@@ -3188,7 +3663,7 @@
                         <button class="echem-mode-btn active" data-mode="galvanic">原电池</button>
                         <button class="echem-mode-btn" data-mode="electrolytic">电解池</button>
                     </div>
-                    <button id="echem-play" class="primary-btn small">⏸ 暂停</button>
+                    <button id="echem-play" class="primary-btn small">? 暂停</button>
                 </div>
                 <div class="chem-canvas-wrap">
                     <canvas id="echem-canvas"></canvas>
@@ -3225,17 +3700,17 @@
                 </div>
                 <div class="organic-controls">
                     <div class="organic-mol-btns">
-                        <button class="organic-mol-btn active" data-mol="ethylene" aria-label="乙烯 C₂H₄">乙烯</button>
-                        <button class="organic-mol-btn" data-mol="acetylene" aria-label="乙炔 C₂H₂">乙炔</button>
-                        <button class="organic-mol-btn" data-mol="ethane" aria-label="乙烷 C₂H₆">乙烷</button>
-                        <button class="organic-mol-btn" data-mol="ethanol" aria-label="乙醇 C₂H₅OH">乙醇</button>
-                        <button class="organic-mol-btn" data-mol="acetic-acid" aria-label="乙酸 CH₃COOH">乙酸</button>
-                        <button class="organic-mol-btn" data-mol="benzene" aria-label="苯 C₆H₆">苯</button>
-                        <button class="organic-mol-btn" data-mol="propene" aria-label="丙烯 C₃H₆">丙烯</button>
-                        <button class="organic-mol-btn" data-mol="acetone" aria-label="丙酮 C₃H₆O">丙酮</button>
+                        <button class="organic-mol-btn active" data-mol="ethylene" aria-label="乙烯 C?H?">乙烯</button>
+                        <button class="organic-mol-btn" data-mol="acetylene" aria-label="乙炔 C?H?">乙炔</button>
+                        <button class="organic-mol-btn" data-mol="ethane" aria-label="乙烷 C?H?">乙烷</button>
+                        <button class="organic-mol-btn" data-mol="ethanol" aria-label="乙醇 C?H?OH">乙醇</button>
+                        <button class="organic-mol-btn" data-mol="acetic-acid" aria-label="乙酸 CH?COOH">乙酸</button>
+                        <button class="organic-mol-btn" data-mol="benzene" aria-label="苯 C?H?">苯</button>
+                        <button class="organic-mol-btn" data-mol="propene" aria-label="丙烯 C?H?">丙烯</button>
+                        <button class="organic-mol-btn" data-mol="acetone" aria-label="丙酮 C?H?O">丙酮</button>
                     </div>
-                    <button id="organic-rotate-bond" class="organic-mol-btn" aria-pressed="false" title="演示乙烷 C—C 单键自由旋转构象">🔄 旋转 σ 键</button>
-                    <button id="organic-pause" class="organic-mol-btn" aria-pressed="false">⏸ 暂停</button>
+                    <button id="organic-rotate-bond" class="organic-mol-btn" aria-pressed="false" title="演示乙烷 C—C 单键自由旋转构象">?? 旋转 σ 键</button>
+                    <button id="organic-pause" class="organic-mol-btn" aria-pressed="false">? 暂停</button>
                 </div>
                 <div class="canvas-wrapper">
                     <canvas id="organic-canvas"></canvas>
@@ -3255,10 +3730,10 @@
                     <label class="rxr-label">温度 <input type="range" id="rxnrate-temp" min="100" max="800" value="300" step="50"> <span id="rxnrate-temp-val">300</span>K</label>
                     <label class="rxr-label">浓度 <input type="range" id="rxnrate-conc" min="10" max="100" value="50" step="10"> <span id="rxnrate-conc-val">50</span>%</label>
                     <label class="rxr-label"><input type="checkbox" id="rxnrate-catalyst"> 催化剂</label>
-                    <button id="rxnrate-reset" class="rxr-reset-btn" aria-label="重置模拟">↺ 重置</button>
+                    <button id="rxnrate-reset" class="rxr-reset-btn" aria-label="重置模拟">? 重置</button>
                     <div class="rxr-ctrl-right">
                         <label class="rxr-label">速度 <input type="range" id="rxr-speed" min="0.2" max="3" value="1" step="0.1"></label>
-                        <button id="rxr-pause" class="rxr-pause-btn" aria-label="暂停">⏸</button>
+                        <button id="rxr-pause" class="rxr-pause-btn" aria-label="暂停">?</button>
                     </div>
                 </div>
                 <div class="canvas-container"><canvas id="rxnrate-canvas" aria-label="化学反应速率碰撞模拟画布"></canvas></div>
@@ -3276,15 +3751,15 @@
                     <div class="sol-substance-btns" role="group" aria-label="选择溶质">
                         <button class="sol-substance-btn active" data-sub="hcl" aria-pressed="true">HCl 强酸</button>
                         <button class="sol-substance-btn" data-sub="naoh" aria-pressed="false">NaOH 强碱</button>
-                        <button class="sol-substance-btn" data-sub="ch3cooh" aria-pressed="false">CH₃COOH 弱酸</button>
-                        <button class="sol-substance-btn" data-sub="nh3h2o" aria-pressed="false">NH₃·H₂O 弱碱</button>
+                        <button class="sol-substance-btn" data-sub="ch3cooh" aria-pressed="false">CH?COOH 弱酸</button>
+                        <button class="sol-substance-btn" data-sub="nh3h2o" aria-pressed="false">NH?·H?O 弱碱</button>
                         <button class="sol-substance-btn" data-sub="nacl" aria-pressed="false">NaCl 盐</button>
-                        <button class="sol-substance-btn" data-sub="nahco3" aria-pressed="false">NaHCO₃ 水解</button>
+                        <button class="sol-substance-btn" data-sub="nahco3" aria-pressed="false">NaHCO? 水解</button>
                     </div>
                     <div class="sol-ctrl-right">
                         <label>浓度 <input type="range" id="sol-conc" min="0.01" max="1" value="0.1" step="0.01"> <span id="sol-conc-val">0.10</span> mol/L</label>
                         <label>速度 <input type="range" id="sol-speed" min="0.2" max="3" value="1" step="0.1"> <span id="sol-speed-val">1.0x</span></label>
-                        <button id="sol-pause" class="sol-pause-btn" aria-pressed="false">⏸ 暂停</button>
+                        <button id="sol-pause" class="sol-pause-btn" aria-pressed="false">? 暂停</button>
                     </div>
                 </div>
                 <div class="canvas-container"><canvas id="solution-canvas"></canvas></div>
@@ -3889,8 +4364,8 @@
                     </div>
                 <div class="sortcmp-controls">
                     <div class="sortcmp-actions">
-                        <button class="btn-primary" id="sortcmp-start">▶ 开始排序</button>
-                        <button class="btn-secondary" id="sortcmp-gen">↺ 重新生成</button>
+                        <button class="btn-primary" id="sortcmp-start">? 开始排序</button>
+                        <button class="btn-secondary" id="sortcmp-gen">? 重新生成</button>
                     </div>
                     <div class="sortcmp-param">
                         <label>数组大小: <span id="sortcmp-size-val">30</span></label>
@@ -3928,9 +4403,9 @@
                         <label>速度: <input type="range" id="recur-speed" min="50" max="800" value="200" step="50"></label>
                     </div>
                     <div class="recur-btns">
-                        <button id="recur-play" class="primary-btn small">▶ 播放</button>
-                        <button id="recur-step" class="primary-btn small">⏭ 单步</button>
-                        <button id="recur-reset" class="primary-btn small">↺ 重置</button>
+                        <button id="recur-play" class="primary-btn small">? 播放</button>
+                        <button id="recur-step" class="primary-btn small">? 单步</button>
+                        <button id="recur-reset" class="primary-btn small">? 重置</button>
                     </div>
                 </div>
                 <div class="algo-canvas-wrap">
@@ -3948,9 +4423,9 @@
                     <p>0/1背包问题 DP 表格填充动画</p>
                 </div>
                 <div class="dp-controls">
-                    <button id="dp-play" class="primary-btn small">▶ 播放</button>
+                    <button id="dp-play" class="primary-btn small">? 播放</button>
                     <button id="dp-step" class="primary-btn small">→ 单步</button>
-                    <button id="dp-reset" class="primary-btn small">↺ 重置</button>
+                    <button id="dp-reset" class="primary-btn small">? 重置</button>
                     <label>速度: <input type="range" id="dp-speed" min="0.5" max="5" value="1" step="0.5"></label>
                 </div>
                 <div class="algo-canvas-wrap">
@@ -3970,9 +4445,9 @@
                         <button class="strmatch-algo-btn active" data-algo="kmp">KMP</button>
                         <button class="strmatch-algo-btn" data-algo="brute">暴力</button>
                     </div>
-                    <button class="btn-secondary" id="strmatch-play">▶ 播放</button>
+                    <button class="btn-secondary" id="strmatch-play">? 播放</button>
                     <button class="btn-secondary" id="strmatch-step">→ 单步</button>
-                    <button class="btn-secondary" id="strmatch-reset">↺ 重置</button>
+                    <button class="btn-secondary" id="strmatch-reset">? 重置</button>
                     <label>速度 <input type="range" id="strmatch-speed" min="0.3" max="3" value="1" step="0.1"></label>
                 </div>
                 <div class="canvas-container"><canvas id="strmatch-canvas"></canvas></div>
@@ -4088,16 +4563,16 @@
                 <div class="steps-panel">
                     <h3 class="steps-panel__title">光合作用 — 能量转化</h3>
                     <p style="margin-bottom: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);">
-                        <strong style="color: var(--text-primary);">光合作用</strong>是绿色植物利用光能将 CO₂ 和 H₂O 转化为有机物并释放 O₂ 的过程。
+                        <strong style="color: var(--text-primary);">光合作用</strong>是绿色植物利用光能将 CO? 和 H?O 转化为有机物并释放 O? 的过程。
                     </p>
                     <ol class="steps-list">
                         <li class="step-item">
                             <div class="step-number">1</div>
-                            <div class="step-content"><p><strong>光反应</strong> — 在类囊体薄膜上，水的光解产生 [H]、ATP 和 O₂。</p></div>
+                            <div class="step-content"><p><strong>光反应</strong> — 在类囊体薄膜上，水的光解产生 [H]、ATP 和 O?。</p></div>
                         </li>
                         <li class="step-item">
                             <div class="step-number">2</div>
-                            <div class="step-content"><p><strong>Calvin 循环</strong> — 在叶绿体基质中，CO₂ 被固定并还原为 G3P（三碳糖磷酸/甘油醛-3-磷酸）。</p></div>
+                            <div class="step-content"><p><strong>Calvin 循环</strong> — 在叶绿体基质中，CO? 被固定并还原为 G3P（三碳糖磷酸/甘油醛-3-磷酸）。</p></div>
                         </li>
                     </ol>
                 </div>
@@ -4111,7 +4586,7 @@
                     <label style="color: var(--text-secondary); font-size: var(--text-sm);">温度:</label>
                     <input type="range" id="bio-photo-temp" min="5" max="50" value="25">
                     <span id="bio-photo-temp-value" class="bio-range-value">25°C</span>
-                    <label style="color: var(--text-secondary); font-size: var(--text-sm);">CO₂:</label>
+                    <label style="color: var(--text-secondary); font-size: var(--text-sm);">CO?:</label>
                     <input type="range" id="bio-photo-co2" min="0.01" max="0.1" step="0.01" value="0.04">
                     <span id="bio-photo-co2-value" class="bio-range-value">0.04%</span>
                 </div>
@@ -4290,10 +4765,10 @@
                     </div>
                 <div class="mito-controls">
                     <div class="mito-transport">
-                        <button class="btn-secondary" id="mito-prev">◀ 上一期</button>
-                        <button class="btn-primary" id="mito-play-btn">▶ 播放</button>
-                        <button class="btn-secondary" id="mito-next">下一期 ▶</button>
-                        <button class="btn-secondary" id="mito-reset-btn">↺ 重置</button>
+                        <button class="btn-secondary" id="mito-prev">? 上一期</button>
+                        <button class="btn-primary" id="mito-play-btn">? 播放</button>
+                        <button class="btn-secondary" id="mito-next">下一期 ?</button>
+                        <button class="btn-secondary" id="mito-reset-btn">? 重置</button>
                     </div>
                     <div class="mito-slider-row">
                         <label>速度</label>
@@ -4327,7 +4802,7 @@
                 <div class="demo-section">
                     <div class="section-header">
                         <h2>神经调节 <span class="subtitle">突触与动作电位</span></h2>
-                        <p>沿动作电位、Ca²⁺内流、递质释放、受体结合与膜电位变化，观察神经信号如何在细胞间传递</p>
+                        <p>沿动作电位、Ca2?内流、递质释放、受体结合与膜电位变化，观察神经信号如何在细胞间传递</p>
                     </div>
                 <div class="neural-controls">
                     <div class="neural-mode-btns">
@@ -4337,7 +4812,7 @@
                     <div class="neur-ctrl-right">
                         <label class="neur-slider-label">速度 <input type="range" id="neural-speed" min="0.3" max="3" step="0.1" value="1" class="neur-slider"><span id="neural-speed-val">1.0x</span></label>
                         <button class="btn-secondary" id="neural-fire">重新发放</button>
-                        <button class="neural-mode-btn" id="neural-pause" aria-pressed="false">⏸ 暂停</button>
+                        <button class="neural-mode-btn" id="neural-pause" aria-pressed="false">? 暂停</button>
                     </div>
                 </div>
                 <div class="canvas-container"><canvas id="neural-canvas"></canvas></div>
@@ -4359,7 +4834,7 @@
                     <div class="imm-ctrl-right">
                         <label class="imm-slider-label">速度 <input type="range" id="immune-speed" min="0.3" max="3" step="0.1" value="1" class="imm-slider"><span id="immune-speed-val">1.0x</span></label>
                         <button class="btn-secondary" id="immune-reset">重置</button>
-                        <button class="immune-mode-btn" id="immune-pause" aria-pressed="false">⏸ 暂停</button>
+                        <button class="immune-mode-btn" id="immune-pause" aria-pressed="false">? 暂停</button>
                     </div>
                 </div>
                 <div class="canvas-container"><canvas id="immune-canvas"></canvas></div>
@@ -4407,11 +4882,11 @@
                         <ol class="steps-list">
                             <li class="step-item">
                                 <div class="step-number">1</div>
-                                <div class="step-content"><p><strong>碳循环</strong> — CO₂ 经光合作用进入有机物，又经呼吸、分解、海气交换、火山和燃烧返回无机环境。</p></div>
+                                <div class="step-content"><p><strong>碳循环</strong> — CO? 经光合作用进入有机物，又经呼吸、分解、海气交换、火山和燃烧返回无机环境。</p></div>
                             </li>
                             <li class="step-item">
                                 <div class="step-number">2</div>
-                                <div class="step-content"><p><strong>氮循环</strong> — 固氮、铵化、硝化和反硝化主要依赖微生物，把难直接利用的 N₂ 接入生命系统。</p></div>
+                                <div class="step-content"><p><strong>氮循环</strong> — 固氮、铵化、硝化和反硝化主要依赖微生物，把难直接利用的 N? 接入生命系统。</p></div>
                             </li>
                             <li class="step-item">
                                 <div class="step-number">3</div>
@@ -4529,7 +5004,7 @@
                     <button id="gmut-trigger" class="gmut-trigger-btn">触发突变</button>
                     <button id="gmut-reset" class="gmut-btn">重置</button>
                     <label class="gmut-speed"><span>速度</span><input type="range" id="gmut-speed" min="0.5" max="3" step="0.5" value="1"></label>
-                    <button id="gmut-pause" class="gmut-btn" aria-label="暂停" aria-pressed="false">⏸</button>
+                    <button id="gmut-pause" class="gmut-btn" aria-label="暂停" aria-pressed="false">?</button>
                 </div>
                 <div class="canvas-container"><canvas id="gene-mutation-canvas"></canvas></div>
                 <div id="gmut-info" class="gmut-info" aria-live="polite"></div>
@@ -4658,9 +5133,9 @@
     </div>
 
     <!-- Application Scripts: minimal boot path -->
-    <script src="shared/js/config.js?v=20260619v63AsyncGsapP1"></script>
-    <script src="shared/js/router.js?v=20260619v63FrontierLifecycleP1"></script>
-    <script src="shared/js/main.js?v=20260619v63FrontierLifecycleP1"></script>
+    <script src="shared/js/config.js?v=20260630mainV64"></script>
+    <script src="shared/js/router.js?v=20260630mainV64"></script>
+    <script src="shared/js/main.js?v=20260630mainV64"></script>
     <script>
         (function () {
             try {

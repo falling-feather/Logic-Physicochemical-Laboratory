@@ -152,6 +152,70 @@ body.planets-scroll-locked .navbar {
     line-height: 1.9;
 }
 
+#page-planets .planets-recommendation {
+    margin-top: 24px;
+    padding: 18px;
+    border: 1px solid rgba(242, 200, 107, 0.20);
+    border-left-color: rgba(242, 200, 107, 0.62);
+    border-radius: 8px;
+    background:
+        linear-gradient(135deg, rgba(242, 200, 107, 0.10), rgba(101, 228, 240, 0.035)),
+        rgba(7, 14, 24, 0.66);
+}
+
+#page-planets .planets-recommendation span {
+    display: block;
+    color: #f2c86b;
+    font-family: Consolas, "SFMono-Regular", "Liberation Mono", monospace;
+    font-size: 0.74rem;
+    font-weight: 760;
+    letter-spacing: 0;
+}
+
+#page-planets .planets-recommendation strong {
+    display: block;
+    margin-top: 9px;
+    color: #fff7de;
+    font-size: 1.02rem;
+    line-height: 1.36;
+}
+
+#page-planets .planets-recommendation p {
+    margin: 9px 0 0;
+    color: rgba(213, 224, 238, 0.68);
+    font-size: 0.84rem;
+    line-height: 1.62;
+}
+
+#page-planets .planets-recommendation__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+#page-planets .planets-recommendation__actions a {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 11px;
+    border: 1px solid rgba(242, 200, 107, 0.22);
+    border-radius: 7px;
+    color: #fff7de;
+    background: rgba(242, 200, 107, 0.08);
+    font-size: 0.82rem;
+    font-weight: 650;
+    text-decoration: none;
+}
+
+#page-planets .planets-recommendation__actions a:hover,
+#page-planets .planets-recommendation__actions a:focus-visible {
+    border-color: rgba(242, 200, 107, 0.48);
+    background: rgba(242, 200, 107, 0.13);
+    outline: none;
+}
+
 #page-planets .planets-stage {
     position: relative;
     min-height: 640px;
@@ -587,6 +651,15 @@ body.planets-scroll-locked .navbar {
         margin-top: 16px;
         font-size: 0.95rem;
         line-height: 1.78;
+    }
+
+    #page-planets .planets-recommendation {
+        margin-top: 16px;
+        padding: 14px;
+    }
+
+    #page-planets .planets-recommendation__actions a {
+        flex: 1 1 118px;
     }
 
     #page-planets .planets-stage {

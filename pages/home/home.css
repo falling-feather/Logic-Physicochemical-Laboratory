@@ -268,6 +268,7 @@
     transform-style: preserve-3d;
     display: grid;
     place-items: center;
+    margin: auto;
 }
 
 .main-star.shake  { animation: starShake 0.5s ease-in-out; }
@@ -391,8 +392,11 @@
 }
 
 .star-title {
-    font-size: clamp(1.55rem, 3.15vw, 3.25rem);
-    font-weight: 700;
+    width: 100%;
+    padding: 0 9%;
+    box-sizing: border-box;
+    font-size: clamp(1.3rem, 2.4vw, 2.05rem);
+    font-weight: 760;
     color: #eef6ff;
     text-shadow:
         0 0 12px rgba(138,216,255,0.70),
@@ -400,22 +404,28 @@
         0 2px 8px rgba(0,0,0,0.6);
     z-index: 3; position: relative;
     letter-spacing: 0.08em;
+    text-indent: 0.08em;
     font-family: var(--font-display);
     line-height: 1;
-    transform: translateY(-12px);
+    text-align: center;
+    white-space: nowrap;
+    transform: translateY(-13px);
 }
 
 .star-subtitle {
+    width: 100%;
+    text-align: center;
     position: relative;
     z-index: 3;
-    color: rgba(215, 229, 252, 0.78);
+    color: rgba(215, 229, 252, 0.80);
     font-family: var(--font-mono);
-    font-size: clamp(0.58rem, 0.75vw, 0.76rem);
-    letter-spacing: 0.16em;
+    font-size: clamp(0.54rem, 0.66vw, 0.70rem);
+    letter-spacing: 0.2em;
+    text-indent: 0.2em;
     text-transform: uppercase;
     text-shadow: 0 0 10px rgba(117,170,255,0.35);
     white-space: nowrap;
-    transform: translateY(-12px);
+    transform: translateY(-9px);
 }
 
 .star-eyes-container {
@@ -924,33 +934,3 @@
     color: rgba(226,239,255,0.78);
 }
 
-.home-page .planets-entry {
-    bottom: 28px;
-    right: 32px;
-    padding: 9px 14px;
-    background: rgba(7, 15, 31, 0.60);
-    border-color: rgba(117,170,255,0.32);
-    color: rgba(214,229,252,0.78);
-    letter-spacing: 0.12em;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 0 0 1px rgba(117,170,255,0.08) inset, 0 10px 28px rgba(0,0,0,0.38);
-}
-
-.home-page .planets-entry:hover,
-.home-page .planets-entry:focus-visible {
-    color: #eef6ff;
-    border-color: rgba(138,216,255,0.72);
-    background: rgba(12, 26, 50, 0.72);
-    box-shadow: 0 0 0 1px rgba(117,170,255,0.14) inset, 0 12px 30px rgba(0,0,0,0.42), 0 0 20px rgba(117,170,255,0.20);
-}
-
-.home-page .planets-entry::before {
-    content: '';
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    border: 1px solid rgba(138,216,255,0.72);
-    box-shadow: 0 0 9px rgba(138,216,255,0.48);
-    animation: planetsBlink 1.8s ease-in-out infinite;
-}

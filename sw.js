@@ -1,19 +1,21 @@
-const CACHE_NAME = 'astra-static-v20260619v63FrontierLifecycleP1';
+const CACHE_NAME = 'astra-static-v20260630mainV64';
 const APP_SHELL = [
   './',
   './index.html',
   './shared/js/lucide.min.js?v=20260417d',
-  './shared/js/config.js?v=20260619v63AsyncGsapP1',
-  './shared/js/router.js?v=20260619v63FrontierLifecycleP1',
-  './shared/js/main.js?v=20260619v63FrontierLifecycleP1',
+  './shared/js/config.js?v=20260630mainV64',
+  './shared/js/router.js?v=20260630mainV64',
+  './shared/js/main.js?v=20260630mainV64',
   './shared/css/tokens.css?v=20260424ss',
-  './shared/css/base.css?v=20260619v63FrontierLifecycleP1',
+  './shared/css/base.css?v=20260630mainV64',
   './shared/css/typography.css?v=20260526v61c',
-  './shared/css/navbar.css?v=20260619v63AsyncGsapP1',
+  './shared/css/navbar.css?v=20260630mainV64',
   './shared/css/page-layout.css?v=20260606v62e',
-  './shared/css/responsive.css?v=20260619v63FrontierLifecycleP1',
-  './pages/planets/planets.css?v=20260619v63FrontierLifecycleP1',
-  './pages/planets/planets.js?v=20260619v63AsyncGsapP1',
+  './shared/css/responsive.css?v=20260630mainV64',
+  './pages/planets/planets.css?v=20260630mainV64',
+  './pages/planets/planets.js?v=20260630mainV64',
+  './UI/future-galaxy/future-galaxy-hero-sky.png',
+  './UI/future-galaxy/future-galaxy-hero-nebula.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -40,7 +42,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (/^\/(?:(?:doc|muban|server)(?:\/|$)|(?:.*\/)?README\.md$|\.(?:git|github|vscode|agents|codex)(?:\/|$))/i.test(url.pathname)) {
+  if (/^\/(?:(?:doc|muban|server|tools)(?:\/|$)|(?:.*\/)?README\.md$|\.(?:git|github|vscode|agents|codex)(?:\/|$))/i.test(url.pathname)) {
     event.respondWith(new Response('Not Found', {
       status: 404,
       headers: { 'Content-Type': 'text/plain; charset=utf-8' }

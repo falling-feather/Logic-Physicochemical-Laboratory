@@ -30,8 +30,10 @@
         frontier: {
             title: '未来星系',
             state: '学习方向',
-            copy: '跨学科入口由未来星系独立承载：先进入星系总览，再选择二级知识方向。',
+            copy: '跨学科入口由未来星系独立承载：先看学习主线，再进入材料样板路线和其他学科总览。',
             modules: [
+                { label: '学习主线', href: '#frontier-frontier-route', meta: '星序 -> 未来星系 -> 材料微观' },
+                { label: '材料样板路线', href: '#frontier-materials-route', meta: '尺度桥 · 实验台 · 状态回查' },
                 { label: '未来星系总览', href: '#frontier', meta: '星系坐标 · 二级目录' },
                 { label: '地球与宇宙科学', href: '#cosmos', meta: '季节变化 · 太阳高度' },
                 { label: '工程应用', href: '#engineering', meta: '桥梁受力 · 入门实验' },
@@ -162,18 +164,22 @@
             if (!link || !this.moduleMenu || !this.moduleMenu.contains(link)) return;
 
             const href = link.getAttribute('href') || '';
-            const page = href.slice(1).split('/')[0];
+            const router = window.Router || (typeof Router !== 'undefined' ? Router : null);
+            const hashTarget = href.slice(1);
+            const page = this._pageFromHashTarget(hashTarget, router);
             if (!page) return;
 
             event.preventDefault();
             const rect = link.getBoundingClientRect();
-            const router = window.Router || (typeof Router !== 'undefined' ? Router : null);
 
             if (router && typeof router.navigateTo === 'function') {
                 router.transitionOrigin = {
                     x: ((rect.left + rect.width / 2) / window.innerWidth) * 100,
                     y: ((rect.top + rect.height / 2) / window.innerHeight) * 100
                 };
+                router._pendingModule = null;
+                router._pendingAnchor = this._isFrontierAnchor(hashTarget, router) ? hashTarget : null;
+                if (!router._pendingAnchor) router._lastAppliedAnchor = null;
                 this.resetGalaxyView();
                 router.navigateTo(page, false);
             } else if (typeof window.navigate === 'function') {
@@ -203,12 +209,33 @@
                 : item;
             const label = this._escapeHtml(source.label || '');
             const href = this._escapeHtml(source.href || '#planets');
-            const page = href.startsWith('#') ? href.slice(1).split('/')[0] : '';
+            const rawHash = source.href && String(source.href).startsWith('#') ? String(source.href).slice(1) : '';
+            const page = rawHash ? this._pageFromHashTarget(rawHash) : '';
             const pageAttr = page ? ` data-page="${this._escapeHtml(page)}"` : '';
             const meta = source.meta
                 ? `<span class="planets-module-link__meta">${this._escapeHtml(source.meta)}</span>`
                 : '';
             return `<a class="planets-module-link${source.meta ? ' planets-module-link--planned' : ''}" href="${href}"${pageAttr}><span>${label}</span>${meta}</a>`;
+        },
+
+        _pageFromHashTarget(hashTarget, router) {
+            if (!hashTarget) return '';
+            const activeRouter = router || window.Router || (typeof Router !== 'undefined' ? Router : null);
+            if (this._isFrontierAnchor(hashTarget, activeRouter)) {
+                return activeRouter && typeof activeRouter._pageForFrontierAnchor === 'function'
+                    ? activeRouter._pageForFrontierAnchor(hashTarget)
+                    : 'frontier';
+            }
+            return hashTarget.split('/')[0];
+        },
+
+        _isFrontierAnchor(hashTarget, router) {
+            if (!hashTarget || !hashTarget.startsWith('frontier-')) return false;
+            const activeRouter = router || window.Router || (typeof Router !== 'undefined' ? Router : null);
+            if (activeRouter && typeof activeRouter._pageForFrontierAnchor === 'function') {
+                return !!activeRouter._pageForFrontierAnchor(hashTarget);
+            }
+            return /^frontier-(frontier|cosmos|engineering|datascience|infotech|materials|humanities)-/.test(hashTarget);
         },
 
         _escapeHtml(value) {

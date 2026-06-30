@@ -30,7 +30,7 @@ function getArg(name) {
 
 function isBlockedPath(urlPath) {
   const normalized = urlPath.replace(/\\/g, '/');
-  return /^\/(?:(?:doc|muban|server)(?:\/|$)|(?:.*\/)?README\.md$|\.(?:git|github|vscode|agents|codex)(?:\/|$))/i
+  return /^\/(?:(?:doc|muban|server|tools)(?:\/|$)|(?:.*\/)?README\.md$|\.(?:git|github|vscode|agents|codex)(?:\/|$))/i
     .test(normalized);
 }
 

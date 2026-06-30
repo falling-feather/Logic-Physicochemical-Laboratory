@@ -29,37 +29,83 @@ const ParticleNetwork = {
     _worker: null,
     _useWorker: false,
     _dpr: 1,
+    _initing: false,
+    _mouseBound: false,
+    _visibilityBound: false,
 
     init() {
         this.canvas = document.getElementById('particle-network');
-        if (!this.canvas) return;
-        this._maxParticles = (typeof _isLowEnd !== 'undefined' && _isLowEnd) ? 28 : 56;
-        this._cellSize = this.maxDist;
+        if (!this.canvas || this._initing || this.running) return;
+        const homePage = document.getElementById('page-home');
+        if (homePage && !homePage.classList.contains('active')) return;
 
-        // 优先使用 OffscreenCanvas + Web Worker（释放主线程）
-        if (typeof this.canvas.transferControlToOffscreen === 'function' && typeof Worker !== 'undefined') {
+        this._maxParticles = (typeof _isLowEnd !== 'undefined' && _isLowEnd) ? 28 : 48;
+        this._cellSize = this.maxDist;
+        this._initing = true;
+        this._tryInit(0);
+    },
+
+    _measure() {
+        const parent = this.canvas.parentElement;
+        const w = parent && parent.clientWidth > 0 ? parent.clientWidth : window.innerWidth;
+        const h = parent && parent.clientHeight > 0 ? parent.clientHeight : window.innerHeight;
+        return { w, h };
+    },
+
+    _tryInit(attempt) {
+        const { w, h } = this._measure();
+        if ((w < 8 || h < 8) && attempt < 48) {
+            requestAnimationFrame(() => this._tryInit(attempt + 1));
+            return;
+        }
+        if (w < 8 || h < 8) {
+            this._initing = false;
+            return;
+        }
+
+        const preferDirect = typeof _isLowEnd !== 'undefined' && _isLowEnd;
+        const canWorker = !preferDirect &&
+            typeof this.canvas.transferControlToOffscreen === 'function' &&
+            typeof Worker !== 'undefined' &&
+            !this.canvas.dataset.workerFailed;
+
+        if (canWorker) {
             try {
-                this._initWorker();
+                this._initWorker(w, h);
+                this._initing = false;
                 return;
             } catch (e) {
                 console.warn('[ParticleNetwork] OffscreenCanvas 回退:', e);
+                this.canvas.dataset.workerFailed = '1';
             }
         }
+
         this._initDirect();
+        this._initing = false;
     },
 
     /** OffscreenCanvas + Web Worker 渲染路径 */
-    _initWorker() {
+    _initWorker(w, h) {
         const lowEnd = typeof _isLowEnd !== 'undefined' && _isLowEnd;
-        this._dpr = lowEnd ? Math.min(window.devicePixelRatio || 1, 1.5) : (window.devicePixelRatio || 1);
+        this._dpr = lowEnd ? Math.min(window.devicePixelRatio || 1, 1.25) : Math.min(window.devicePixelRatio || 1, 1.5);
         const offscreen = this.canvas.transferControlToOffscreen();
         this._worker = new Worker('shared/workers/particle-worker.js');
         this._useWorker = true;
 
-        const w = window.innerWidth, h = window.innerHeight;
         this.canvas.style.width = w + 'px';
         this.canvas.style.height = h + 'px';
         this.W = w; this.H = h;
+
+        this._worker.onerror = (e) => {
+            console.warn('[ParticleNetwork] Worker 异常，停止后台渲染:', e.message || e);
+            this.running = false;
+            if (this._worker) {
+                this._worker.terminate();
+                this._worker = null;
+            }
+            this._useWorker = false;
+            this.canvas.dataset.workerFailed = '1';
+        };
 
         this._worker.postMessage({
             type: 'init', canvas: offscreen,
@@ -68,57 +114,57 @@ const ParticleNetwork = {
         }, [offscreen]);
 
         this.running = true;
+        this._bindSharedListeners();
+    },
 
-        // 转发鼠标位置
-        document.addEventListener('mousemove', e => {
-            this.mouse.x = e.clientX;
-            this.mouse.y = e.clientY;
-            if (this._worker) this._worker.postMessage({ type: 'mouse', x: e.clientX, y: e.clientY });
-        });
+    _bindSharedListeners() {
+        if (!this._mouseBound) {
+            this._mouseBound = true;
+            document.addEventListener('mousemove', e => {
+                this.mouse.x = e.clientX;
+                this.mouse.y = e.clientY;
+                if (this._worker) this._worker.postMessage({ type: 'mouse', x: e.clientX, y: e.clientY });
+            });
+        }
 
-        // 转发尺寸变化
-        if (typeof ResizeObserver !== 'undefined') {
+        if (!this._resizeObs && typeof ResizeObserver !== 'undefined') {
             this._resizeObs = new ResizeObserver(() => {
-                const nw = window.innerWidth, nh = window.innerHeight;
+                const { w: nw, h: nh } = this._measure();
+                if (nw < 8 || nh < 8) return;
                 this.canvas.style.width = nw + 'px';
                 this.canvas.style.height = nh + 'px';
                 this.W = nw; this.H = nh;
                 if (this._worker) this._worker.postMessage({ type: 'resize', width: nw, height: nh, dpr: this._dpr });
+                else if (this.ctx) { this.resize(); this.spawn(); }
             });
             this._resizeObs.observe(this.canvas.parentElement);
         }
 
-        // 转发可见性状态
-        document.addEventListener('visibilitychange', () => {
-            if (this._worker) this._worker.postMessage({ type: 'visibility', hidden: document.hidden });
-        });
+        if (!this._visibilityBound) {
+            this._visibilityBound = true;
+            document.addEventListener('visibilitychange', () => {
+                this._hidden = document.hidden;
+                if (this._worker) {
+                    this._worker.postMessage({ type: 'visibility', hidden: document.hidden });
+                } else if (!this._hidden && this.running) {
+                    this._fpsTime = performance.now();
+                    this._fpsFrames = 0;
+                }
+            });
+        }
     },
 
     /** 主线程直接渲染路径（OffscreenCanvas 不可用时的回退） */
     _initDirect() {
-        this.ctx = this.canvas.getContext('2d');
+        if (this._useWorker) return;
+        this.ctx = this.canvas.getContext('2d', { alpha: true });
+        if (!this.ctx) return;
         this.resize();
+        this._bindSharedListeners();
 
-        if (typeof ResizeObserver !== 'undefined') {
-            this._resizeObs = new ResizeObserver(() => { this.resize(); this.spawn(); });
-            this._resizeObs.observe(this.canvas.parentElement);
-        } else {
+        if (!this._resizeObs && typeof ResizeObserver === 'undefined') {
             window.addEventListener('resize', () => { this.resize(); this.spawn(); });
         }
-
-        document.addEventListener('mousemove', e => {
-            this.mouse.x = e.clientX;
-            this.mouse.y = e.clientY;
-        });
-
-        // Page Visibility — 标签页隐藏时暂停
-        document.addEventListener('visibilitychange', () => {
-            this._hidden = document.hidden;
-            if (!this._hidden && this.running) {
-                this._fpsTime = performance.now();
-                this._fpsFrames = 0;
-            }
-        });
 
         this.spawn();
         this.running = true;
@@ -128,19 +174,23 @@ const ParticleNetwork = {
 
     destroy() {
         this.running = false;
+        this._initing = false;
         if (this._worker) {
             this._worker.postMessage({ type: 'destroy' });
             this._worker.terminate();
             this._worker = null;
         }
+        this._useWorker = false;
         if (this._resizeObs) { this._resizeObs.disconnect(); this._resizeObs = null; }
     },
 
     resize() {
         const lowEnd = typeof _isLowEnd !== 'undefined' && _isLowEnd;
-        const dpr = lowEnd ? Math.min(window.devicePixelRatio || 1, 1.5) : (window.devicePixelRatio || 1);
-        const w = window.innerWidth;
-        const h = window.innerHeight;
+        const dpr = lowEnd ? Math.min(window.devicePixelRatio || 1, 1.25) : Math.min(window.devicePixelRatio || 1, 1.5);
+        const measured = this._measure ? this._measure() : { w: window.innerWidth, h: window.innerHeight };
+        const w = measured.w;
+        const h = measured.h;
+        if (!this.canvas || w < 8 || h < 8) return;
         this.canvas.width = w * dpr;
         this.canvas.height = h * dpr;
         this.canvas.style.width = w + 'px';
@@ -779,12 +829,15 @@ function initHome() {
         scheduleEnhancements(function () {
             createStars();
             initParallax();
+            const startParticles = () => {
+                if (!ParticleNetwork.running) ParticleNetwork.init();
+            };
             if (!_isLowEnd && !_isReturningVisitor) {
-                ParticleNetwork.init();
+                startParticles();
                 initShootingStars();
             } else if (!_isLowEnd) {
                 setTimeout(function () {
-                    ParticleNetwork.init();
+                    startParticles();
                     initShootingStars();
                 }, 350);
             }
@@ -797,4 +850,5 @@ function initHome() {
 // 导出全局
 window.selectModule = selectModule;
 window.SatelliteSystem = SatelliteSystem;
+window.ParticleNetwork = ParticleNetwork;
 

@@ -42,6 +42,12 @@ const FrontierLearning = {
             { key: 'reference', selector: '.infotech-reference', label: '资料', note: '回到 IETF RFC 原文确认协议定义。', evidence: '来源索引：4 条' }
         ],
         materials: [
+            { key: 'topics', selector: '.materials-topic-map', label: '专题地图', note: '把材料样板拆成晶体结构、晶粒尺度、性能趋势和来源附录。', evidence: '四分支导通' },
+            { key: 'pages', selector: '.materials-topic-pages', label: '专题页骨架', note: '把四个专题整理成可迁移为真实路由的页面蓝图。', evidence: '四条可寻址专题页路径' },
+            { key: 'modules', selector: '.materials-topic-modules', label: '专题模块', note: '把四个专题拆成学习看点、操作动作和来源边界。', evidence: '四张任务卡' },
+            { key: 'deep', selector: '.materials-deep-panels', label: '深层面板', note: '用折叠面板呈现准独立专题页的讲解脚本和拆页方向。', evidence: '四个专题面板' },
+            { key: 'visuals', selector: '.materials-visual-atlas', label: '视觉图谱', note: '用三张自制教学示意连接晶格、晶界和趋势曲线。', evidence: '自制 SVG 素材：3 组' },
+            { key: 'trust', selector: '.materials-trust-ledger', label: '可信审查', note: '前置事实依据、教学近似、不可外推和回查动作。', evidence: '模型边界前置' },
             { key: 'scale', selector: '.materials-scales', label: '尺度桥', note: '区分理想晶胞、位错、晶界和加工历史。', evidence: '尺度边界：晶胞到晶粒' },
             { key: 'judge', selector: '.materials-judgement', label: '判断链', note: '把显微图像转成有边界的材料判断。', evidence: 'Hall-Petch：统计边界' },
             { key: 'lab', selector: '.materials-lab', label: '实验台', note: '切换晶体结构与晶粒尺寸，观察相对趋势。', evidence: '晶体结构 + 晶粒趋势', protocol: { adjust: '晶体结构、晶粒尺寸', observe: '配位、堆积、相对强度趋势', boundary: 'Hall-Petch 不无限外推' }, legend: [
@@ -103,6 +109,45 @@ const FrontierLearning = {
         }
     },
 
+    subjectModules: {
+        cosmos: [
+            { label: '太阳路径模型', href: '#frontier-cosmos-lab', icon: 'sun', note: '调节日期和纬度，观察太阳高度、昼长和赤纬变化。' },
+            { label: '季节判读', href: '#frontier-cosmos-read', icon: 'orbit', note: '把地轴倾角、直射点和纬度差异连成解释链。' },
+            { label: '极区与低纬', href: '#frontier-cosmos-lab', icon: 'globe-2', note: '用预设纬度快速比较不同地区的日照节奏。' },
+            { label: '资料回查', href: '#frontier-cosmos-reference', icon: 'book-open-check', note: '回到公开资料确认模型近似和适用边界。' }
+        ],
+        engineering: [
+            { label: '结构模型', href: '#frontier-engineering-chain', icon: 'construction', note: '先确认支座、节点和杆件的二维静定假设。' },
+            { label: '荷载路径', href: '#frontier-engineering-lab', icon: 'weight', note: '移动荷载位置，观察支座反力和杆件拉压变化。' },
+            { label: '节点判读', href: '#frontier-engineering-read', icon: 'git-fork', note: '区分整体平衡、节点平衡和拉压符号。' },
+            { label: '设计边界', href: '#frontier-engineering-reference', icon: 'shield-check', note: '把教学桁架和真实工程验算明确分层。' }
+        ],
+        datascience: [
+            { label: '样本与特征', href: '#frontier-datascience-map', icon: 'scatter-chart', note: '从数据点、参数和预测线建立模型坐标。' },
+            { label: '损失函数', href: '#frontier-datascience-lab', icon: 'line-chart', note: '调节斜率、截距和学习率，观察损失变化。' },
+            { label: '残差判读', href: '#frontier-datascience-read', icon: 'scan-line', note: '用残差、样本范围和异常点检查模型解释。' },
+            { label: '模型边界', href: '#frontier-datascience-reference', icon: 'book-marked', note: '回到资料说明训练样本与样本外预测边界。' }
+        ],
+        infotech: [
+            { label: '协议分层', href: '#frontier-infotech-protocols', icon: 'layers-3', note: '建立 DNS、HTTP、TCP、IPv6 的角色边界。' },
+            { label: '请求旅程', href: '#frontier-infotech-lab', icon: 'network', note: '切换请求阶段，观察封装和逐跳转发。' },
+            { label: '包头判读', href: '#frontier-infotech-read', icon: 'binary', note: '区分教学包头模型和真实抓包开销。' },
+            { label: '标准回查', href: '#frontier-infotech-reference', icon: 'file-search', note: '对照 RFC 原文确认协议定义和省略内容。' }
+        ],
+        materials: [
+            { label: '晶体结构', href: '#frontier-materials-topic-page-crystal', icon: 'box', note: '比较 SC、BCC、FCC、HCP 的几何读数。' },
+            { label: '晶粒尺度', href: '#frontier-materials-topic-page-grain', icon: 'grip', note: '理解晶界、位错和加工历史如何影响趋势。' },
+            { label: '性能趋势', href: '#frontier-materials-topic-page-performance', icon: 'activity', note: '用相对曲线练习趋势判断和不可外推边界。' },
+            { label: '来源回查', href: '#frontier-materials-trust', icon: 'book-open-check', note: '查看资料用途、模型边界和本地来源附录。' }
+        ],
+        humanities: [
+            { label: '文本清理', href: '#frontier-humanities-chain', icon: 'text-cursor-input', note: '先确认语料、分词和停用词的处理边界。' },
+            { label: '词频上下文', href: '#frontier-humanities-lab', icon: 'list-filter', note: '切换文本视角，观察词项如何提出回读问题。' },
+            { label: '共现网络', href: '#frontier-humanities-read', icon: 'network', note: '把数量线索放回原文和语境解释。' },
+            { label: '资料回读', href: '#frontier-humanities-reference', icon: 'book-open-text', note: '回到来源、标注规则和阅读方法确认解释边界。' }
+        ]
+    },
+
     _runtimes: Object.create(null),
     _activeRuntimePage: null,
 
@@ -112,6 +157,7 @@ const FrontierLearning = {
         if (this.pages.includes(targetPage)) {
             this._activateRuntime(targetPage);
             this.renderPage(targetPage);
+            this.bindHashDetailsTarget();
         } else if (targetPage === 'all') {
             this.pages.forEach((item) => {
                 this._activateRuntime(item);
@@ -225,10 +271,8 @@ const FrontierLearning = {
             })
         ].join('');
 
-        const sourceItems = this.getSourceItems(learning);
-        const sourceLinks = sourceItems.map((source) => `
-            <a href="${source.url}" target="_blank" rel="noopener">${source.label}</a>
-        `).join('');
+        const sourceItems = this.getSourceItems(learning, page);
+        const sourceLinks = sourceItems.map((source) => this.renderSourceItem(source)).join('');
         const sourceSummary = sourceItems.length
             ? `本页列出 ${sourceItems.length} 条资料，用于回查概念定义、模型边界和拓展阅读。`
             : '本页会在学习框架中列出可回查的公开资料。';
@@ -274,6 +318,7 @@ const FrontierLearning = {
 
         shell.insertBefore(frame, shell.firstElementChild);
         }
+        this.renderSubjectOverview(page, shell, learning, meta);
         this.renderPathway(page, shell, learning, meta);
     },
 
@@ -283,6 +328,42 @@ const FrontierLearning = {
         if (!overview) return;
         overview.hidden = true;
         overview.dataset.frontierLegacyOverview = 'hidden';
+    },
+
+    renderSubjectOverview(page, shell, learning, meta) {
+        if (!shell || shell.querySelector('.frontier-subject-overview')) return;
+        const modules = this.subjectModules[page] || [];
+        if (!modules.length) return;
+
+        const cards = modules.map((item, index) => `
+            <a class="frontier-subject-module" href="${this.escapeAttr(item.href || '#')}" data-frontier-subject-module="${this.escapeAttr(page)}-${index + 1}">
+                <span class="frontier-subject-module__index">${String(index + 1).padStart(2, '0')}</span>
+                <i data-lucide="${this.escapeAttr(item.icon || 'sparkles')}"></i>
+                <strong>${this.escape(item.label)}</strong>
+                <p>${this.escape(item.note)}</p>
+            </a>
+        `).join('');
+
+        const overview = document.createElement('section');
+        overview.className = 'frontier-subject-overview';
+        overview.setAttribute('aria-label', `${meta.label || meta.title}学科总览`);
+        overview.innerHTML = `
+            <div class="frontier-subject-overview__head">
+                <span><i data-lucide="layout-dashboard"></i>学科总览</span>
+                <h2>${this.escape(meta.label || meta.title || '学习主题')} · 先选模块再进入细节</h2>
+                <p>${this.escape(learning.overview || '先建立主题坐标，再进入实验、判读和资料回查。')}</p>
+            </div>
+            <div class="frontier-subject-overview__grid">
+                ${cards}
+            </div>
+        `;
+
+        const brief = shell.querySelector('.frontier-brief');
+        if (brief) {
+            brief.insertAdjacentElement('afterend', overview);
+        } else {
+            shell.insertBefore(overview, shell.firstElementChild);
+        }
     },
 
     renderPathway(page, shell, learning, meta) {
@@ -305,7 +386,7 @@ const FrontierLearning = {
                 `;
             }).join('');
 
-            const sourceCount = this.getSourceItems(learning).length;
+            const sourceCount = this.getSourceItems(learning, page).length;
             const pathway = document.createElement('section');
             pathway.className = 'frontier-pathway';
             pathway.setAttribute('aria-label', `${meta.label || meta.title}页内学习路径`);
@@ -1262,15 +1343,48 @@ const FrontierLearning = {
         }
     },
 
+    renderSourceItem(source) {
+        return `
+            <a class="frontier-brief__source" href="${source.url}" target="_blank" rel="noopener">${source.label}</a>
+        `;
+    },
+
     getSourceItems(learning) {
         const sources = Array.isArray(learning && learning.sources) ? learning.sources : [];
         return sources.map((source) => {
-            const label = source && source.label ? this.escape(source.label) : '';
-            const url = this.safeUrl(source && source.url);
+            const rawLabel = source && source.label ? String(source.label) : '';
+            const rawUrl = source && source.url ? String(source.url) : '';
+            const label = rawLabel ? this.escape(rawLabel) : '';
+            const url = this.safeUrl(rawUrl);
             if (!label || url === '#') return null;
             return { label, url };
         }).filter(Boolean);
     },
+
+    bindHashDetailsTarget() {
+        this._listen(window, 'hashchange', () => {
+            this._setTimeout(() => this.openTargetDetailsFromHash(), 0);
+        });
+        this._requestFrame(() => this.openTargetDetailsFromHash());
+        this._setTimeout(() => this.openTargetDetailsFromHash(), 120);
+    },
+
+    openTargetDetailsFromHash() {
+        const rawHash = (window.location.hash || '').slice(1);
+        if (!rawHash) return;
+        let target = null;
+        try {
+            target = document.getElementById(decodeURIComponent(rawHash));
+        } catch (e) {
+            target = document.getElementById(rawHash);
+        }
+        if (!target) return;
+        const details = target.tagName && target.tagName.toLowerCase() === 'details'
+            ? target
+            : target.closest && target.closest('details');
+        if (details && !details.open) details.open = true;
+    },
+
 
     bindSectionRail(page, shell, sections) {
         const rail = shell ? shell.querySelector('.frontier-section-rail') : null;

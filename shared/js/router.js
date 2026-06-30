@@ -11,13 +11,15 @@ const Router = {
     _pendingModule: null,
     _pendingAnchor: null,
     _lastAppliedAnchor: null,
+    _anchorScrollGeneration: 0,
+    _anchorScrollTimers: [],
     _pageScriptPromises: {},
     _galaxySupportPromises: {},
     frontierPages: ['frontier', 'cosmos', 'engineering', 'datascience', 'infotech', 'materials', 'humanities'],
     coursePages: ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology'],
     _activeGalaxy: null,
     _galaxyCacheKey: 'astra-galaxy-cache-meta',
-    _galaxyCacheVersion: '20260619v63FrontierLifecycleP1',
+    _galaxyCacheVersion: '20260630mainV64',
     _galaxyPageMap: {
         planets: 'astra',
         home: 'englab',
@@ -49,7 +51,7 @@ const Router = {
             'shared/js/back-to-top.js?v=20260424rr',
             'shared/js/fab-trigger.js?v=20260528v61g',
             'shared/js/touch-gestures.js?v=20260418a',
-            'shared/js/experiment-guide.js?v=20260619v63FrontierLifecycleP1',
+            'shared/js/experiment-guide.js?v=20260630mainV64',
             'shared/js/experiment-export.js?v=20260528v61f',
             'shared/js/quiz-data.js?v=20260618refsP1',
             'shared/js/experiment-quiz.js?v=20260606fix1',
@@ -61,21 +63,21 @@ const Router = {
         ],
         frontier: [
             'shared/js/lucide.min.js?v=20260417d',
-            'shared/js/frontier-learning.js?v=20260619v63FrontierLifecycleP1',
-            'shared/js/scroll-animations.js?v=20260619v63FrontierLifecycleP1'
+            'shared/js/frontier-learning.js?v=20260630mainV64',
+            'shared/js/scroll-animations.js?v=20260630mainV64'
         ]
     },
     pageScripts: {
         home: 'pages/home/home.js?v=20260619v63StartupLazyP1',
-        planets: 'pages/planets/planets.js?v=20260619v63AsyncGsapP1',
-        cosmos: 'pages/cosmos/earth-sun.js?v=20260619v63FrontierLifecycleP1',
-        datascience: 'pages/datascience/linear-regression.js?v=20260619v63FrontierLifecycleP1',
-        infotech: 'pages/infotech/network-layers.js?v=20260619v63FrontierLifecycleP1',
-        materials: 'pages/materials/materials-lab.js?v=20260619v63AsyncGsapP1',
-        humanities: 'pages/humanities/text-lab.js?v=20260618humanP3',
-        engineering: 'pages/engineering/bridge-truss.js?v=20260619v63FrontierLifecycleP1',
-        license: 'pages/about/about.js?v=20260619v63FrontierLifecycleP1',
-        changelog: 'pages/about/about.js?v=20260619v63FrontierLifecycleP1'
+        planets: 'pages/planets/planets.js?v=20260630mainV64',
+        cosmos: 'pages/cosmos/earth-sun.js?v=20260630mainV64',
+        datascience: 'pages/datascience/linear-regression.js?v=20260630mainV64',
+        infotech: 'pages/infotech/network-layers.js?v=20260630mainV64',
+        materials: 'pages/materials/materials-lab.js?v=20260630mainV64',
+        humanities: 'pages/humanities/text-lab.js?v=20260630mainV64',
+        engineering: 'pages/engineering/bridge-truss.js?v=20260630mainV64',
+        license: 'pages/about/about.js?v=20260630mainV64',
+        changelog: 'pages/about/about.js?v=20260630mainV64'
     },
     pageReadyChecks: {
         home: () => typeof window.initHome === 'function',
@@ -132,7 +134,7 @@ const Router = {
             });
         });
 
-        // Initial state — determine page from hash
+        // Initial state 鈥?determine page from hash
         const parsedInit = this._parseHash();
         const initialPage = parsedInit.page;
         this.currentPage = initialPage;
@@ -149,11 +151,11 @@ const Router = {
 
         // CRITICAL FIX: Always fire onPageEnter for the initial page.
         // Previously, handleHash() returned early when page-home already had .active
-        // in HTML, so initHome() was never called on first load — causing the
+        // in HTML, so initHome() was never called on first load 鈥?causing the
         // satellite animation to never start until a re-navigation.
         this._initialEnterFired = true;
-        // v5.0：初次加载（特别是直接进入 #planets）也需要同步导航栏可见性，
-        //       否则 HTML 默认的 .navbar--transparent 不会被替换为 .navbar--hidden。
+        // v5.0锛氬垵娆″姞杞斤紙鐗瑰埆鏄洿鎺ヨ繘鍏?#planets锛変篃闇€瑕佸悓姝ュ鑸爮鍙鎬э紝
+        //       鍚﹀垯 HTML 榛樿鐨?.navbar--transparent 涓嶄細琚浛鎹负 .navbar--hidden銆?
         const initNavbar = document.getElementById('navbar');
         if (initNavbar) {
             const isFrontier = this._isFrontierPage(initialPage);
@@ -177,8 +179,8 @@ const Router = {
     },
 
     /**
-     * 解析 hash，支持 "subject/experiment" 深链接与未来星系页内锚点。
-     * 返回 { page, moduleId, anchorId }，moduleId 与 anchorId 均可为空。
+     * 瑙ｆ瀽 hash锛屾敮鎸?"subject/experiment" 娣遍摼鎺ヤ笌鏈潵鏄熺郴椤靛唴閿氱偣銆?
+     * 杩斿洖 { page, moduleId, anchorId }锛宮oduleId 涓?anchorId 鍧囧彲涓虹┖銆?
      */
     _parseHash() {
         const raw = (window.location.hash || '').slice(1);
@@ -337,6 +339,55 @@ const Router = {
             if (current !== 'home' && current !== 'planets' && typeof window.initHeroVisual === 'function') {
                 window.initHeroVisual(current);
             }
+            this._reapplyFrontierAnchorAfterRuntime(current);
+        }
+    },
+
+    _reapplyFrontierAnchorAfterRuntime(page) {
+        const parsed = this._parseHash();
+        if (parsed.page !== page || !parsed.anchorId) return;
+        this._pendingAnchor = parsed.anchorId;
+        this._scheduleAnchorScroll(() => {
+            if (this.currentPage !== page || !this._isActivePage(page)) return;
+            this._applyPendingAnchor();
+        }, 40);
+    },
+
+    _cancelPendingAnchorScroll() {
+        this._anchorScrollGeneration += 1;
+        if (Array.isArray(this._anchorScrollTimers) && this._anchorScrollTimers.length) {
+            this._anchorScrollTimers.splice(0).forEach((id) => {
+                try { clearTimeout(id); } catch (e) {}
+            });
+        }
+    },
+
+    _scheduleAnchorScroll(handler, delay) {
+        const id = setTimeout(() => {
+            this._anchorScrollTimers = this._anchorScrollTimers.filter((item) => item !== id);
+            handler();
+        }, delay);
+        this._anchorScrollTimers.push(id);
+        return id;
+    },
+
+    _resetPageScroll() {
+        try {
+            const rootStyle = document.documentElement.style;
+            const bodyStyle = document.body.style;
+            const previousRootBehavior = rootStyle.scrollBehavior;
+            const previousBodyBehavior = bodyStyle.scrollBehavior;
+            const scroller = document.scrollingElement || document.documentElement;
+            rootStyle.scrollBehavior = 'auto';
+            bodyStyle.scrollBehavior = 'auto';
+            window.scrollTo(0, 0);
+            if (scroller) scroller.scrollTop = 0;
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
+            rootStyle.scrollBehavior = previousRootBehavior;
+            bodyStyle.scrollBehavior = previousBodyBehavior;
+        } catch (e) {
+            try { window.scrollTo(0, 0); } catch (ignored) {}
         }
     },
 
@@ -389,8 +440,11 @@ const Router = {
         const page = parsed.page;
         this._pendingModule = parsed.moduleId;
         this._pendingAnchor = parsed.anchorId || null;
-        if (!this._pendingAnchor) this._lastAppliedAnchor = null;
-        // 同 page 但深链接或页内锚点变化：直接处理，不重走转场
+        if (!this._pendingAnchor) {
+            this._lastAppliedAnchor = null;
+            this._cancelPendingAnchorScroll();
+        }
+        // 鍚?page 浣嗘繁閾炬帴鎴栭〉鍐呴敋鐐瑰彉鍖栵細鐩存帴澶勭悊锛屼笉閲嶈蛋杞満
         if (page === this.currentPage && this._isActivePage(page)) {
             if (this._pendingAnchor) {
                 this._applyPendingAnchor();
@@ -412,6 +466,7 @@ const Router = {
             return;
         }
         this.isTransitioning = true; // Set immediately to prevent race conditions
+        this._cancelPendingAnchorScroll();
 
         const currentEl = document.querySelector('.page.active');
         const targetEl = document.getElementById(`page-${page}`);
@@ -424,7 +479,7 @@ const Router = {
         this._pageEnterComplete = false;
 
         // Update hash without triggering hashchange
-        // 保留可能存在的深链接模块后缀（如 #physics/momentum-conservation）
+        // 淇濈暀鍙兘瀛樺湪鐨勬繁閾炬帴妯″潡鍚庣紑锛堝 #physics/momentum-conservation锛?
         const desiredHash = this._pendingAnchor || (this._pendingModule ? `${page}/${this._pendingModule}` : page);
         if (window.location.hash.slice(1) !== desiredHash) {
             history.pushState(null, '', `#${desiredHash}`);
@@ -434,7 +489,7 @@ const Router = {
         this.updateNav(page);
 
         // Update navbar visibility/transparency
-        // v4.3：home 透明化；v4.4：planets 大屏完全隐藏顶栏（作为目录承载更沉浸）
+        // v4.3锛歨ome 閫忔槑鍖栵紱v4.4锛歱lanets 澶у睆瀹屽叏闅愯棌椤舵爮锛堜綔涓虹洰褰曟壙杞芥洿娌夋蹈锛?
         const navbar = document.getElementById('navbar');
         if (navbar) {
             const isFrontier = this._isFrontierPage(page);
@@ -464,7 +519,7 @@ const Router = {
             // No animation (initial load, no GSAP, or reduced motion)
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             targetEl.classList.add('active');
-            window.scrollTo({ top: 0 });
+            this._resetPageScroll();
             this.onPageEnter(page);
             this._finishTransition();
             return;
@@ -526,7 +581,7 @@ const Router = {
         // Phase 3: Switch content and start reveal
         tl.add(() => {
             targetEl.classList.add('active');
-            window.scrollTo({ top: 0 });
+            this._resetPageScroll();
             gsap.set(targetEl, { opacity: 0, y: 20 });
             // Pre-hide hero children so they never flash visible during the page fade-in.
             // animatePageContent will animate them in individually afterwards.
@@ -814,26 +869,20 @@ const Router = {
             return;
         }
 
-        // v6.1.0-alpha6 修复：home / planets 是「单屏锁定式」展示页，若沿用前一页的 scrollTop，
-        // 加上 home-scroll-locked 后 body 高度被钉死在 100vh，旧滚动偏移会让首页卡在下方留黑框。
-        // 用双阶段重置：同步置 0 + rAF 再置 0（覆盖 GSAP 转场结束后浏览器恢复滚动的边缘场景）。
+        // v6.1.0-alpha6 淇锛歨ome / planets 鏄€屽崟灞忛攣瀹氬紡銆嶅睍绀洪〉锛岃嫢娌跨敤鍓嶄竴椤电殑 scrollTop锛?
+        // 鍔犱笂 home-scroll-locked 鍚?body 楂樺害琚拤姝诲湪 100vh锛屾棫婊氬姩鍋忕Щ浼氳棣栭〉鍗″湪涓嬫柟鐣欓粦妗嗐€?
+        // 鐢ㄥ弻闃舵閲嶇疆锛氬悓姝ョ疆 0 + rAF 鍐嶇疆 0锛堣鐩?GSAP 杞満缁撴潫鍚庢祻瑙堝櫒鎭㈠婊氬姩鐨勮竟缂樺満鏅級銆?
         if (page === 'home' || page === 'planets') {
-            const resetScroll = () => {
-                try {
-                    window.scrollTo(0, 0);
-                    document.documentElement.scrollTop = 0;
-                    document.body.scrollTop = 0;
-                } catch (e) { /* noop */ }
-            };
+            const resetScroll = () => this._resetPageScroll();
             resetScroll();
             requestAnimationFrame(resetScroll);
         }
         document.body.classList.toggle('home-scroll-locked', page === 'home');
 
-        // v5.0：移除亮色主题，全站固定 dark
+        // v5.0锛氱Щ闄や寒鑹蹭富棰橈紝鍏ㄧ珯鍥哄畾 dark
         document.documentElement.setAttribute('data-theme', 'dark');
 
-        // v5.0：FAB 仅在学科课程页显示，首页/多星系大屏等展示页面不显示
+        // v5.0锛欶AB 浠呭湪瀛︾璇剧▼椤垫樉绀猴紝棣栭〉/澶氭槦绯诲ぇ灞忕瓑灞曠ず椤甸潰涓嶆樉绀?
         const isCoursePage = ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology'].includes(page);
         if (typeof BackToTop !== 'undefined') {
             if (isCoursePage) BackToTop.show(); else BackToTop.hide();
@@ -887,7 +936,7 @@ const Router = {
             initHeroVisual(page);
         }
 
-        // 深链接：URL 形如 #physics/momentum-conservation 时，自动打开对应实验
+        // 娣遍摼鎺ワ細URL 褰㈠ #physics/momentum-conservation 鏃讹紝鑷姩鎵撳紑瀵瑰簲瀹為獙
         this._applyPendingModule(page);
         this._applyPendingAnchor();
         this._pageEnterComplete = true;
@@ -895,8 +944,8 @@ const Router = {
     },
 
     /**
-     * 若 _pendingModule 与当前 page（课程页）匹配，则尝试调用 ModuleSelector.openModule。
-     * 等待 ModuleSelector 渲染好侧栏后再调用，以处理首屏即直达的场景。
+     * 鑻?_pendingModule 涓庡綋鍓?page锛堣绋嬮〉锛夊尮閰嶏紝鍒欏皾璇曡皟鐢?ModuleSelector.openModule銆?
+     * 绛夊緟 ModuleSelector 娓叉煋濂戒晶鏍忓悗鍐嶈皟鐢紝浠ュ鐞嗛灞忓嵆鐩磋揪鐨勫満鏅€?
      */
     _applyPendingModule(page) {
         const moduleId = this._pendingModule;
@@ -911,22 +960,35 @@ const Router = {
             }
             if (retries > 0) setTimeout(() => tryOpen(retries - 1), 60);
         };
-        // 等一个 microtask + 一次 60ms 重试，覆盖 ModuleSelector 尚未初始化的边缘场景
+        // 绛変竴涓?microtask + 涓€娆?60ms 閲嶈瘯锛岃鐩?ModuleSelector 灏氭湭鍒濆鍖栫殑杈圭紭鍦烘櫙
         setTimeout(() => tryOpen(5), 0);
     },
 
     _applyPendingAnchor() {
         const anchorId = this._pendingAnchor;
         if (!anchorId) return;
+        const parsed = this._parseHash();
+        const anchorPage = parsed.anchorId === anchorId ? parsed.page : this._pageForFrontierAnchor(anchorId);
         const target = document.getElementById(anchorId);
         if (!target) return;
+        if (anchorPage && (this.currentPage !== anchorPage || !this._isActivePage(anchorPage))) return;
+        const activePage = anchorPage
+            ? document.getElementById(`page-${anchorPage}`)
+            : document.querySelector('.page.active');
+        if (activePage && !activePage.contains(target)) return;
+
+        this._cancelPendingAnchorScroll();
+        const generation = this._anchorScrollGeneration;
         const context = target.previousElementSibling && target.previousElementSibling.classList.contains('frontier-section-context')
             ? target.previousElementSibling
             : null;
         const scrollTarget = context || target;
         this._lastAppliedAnchor = anchorId;
         this._pendingAnchor = null;
-        setTimeout(() => {
+        const run = () => {
+            if (generation !== this._anchorScrollGeneration) return;
+            if (anchorPage && (this.currentPage !== anchorPage || !this._isActivePage(anchorPage))) return;
+            if (activePage && !activePage.classList.contains('active')) return;
             try {
                 const offset = 88;
                 const rootStyle = document.documentElement.style;
@@ -934,6 +996,9 @@ const Router = {
                 const previousRootBehavior = rootStyle.scrollBehavior;
                 const previousBodyBehavior = bodyStyle.scrollBehavior;
                 const align = () => {
+                    if (generation !== this._anchorScrollGeneration) return;
+                    if (anchorPage && (this.currentPage !== anchorPage || !this._isActivePage(anchorPage))) return;
+                    if (activePage && !activePage.classList.contains('active')) return;
                     const top = Math.max(0, scrollTarget.getBoundingClientRect().top + window.pageYOffset - offset);
                     const scroller = document.scrollingElement || document.documentElement;
                     rootStyle.scrollBehavior = 'auto';
@@ -944,23 +1009,23 @@ const Router = {
                     document.body.scrollTop = top;
                 };
                 requestAnimationFrame(align);
-                setTimeout(align, 80);
-                setTimeout(align, 220);
-                setTimeout(() => {
+                [80, 220, 720, 1400].forEach((delay) => this._scheduleAnchorScroll(align, delay));
+                this._scheduleAnchorScroll(() => {
+                    if (generation !== this._anchorScrollGeneration) return;
                     rootStyle.scrollBehavior = previousRootBehavior;
                     bodyStyle.scrollBehavior = previousBodyBehavior;
-                }, 260);
+                }, 1460);
                 target.setAttribute('tabindex', '-1');
                 target.focus({ preventScroll: true });
             } catch (e) { /* noop */ }
-        }, 0);
+        };
+        this._scheduleAnchorScroll(run, 0);
     },
 
     onPageLeave(page) {
         if (page === 'home') {
             document.body.classList.remove('home-scroll-locked');
         }
-
         if (page !== 'home' && page !== 'planets' && typeof destroyHeroVisual === 'function') {
             try { destroyHeroVisual(page); } catch (e) { /* ignore */ }
         }
@@ -989,15 +1054,15 @@ const Router = {
         } else if (page === 'engineering') {
             if (typeof destroyBridgeTruss === 'function') destroyBridgeTruss();
         } else {
-            // v4.2.3 Bug3 修复：先调用 closeModule 隐藏全部浮动控件
-            // （ExperimentExport / ExperimentQuiz / ExperimentFavorites / ExperimentRating /
-            //   ExperimentGuide），避免离开学科页面后控件仍残留在首页/星系大屏。
+            // v4.2.3 Bug3 淇锛氬厛璋冪敤 closeModule 闅愯棌鍏ㄩ儴娴姩鎺т欢
+            // 锛圗xperimentExport / ExperimentQuiz / ExperimentFavorites / ExperimentRating /
+            //   ExperimentGuide锛夛紝閬垮厤绂诲紑瀛︾椤甸潰鍚庢帶浠朵粛娈嬬暀鍦ㄩ椤?鏄熺郴澶у睆銆?
             if (typeof ModuleSelector !== 'undefined' && ModuleSelector.activeModule
                 && ModuleSelector.activeModule[page]
                 && typeof ModuleSelector.closeModule === 'function') {
                 try { ModuleSelector.closeModule(page); } catch (e) { /* ignore */ }
             }
-            // 兜底：即便 ModuleSelector 未记录 active module，也强制隐藏全部浮动控件
+            // 鍏滃簳锛氬嵆渚?ModuleSelector 鏈褰?active module锛屼篃寮哄埗闅愯棌鍏ㄩ儴娴姩鎺т欢
             try {
                 const guide = window.ExperimentGuide || (typeof ExperimentGuide !== 'undefined' ? ExperimentGuide : null);
                 if (guide) guide.hideHelpButton();
@@ -1100,7 +1165,7 @@ const Router = {
         }
     },
 
-    // ── Running Time Footer ──
+    // 鈹€鈹€ Running Time Footer 鈹€鈹€
     _toggleRunningTime(show) {
         const el = document.getElementById('running-time-footer');
         if (!el) return;

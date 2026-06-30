@@ -1,4 +1,4 @@
-﻿// ===== Main Application Bootstrap =====
+// ===== Main Application Bootstrap =====
 
 function initApp() {
     if (window.__loadProgress) window.__loadProgress(30);
@@ -221,44 +221,44 @@ function updateFooterVisibility() {
 
 window.updateFooterVisibility = updateFooterVisibility;
 
-const ENGLAB_ASSET_VERSION = '20260619v63FrontierLifecycleP1';
+const ENGLAB_ASSET_VERSION = '20260630mainV64';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',
     './shared/css/tokens.css?v=20260424ss',
-    './shared/css/base.css?v=20260619v63FrontierLifecycleP1',
+    './shared/css/base.css?v=20260630mainV64',
     './shared/css/typography.css?v=20260526v61c',
-    './shared/css/navbar.css?v=20260619v63AsyncGsapP1',
+    './shared/css/navbar.css?v=20260630mainV64',
     './shared/css/page-layout.css?v=20260606v62e',
-    './shared/css/responsive.css?v=20260619v63FrontierLifecycleP1',
+    './shared/css/responsive.css?v=20260630mainV64',
     './shared/js/lucide.min.js?v=20260417d',
-    './shared/js/config.js?v=20260619v63AsyncGsapP1',
+    './shared/js/config.js?v=20260630mainV64',
     './shared/js/router.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/main.js?v=' + ENGLAB_ASSET_VERSION
 ];
 
 const GALAXY_HTTP_FALLBACK_ASSETS = {
     astra: [
-        './pages/planets/planets.css?v=20260619v63FrontierLifecycleP1',
-        './pages/planets/planets.js?v=20260619v63AsyncGsapP1'
+        './pages/planets/planets.css?v=20260630mainV64',
+        './pages/planets/planets.js?v=20260630mainV64'
     ],
     englab: [
-        './shared/css/cards.css?v=20260619v63FrontierLifecycleP1',
-        './shared/css/module-selector.css?v=20260619v63FrontierLifecycleP1',
-        './shared/css/experiment-guide.css?v=20260619v63FrontierLifecycleP1',
+        './shared/css/cards.css?v=20260630mainV64',
+        './shared/css/module-selector.css?v=20260630mainV64',
+        './shared/css/experiment-guide.css?v=20260630mainV64',
         './shared/css/experiment-export.css?v=20260424v44a',
         './shared/css/experiment-quiz.css?v=20260422z',
         './shared/css/experiment-favorites.css?v=20260424oo',
         './shared/css/experiment-rating.css?v=20260422z',
         './shared/css/experiment-polish.css?v=20260526v61c',
-        './pages/home/home.css?v=20260605v62e',
+        './pages/home/home.css?v=20260630mainV64',
         './pages/mathematics/mathematics.css?v=20260618mathModelP1',
         './pages/physics/physics.css?v=20260618thermoP1',
         './pages/chemistry/chemistry.css?v=20260618ionP1',
         './pages/algorithms/algorithms.css?v=20260618algoTextP1',
         './pages/biology/biology.css?v=20260618neuralP1',
         './shared/js/module-selector.js?v=20260619v63StartupLazyP1',
-        './shared/js/experiment-guide.js?v=20260619v63FrontierLifecycleP1',
+        './shared/js/experiment-guide.js?v=20260630mainV64',
         './shared/js/experiment-export.js?v=20260528v61f',
         './shared/js/quiz-data.js?v=20260618refsP1',
         './shared/js/experiment-quiz.js?v=20260606fix1',
@@ -270,22 +270,22 @@ const GALAXY_HTTP_FALLBACK_ASSETS = {
         './pages/home/home.js?v=20260619v63StartupLazyP1'
     ],
     frontier: [
-        './shared/js/frontier-learning.js?v=20260619v63FrontierLifecycleP1',
-        './shared/js/scroll-animations.js?v=20260619v63FrontierLifecycleP1',
-        './shared/js/cards.js?v=20260619v63FrontierLifecycleP1',
+        './shared/js/frontier-learning.js?v=20260630mainV64',
+        './shared/js/scroll-animations.js?v=20260630mainV64',
+        './shared/js/cards.js?v=20260630mainV64',
         './shared/js/common.js?v=20260417d',
-        './pages/cosmos/cosmos.css?v=20260619v63AsyncGsapP1',
-        './pages/cosmos/earth-sun.js?v=20260619v63FrontierLifecycleP1',
-        './pages/datascience/datascience.css?v=20260619v63AsyncGsapP1',
-        './pages/datascience/linear-regression.js?v=20260619v63FrontierLifecycleP1',
-        './pages/infotech/infotech.css?v=20260619v63AsyncGsapP1',
-        './pages/infotech/network-layers.js?v=20260619v63FrontierLifecycleP1',
-        './pages/materials/materials.css?v=20260619v63AsyncGsapP1',
-        './pages/materials/materials-lab.js?v=20260619v63AsyncGsapP1',
-        './pages/humanities/humanities.css?v=20260619v63AsyncGsapP1',
-        './pages/humanities/text-lab.js?v=20260618humanP3',
-        './pages/engineering/engineering.css?v=20260619v63AsyncGsapP1',
-        './pages/engineering/bridge-truss.js?v=20260619v63FrontierLifecycleP1'
+        './pages/cosmos/cosmos.css?v=20260630mainV64',
+        './pages/cosmos/earth-sun.js?v=20260630mainV64',
+        './pages/datascience/datascience.css?v=20260630mainV64',
+        './pages/datascience/linear-regression.js?v=20260630mainV64',
+        './pages/infotech/infotech.css?v=20260630mainV64',
+        './pages/infotech/network-layers.js?v=20260630mainV64',
+        './pages/materials/materials.css?v=20260630mainV64',
+        './pages/materials/materials-lab.js?v=20260630mainV64',
+        './pages/humanities/humanities.css?v=20260630mainV64',
+        './pages/humanities/text-lab.js?v=20260630mainV64',
+        './pages/engineering/engineering.css?v=20260630mainV64',
+        './pages/engineering/bridge-truss.js?v=20260630mainV64'
     ]
 };
 
