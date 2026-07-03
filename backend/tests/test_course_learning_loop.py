@@ -1,3 +1,15 @@
+from datetime import date
+
+import pytest
+from sqlalchemy import select
+
+from app.core.config import get_settings
+from app.db.session import get_session_factory
+from app.models import ClassKnowledgeSnapshot, KnowledgeSnapshotRun, UserKnowledgeSnapshot
+from app.models.base import utc_now
+from app.services import knowledge_snapshot_runs
+
+
 def _auth_header(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
@@ -39,7 +51,17 @@ def _bootstrap_admin(client, username: str) -> str:
     return login.json()["access_token"]
 
 
-def test_teacher_course_assignment_and_student_learning_event_loop(client):
+def test_knowledge_snapshot_period_windows_align_day_and_week():
+    day_start, day_end = knowledge_snapshot_runs.snapshot_window("day", date(2026, 7, 3))
+    assert day_start.isoformat() == "2026-07-03T00:00:00"
+    assert day_end.isoformat() == "2026-07-03T23:59:59.999999"
+
+    week_start, week_end = knowledge_snapshot_runs.snapshot_window("week", date(2026, 7, 3))
+    assert week_start.isoformat() == "2026-06-29T00:00:00"
+    assert week_end.isoformat() == "2026-07-05T23:59:59.999999"
+
+
+def test_teacher_course_assignment_and_student_learning_event_loop(client, monkeypatch):
     teacher_token = _register_and_login(client, "teacher_course", "teacher")
     student_token = _register_and_login(client, "student_course", "student")
     outsider_token = _register_and_login(client, "student_outside_course", "student")
@@ -566,6 +588,74 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client):
     assert snapshot_list_body["total"] == 1
     assert snapshot_list_body["next_offset"] is None
     assert snapshot_list_body["items"][0]["id"] == class_snapshot_body["id"]
+
+    run_reference_date = utc_now().date()
+    with get_session_factory(get_settings().database_url)() as db:
+        run = knowledge_snapshot_runs.rebuild_periodic_knowledge_snapshots(
+            db,
+            granularity="day",
+            reference_date=run_reference_date,
+            trigger_source="pytest",
+        )
+        assert run.status == "success"
+        assert run.user_snapshot_count == 1
+        assert run.class_snapshot_count == 1
+        assert run.metadata_json["class_course_pairs"] == 1
+        run_id = run.id
+        user_period_snapshot = db.scalar(
+            select(UserKnowledgeSnapshot).where(
+                UserKnowledgeSnapshot.user_id == grade.json()["student_id"],
+                UserKnowledgeSnapshot.class_id == class_id,
+                UserKnowledgeSnapshot.course_id == course_id,
+                UserKnowledgeSnapshot.granularity == "day",
+                UserKnowledgeSnapshot.period_start == run.period_start,
+                UserKnowledgeSnapshot.period_end == run.period_end,
+            )
+        )
+        assert user_period_snapshot is not None
+        assert user_period_snapshot.total_points == 18
+        class_period_snapshot = db.scalar(
+            select(ClassKnowledgeSnapshot).where(
+                ClassKnowledgeSnapshot.class_id == class_id,
+                ClassKnowledgeSnapshot.course_id == course_id,
+                ClassKnowledgeSnapshot.granularity == "day",
+                ClassKnowledgeSnapshot.period_start == run.period_start,
+                ClassKnowledgeSnapshot.period_end == run.period_end,
+            )
+        )
+        assert class_period_snapshot is not None
+        assert class_period_snapshot.total_points == 18
+
+        rerun = knowledge_snapshot_runs.rebuild_periodic_knowledge_snapshots(
+            db,
+            granularity="day",
+            reference_date=run_reference_date,
+            trigger_source="pytest",
+        )
+        assert rerun.id == run_id
+        assert rerun.status == "success"
+        assert db.scalar(select(KnowledgeSnapshotRun).where(KnowledgeSnapshotRun.id == run_id)) is not None
+
+        def fail_class_knowledge(*args, **kwargs):
+            raise RuntimeError("forced snapshot failure")
+
+        monkeypatch.setattr(knowledge_snapshot_runs.knowledge_endpoint, "_build_class_knowledge", fail_class_knowledge)
+        with pytest.raises(RuntimeError):
+            knowledge_snapshot_runs.rebuild_periodic_knowledge_snapshots(
+                db,
+                granularity="week",
+                reference_date=run_reference_date,
+                trigger_source="pytest",
+            )
+        failed_run = db.scalar(
+            select(KnowledgeSnapshotRun).where(
+                KnowledgeSnapshotRun.granularity == "week",
+                KnowledgeSnapshotRun.trigger_source == "pytest",
+            )
+        )
+        assert failed_run is not None
+        assert failed_run.status == "failed"
+        assert failed_run.error_message == "RuntimeError"
 
     student_class_knowledge = client.get(
         f"/api/classes/{class_id}/knowledge",

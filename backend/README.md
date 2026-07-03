@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、密码策略、登录失败锁定、学校、班级、课程、作业、提交批改、积分流水、知识状态/班级规则统计、个人/班级知识快照、管理端基础 API、学校/班级深度统计、管理端列表分页搜索、待批改队列、审计元数据和认证事件审计等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、密码策略、登录失败锁定、学校、班级、课程、作业、提交批改、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录、管理端基础 API、学校/班级深度统计、管理端列表分页搜索、待批改队列、审计元数据和认证事件审计等能力。
 
 ## 本地启动
 
@@ -120,7 +120,17 @@ $env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
 python -m alembic upgrade head
 ```
 
-当前 Alembic head：`20260703_0010`（个人知识快照）。
+当前 Alembic head：`20260703_0011`（知识快照运行记录）。
+
+知识快照周期重算：
+
+```bash
+cd backend
+python -m scripts.rebuild_knowledge_snapshots --granularity day
+python -m scripts.rebuild_knowledge_snapshots --granularity week --date 2026-07-03
+```
+
+脚本按日或自然周对齐窗口，重算活跃班级已挂接课程的个人/班级快照，并写入 `knowledge_snapshot_runs` 运行记录；失败时输出 JSON 并返回非零退出码。
 
 部署预检：
 

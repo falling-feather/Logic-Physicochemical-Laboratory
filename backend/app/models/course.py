@@ -187,3 +187,22 @@ class UserKnowledgeSnapshot(TimestampMixin, Base):
     total_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     knowledge_stats_json: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class KnowledgeSnapshotRun(TimestampMixin, Base):
+    __tablename__ = "knowledge_snapshot_runs"
+    __table_args__ = (UniqueConstraint("run_key", name="uq_knowledge_snapshot_runs_run_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    run_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    granularity: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    trigger_source: Mapped[str] = mapped_column(String(32), default="script", nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="running", index=True, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    user_snapshot_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    class_snapshot_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
