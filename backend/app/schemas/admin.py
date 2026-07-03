@@ -63,6 +63,23 @@ class AdminStats(BaseModel):
     total_point_ledger_entries: int
     total_bug_records: int
     open_bug_records: int
+    total_audit_logs: int
+
+
+class AuditLogRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    actor_user_id: int | None = None
+    actor_role: str | None = None
+    action: str
+    resource: str
+    resource_type: str
+    resource_id: str | None = None
+    school_id: int | None = None
+    class_id: int | None = None
+    snapshot_json: dict
+    created_at: datetime
 
 
 class BugRecordCreate(BaseModel):

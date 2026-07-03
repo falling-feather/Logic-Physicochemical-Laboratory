@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -9,6 +10,7 @@ from app.core.config import get_settings
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.models import (
+    AuditLog,
     Assignment,
     BugRecord,
     ClassGroup,
@@ -26,11 +28,13 @@ from app.schemas.admin import (
     AdminStats,
     AdminUserRead,
     AdminUserUpdate,
+    AuditLogRead,
     BugRecordCreate,
     BugRecordRead,
     BugRecordUpdate,
 )
 from app.schemas.school import ClassRead, SchoolRead
+from app.services.audit import record_audit_log
 from app.services.content_catalog import ensure_seed_pages
 
 
@@ -62,6 +66,15 @@ def bootstrap_admin(payload: AdminBootstrapRequest, db: Session = Depends(get_db
         password_hash=hash_password(payload.password),
     )
     db.add(user)
+    db.flush()
+    record_audit_log(
+        db,
+        actor=user,
+        action="admin.bootstrap",
+        resource_type="user",
+        resource_id=user.id,
+        snapshot={"after": {"username": user.username, "role": user.role, "status": user.status}},
+    )
     db.commit()
     db.refresh(user)
     return user
@@ -95,6 +108,7 @@ def update_user(
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
+    before = _user_snapshot(user)
     next_role = payload.role or user.role
     next_status = payload.status or user.status
     if user.role == "admin" and (next_role != "admin" or next_status != "active"):
@@ -108,6 +122,15 @@ def update_user(
     if payload.status is not None:
         user.status = payload.status
 
+    after = _user_snapshot(user)
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.user.update",
+        resource_type="user",
+        resource_id=user.id,
+        snapshot=_change_snapshot(before, after),
+    )
     db.commit()
     db.refresh(user)
     return user
@@ -184,7 +207,46 @@ def read_admin_stats(
         total_point_ledger_entries=_count(db, PointLedger),
         total_bug_records=_count(db, BugRecord),
         open_bug_records=_count(db, BugRecord, BugRecord.status != "closed"),
+        total_audit_logs=_count(db, AuditLog),
     )
+
+
+@router.get("/audit-logs", response_model=list[AuditLogRead])
+def list_audit_logs(
+    actor_user_id: int | None = Query(default=None),
+    action: str | None = Query(default=None),
+    resource_type: str | None = Query(default=None),
+    resource_id: str | None = Query(default=None),
+    school_id: int | None = Query(default=None),
+    class_id: int | None = Query(default=None),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[AuditLog]:
+    _require_admin(current_user)
+    if from_at is not None and to_at is not None and from_at > to_at:
+        raise HTTPException(status_code=422, detail="from must be earlier than to")
+    statement = select(AuditLog).order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+    if actor_user_id is not None:
+        statement = statement.where(AuditLog.actor_user_id == actor_user_id)
+    if action is not None:
+        statement = statement.where(AuditLog.action == action.strip())
+    if resource_type is not None:
+        statement = statement.where(AuditLog.resource_type == resource_type.strip())
+    if resource_id is not None:
+        statement = statement.where(AuditLog.resource_id == resource_id.strip())
+    if school_id is not None:
+        statement = statement.where(AuditLog.school_id == school_id)
+    if class_id is not None:
+        statement = statement.where(AuditLog.class_id == class_id)
+    if from_at is not None:
+        statement = statement.where(AuditLog.created_at >= from_at)
+    if to_at is not None:
+        statement = statement.where(AuditLog.created_at <= to_at)
+    return list(db.scalars(statement.offset(offset).limit(limit)).all())
 
 
 @router.get("/bugs", response_model=list[BugRecordRead])
@@ -217,6 +279,15 @@ def create_bug_record(
         notes=_strip_optional(payload.notes),
     )
     db.add(bug)
+    db.flush()
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.bug.create",
+        resource_type="bug_record",
+        resource_id=bug.id,
+        snapshot={"after": _bug_snapshot(bug)},
+    )
     db.commit()
     db.refresh(bug)
     return bug
@@ -234,6 +305,7 @@ def update_bug_record(
     if bug is None:
         raise HTTPException(status_code=404, detail="Bug record not found")
 
+    before = _bug_snapshot(bug)
     for field in ("title", "category", "source", "evidence", "notes"):
         value = getattr(payload, field)
         if value is not None:
@@ -243,6 +315,15 @@ def update_bug_record(
     if payload.status is not None:
         bug.status = payload.status
 
+    after = _bug_snapshot(bug)
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.bug.update",
+        resource_type="bug_record",
+        resource_id=bug.id,
+        snapshot=_change_snapshot(before, after),
+    )
     db.commit()
     db.refresh(bug)
     return bug
@@ -272,3 +353,33 @@ def _strip_optional(value: str | None) -> str | None:
 
 def _strip_required(value: str) -> str:
     return value.strip()
+
+
+def _user_snapshot(user: User) -> dict[str, str]:
+    return {
+        "username": user.username,
+        "display_name": user.display_name,
+        "role": user.role,
+        "status": user.status,
+    }
+
+
+def _bug_snapshot(bug: BugRecord) -> dict[str, str | None]:
+    return {
+        "title": bug.title,
+        "category": bug.category,
+        "severity": bug.severity,
+        "status": bug.status,
+        "source": bug.source,
+        "evidence": bug.evidence,
+        "notes": bug.notes,
+    }
+
+
+def _change_snapshot(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
+    changes = {
+        key: {"from": before.get(key), "to": after.get(key)}
+        for key in sorted(set(before) | set(after))
+        if before.get(key) != after.get(key)
+    }
+    return {"before": before, "after": after, "changes": changes}

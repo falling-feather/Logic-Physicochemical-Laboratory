@@ -150,6 +150,24 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert stats.json()["total_learning_events"] == 0
     assert stats.json()["total_bug_records"] == 1
     assert stats.json()["open_bug_records"] == 0
+    assert stats.json()["total_audit_logs"] == 4
+
+    audit_forbidden = client.get("/api/admin/audit-logs", headers=_auth_header(student_token))
+    assert audit_forbidden.status_code == 403
+
+    audit_logs = client.get("/api/admin/audit-logs?limit=10", headers=_auth_header(admin_token))
+    assert audit_logs.status_code == 200
+    actions = {item["action"] for item in audit_logs.json()}
+    assert actions == {"admin.bootstrap", "admin.user.update", "admin.bug.create", "admin.bug.update"}
+
+    update_audit = client.get(
+        f"/api/admin/audit-logs?action=admin.user.update&resource_id={teacher['id']}",
+        headers=_auth_header(admin_token),
+    )
+    assert update_audit.status_code == 200
+    assert len(update_audit.json()) == 1
+    update_snapshot = update_audit.json()[0]["snapshot_json"]
+    assert update_snapshot["changes"]["status"] == {"from": "active", "to": "disabled"}
 
     student_forbidden = client.get("/api/admin/stats", headers=_auth_header(student_token))
     assert student_forbidden.status_code == 403

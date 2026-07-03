@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、学校、班级、课程、作业、提交批改、积分流水、知识状态/班级规则统计和管理端基础 API 等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、学校、班级、课程、作业、提交批改、积分流水、知识状态/班级规则统计、管理端基础 API 和审计日志等能力。
 
 ## 本地启动
 
@@ -35,6 +35,7 @@ curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 | GET | `/api/admin/classes` | 管理端班级基础查看，可按学校过滤 |
 | GET | `/api/admin/content/pages` | 管理端内容页状态查看 |
 | GET | `/api/admin/stats` | 管理端全站统计摘要 |
+| GET | `/api/admin/audit-logs` | 管理端审计日志查询，可按 actor/action/resource/时间窗过滤 |
 | GET/POST/PATCH | `/api/admin/bugs` | 缺陷/风险清单基础维护 |
 | GET/POST | `/api/schools` | 当前用户可见学校 / 创建学校 |
 | GET | `/api/schools/{id}/classes` | 学校内班级 |

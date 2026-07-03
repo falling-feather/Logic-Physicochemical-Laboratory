@@ -19,6 +19,7 @@ from app.models import (
 )
 from app.models.base import utc_now
 from app.schemas.course import SubmissionCreate, SubmissionGrade, SubmissionRead
+from app.services.audit import record_audit_log
 
 
 router = APIRouter()
@@ -129,6 +130,12 @@ def grade_submission(
     if payload.score > assignment.max_score:
         raise HTTPException(status_code=422, detail="Score cannot exceed assignment max_score")
 
+    previous_snapshot = {
+        "status": submission.status,
+        "score": submission.score,
+        "feedback": submission.feedback,
+        "graded_by_user_id": submission.graded_by_user_id,
+    }
     previous_score = submission.score or 0
     submission.score = payload.score
     submission.feedback = (payload.feedback or "").strip() or None
@@ -151,6 +158,25 @@ def grade_submission(
                 created_by_user_id=current_user.id,
             )
         )
+    next_snapshot = {
+        "status": submission.status,
+        "score": submission.score,
+        "feedback": submission.feedback,
+        "graded_by_user_id": submission.graded_by_user_id,
+        "assignment_id": assignment.id,
+        "student_id": submission.student_id,
+        "score_delta": delta,
+    }
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="submission.grade",
+        resource_type="submission",
+        resource_id=submission.id,
+        school_id=course.school_id,
+        class_id=submission.class_id,
+        snapshot={"before": previous_snapshot, "after": next_snapshot},
+    )
     db.commit()
     db.refresh(submission)
     return submission

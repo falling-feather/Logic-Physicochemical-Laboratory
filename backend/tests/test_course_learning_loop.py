@@ -21,6 +21,24 @@ def _register_and_login(client, username: str, role: str) -> str:
     return login.json()["access_token"]
 
 
+def _bootstrap_admin(client, username: str) -> str:
+    response = client.post(
+        "/api/admin/bootstrap",
+        json={
+            "username": username,
+            "password": "secret123",
+            "display_name": username.replace("_", " ").title(),
+        },
+    )
+    assert response.status_code == 201
+    login = client.post(
+        "/api/auth/login",
+        json={"username": username, "password": "secret123"},
+    )
+    assert login.status_code == 200
+    return login.json()["access_token"]
+
+
 def test_teacher_course_assignment_and_student_learning_event_loop(client):
     teacher_token = _register_and_login(client, "teacher_course", "teacher")
     student_token = _register_and_login(client, "student_course", "student")
@@ -195,6 +213,18 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client):
     assert grade.status_code == 200
     assert grade.json()["status"] == "graded"
     assert grade.json()["score"] == 18
+
+    admin_token = _bootstrap_admin(client, "admin_course_audit")
+    grade_audit = client.get(
+        f"/api/admin/audit-logs?action=submission.grade&resource_id={submission_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert grade_audit.status_code == 200
+    assert len(grade_audit.json()) == 1
+    grade_snapshot = grade_audit.json()[0]["snapshot_json"]
+    assert grade_snapshot["before"]["score"] is None
+    assert grade_snapshot["after"]["score"] == 18
+    assert grade_snapshot["after"]["score_delta"] == 18
 
     student_points = client.get("/api/points/ledger", headers=_auth_header(student_token))
     assert student_points.status_code == 200
