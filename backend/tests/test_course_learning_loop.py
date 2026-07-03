@@ -205,6 +205,54 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client):
     )
     assert outsider_submission_list.status_code == 403
 
+    admin_token = _bootstrap_admin(client, "admin_course_audit")
+    pending_forbidden = client.get("/api/admin/submissions/pending", headers=_auth_header(student_token))
+    assert pending_forbidden.status_code == 403
+
+    pending = client.get(
+        (
+            "/api/admin/submissions/pending"
+            f"?school_id={school_id}&class_id={class_id}&course_id={course_id}&assignment_id={assignment_id}"
+        ),
+        headers=_auth_header(admin_token),
+    )
+    assert pending.status_code == 200
+    pending_body = pending.json()
+    assert pending_body["total"] == 1
+    assert pending_body["next_offset"] is None
+    assert pending_body["items"][0]["id"] == submission_id
+    assert pending_body["items"][0]["assignment_title"] == "Observe dissipation"
+    assert pending_body["items"][0]["status"] == "submitted"
+
+    school_stats_before_grade = client.get(
+        f"/api/admin/schools/{school_id}/stats",
+        headers=_auth_header(admin_token),
+    )
+    assert school_stats_before_grade.status_code == 200
+    school_stats_before = school_stats_before_grade.json()
+    assert school_stats_before["active_students"] == 1
+    assert school_stats_before["active_teachers"] == 1
+    assert school_stats_before["active_assignments"] == 1
+    assert school_stats_before["pending_submissions"] == 1
+    assert school_stats_before["graded_submissions"] == 0
+    assert school_stats_before["total_points"] == 0
+
+    class_stats_before_grade = client.get(
+        f"/api/admin/classes/{class_id}/stats",
+        headers=_auth_header(admin_token),
+    )
+    assert class_stats_before_grade.status_code == 200
+    class_stats_before = class_stats_before_grade.json()
+    assert class_stats_before["active_students"] == 1
+    assert class_stats_before["active_teachers"] == 1
+    assert class_stats_before["active_courses"] == 1
+    assert class_stats_before["expected_submissions"] == 1
+    assert class_stats_before["total_learning_events"] == 2
+    assert class_stats_before["complete_learning_events"] == 1
+    assert class_stats_before["pending_submissions"] == 1
+    assert class_stats_before["pending_submission_ratio"] == 1
+    assert class_stats_before["average_score_percent"] == 0
+
     grade = client.patch(
         f"/api/submissions/{submission_id}/grade",
         headers=_auth_header(teacher_token),
@@ -214,7 +262,46 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client):
     assert grade.json()["status"] == "graded"
     assert grade.json()["score"] == 18
 
-    admin_token = _bootstrap_admin(client, "admin_course_audit")
+    pending_after_grade = client.get(
+        f"/api/admin/submissions/pending?class_id={class_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert pending_after_grade.status_code == 200
+    assert pending_after_grade.json()["total"] == 0
+    assert pending_after_grade.json()["items"] == []
+
+    graded_queue = client.get(
+        f"/api/admin/submissions/pending?class_id={class_id}&status=graded",
+        headers=_auth_header(admin_token),
+    )
+    assert graded_queue.status_code == 200
+    assert graded_queue.json()["total"] == 1
+    assert graded_queue.json()["items"][0]["status"] == "graded"
+
+    school_stats_after_grade = client.get(
+        f"/api/admin/schools/{school_id}/stats",
+        headers=_auth_header(admin_token),
+    )
+    assert school_stats_after_grade.status_code == 200
+    school_stats_after = school_stats_after_grade.json()
+    assert school_stats_after["total_submissions"] == 1
+    assert school_stats_after["pending_submissions"] == 0
+    assert school_stats_after["graded_submissions"] == 1
+    assert school_stats_after["total_points"] == 18
+
+    class_stats_after_grade = client.get(
+        f"/api/admin/classes/{class_id}/stats",
+        headers=_auth_header(admin_token),
+    )
+    assert class_stats_after_grade.status_code == 200
+    class_stats_after = class_stats_after_grade.json()
+    assert class_stats_after["pending_submissions"] == 0
+    assert class_stats_after["pending_submission_ratio"] == 0
+    assert class_stats_after["graded_submissions"] == 1
+    assert class_stats_after["total_points"] == 18
+    assert class_stats_after["average_points_per_student"] == 18
+    assert class_stats_after["average_score_percent"] == 90
+
     grade_audit = client.get(
         f"/api/admin/audit-logs?action=submission.grade&resource_id={submission_id}",
         headers=_auth_header(admin_token),

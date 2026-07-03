@@ -66,6 +66,79 @@ class AdminStats(BaseModel):
     total_audit_logs: int
 
 
+class AdminSchoolStats(BaseModel):
+    school_id: int
+    school_name: str
+    region: str | None = None
+    status: str
+    total_classes: int
+    active_classes: int
+    active_students: int
+    active_teachers: int
+    total_courses: int
+    active_courses: int
+    total_assignments: int
+    active_assignments: int
+    total_learning_events: int
+    complete_learning_events: int
+    total_submissions: int
+    graded_submissions: int
+    returned_submissions: int
+    pending_submissions: int
+    total_points: int
+
+
+class AdminClassStats(BaseModel):
+    class_id: int
+    class_name: str
+    school_id: int
+    grade: str | None = None
+    term: str | None = None
+    status: str
+    active_students: int
+    active_teachers: int
+    active_courses: int
+    active_assignments: int
+    expected_submissions: int
+    total_learning_events: int
+    complete_learning_events: int
+    total_submissions: int
+    graded_submissions: int
+    returned_submissions: int
+    pending_submissions: int
+    pending_submission_ratio: float
+    total_points: int
+    average_points_per_student: float
+    average_score_percent: float
+
+
+class AdminPendingSubmissionRead(BaseModel):
+    id: int
+    assignment_id: int
+    assignment_title: str
+    student_id: int
+    student_username: str
+    student_display_name: str
+    class_id: int | None = None
+    class_name: str | None = None
+    school_id: int
+    course_id: int
+    course_title: str
+    status: str
+    score: int | None = None
+    submitted_at: datetime
+    graded_at: datetime | None = None
+    due_at: datetime | None = None
+
+
+class AdminPendingSubmissionQueue(BaseModel):
+    items: list[AdminPendingSubmissionRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
 class AuditLogRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

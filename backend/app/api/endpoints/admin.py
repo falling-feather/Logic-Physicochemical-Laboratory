@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
@@ -14,17 +14,25 @@ from app.models import (
     Assignment,
     BugRecord,
     ClassGroup,
+    ClassMembership,
     ContentPageRecord,
     Course,
+    CourseClass,
+    CourseUnit,
     LearningEvent,
     PointLedger,
     School,
+    SchoolMembership,
     Submission,
     User,
 )
 from app.schemas.admin import (
     AdminBootstrapRequest,
+    AdminClassStats,
     AdminContentPageRead,
+    AdminPendingSubmissionQueue,
+    AdminPendingSubmissionRead,
+    AdminSchoolStats,
     AdminStats,
     AdminUserRead,
     AdminUserUpdate,
@@ -39,6 +47,7 @@ from app.services.content_catalog import ensure_seed_pages
 
 
 router = APIRouter()
+PENDING_SUBMISSION_STATUSES = ["submitted", "returned"]
 
 
 @router.post("/bootstrap", response_model=AdminUserRead, status_code=status.HTTP_201_CREATED)
@@ -145,6 +154,54 @@ def list_admin_schools(
     return list(db.scalars(select(School).order_by(School.id)).all())
 
 
+@router.get("/schools/{school_id}/stats", response_model=AdminSchoolStats)
+def read_admin_school_stats(
+    school_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminSchoolStats:
+    _require_admin(current_user)
+    school = _get_school(db, school_id)
+    return AdminSchoolStats(
+        school_id=school.id,
+        school_name=school.name,
+        region=school.region,
+        status=school.status,
+        total_classes=_count(db, ClassGroup, ClassGroup.school_id == school.id),
+        active_classes=_count(db, ClassGroup, ClassGroup.school_id == school.id, ClassGroup.status == "active"),
+        active_students=_distinct_count(
+            db,
+            SchoolMembership.user_id,
+            SchoolMembership.school_id == school.id,
+            SchoolMembership.role == "student",
+            SchoolMembership.status == "active",
+        ),
+        active_teachers=_distinct_count(
+            db,
+            SchoolMembership.user_id,
+            SchoolMembership.school_id == school.id,
+            SchoolMembership.role.in_(["admin", "teacher"]),
+            SchoolMembership.status == "active",
+        ),
+        total_courses=_count(db, Course, Course.school_id == school.id),
+        active_courses=_count(db, Course, Course.school_id == school.id, Course.status != "archived"),
+        total_assignments=_school_assignment_count(db, school.id),
+        active_assignments=_school_assignment_count(db, school.id, active_only=True),
+        total_learning_events=_count(db, LearningEvent, LearningEvent.school_id == school.id),
+        complete_learning_events=_count(
+            db,
+            LearningEvent,
+            LearningEvent.school_id == school.id,
+            LearningEvent.event_type == "complete",
+        ),
+        total_submissions=_school_submission_count(db, school.id),
+        graded_submissions=_school_submission_count(db, school.id, statuses=["graded"]),
+        returned_submissions=_school_submission_count(db, school.id, statuses=["returned"]),
+        pending_submissions=_school_submission_count(db, school.id, statuses=PENDING_SUBMISSION_STATUSES),
+        total_points=_sum_int(db, PointLedger.delta, PointLedger.school_id == school.id),
+    )
+
+
 @router.get("/classes", response_model=list[ClassRead])
 def list_admin_classes(
     school_id: int | None = Query(default=None),
@@ -156,6 +213,76 @@ def list_admin_classes(
     if school_id is not None:
         statement = statement.where(ClassGroup.school_id == school_id)
     return list(db.scalars(statement).all())
+
+
+@router.get("/classes/{class_id}/stats", response_model=AdminClassStats)
+def read_admin_class_stats(
+    class_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminClassStats:
+    _require_admin(current_user)
+    class_group = _get_class(db, class_id)
+    active_students = _distinct_count(
+        db,
+        ClassMembership.user_id,
+        ClassMembership.class_id == class_group.id,
+        ClassMembership.role == "student",
+        ClassMembership.status == "active",
+    )
+    active_assignments = _class_assignment_count(db, class_group.id, active_only=True)
+    expected_submissions = active_students * active_assignments
+    pending_submissions = _count(
+        db,
+        Submission,
+        Submission.class_id == class_group.id,
+        Submission.status.in_(PENDING_SUBMISSION_STATUSES),
+    )
+    total_points = _sum_int(db, PointLedger.delta, PointLedger.class_id == class_group.id)
+    return AdminClassStats(
+        class_id=class_group.id,
+        class_name=class_group.name,
+        school_id=class_group.school_id,
+        grade=class_group.grade,
+        term=class_group.term,
+        status=class_group.status,
+        active_students=active_students,
+        active_teachers=_distinct_count(
+            db,
+            ClassMembership.user_id,
+            ClassMembership.class_id == class_group.id,
+            ClassMembership.role.in_(["admin", "teacher"]),
+            ClassMembership.status == "active",
+        ),
+        active_courses=_class_course_count(db, class_group.id),
+        active_assignments=active_assignments,
+        expected_submissions=expected_submissions,
+        total_learning_events=_count(db, LearningEvent, LearningEvent.class_id == class_group.id),
+        complete_learning_events=_count(
+            db,
+            LearningEvent,
+            LearningEvent.class_id == class_group.id,
+            LearningEvent.event_type == "complete",
+        ),
+        total_submissions=_count(db, Submission, Submission.class_id == class_group.id),
+        graded_submissions=_count(
+            db,
+            Submission,
+            Submission.class_id == class_group.id,
+            Submission.status == "graded",
+        ),
+        returned_submissions=_count(
+            db,
+            Submission,
+            Submission.class_id == class_group.id,
+            Submission.status == "returned",
+        ),
+        pending_submissions=pending_submissions,
+        pending_submission_ratio=_divide(pending_submissions, expected_submissions),
+        total_points=total_points,
+        average_points_per_student=_divide(total_points, active_students),
+        average_score_percent=_class_average_score_percent(db, class_group.id),
+    )
 
 
 @router.get("/content/pages", response_model=list[AdminContentPageRead])
@@ -249,6 +376,82 @@ def list_audit_logs(
     return list(db.scalars(statement.offset(offset).limit(limit)).all())
 
 
+@router.get("/submissions/pending", response_model=AdminPendingSubmissionQueue)
+def list_pending_submissions(
+    school_id: int | None = Query(default=None),
+    class_id: int | None = Query(default=None),
+    course_id: int | None = Query(default=None),
+    assignment_id: int | None = Query(default=None),
+    student_id: int | None = Query(default=None),
+    status_filter: Literal["submitted", "returned", "graded"] | None = Query(default=None, alias="status"),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    order_by: Literal["submitted_at", "graded_at", "due_at"] = Query(default="submitted_at"),
+    order: Literal["asc", "desc"] = Query(default="asc"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminPendingSubmissionQueue:
+    _require_admin(current_user)
+    if from_at is not None and to_at is not None and from_at > to_at:
+        raise HTTPException(status_code=422, detail="from must be earlier than to")
+    _validate_pending_submission_filters(db, school_id, class_id, course_id, assignment_id)
+
+    criteria = _pending_submission_criteria(
+        school_id=school_id,
+        class_id=class_id,
+        course_id=course_id,
+        assignment_id=assignment_id,
+        student_id=student_id,
+        status_filter=status_filter,
+        from_at=from_at,
+        to_at=to_at,
+    )
+    total = _pending_submission_total(db, criteria)
+    order_column = {
+        "submitted_at": Submission.submitted_at,
+        "graded_at": Submission.graded_at,
+        "due_at": Assignment.due_at,
+    }[order_by]
+    order_clause = order_column.desc() if order == "desc" else order_column.asc()
+    rows = db.execute(
+        select(Submission, Assignment, Course, ClassGroup, User)
+        .join(Assignment, Assignment.id == Submission.assignment_id)
+        .join(CourseUnit, CourseUnit.id == Assignment.unit_id)
+        .join(Course, Course.id == CourseUnit.course_id)
+        .outerjoin(ClassGroup, ClassGroup.id == Submission.class_id)
+        .join(User, User.id == Submission.student_id)
+        .where(*criteria)
+        .order_by(order_clause, Submission.id.asc())
+        .offset(offset)
+        .limit(limit)
+    ).all()
+    items = [
+        AdminPendingSubmissionRead(
+            id=submission.id,
+            assignment_id=assignment.id,
+            assignment_title=assignment.title,
+            student_id=student.id,
+            student_username=student.username,
+            student_display_name=student.display_name,
+            class_id=submission.class_id,
+            class_name=class_group.name if class_group is not None else None,
+            school_id=course.school_id,
+            course_id=course.id,
+            course_title=course.title,
+            status=submission.status,
+            score=submission.score,
+            submitted_at=submission.submitted_at,
+            graded_at=submission.graded_at,
+            due_at=assignment.due_at,
+        )
+        for submission, assignment, course, class_group, student in rows
+    ]
+    next_offset = offset + len(items) if offset + len(items) < total else None
+    return AdminPendingSubmissionQueue(items=items, total=total, limit=limit, offset=offset, next_offset=next_offset)
+
+
 @router.get("/bugs", response_model=list[BugRecordRead])
 def list_bug_records(
     status_filter: str | None = Query(default=None, alias="status"),
@@ -327,6 +530,206 @@ def update_bug_record(
     db.commit()
     db.refresh(bug)
     return bug
+
+
+def _get_school(db: Session, school_id: int) -> School:
+    school = db.get(School, school_id)
+    if school is None:
+        raise HTTPException(status_code=404, detail="School not found")
+    return school
+
+
+def _get_class(db: Session, class_id: int) -> ClassGroup:
+    class_group = db.get(ClassGroup, class_id)
+    if class_group is None:
+        raise HTTPException(status_code=404, detail="Class not found")
+    return class_group
+
+
+def _distinct_count(db: Session, column: Any, *criteria: Any) -> int:
+    statement = select(func.count(func.distinct(column)))
+    for criterion in criteria:
+        statement = statement.where(criterion)
+    return int(db.scalar(statement) or 0)
+
+
+def _sum_int(db: Session, column: Any, *criteria: Any) -> int:
+    statement = select(func.coalesce(func.sum(column), 0))
+    for criterion in criteria:
+        statement = statement.where(criterion)
+    return int(db.scalar(statement) or 0)
+
+
+def _school_assignment_count(db: Session, school_id: int, active_only: bool = False) -> int:
+    statement = (
+        select(func.count(func.distinct(Assignment.id)))
+        .select_from(Assignment)
+        .join(CourseUnit, CourseUnit.id == Assignment.unit_id)
+        .join(Course, Course.id == CourseUnit.course_id)
+        .where(Course.school_id == school_id)
+    )
+    if active_only:
+        statement = statement.where(Assignment.status == "active", Course.status != "archived")
+    return int(db.scalar(statement) or 0)
+
+
+def _class_course_count(db: Session, class_id: int) -> int:
+    return int(
+        db.scalar(
+            select(func.count(func.distinct(Course.id)))
+            .select_from(Course)
+            .join(CourseClass, CourseClass.course_id == Course.id)
+            .where(
+                CourseClass.class_id == class_id,
+                CourseClass.status == "active",
+                Course.status != "archived",
+            )
+        )
+        or 0
+    )
+
+
+def _class_assignment_count(db: Session, class_id: int, active_only: bool = False) -> int:
+    statement = (
+        select(func.count(func.distinct(Assignment.id)))
+        .select_from(Assignment)
+        .join(CourseUnit, CourseUnit.id == Assignment.unit_id)
+        .join(Course, Course.id == CourseUnit.course_id)
+        .join(CourseClass, CourseClass.course_id == Course.id)
+        .where(CourseClass.class_id == class_id, CourseClass.status == "active")
+    )
+    if active_only:
+        statement = statement.where(Assignment.status == "active", Course.status != "archived")
+    return int(db.scalar(statement) or 0)
+
+
+def _school_submission_count(db: Session, school_id: int, statuses: list[str] | None = None) -> int:
+    statement = (
+        select(func.count(func.distinct(Submission.id)))
+        .select_from(Submission)
+        .join(Assignment, Assignment.id == Submission.assignment_id)
+        .join(CourseUnit, CourseUnit.id == Assignment.unit_id)
+        .join(Course, Course.id == CourseUnit.course_id)
+        .where(Course.school_id == school_id)
+    )
+    if statuses is not None:
+        statement = statement.where(Submission.status.in_(statuses))
+    return int(db.scalar(statement) or 0)
+
+
+def _class_average_score_percent(db: Session, class_id: int) -> float:
+    score_total, max_score_total = db.execute(
+        select(
+            func.coalesce(func.sum(Submission.score), 0),
+            func.coalesce(func.sum(Assignment.max_score), 0),
+        )
+        .select_from(Submission)
+        .join(Assignment, Assignment.id == Submission.assignment_id)
+        .where(Submission.class_id == class_id, Submission.status == "graded")
+    ).one()
+    return _percent(float(score_total or 0), float(max_score_total or 0))
+
+
+def _pending_submission_criteria(
+    *,
+    school_id: int | None,
+    class_id: int | None,
+    course_id: int | None,
+    assignment_id: int | None,
+    student_id: int | None,
+    status_filter: str | None,
+    from_at: datetime | None,
+    to_at: datetime | None,
+) -> list[Any]:
+    criteria: list[Any] = []
+    if status_filter is None:
+        criteria.append(Submission.status.in_(PENDING_SUBMISSION_STATUSES))
+    else:
+        criteria.append(Submission.status == status_filter)
+    if school_id is not None:
+        criteria.append(Course.school_id == school_id)
+    if class_id is not None:
+        criteria.append(Submission.class_id == class_id)
+    if course_id is not None:
+        criteria.append(Course.id == course_id)
+    if assignment_id is not None:
+        criteria.append(Submission.assignment_id == assignment_id)
+    if student_id is not None:
+        criteria.append(Submission.student_id == student_id)
+    if from_at is not None:
+        criteria.append(Submission.submitted_at >= from_at)
+    if to_at is not None:
+        criteria.append(Submission.submitted_at <= to_at)
+    return criteria
+
+
+def _pending_submission_total(db: Session, criteria: list[Any]) -> int:
+    return int(
+        db.scalar(
+            select(func.count(Submission.id))
+            .select_from(Submission)
+            .join(Assignment, Assignment.id == Submission.assignment_id)
+            .join(CourseUnit, CourseUnit.id == Assignment.unit_id)
+            .join(Course, Course.id == CourseUnit.course_id)
+            .where(*criteria)
+        )
+        or 0
+    )
+
+
+def _validate_pending_submission_filters(
+    db: Session,
+    school_id: int | None,
+    class_id: int | None,
+    course_id: int | None,
+    assignment_id: int | None,
+) -> None:
+    if school_id is not None:
+        _get_school(db, school_id)
+    class_group = _get_class(db, class_id) if class_id is not None else None
+    course = db.get(Course, course_id) if course_id is not None else None
+    if course_id is not None and course is None:
+        raise HTTPException(status_code=404, detail="Course not found")
+    assignment_course_id = None
+    assignment_school_id = None
+    if assignment_id is not None:
+        assignment_course_id, assignment_school_id = _assignment_course_refs(db, assignment_id)
+
+    if class_group is not None and school_id is not None and class_group.school_id != school_id:
+        raise HTTPException(status_code=422, detail="Class does not belong to requested school")
+    if course is not None and school_id is not None and course.school_id != school_id:
+        raise HTTPException(status_code=422, detail="Course does not belong to requested school")
+    if course is not None and class_group is not None and course.school_id != class_group.school_id:
+        raise HTTPException(status_code=422, detail="Course does not belong to requested class school")
+    if assignment_school_id is not None and school_id is not None and assignment_school_id != school_id:
+        raise HTTPException(status_code=422, detail="Assignment does not belong to requested school")
+    if assignment_course_id is not None and course_id is not None and assignment_course_id != course_id:
+        raise HTTPException(status_code=422, detail="Assignment does not belong to requested course")
+    if assignment_school_id is not None and class_group is not None and assignment_school_id != class_group.school_id:
+        raise HTTPException(status_code=422, detail="Assignment does not belong to requested class school")
+
+
+def _assignment_course_refs(db: Session, assignment_id: int) -> tuple[int, int]:
+    row = db.execute(
+        select(Course.id.label("course_id"), Course.school_id.label("school_id"))
+        .select_from(Assignment)
+        .join(CourseUnit, CourseUnit.id == Assignment.unit_id)
+        .join(Course, Course.id == CourseUnit.course_id)
+        .where(Assignment.id == assignment_id)
+    ).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    return int(row.course_id), int(row.school_id)
+
+
+def _divide(numerator: int | float, denominator: int | float) -> float:
+    if not denominator:
+        return 0.0
+    return round(float(numerator) / float(denominator), 4)
+
+
+def _percent(numerator: int | float, denominator: int | float) -> float:
+    return round(_divide(numerator, denominator) * 100, 2)
 
 
 def _require_admin(user: User) -> None:
