@@ -241,8 +241,8 @@ const CORE_HTTP_FALLBACK_ASSETS = [
 
 const GALAXY_HTTP_FALLBACK_ASSETS = {
     astra: [
-        './pages/planets/planets.css?v=20260704qianduanV70',
-        './pages/planets/planets.js?v=20260704qianduanV70'
+        './pages/planets/planets.css?v=20260704qianduanV71',
+        './pages/planets/planets.js?v=20260704qianduanV71'
     ],
     englab: [
         './shared/css/cards.css?v=20260630mainV64',

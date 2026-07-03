@@ -45,7 +45,7 @@
     <link rel="stylesheet" href="shared/css/fab-trigger.css?v=20260630mainV64">
     <!-- CSS: Pages -->
     <link rel="stylesheet" href="pages/home/home.css?v=20260704qianduanV70">
-    <link rel="stylesheet" href="pages/planets/planets.css?v=20260704qianduanV70">
+    <link rel="stylesheet" href="pages/planets/planets.css?v=20260704qianduanV71">
     <link rel="stylesheet" href="pages/cosmos/cosmos.css?v=20260630mainV64">
     <link rel="stylesheet" href="pages/datascience/datascience.css?v=20260630mainV64">
     <link rel="stylesheet" href="pages/infotech/infotech.css?v=20260630mainV64">
@@ -420,15 +420,54 @@
                 </header>
 
                 <main class="planets-hero">
+                    <section class="planets-stage" aria-label="星序星系拨盘（拖动旋转选择星系）">
+                        <button class="planets-galaxy planets-galaxy--eng" type="button" data-galaxy="englab" aria-label="选择工科试验室星系">
+                            <span class="planets-galaxy-disc">
+                                <span class="planets-galaxy-core"></span>
+                                <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
+                            </span>
+                            <span class="planets-galaxy-no" aria-hidden="true">02</span>
+                            <span class="planets-galaxy-label">
+                                <strong>工科试验室</strong>
+                                <span>Engineering Lab</span>
+                            </span>
+                        </button>
+
+                        <button class="planets-galaxy planets-galaxy--code" type="button" data-galaxy="codespace" aria-label="选择代码空间星系">
+                            <span class="planets-galaxy-disc planets-galaxy-disc--code">
+                                <span class="planets-galaxy-core"></span>
+                                <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
+                            </span>
+                            <span class="planets-galaxy-no" aria-hidden="true">01</span>
+                            <span class="planets-galaxy-label">
+                                <strong>代码空间</strong>
+                                <span>Code Space</span>
+                            </span>
+                        </button>
+
+                        <button class="planets-galaxy planets-galaxy--roadmap" type="button" data-galaxy="frontier" aria-label="选择未来星系">
+                            <span class="planets-galaxy-disc planets-galaxy-disc--roadmap">
+                                <span class="planets-galaxy-core"></span>
+                                <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
+                            </span>
+                            <span class="planets-galaxy-no" aria-hidden="true">03</span>
+                            <span class="planets-galaxy-label">
+                                <strong>未来星系</strong>
+                                <span>Frontier</span>
+                            </span>
+                        </button>
+                    </section>
+
                     <section class="planets-intro" aria-labelledby="planets-main-title">
                         <span class="planets-intro__eyebrow">Galaxy Directory</span>
                         <h1 id="planets-main-title">星序</h1>
                         <p class="planets-intro__sub">A·S·T·R·A</p>
-                        <p class="planets-intro__copy">面向未来学习者的星系化学科探索平台。先选择一座知识星系，再沿二级目录进入实验、判读和可信回查。</p>
+                        <p class="planets-intro__copy">面向未来学习者的星系化学科探索平台。拨动右侧星盘，将星系对准准星即可展开二级目录。</p>
+                        <p class="planets-intro__hint">Drag to rotate · Scroll to shift</p>
                         <div class="planets-recommendation" aria-label="推荐学习主线">
                             <span>推荐路径</span>
                             <strong>从未来星系进入材料样板路线</strong>
-                            <p>星序总览 → 未来星系 → 材料微观 → 晶体/晶粒实验台 → 状态回查</p>
+                            <p>星序总览 → 未来星系 → 材料微观 → 实验台 → 状态回查</p>
                             <div class="planets-recommendation__actions">
                                 <a href="#frontier-frontier-route">学习主线</a>
                                 <a href="#frontier-materials-route">材料样板</a>
@@ -437,59 +476,13 @@
                         </div>
                     </section>
 
-                    <section class="planets-stage" aria-label="星序星系图">
-                        <div class="planets-beacon" aria-hidden="true">
-                            <span></span>
-                            <strong>ASTRA</strong>
-                        </div>
-
-                        <button class="planets-galaxy planets-galaxy--eng" type="button" data-galaxy="englab" aria-label="进入工科试验室星系二级菜单">
-                            <span class="planets-galaxy-disc">
-                                <span class="planets-galaxy-core"></span>
-                                <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
-                            </span>
-                            <span class="planets-galaxy-orbit planets-galaxy-orbit--two"></span>
-                            <span class="planets-galaxy-no" aria-hidden="true">01</span>
-                            <span class="planets-galaxy-label">
-                                <strong>工科试验室</strong>
-                                <span>Engineering Lab</span>
-                            </span>
-                        </button>
-
-                        <button class="planets-galaxy planets-galaxy--code" type="button" data-galaxy="codespace" aria-label="进入代码空间星系二级菜单">
-                            <span class="planets-galaxy-disc planets-galaxy-disc--code">
-                                <span class="planets-galaxy-core"></span>
-                                <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
-                            </span>
-                            <span class="planets-galaxy-orbit planets-galaxy-orbit--two"></span>
-                            <span class="planets-galaxy-no" aria-hidden="true">02</span>
-                            <span class="planets-galaxy-label">
-                                <strong>代码空间</strong>
-                                <span>Code Space</span>
-                            </span>
-                        </button>
-
-                        <button class="planets-galaxy planets-galaxy--roadmap" type="button" data-galaxy="frontier" aria-label="查看未来星系学习方向">
-                            <span class="planets-galaxy-disc planets-galaxy-disc--roadmap">
-                                <span class="planets-galaxy-core"></span>
-                                <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
-                            </span>
-                            <span class="planets-galaxy-orbit planets-galaxy-orbit--two"></span>
-                            <span class="planets-galaxy-no" aria-hidden="true">03</span>
-                            <span class="planets-galaxy-label">
-                                <strong>未来星系</strong>
-                                <span>Frontier</span>
-                            </span>
-                        </button>
-
-                        <aside class="planets-menu" id="planets-menu" aria-live="polite" aria-label="星系二级菜单">
-                            <button class="planets-menu__close" type="button" data-close-menu aria-label="关闭二级菜单">×</button>
-                            <span class="planets-menu__state" id="planets-menu-state">进入星系</span>
-                            <h2 id="planets-menu-title">工科试验室</h2>
-                            <p id="planets-menu-copy">选择学科后进入该星系自己的二级内容。</p>
-                            <nav class="planets-module-menu" id="planets-module-menu" aria-label="二级模块"></nav>
-                        </aside>
-                    </section>
+                    <aside class="planets-menu" id="planets-menu" aria-live="polite" aria-label="星系二级菜单">
+                        <button class="planets-menu__close" type="button" data-close-menu aria-label="关闭二级菜单">×</button>
+                        <span class="planets-menu__state" id="planets-menu-state">进入星系</span>
+                        <h2 id="planets-menu-title">工科试验室</h2>
+                        <p id="planets-menu-copy">选择学科后进入该星系自己的二级内容。</p>
+                        <nav class="planets-module-menu" id="planets-module-menu" aria-label="二级模块"></nav>
+                    </aside>
                 </main>
             </div>
         </section>

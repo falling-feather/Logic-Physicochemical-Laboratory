@@ -1,4 +1,4 @@
-const CACHE_NAME = 'astra-static-v20260704qianduanV70';
+const CACHE_NAME = 'astra-static-v20260704qianduanV71';
 const APP_SHELL = [
   './',
   './index.html',
@@ -14,8 +14,8 @@ const APP_SHELL = [
   './shared/css/page-layout.css?v=20260606v62e',
   './shared/css/backend-content.css?v=20260703v65BackendSchemaP4',
   './shared/css/responsive.css?v=20260704qianduanV70',
-  './pages/planets/planets.css?v=20260704qianduanV70',
-  './pages/planets/planets.js?v=20260704qianduanV70',
+  './pages/planets/planets.css?v=20260704qianduanV71',
+  './pages/planets/planets.js?v=20260704qianduanV71',
   './UI/future-galaxy/future-galaxy-hero-sky.png',
   './UI/future-galaxy/future-galaxy-hero-nebula.png',
 ];
