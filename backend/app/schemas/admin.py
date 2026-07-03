@@ -83,12 +83,46 @@ class AdminClassPage(BaseModel):
     next_offset: int | None = None
 
 
+class AdminClassJoinRequestRead(BaseModel):
+    id: int
+    school_id: int
+    school_name: str
+    class_id: int
+    class_name: str
+    user_id: int
+    user_username: str
+    user_display_name: str
+    role: str
+    status: str
+    message: str | None = None
+    requested_by_user_id: int
+    reviewed_by_user_id: int | None = None
+    reviewed_at: datetime | None = None
+    review_note: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminClassJoinRequestPage(BaseModel):
+    items: list[AdminClassJoinRequestRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class AdminClassJoinRequestReview(BaseModel):
+    status: Literal["approved", "rejected"]
+    note: str | None = Field(default=None, max_length=500)
+
+
 class AdminStats(BaseModel):
     total_users: int
     active_users: int
     users_by_role: dict[str, int]
     total_schools: int
     total_classes: int
+    pending_class_join_requests: int
     total_content_pages: int
     total_courses: int
     total_assignments: int

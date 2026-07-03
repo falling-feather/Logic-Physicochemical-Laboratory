@@ -14,6 +14,7 @@ from app.models import (
     Assignment,
     BugRecord,
     ClassGroup,
+    ClassJoinRequest,
     ClassMembership,
     ContentPageRecord,
     Course,
@@ -29,6 +30,9 @@ from app.models import (
 from app.schemas.admin import (
     AdminBootstrapRequest,
     AdminClassPage,
+    AdminClassJoinRequestPage,
+    AdminClassJoinRequestRead,
+    AdminClassJoinRequestReview,
     AdminClassStats,
     AdminContentPageRead,
     AdminContentPagePage,
@@ -48,6 +52,11 @@ from app.schemas.admin import (
     BugRecordUpdate,
 )
 from app.services.audit import record_audit_log
+from app.services.class_join_requests import (
+    apply_class_join_request_review,
+    normalize_class_role,
+    normalize_join_request_status,
+)
 from app.services.content_catalog import ensure_seed_pages
 
 
@@ -335,6 +344,105 @@ def read_admin_class_stats(
     )
 
 
+@router.get("/class-join-requests", response_model=AdminClassJoinRequestPage)
+def list_admin_class_join_requests(
+    school_id: int | None = Query(default=None),
+    class_id: int | None = Query(default=None),
+    user_id: int | None = Query(default=None),
+    role: str | None = Query(default=None),
+    status_filter: str | None = Query(default="pending", alias="status"),
+    q: str | None = Query(default=None, max_length=160),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminClassJoinRequestPage:
+    _require_admin(current_user)
+    if from_at is not None and to_at is not None and from_at > to_at:
+        raise HTTPException(status_code=422, detail="from must be earlier than to")
+    statement = (
+        select(ClassJoinRequest, School, ClassGroup, User)
+        .join(School, School.id == ClassJoinRequest.school_id)
+        .join(ClassGroup, ClassGroup.id == ClassJoinRequest.class_id)
+        .join(User, User.id == ClassJoinRequest.user_id)
+        .order_by(ClassJoinRequest.created_at.desc(), ClassJoinRequest.id.desc())
+    )
+    if school_id is not None:
+        statement = statement.where(ClassJoinRequest.school_id == school_id)
+    if class_id is not None:
+        statement = statement.where(ClassJoinRequest.class_id == class_id)
+    if user_id is not None:
+        statement = statement.where(ClassJoinRequest.user_id == user_id)
+    if role is not None:
+        statement = statement.where(ClassJoinRequest.role == normalize_class_role(role))
+    if status_filter is not None:
+        statement = statement.where(ClassJoinRequest.status == normalize_join_request_status(status_filter))
+    if from_at is not None:
+        statement = statement.where(ClassJoinRequest.created_at >= from_at)
+    if to_at is not None:
+        statement = statement.where(ClassJoinRequest.created_at <= to_at)
+    if q is not None and q.strip():
+        pattern = f"%{q.strip()}%"
+        statement = statement.where(
+            or_(
+                School.name.ilike(pattern),
+                ClassGroup.name.ilike(pattern),
+                User.username.ilike(pattern),
+                User.display_name.ilike(pattern),
+                ClassJoinRequest.message.ilike(pattern),
+            )
+        )
+    total = _statement_count(db, statement)
+    rows = db.execute(statement.offset(offset).limit(limit)).all()
+    items = [
+        _admin_class_join_request_read(join_request, school, class_group, user)
+        for join_request, school, class_group, user in rows
+    ]
+    return AdminClassJoinRequestPage(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        next_offset=_next_offset(total, offset, len(items)),
+    )
+
+
+@router.patch("/class-join-requests/{join_request_id}", response_model=AdminClassJoinRequestRead)
+def review_admin_class_join_request(
+    join_request_id: int,
+    payload: AdminClassJoinRequestReview,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminClassJoinRequestRead:
+    _require_admin(current_user)
+    row = db.execute(
+        select(ClassJoinRequest, School, ClassGroup, User)
+        .join(School, School.id == ClassJoinRequest.school_id)
+        .join(ClassGroup, ClassGroup.id == ClassJoinRequest.class_id)
+        .join(User, User.id == ClassJoinRequest.user_id)
+        .where(ClassJoinRequest.id == join_request_id)
+    ).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Class join request not found")
+
+    join_request, school, class_group, applicant = row
+    apply_class_join_request_review(
+        db,
+        join_request=join_request,
+        reviewer=current_user,
+        request=request,
+        next_status=payload.status,
+        note=payload.note,
+        approval_source="admin_queue",
+    )
+    db.commit()
+    db.refresh(join_request)
+    return _admin_class_join_request_read(join_request, school, class_group, applicant)
+
+
 @router.get("/content/pages", response_model=AdminContentPagePage)
 def list_admin_content_pages(
     status_filter: str | None = Query(default=None, alias="status"),
@@ -403,6 +511,7 @@ def read_admin_stats(
         users_by_role=users_by_role,
         total_schools=_count(db, School),
         total_classes=_count(db, ClassGroup),
+        pending_class_join_requests=_count(db, ClassJoinRequest, ClassJoinRequest.status == "pending"),
         total_content_pages=_count(db, ContentPageRecord),
         total_courses=_count(db, Course),
         total_assignments=_count(db, Assignment),
@@ -654,6 +763,33 @@ def _get_class(db: Session, class_id: int) -> ClassGroup:
     if class_group is None:
         raise HTTPException(status_code=404, detail="Class not found")
     return class_group
+
+
+def _admin_class_join_request_read(
+    join_request: ClassJoinRequest,
+    school: School,
+    class_group: ClassGroup,
+    applicant: User,
+) -> AdminClassJoinRequestRead:
+    return AdminClassJoinRequestRead(
+        id=join_request.id,
+        school_id=join_request.school_id,
+        school_name=school.name,
+        class_id=join_request.class_id,
+        class_name=class_group.name,
+        user_id=join_request.user_id,
+        user_username=applicant.username,
+        user_display_name=applicant.display_name,
+        role=join_request.role,
+        status=join_request.status,
+        message=join_request.message,
+        requested_by_user_id=join_request.requested_by_user_id,
+        reviewed_by_user_id=join_request.reviewed_by_user_id,
+        reviewed_at=join_request.reviewed_at,
+        review_note=join_request.review_note,
+        created_at=join_request.created_at,
+        updated_at=join_request.updated_at,
+    )
 
 
 def _distinct_count(db: Session, column: Any, *criteria: Any) -> int:

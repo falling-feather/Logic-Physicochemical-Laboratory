@@ -16,11 +16,18 @@ from app.schemas.school import (
     MembershipRead,
 )
 from app.services.audit import record_audit_log
+from app.services.class_join_requests import (
+    apply_class_join_request_review,
+    ensure_class_membership,
+    ensure_school_membership,
+    existing_active_class_membership,
+    normalize_class_role,
+    normalize_join_request_status,
+    trim_optional,
+)
 
 
 router = APIRouter()
-_CLASS_ROLES = {"student", "teacher"}
-_JOIN_REQUEST_STATUSES = {"pending", "approved", "rejected"}
 
 
 @router.get("", response_model=list[ClassRead])
@@ -66,8 +73,8 @@ def create_class(
     )
     db.add(class_group)
     db.flush()
-    _ensure_school_membership(db, payload.school_id, current_user.id, "teacher")
-    _ensure_class_membership(db, class_group.id, current_user.id, "teacher")
+    ensure_school_membership(db, payload.school_id, current_user.id, "teacher")
+    ensure_class_membership(db, class_group.id, current_user.id, "teacher")
     record_audit_log(
         db,
         actor=current_user,
@@ -106,14 +113,14 @@ def join_class(
     if class_group is None:
         raise HTTPException(status_code=404, detail="Class not found")
 
-    role = _normalize_class_role(payload.role)
+    role = normalize_class_role(payload.role)
     if role == "teacher" and current_user.role not in {"admin", "teacher"}:
         raise HTTPException(status_code=403, detail="Only teachers can join with teacher role")
     if role == "teacher" and current_user.role != "admin":
         _require_school_role(db, current_user, class_group.school_id, {"admin", "teacher"})
 
-    _ensure_school_membership(db, class_group.school_id, current_user.id, role)
-    membership, membership_created = _ensure_class_membership(db, class_group.id, current_user.id, role)
+    ensure_school_membership(db, class_group.school_id, current_user.id, role)
+    membership, membership_created = ensure_class_membership(db, class_group.id, current_user.id, role)
     join_request = db.scalar(
         select(ClassJoinRequest).where(
             ClassJoinRequest.class_id == class_group.id,
@@ -195,13 +202,13 @@ def create_class_join_request(
     if class_group is None:
         raise HTTPException(status_code=404, detail="Class not found")
 
-    role = _normalize_class_role(payload.role)
+    role = normalize_class_role(payload.role)
     if role == "teacher" and current_user.role not in {"admin", "teacher"}:
         raise HTTPException(status_code=403, detail="Only teachers can request teacher role")
     if role == "teacher" and current_user.role != "admin":
         _require_school_role(db, current_user, class_group.school_id, {"admin", "teacher"})
 
-    if _existing_active_class_membership(db, class_group.id, current_user.id, role) is not None:
+    if existing_active_class_membership(db, class_group.id, current_user.id, role) is not None:
         raise HTTPException(status_code=409, detail="Class membership already exists")
 
     join_request = db.scalar(
@@ -217,7 +224,7 @@ def create_class_join_request(
         if join_request.status == "approved":
             raise HTTPException(status_code=409, detail="Class join request already approved")
         join_request.status = "pending"
-        join_request.message = _trim_optional(payload.message)
+        join_request.message = trim_optional(payload.message)
         join_request.requested_by_user_id = current_user.id
         join_request.reviewed_by_user_id = None
         join_request.reviewed_at = None
@@ -229,7 +236,7 @@ def create_class_join_request(
             user_id=current_user.id,
             role=role,
             status="pending",
-            message=_trim_optional(payload.message),
+            message=trim_optional(payload.message),
             requested_by_user_id=current_user.id,
         )
         db.add(join_request)
@@ -278,7 +285,7 @@ def list_class_join_requests(
         .order_by(ClassJoinRequest.id)
     )
     if status_filter is not None:
-        statement = statement.where(ClassJoinRequest.status == _normalize_join_request_status(status_filter))
+        statement = statement.where(ClassJoinRequest.status == normalize_join_request_status(status_filter))
     return list(db.scalars(statement).all())
 
 
@@ -305,78 +312,14 @@ def review_class_join_request(
     if join_request is None:
         raise HTTPException(status_code=404, detail="Class join request not found")
 
-    next_status = payload.status
-    if join_request.status in {"approved", "rejected"}:
-        if join_request.status == next_status:
-            return join_request
-        raise HTTPException(status_code=409, detail="Class join request already reviewed")
-
-    before_status = join_request.status
-    before_reviewed_by_user_id = join_request.reviewed_by_user_id
-    join_request.status = next_status
-    join_request.reviewed_by_user_id = current_user.id
-    join_request.reviewed_at = utc_now()
-    join_request.review_note = _trim_optional(payload.note)
-
-    membership_created = False
-    membership: ClassMembership | None = None
-    if next_status == "approved":
-        _ensure_school_membership(db, join_request.school_id, join_request.user_id, join_request.role)
-        membership, membership_created = _ensure_class_membership(
-            db,
-            join_request.class_id,
-            join_request.user_id,
-            join_request.role,
-        )
-        if membership_created:
-            record_audit_log(
-                db,
-                actor=current_user,
-                action="class.join",
-                resource_type="class_membership",
-                resource_id=membership.id,
-                school_id=class_group.school_id,
-                class_id=class_group.id,
-                event_result="success",
-                request=request,
-                snapshot={
-                    "after": {
-                        "class_id": membership.class_id,
-                        "user_id": membership.user_id,
-                        "role": membership.role,
-                        "status": membership.status,
-                        "source_join_request_id": join_request.id,
-                    }
-                },
-            )
-
-    record_audit_log(
+    apply_class_join_request_review(
         db,
-        actor=current_user,
-        action=_join_request_review_action(next_status),
-        resource_type="class_join_request",
-        resource_id=join_request.id,
-        school_id=class_group.school_id,
-        class_id=class_group.id,
-        event_result="success",
+        join_request=join_request,
+        reviewer=current_user,
         request=request,
-        snapshot={
-            "before": {
-                "status": before_status,
-                "reviewed_by_user_id": before_reviewed_by_user_id,
-            },
-            "after": {
-                "class_id": join_request.class_id,
-                "user_id": join_request.user_id,
-                "role": join_request.role,
-                "status": join_request.status,
-                "reviewed_by_user_id": join_request.reviewed_by_user_id,
-                "reviewer_role": current_user.role,
-                "has_review_note": join_request.review_note is not None,
-                "membership_created": membership_created,
-                "membership_id": membership.id if membership is not None else None,
-            }
-        },
+        next_status=payload.status,
+        note=payload.note,
+        approval_source="class_review",
     )
     db.commit()
     db.refresh(join_request)
@@ -436,77 +379,3 @@ def _require_class_review_scope(db: Session, user: User, class_group: ClassGroup
     )
     if membership is None:
         raise HTTPException(status_code=403, detail="Class review scope requires class teacher role")
-
-
-def _ensure_school_membership(db: Session, school_id: int, user_id: int, role: str) -> SchoolMembership:
-    membership = db.scalar(
-        select(SchoolMembership).where(
-            SchoolMembership.school_id == school_id,
-            SchoolMembership.user_id == user_id,
-            SchoolMembership.role == role,
-        )
-    )
-    if membership is None:
-        membership = SchoolMembership(school_id=school_id, user_id=user_id, role=role)
-        db.add(membership)
-        db.flush()
-    return membership
-
-
-def _ensure_class_membership(db: Session, class_id: int, user_id: int, role: str) -> tuple[ClassMembership, bool]:
-    membership = db.scalar(
-        select(ClassMembership).where(
-            ClassMembership.class_id == class_id,
-            ClassMembership.user_id == user_id,
-            ClassMembership.role == role,
-        )
-    )
-    if membership is None:
-        membership = ClassMembership(class_id=class_id, user_id=user_id, role=role)
-        db.add(membership)
-        db.flush()
-        return membership, True
-    return membership, False
-
-
-def _existing_active_class_membership(
-    db: Session,
-    class_id: int,
-    user_id: int,
-    role: str,
-) -> ClassMembership | None:
-    return db.scalar(
-        select(ClassMembership).where(
-            ClassMembership.class_id == class_id,
-            ClassMembership.user_id == user_id,
-            ClassMembership.role == role,
-            ClassMembership.status == "active",
-        )
-    )
-
-
-def _normalize_class_role(role: str) -> str:
-    normalized = role.strip().lower()
-    if normalized not in _CLASS_ROLES:
-        raise HTTPException(status_code=422, detail="Unsupported class role")
-    return normalized
-
-
-def _normalize_join_request_status(value: str) -> str:
-    normalized = value.strip().lower()
-    if normalized not in _JOIN_REQUEST_STATUSES:
-        raise HTTPException(status_code=422, detail="Unsupported class join request status")
-    return normalized
-
-
-def _join_request_review_action(status_value: str) -> str:
-    if status_value == "approved":
-        return "class.join.request.approve"
-    return "class.join.request.reject"
-
-
-def _trim_optional(value: str | None) -> str | None:
-    if value is None:
-        return None
-    value = value.strip()
-    return value or None

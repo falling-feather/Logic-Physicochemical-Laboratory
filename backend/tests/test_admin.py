@@ -185,6 +185,7 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert stats.json()["users_by_role"]["admin"] == 1
     assert stats.json()["total_schools"] == 1
     assert stats.json()["total_classes"] == 1
+    assert stats.json()["pending_class_join_requests"] == 0
     assert stats.json()["total_content_pages"] >= 1
     assert stats.json()["total_learning_events"] == 0
     assert stats.json()["total_bug_records"] == 1
@@ -263,3 +264,127 @@ def test_admin_views_user_management_stats_and_bug_records(client):
 
     student_forbidden = client.get("/api/admin/stats", headers=_auth_header(student_token))
     assert student_forbidden.status_code == 403
+
+
+def test_admin_class_join_request_queue_and_review(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "teacher_join_queue", "teacher")
+    first_student_token = _register_and_login(client, "student_join_queue_one", "student")
+    second_student_token = _register_and_login(client, "student_join_queue_two", "student")
+
+    school = client.post(
+        "/api/schools",
+        headers=_auth_header(admin_token),
+        json={"name": "Admin Join Queue School", "region": "Shanghai"},
+    )
+    assert school.status_code == 201
+    school_id = school.json()["id"]
+
+    class_group = client.post(
+        "/api/classes",
+        headers=_auth_header(admin_token),
+        json={"school_id": school_id, "name": "Admin Join Queue Class", "grade": "10"},
+    )
+    assert class_group.status_code == 201
+    class_id = class_group.json()["id"]
+
+    first_request = client.post(
+        f"/api/classes/{class_id}/join-requests",
+        headers=_auth_header(first_student_token),
+        json={"role": "student", "message": "Queue alpha applicant"},
+    )
+    assert first_request.status_code == 201
+    first_request_id = first_request.json()["id"]
+    first_student_id = first_request.json()["user_id"]
+
+    second_request = client.post(
+        f"/api/classes/{class_id}/join-requests",
+        headers=_auth_header(second_student_token),
+        json={"role": "student", "message": "Queue beta applicant"},
+    )
+    assert second_request.status_code == 201
+    second_request_id = second_request.json()["id"]
+
+    forbidden_queue = client.get("/api/admin/class-join-requests", headers=_auth_header(teacher_token))
+    assert forbidden_queue.status_code == 403
+
+    stats = client.get("/api/admin/stats", headers=_auth_header(admin_token))
+    assert stats.status_code == 200
+    assert stats.json()["pending_class_join_requests"] == 2
+
+    queue = client.get("/api/admin/class-join-requests?limit=1", headers=_auth_header(admin_token))
+    assert queue.status_code == 200
+    assert queue.json()["total"] == 2
+    assert queue.json()["next_offset"] == 1
+    queue_item = queue.json()["items"][0]
+    assert queue_item["school_name"] == "Admin Join Queue School"
+    assert queue_item["class_name"] == "Admin Join Queue Class"
+    assert queue_item["status"] == "pending"
+
+    filtered = client.get(
+        f"/api/admin/class-join-requests?school_id={school_id}&class_id={class_id}&user_id={first_student_id}&q=alpha",
+        headers=_auth_header(admin_token),
+    )
+    assert filtered.status_code == 200
+    assert filtered.json()["total"] == 1
+    assert filtered.json()["items"][0]["id"] == first_request_id
+
+    approve = client.patch(
+        f"/api/admin/class-join-requests/{first_request_id}",
+        headers={**_auth_header(admin_token), "X-Request-ID": "admin-join-approve"},
+        json={"status": "approved", "note": "Approved from admin queue"},
+    )
+    assert approve.status_code == 200
+    assert approve.json()["status"] == "approved"
+    assert approve.json()["reviewed_by_user_id"] is not None
+
+    reject = client.patch(
+        f"/api/admin/class-join-requests/{second_request_id}",
+        headers=_auth_header(admin_token),
+        json={"status": "rejected", "note": "Missing confirmation"},
+    )
+    assert reject.status_code == 200
+    assert reject.json()["status"] == "rejected"
+
+    pending = client.get("/api/admin/class-join-requests", headers=_auth_header(admin_token))
+    assert pending.status_code == 200
+    assert pending.json()["total"] == 0
+
+    approved = client.get("/api/admin/class-join-requests?status=approved", headers=_auth_header(admin_token))
+    assert approved.status_code == 200
+    assert approved.json()["total"] == 1
+    assert approved.json()["items"][0]["id"] == first_request_id
+
+    rejected = client.get("/api/admin/class-join-requests?status=rejected", headers=_auth_header(admin_token))
+    assert rejected.status_code == 200
+    assert rejected.json()["total"] == 1
+    assert rejected.json()["items"][0]["id"] == second_request_id
+
+    stats_after_review = client.get("/api/admin/stats", headers=_auth_header(admin_token))
+    assert stats_after_review.status_code == 200
+    assert stats_after_review.json()["pending_class_join_requests"] == 0
+
+    approved_student_classes = client.get(f"/api/classes?school_id={school_id}", headers=_auth_header(first_student_token))
+    assert approved_student_classes.status_code == 200
+    assert approved_student_classes.json()[0]["id"] == class_id
+
+    rejected_student_classes = client.get(f"/api/classes?school_id={school_id}", headers=_auth_header(second_student_token))
+    assert rejected_student_classes.status_code == 403
+
+    approve_audit = client.get(
+        f"/api/admin/audit-logs?action=class.join.request.approve&resource_id={first_request_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert approve_audit.status_code == 200
+    assert approve_audit.json()["total"] == 1
+    approve_audit_item = approve_audit.json()["items"][0]
+    assert approve_audit_item["request_id"] == "admin-join-approve"
+    assert approve_audit_item["snapshot_json"]["after"]["approval_source"] == "admin_queue"
+
+    join_audit = client.get(
+        f"/api/admin/audit-logs?action=class.join&class_id={class_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert join_audit.status_code == 200
+    assert join_audit.json()["total"] == 1
+    assert join_audit.json()["items"][0]["snapshot_json"]["after"]["source_join_request_id"] == first_request_id
