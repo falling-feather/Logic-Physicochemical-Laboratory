@@ -221,6 +221,61 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client):
     assert teacher_progress.status_code == 200
     assert teacher_progress.json()["user_id"] == grade.json()["student_id"]
 
+    knowledge = client.get(
+        f"/api/knowledge/me?class_id={class_id}&course_id={course_id}",
+        headers=_auth_header(student_token),
+    )
+    assert knowledge.status_code == 200
+    knowledge_body = knowledge.json()
+    assert knowledge_body["assignment_count"] == 1
+    assert knowledge_body["submitted_assignments"] == 1
+    assert knowledge_body["graded_assignments"] == 1
+    assert knowledge_body["total_events"] == 2
+    assert knowledge_body["submit_events"] == 1
+    assert knowledge_body["complete_events"] == 1
+    assert knowledge_body["score_total"] == 18
+    assert knowledge_body["max_score_total"] == 20
+    assert knowledge_body["accuracy_percent"] == 90
+    assert knowledge_body["completion_percent"] == 50
+    assert knowledge_body["total_points"] == 18
+    knowledge_stats = {item["rule_code"]: item for item in knowledge_body["knowledge_stats"]}
+    assert knowledge_stats["assignment_completion"]["percent"] == 100
+    assert knowledge_stats["graded_score"]["frequency"] == 18
+    assert knowledge_stats["graded_score"]["sample_size"] == 20
+    assert knowledge_stats["learning_completion"]["percent"] == 50
+
+    class_knowledge = client.get(
+        f"/api/classes/{class_id}/knowledge?course_id={course_id}",
+        headers=_auth_header(teacher_token),
+    )
+    assert class_knowledge.status_code == 200
+    class_knowledge_body = class_knowledge.json()
+    assert class_knowledge_body["students_total"] == 1
+    assert class_knowledge_body["students_active"] == 1
+    assert class_knowledge_body["assignment_count"] == 1
+    assert class_knowledge_body["expected_submissions"] == 1
+    assert class_knowledge_body["submitted_assignments"] == 1
+    assert class_knowledge_body["graded_assignments"] == 1
+    assert class_knowledge_body["average_score_percent"] == 90
+    assert class_knowledge_body["completion_percent"] == 50
+    assert class_knowledge_body["total_points"] == 18
+    assert class_knowledge_body["average_points_per_student"] == 18
+    class_stats = {item["rule_code"]: item for item in class_knowledge_body["knowledge_stats"]}
+    assert class_stats["assignment_completion"]["sample_size"] == 1
+    assert class_stats["graded_score"]["percent"] == 90
+
+    student_class_knowledge = client.get(
+        f"/api/classes/{class_id}/knowledge",
+        headers=_auth_header(student_token),
+    )
+    assert student_class_knowledge.status_code == 403
+
+    outsider_class_knowledge = client.get(
+        f"/api/classes/{class_id}/knowledge",
+        headers=_auth_header(outsider_token),
+    )
+    assert outsider_class_knowledge.status_code == 403
+
     own_events = client.get("/api/learning-events", headers=_auth_header(student_token))
     assert own_events.status_code == 200
     assert own_events.json()[0]["payload"]["score"] == 18

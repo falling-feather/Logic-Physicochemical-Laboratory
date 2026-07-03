@@ -7,6 +7,7 @@ from app.api.endpoints import (
     content,
     courses,
     health,
+    knowledge,
     learning_events,
     points,
     progress,
@@ -25,6 +26,7 @@ api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(schools.router, prefix="/schools", tags=["schools"])
 api_router.include_router(classes.router, prefix="/classes", tags=["classes"])
 api_router.include_router(courses.router, prefix="/courses", tags=["courses"])
+api_router.include_router(knowledge.router, tags=["knowledge"])
 api_router.include_router(learning_events.router, prefix="/learning-events", tags=["learning-events"])
 api_router.include_router(submissions.router, tags=["submissions"])
 api_router.include_router(points.router, prefix="/points", tags=["points"])
