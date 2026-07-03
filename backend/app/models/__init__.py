@@ -3,7 +3,7 @@ from app.models.admin import AuditLog, BugRecord
 from app.models.content import ContentPageRecord
 from app.models.course import Assignment, Course, CourseClass, CourseUnit, LearningEvent, PointLedger, Submission
 from app.models.school import ClassGroup, ClassMembership, School, SchoolMembership
-from app.models.user import AuthSession, User
+from app.models.user import AuthSession, LoginAttempt, User
 
 __all__ = [
     "Assignment",
@@ -18,6 +18,7 @@ __all__ = [
     "CourseClass",
     "CourseUnit",
     "LearningEvent",
+    "LoginAttempt",
     "PointLedger",
     "School",
     "SchoolMembership",

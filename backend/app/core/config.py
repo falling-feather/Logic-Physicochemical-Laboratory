@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     auto_create_tables: bool = False
     session_cookie_name: str = "astra_session"
     session_days: int = 7
+    login_max_attempts: int = 5
+    login_lockout_seconds: int = 15 * 60
+    login_attempt_window_seconds: int = 15 * 60
     cors_origins: str = "http://127.0.0.1:8766,http://localhost:8766"
     admin_bootstrap_token: str | None = None
     database_url: str = Field(

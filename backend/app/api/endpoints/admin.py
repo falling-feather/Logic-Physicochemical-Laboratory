@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
 from app.core.config import get_settings
-from app.core.security import hash_password
+from app.core.security import hash_password, password_strength_errors
 from app.db.session import get_db
 from app.models import (
     AuditLog,
@@ -68,6 +68,9 @@ def bootstrap_admin(payload: AdminBootstrapRequest, db: Session = Depends(get_db
         raise HTTPException(status_code=403, detail="Admin bootstrap token is required in production")
 
     username = payload.username.strip()
+    if not username:
+        raise HTTPException(status_code=422, detail="Username is required")
+    _enforce_password_strength(payload.password, username)
     existing = db.scalar(select(User).where(User.username == username))
     if existing is not None:
         raise HTTPException(status_code=409, detail="Username already exists")
@@ -822,6 +825,12 @@ def _percent(numerator: int | float, denominator: int | float) -> float:
 def _require_admin(user: User) -> None:
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin role required")
+
+
+def _enforce_password_strength(password: str, username: str) -> None:
+    errors = password_strength_errors(password, username=username)
+    if errors:
+        raise HTTPException(status_code=422, detail={"password": errors})
 
 
 def _active_admin_count(db: Session) -> int:

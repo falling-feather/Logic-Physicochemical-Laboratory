@@ -38,6 +38,20 @@ def _register_and_login(client, username: str, role: str) -> str:
     return login.json()["access_token"]
 
 
+def test_admin_bootstrap_rejects_weak_password(client):
+    response = client.post(
+        "/api/admin/bootstrap",
+        json={
+            "username": "admin_weak",
+            "password": "12345678",
+            "display_name": "Weak Admin",
+        },
+    )
+
+    assert response.status_code == 422
+    assert "Password must include at least one letter" in response.json()["detail"]["password"]
+
+
 def test_admin_bootstrap_is_single_use(client):
     admin_token = _bootstrap_admin(client)
 

@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、学校、班级、课程、作业、提交批改、积分流水、知识状态/班级规则统计、管理端基础 API、学校/班级深度统计、管理端列表分页搜索、待批改队列和组织/教学关键写操作审计等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、密码策略、登录失败锁定、学校、班级、课程、作业、提交批改、积分流水、知识状态/班级规则统计、管理端基础 API、学校/班级深度统计、管理端列表分页搜索、待批改队列和组织/教学关键写操作审计等能力。
 
 ## 本地启动
 
@@ -25,11 +25,11 @@ curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 
 | 方法 | 路径 | 说明 |
 | ---- | ---- | ---- |
-| POST | `/api/auth/register` | 本地账号注册 |
-| POST | `/api/auth/login` | 登录并返回 Bearer token，同时写入 HttpOnly cookie |
+| POST | `/api/auth/register` | 本地账号注册；拒绝短密码、纯数字/纯字母、常见弱口令和包含用户名的密码 |
+| POST | `/api/auth/login` | 登录并返回 Bearer token，同时写入 HttpOnly cookie；连续失败达到阈值返回 `429` 与 `Retry-After` |
 | POST | `/api/auth/logout` | 注销当前用户所有活动会话 |
 | GET | `/api/users/me` | 当前用户 |
-| POST | `/api/admin/bootstrap` | 首个管理员受控初始化；公开注册仍拒绝 admin |
+| POST | `/api/admin/bootstrap` | 首个管理员受控初始化；复用密码策略，公开注册仍拒绝 admin |
 | GET/PATCH | `/api/admin/users` / `/api/admin/users/{id}` | 管理端用户列表与角色/状态维护；列表返回 `items/total/limit/offset/next_offset` |
 | GET | `/api/admin/schools` | 管理端学校基础查看；支持分页与关键字搜索 |
 | GET | `/api/admin/schools/{id}/stats` | 管理端学校深度统计，聚合班级、成员、课程、作业、提交、事件和积分 |
@@ -87,6 +87,11 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 | `ASTRA_ENVIRONMENT` | `development` | 运行环境 |
 | `ASTRA_API_PREFIX` | `/api` | API 前缀 |
 | `ASTRA_AUTO_CREATE_TABLES` | `false` | 是否启动时自动建表，开发临时可用，正式迁移应使用 Alembic |
+| `ASTRA_SESSION_COOKIE_NAME` | `astra_session` | 登录会话 cookie 名称 |
+| `ASTRA_SESSION_DAYS` | `7` | 登录会话有效天数 |
+| `ASTRA_LOGIN_MAX_ATTEMPTS` | `5` | 登录失败锁定阈值 |
+| `ASTRA_LOGIN_LOCKOUT_SECONDS` | `900` | 达到失败阈值后的锁定秒数 |
+| `ASTRA_LOGIN_ATTEMPT_WINDOW_SECONDS` | `900` | 统计连续失败的时间窗口 |
 | `ASTRA_ADMIN_BOOTSTRAP_TOKEN` | 空 | 首个管理员初始化令牌；生产环境必须配置 |
 | `ASTRA_CORS_ORIGINS` | `http://127.0.0.1:8766,http://localhost:8766` | 允许访问 API 的前端来源白名单 |
 | `ASTRA_DATABASE_URL` | `mysql+pymysql://astra:astra@127.0.0.1:3306/astra?charset=utf8mb4` | MySQL 连接字符串 |
