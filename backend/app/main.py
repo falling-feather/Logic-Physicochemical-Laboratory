@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import Request
@@ -7,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.db.session import init_db
+from app.services.knowledge_snapshot_scheduler import scheduler_from_settings
 
 
 def create_app() -> FastAPI:
@@ -16,6 +18,7 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         docs_url=f"{settings.api_prefix}/docs",
         openapi_url=f"{settings.api_prefix}/openapi.json",
+        lifespan=lifespan,
     )
     if settings.auto_create_tables:
         init_db(settings.database_url)
@@ -42,6 +45,21 @@ def create_app() -> FastAPI:
         )
     app.include_router(api_router, prefix=settings.api_prefix)
     return app
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    settings = get_settings()
+    scheduler = None
+    if settings.knowledge_snapshot_scheduler_enabled:
+        scheduler = scheduler_from_settings(settings)
+        app.state.knowledge_snapshot_scheduler = scheduler
+        scheduler.start()
+    try:
+        yield
+    finally:
+        if scheduler is not None:
+            await scheduler.stop()
 
 
 def _request_id_from_header(value: str | None) -> str:

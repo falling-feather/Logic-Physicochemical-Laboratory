@@ -42,11 +42,13 @@ def rebuild_periodic_knowledge_snapshots(
     period_start, period_end = snapshot_window(granularity, reference_date)
     run_key = _run_key(granularity, period_start, period_end)
     run = _get_or_create_run(db, run_key, granularity, period_start, period_end, trigger_source)
+    attempt_count = (run.attempt_count or 0) + 1
     run.status = "running"
     run.trigger_source = trigger_source
     run.started_at = utc_now()
     run.finished_at = None
     run.error_message = None
+    run.attempt_count = attempt_count
     run.user_snapshot_count = 0
     run.class_snapshot_count = 0
     run.metadata_json = {"trigger_source": trigger_source}
@@ -69,6 +71,7 @@ def rebuild_periodic_knowledge_snapshots(
         run.trigger_source = trigger_source
         run.started_at = run.started_at or utc_now()
         run.finished_at = utc_now()
+        run.attempt_count = attempt_count
         run.error_message = exc.__class__.__name__
         run.metadata_json = {"trigger_source": trigger_source}
         db.commit()
@@ -86,6 +89,7 @@ def snapshot_run_report(run: KnowledgeSnapshotRun) -> dict:
         "period_end": run.period_end.isoformat(),
         "trigger_source": run.trigger_source,
         "status": run.status,
+        "attempt_count": run.attempt_count,
         "user_snapshot_count": run.user_snapshot_count,
         "class_snapshot_count": run.class_snapshot_count,
         "error_message": run.error_message,
@@ -216,6 +220,10 @@ def _get_or_create_run(
 
 
 def _run_key(granularity: SnapshotGranularity, period_start: datetime, period_end: datetime) -> str:
+    return snapshot_run_key(granularity, period_start, period_end)
+
+
+def snapshot_run_key(granularity: SnapshotGranularity, period_start: datetime, period_end: datetime) -> str:
     return f"knowledge:{granularity}:{period_start.isoformat()}:{period_end.isoformat()}"
 
 

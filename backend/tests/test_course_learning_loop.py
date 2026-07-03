@@ -600,6 +600,7 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client, monke
         assert run.status == "success"
         assert run.user_snapshot_count == 1
         assert run.class_snapshot_count == 1
+        assert run.attempt_count == 1
         assert run.metadata_json["class_course_pairs"] == 1
         run_id = run.id
         user_period_snapshot = db.scalar(
@@ -634,6 +635,7 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client, monke
         )
         assert rerun.id == run_id
         assert rerun.status == "success"
+        assert rerun.attempt_count == 2
         assert db.scalar(select(KnowledgeSnapshotRun).where(KnowledgeSnapshotRun.id == run_id)) is not None
 
         def fail_class_knowledge(*args, **kwargs):
@@ -655,6 +657,7 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client, monke
         )
         assert failed_run is not None
         assert failed_run.status == "failed"
+        assert failed_run.attempt_count == 1
         assert failed_run.error_message == "RuntimeError"
 
     student_class_knowledge = client.get(

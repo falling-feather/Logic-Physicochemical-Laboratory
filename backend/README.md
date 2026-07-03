@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、密码策略、登录失败锁定、学校、班级、课程、作业、提交批改、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录、管理端基础 API、学校/班级深度统计、管理端列表分页搜索、待批改队列、审计元数据和认证事件审计等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、密码策略、登录失败锁定、学校、班级、课程、作业、提交批改、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端基础 API、学校/班级深度统计、管理端列表分页搜索、待批改队列、审计元数据和认证事件审计等能力。
 
 ## 本地启动
 
@@ -100,6 +100,15 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 | `ASTRA_AUDIT_IP_HASH_SALT` | `astra-dev-audit-salt` | 审计中客户端 IP 哈希盐；生产环境应替换 |
 | `ASTRA_ADMIN_BOOTSTRAP_TOKEN` | 空 | 首个管理员初始化令牌；生产环境必须配置 |
 | `ASTRA_CORS_ORIGINS` | `http://127.0.0.1:8766,http://localhost:8766` | 允许访问 API 的前端来源白名单 |
+| `ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_ENABLED` | `false` | 是否随 FastAPI lifespan 启动知识快照进程内调度器 |
+| `ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_RUN_ON_START` | `false` | 调度器启动后是否立即检查一次到期窗口 |
+| `ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_INTERVAL_SECONDS` | `300` | 调度器轮询间隔，最低 30 秒 |
+| `ASTRA_KNOWLEDGE_SNAPSHOT_DAILY_ENABLED` | `true` | 是否启用每日窗口调度 |
+| `ASTRA_KNOWLEDGE_SNAPSHOT_DAILY_HOUR` | `3` | 每日重算在 UTC 当日达到该小时后重算前一日窗口 |
+| `ASTRA_KNOWLEDGE_SNAPSHOT_WEEKLY_ENABLED` | `true` | 是否启用每周窗口调度 |
+| `ASTRA_KNOWLEDGE_SNAPSHOT_WEEKLY_WEEKDAY` | `0` | 每周重算星期，0 表示周一 |
+| `ASTRA_KNOWLEDGE_SNAPSHOT_WEEKLY_HOUR` | `4` | 每周重算在配置星期达到该小时后重算上一自然周 |
+| `ASTRA_KNOWLEDGE_SNAPSHOT_RETRY_ATTEMPTS` | `3` | 失败窗口在调度器中允许的最大尝试次数 |
 | `ASTRA_DATABASE_URL` | `mysql+pymysql://astra:astra@127.0.0.1:3306/astra?charset=utf8mb4` | MySQL 连接字符串 |
 
 可从 `.env.example` 复制本地配置；真实密码不要提交到仓库。
@@ -120,7 +129,7 @@ $env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
 python -m alembic upgrade head
 ```
 
-当前 Alembic head：`20260703_0011`（知识快照运行记录）。
+当前 Alembic head：`20260703_0012`（知识快照调度尝试次数）。
 
 知识快照周期重算：
 
@@ -131,6 +140,8 @@ python -m scripts.rebuild_knowledge_snapshots --granularity week --date 2026-07-
 ```
 
 脚本按日或自然周对齐窗口，重算活跃班级已挂接课程的个人/班级快照，并写入 `knowledge_snapshot_runs` 运行记录；失败时输出 JSON 并返回非零退出码。
+
+知识快照进程内调度器默认关闭。生产启用时应先完成 Alembic 迁移和部署预检，再设置 `ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_ENABLED=true`；调度器当前适合单 worker / 单副本运行，多进程锁、外部任务队列和告警仍是后续部署增强项。
 
 部署预检：
 

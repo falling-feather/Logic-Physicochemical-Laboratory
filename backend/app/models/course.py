@@ -202,6 +202,7 @@ class KnowledgeSnapshotRun(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(32), default="running", index=True, nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     user_snapshot_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     class_snapshot_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
