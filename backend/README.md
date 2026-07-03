@@ -15,7 +15,7 @@ python -m uvicorn app.main:app --reload --port 8000
 curl http://127.0.0.1:8000/api/health
 ```
 
-首个内容协议样例：
+首个内容协议样例会由数据库 seed 写入 `content_pages`，并经过 Pydantic schema 校验后返回：
 
 ```bash
 curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
@@ -33,6 +33,9 @@ curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 | GET | `/api/schools/{id}/classes` | 学校内班级 |
 | GET/POST | `/api/classes` | 当前用户可见班级 / 创建班级 |
 | POST | `/api/classes/{id}/join` | 以学生或教师角色加入班级 |
+| GET | `/api/content/pages` | 当前内容页摘要 |
+| GET | `/api/content/pages/{slug}` | 内容协议详情 |
+| GET | `/api/render/page/{slug}` | 前端可渲染页面结构 |
 
 ## 配置
 

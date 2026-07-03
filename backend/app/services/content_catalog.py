@@ -1,3 +1,7 @@
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.models import ContentPageRecord
 from app.schemas.content import ContentPage
 
 
@@ -64,26 +68,50 @@ ENERGY_CONSERVATION_PAGE = ContentPage(
 )
 
 
-_PAGES = {
+_SEED_PAGES = {
     ENERGY_CONSERVATION_PAGE.slug: ENERGY_CONSERVATION_PAGE,
 }
 
 
-def get_page_schema(slug: str) -> ContentPage | None:
-    return _PAGES.get(slug.strip("/"))
+def ensure_seed_pages(db: Session) -> None:
+    for page in _SEED_PAGES.values():
+        existing = db.scalar(select(ContentPageRecord).where(ContentPageRecord.slug == page.slug))
+        if existing is None:
+            db.add(
+                ContentPageRecord(
+                    slug=page.slug,
+                    status=page.status,
+                    version=page.version,
+                    schema_json=page.model_dump(mode="json"),
+                )
+            )
+        elif existing.version != page.version:
+            existing.status = page.status
+            existing.version = page.version
+            existing.schema_json = page.model_dump(mode="json")
+    db.commit()
 
 
-def list_page_summaries() -> list[dict]:
+def get_page_schema(db: Session, slug: str) -> ContentPage | None:
+    ensure_seed_pages(db)
+    record = db.scalar(select(ContentPageRecord).where(ContentPageRecord.slug == slug.strip("/")))
+    if record is None:
+        return None
+    return ContentPage.model_validate(record.schema_json)
+
+
+def list_page_summaries(db: Session) -> list[dict]:
+    ensure_seed_pages(db)
+    records = db.scalars(select(ContentPageRecord).order_by(ContentPageRecord.slug)).all()
     return [
         {
             "slug": page.slug,
-            "title": page.title,
-            "galaxy": page.galaxy,
-            "subject": page.subject,
-            "layout": page.layout,
+            "title": page.schema_json.get("title", page.slug),
+            "galaxy": page.schema_json.get("galaxy", ""),
+            "subject": page.schema_json.get("subject", ""),
+            "layout": page.schema_json.get("layout", ""),
             "status": page.status,
             "version": page.version,
         }
-        for page in sorted(_PAGES.values(), key=lambda item: item.slug)
+        for page in records
     ]
-
