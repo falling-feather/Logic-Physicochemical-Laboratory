@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、密码策略、登录失败锁定、学校、班级、课程、作业、提交批改、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端基础 API、学校/班级深度统计、管理端列表分页搜索、待批改队列、审计元数据和认证事件审计等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、密码策略、登录失败锁定、学校、班级、班级加入申请审批、课程、作业、提交批改、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端基础 API、学校/班级深度统计、管理端列表分页搜索、待批改队列、审计元数据和认证事件审计等能力。
 
 ## 本地启动
 
@@ -44,6 +44,9 @@ curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 | GET | `/api/schools/{id}/classes` | 学校内班级 |
 | GET/POST | `/api/classes` | 当前用户可见班级 / 创建班级 |
 | POST | `/api/classes/{id}/join` | 以学生或教师角色加入班级 |
+| POST | `/api/classes/{id}/join-requests` | 创建班级加入申请；不立即生成成员关系 |
+| GET | `/api/classes/{id}/join-requests` | 班级教师或管理员查看加入申请，可按 `status` 过滤 |
+| PATCH | `/api/classes/{id}/join-requests/{request_id}` | 班级教师或管理员审批加入申请，支持 `approved` / `rejected` |
 | GET/POST | `/api/courses` | 当前用户可见课程 / 教师创建课程 |
 | POST | `/api/courses/{id}/classes` | 将课程挂接到班级 |
 | GET/POST | `/api/courses/{id}/units` | 课程单元列表 / 教师创建单元 |
@@ -129,7 +132,7 @@ $env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
 python -m alembic upgrade head
 ```
 
-当前 Alembic head：`20260703_0012`（知识快照调度尝试次数）。
+当前 Alembic head：`20260703_0013`（班级加入申请）。
 
 知识快照周期重算：
 

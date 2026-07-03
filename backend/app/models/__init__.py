@@ -13,7 +13,7 @@ from app.models.course import (
     Submission,
     UserKnowledgeSnapshot,
 )
-from app.models.school import ClassGroup, ClassMembership, School, SchoolMembership
+from app.models.school import ClassGroup, ClassJoinRequest, ClassMembership, School, SchoolMembership
 from app.models.user import AuthSession, LoginAttempt, User
 
 __all__ = [
@@ -23,6 +23,7 @@ __all__ = [
     "Base",
     "BugRecord",
     "ClassGroup",
+    "ClassJoinRequest",
     "ClassKnowledgeSnapshot",
     "ClassMembership",
     "ContentPageRecord",

@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -33,12 +36,39 @@ class ClassRead(BaseModel):
     status: str
 
 
-class ClassJoinRequest(BaseModel):
+class ClassJoinPayload(BaseModel):
     role: str = "student"
 
 
+class ClassJoinRequestCreate(BaseModel):
+    role: str = "student"
+    message: str | None = Field(default=None, max_length=500)
+
+
+class ClassJoinRequestReview(BaseModel):
+    status: Literal["approved", "rejected"]
+    note: str | None = Field(default=None, max_length=500)
+
+
+class ClassJoinRequestRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    school_id: int
+    class_id: int
+    user_id: int
+    role: str
+    status: str
+    message: str | None = None
+    requested_by_user_id: int
+    reviewed_by_user_id: int | None = None
+    reviewed_at: datetime | None = None
+    review_note: str | None = None
+
+
 class MembershipRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     role: str
     status: str
-
