@@ -8,6 +8,10 @@ const CF = {
 
 // ===== Application Configuration =====
 const CONFIG = {
+    backend: {
+        apiBaseUrl: ''
+    },
+
     // Page metadata
     pages: {
         mathematics: {

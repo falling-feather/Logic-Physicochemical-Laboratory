@@ -37,6 +37,22 @@ curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 | GET | `/api/content/pages/{slug}` | 内容协议详情 |
 | GET | `/api/render/page/{slug}` | 前端可渲染页面结构 |
 
+## 前端 schema smoke
+
+默认前端不会请求后端 schema。启动 API 后，再从项目根目录启动静态服务：
+
+```bash
+node server/dev-static-server.mjs --port 8766
+```
+
+访问本地试点：
+
+```text
+http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#physics/energy-conservation
+```
+
+`backendSchema=1` 打开试点 adapter，`apiBase=` 指向本地 FastAPI。也可用 `CONFIG.backend.apiBaseUrl` 或 localStorage `astra-api-base` 设置 API 地址。默认静态页面保持回退，不依赖后端可用。
+
 ## 配置
 
 配置使用 `ASTRA_` 前缀环境变量：
@@ -46,6 +62,7 @@ curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 | `ASTRA_ENVIRONMENT` | `development` | 运行环境 |
 | `ASTRA_API_PREFIX` | `/api` | API 前缀 |
 | `ASTRA_AUTO_CREATE_TABLES` | `false` | 是否启动时自动建表，开发临时可用，正式迁移应使用 Alembic |
+| `ASTRA_CORS_ORIGINS` | `http://127.0.0.1:8766,http://localhost:8766` | 允许访问 API 的前端来源白名单 |
 | `ASTRA_DATABASE_URL` | `mysql+pymysql://astra:astra@127.0.0.1:3306/astra?charset=utf8mb4` | MySQL 连接字符串 |
 
 可从 `.env.example` 复制本地配置；真实密码不要提交到仓库。

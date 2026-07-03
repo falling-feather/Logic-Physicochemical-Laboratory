@@ -40,7 +40,7 @@ const Router = {
     },
     courseSupportScripts: [
         'shared/js/lucide.min.js?v=20260417d',
-        'shared/js/module-selector.js?v=20260619v63StartupLazyP1'
+        'shared/js/module-selector.js?v=20260703v65BackendSchemaP4'
     ],
     galaxySupportScripts: {
         astra: [

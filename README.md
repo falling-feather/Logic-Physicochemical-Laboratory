@@ -8,7 +8,7 @@
 
 星序总览页负责承载一级星系入口；进入某个星系后，才显示该星系自己的二级学科或知识目录。内置 C++ httplib 后端服务器，支持静态文件托管。
 
-> **当前状态**: v6.5（2026-07-03 起）— `houduan` 分支已接入 Python 后端骨架、健康检查、工科试验室内容协议持久化样例、本地账号与学校/班级最小闭环
+> **当前状态**: v6.5（2026-07-03 起）— `houduan` 分支已接入 Python 后端骨架、健康检查、工科试验室内容协议持久化样例、本地账号与学校/班级最小闭环，以及前端 opt-in schema 渲染试点
 > **下一阶段规划**: Python + MySQL 后端化、内容协议、登录用户体系与管理员 / 教师 / 学生三端平台设计，详见 [`doc/07-后端优化与设计.md`](doc/07-后端优化与设计.md)
 > **当前分支**: `houduan` — 后端化设计与重构开发分支；`main` 保持主线维护
 > **v6.4 主线**：未来星系产品内容保留，比赛提交/评审/截图临时层清理 + `20260630mainV64` 资产版本同步
@@ -113,6 +113,11 @@ cd backend
 python -m uvicorn app.main:app --reload --port 8000
 # 访问 http://127.0.0.1:8000/api/health
 # 内容协议样例：http://127.0.0.1:8000/api/render/page/physics/energy-conservation
+
+# 前端 schema smoke（另开终端启动静态服务）
+node server/dev-static-server.mjs --port 8766
+# 访问：
+# http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#physics/energy-conservation
 ```
 
 ## ✨ 功能特性

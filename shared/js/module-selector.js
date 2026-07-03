@@ -418,6 +418,7 @@ const ModuleSelector = {
 
         // Lazy-initialize this specific module
         this._initModule(page, moduleId);
+        this._applyBackendSchema(page, moduleId);
 
         // Scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -775,6 +776,18 @@ const ModuleSelector = {
         // Show rating card after delay
         if (window.ExperimentRating) {
             ExperimentRating.show(moduleId);
+        }
+        if (window.BackendContent && typeof BackendContent.applyExperimentSchema === 'function') {
+            this._applyBackendSchema(page, moduleId);
+        }
+    },
+
+    _applyBackendSchema(page, moduleId) {
+        if (!window.BackendContent || typeof BackendContent.applyExperimentSchema !== 'function') return;
+        try {
+            BackendContent.applyExperimentSchema(page, moduleId);
+        } catch (e) {
+            console.warn('[ModuleSelector] backend schema apply failed:', moduleId, e);
         }
     },
 

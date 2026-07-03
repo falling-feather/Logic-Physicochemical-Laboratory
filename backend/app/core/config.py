@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     auto_create_tables: bool = False
     session_cookie_name: str = "astra_session"
     session_days: int = 7
+    cors_origins: str = "http://127.0.0.1:8766,http://localhost:8766"
     database_url: str = Field(
         default="mysql+pymysql://astra:astra@127.0.0.1:3306/astra?charset=utf8mb4",
         description="SQLAlchemy database URL. MySQL is the production target.",
@@ -26,6 +27,10 @@ class Settings(BaseSettings):
         scheme, rest = self.database_url.split("://", 1)
         _, host = rest.rsplit("@", 1)
         return f"{scheme}://***:***@{host}"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
 
 @lru_cache

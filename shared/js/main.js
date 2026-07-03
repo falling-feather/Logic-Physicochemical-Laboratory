@@ -221,7 +221,7 @@ function updateFooterVisibility() {
 
 window.updateFooterVisibility = updateFooterVisibility;
 
-const ENGLAB_ASSET_VERSION = '20260630mainV64';
+const ENGLAB_ASSET_VERSION = '20260703v65BackendSchemaP4';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',
@@ -232,9 +232,11 @@ const CORE_HTTP_FALLBACK_ASSETS = [
     './shared/css/page-layout.css?v=20260606v62e',
     './shared/css/responsive.css?v=20260630mainV64',
     './shared/js/lucide.min.js?v=20260417d',
-    './shared/js/config.js?v=20260630mainV64',
+    './shared/js/config.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/router.js?v=' + ENGLAB_ASSET_VERSION,
-    './shared/js/main.js?v=' + ENGLAB_ASSET_VERSION
+    './shared/js/main.js?v=' + ENGLAB_ASSET_VERSION,
+    './shared/js/backend-content.js?v=' + ENGLAB_ASSET_VERSION,
+    './shared/css/backend-content.css?v=' + ENGLAB_ASSET_VERSION
 ];
 
 const GALAXY_HTTP_FALLBACK_ASSETS = {
@@ -257,7 +259,7 @@ const GALAXY_HTTP_FALLBACK_ASSETS = {
         './pages/chemistry/chemistry.css?v=20260618ionP1',
         './pages/algorithms/algorithms.css?v=20260618algoTextP1',
         './pages/biology/biology.css?v=20260618neuralP1',
-        './shared/js/module-selector.js?v=20260619v63StartupLazyP1',
+        './shared/js/module-selector.js?v=' + ENGLAB_ASSET_VERSION,
         './shared/js/experiment-guide.js?v=20260630mainV64',
         './shared/js/experiment-export.js?v=20260528v61f',
         './shared/js/quiz-data.js?v=20260618refsP1',
