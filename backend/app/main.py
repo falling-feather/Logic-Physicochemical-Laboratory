@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from app.api.router import api_router
 from app.core.config import get_settings
+from app.db.session import init_db
 
 
 def create_app() -> FastAPI:
@@ -12,9 +13,10 @@ def create_app() -> FastAPI:
         docs_url=f"{settings.api_prefix}/docs",
         openapi_url=f"{settings.api_prefix}/openapi.json",
     )
+    if settings.auto_create_tables:
+        init_db(settings.database_url)
     app.include_router(api_router, prefix=settings.api_prefix)
     return app
 
 
 app = create_app()
-

@@ -21,6 +21,19 @@ curl http://127.0.0.1:8000/api/health
 curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 ```
 
+本地账号与学校班级 API：
+
+| 方法 | 路径 | 说明 |
+| ---- | ---- | ---- |
+| POST | `/api/auth/register` | 本地账号注册 |
+| POST | `/api/auth/login` | 登录并返回 Bearer token，同时写入 HttpOnly cookie |
+| POST | `/api/auth/logout` | 注销当前用户所有活动会话 |
+| GET | `/api/users/me` | 当前用户 |
+| GET/POST | `/api/schools` | 当前用户可见学校 / 创建学校 |
+| GET | `/api/schools/{id}/classes` | 学校内班级 |
+| GET/POST | `/api/classes` | 当前用户可见班级 / 创建班级 |
+| POST | `/api/classes/{id}/join` | 以学生或教师角色加入班级 |
+
 ## 配置
 
 配置使用 `ASTRA_` 前缀环境变量：
@@ -29,6 +42,7 @@ curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 | ---- | ------ | ---- |
 | `ASTRA_ENVIRONMENT` | `development` | 运行环境 |
 | `ASTRA_API_PREFIX` | `/api` | API 前缀 |
+| `ASTRA_AUTO_CREATE_TABLES` | `false` | 是否启动时自动建表，开发临时可用，正式迁移应使用 Alembic |
 | `ASTRA_DATABASE_URL` | `mysql+pymysql://astra:astra@127.0.0.1:3306/astra?charset=utf8mb4` | MySQL 连接字符串 |
 
 可从 `.env.example` 复制本地配置；真实密码不要提交到仓库。
@@ -39,4 +53,12 @@ curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 
 ```bash
 python -m pytest backend
+```
+
+迁移烟测：
+
+```bash
+cd backend
+$env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
+python -m alembic upgrade head
 ```
