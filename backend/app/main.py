@@ -1,3 +1,6 @@
+from uuid import uuid4
+
+from fastapi import Request
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -16,16 +19,33 @@ def create_app() -> FastAPI:
     )
     if settings.auto_create_tables:
         init_db(settings.database_url)
+
+    @app.middleware("http")
+    async def attach_request_id(request: Request, call_next):
+        request_id = _request_id_from_header(request.headers.get("x-request-id"))
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+
     if settings.cors_origin_list:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=settings.cors_origin_list,
             allow_credentials=True,
             allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
-            allow_headers=["Authorization", "Content-Type", "Accept"],
+            allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID"],
+            expose_headers=["X-Request-ID"],
         )
     app.include_router(api_router, prefix=settings.api_prefix)
     return app
+
+
+def _request_id_from_header(value: str | None) -> str:
+    request_id = (value or "").strip()
+    if not request_id:
+        return uuid4().hex
+    return request_id[:64]
 
 
 app = create_app()

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -33,6 +33,7 @@ def list_classes(
 @router.post("", response_model=ClassRead, status_code=status.HTTP_201_CREATED)
 def create_class(
     payload: ClassCreate,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ClassGroup:
@@ -64,6 +65,8 @@ def create_class(
         resource_id=class_group.id,
         school_id=class_group.school_id,
         class_id=class_group.id,
+        event_result="success",
+        request=request,
         snapshot={
             "after": {
                 "school_id": class_group.school_id,
@@ -84,6 +87,7 @@ def create_class(
 def join_class(
     class_id: int,
     payload: ClassJoinRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ClassMembership:
@@ -110,6 +114,8 @@ def join_class(
             resource_id=membership.id,
             school_id=class_group.school_id,
             class_id=class_group.id,
+            event_result="success",
+            request=request,
             snapshot={
                 "after": {
                     "class_id": membership.class_id,

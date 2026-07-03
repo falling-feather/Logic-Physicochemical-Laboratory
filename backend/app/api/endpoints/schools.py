@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,7 @@ def list_schools(current_user: User = Depends(get_current_user), db: Session = D
 @router.post("", response_model=SchoolRead, status_code=status.HTTP_201_CREATED)
 def create_school(
     payload: SchoolCreate,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> School:
@@ -53,6 +54,8 @@ def create_school(
         resource_type="school",
         resource_id=school.id,
         school_id=school.id,
+        event_result="success",
+        request=request,
         snapshot={
             "after": {
                 "name": school.name,

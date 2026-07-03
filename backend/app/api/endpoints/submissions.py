@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -33,6 +33,7 @@ router = APIRouter()
 def create_submission(
     assignment_id: int,
     payload: SubmissionCreate,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Submission:
@@ -89,6 +90,8 @@ def create_submission(
         resource_id=submission.id,
         school_id=course.school_id,
         class_id=class_group.id,
+        event_result="success",
+        request=request,
         snapshot={
             "after": {
                 "assignment_id": assignment.id,
@@ -139,6 +142,7 @@ def list_assignment_submissions(
 def grade_submission(
     submission_id: int,
     payload: SubmissionGrade,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Submission:
@@ -195,6 +199,8 @@ def grade_submission(
         resource_id=submission.id,
         school_id=course.school_id,
         class_id=submission.class_id,
+        event_result="success",
+        request=request,
         snapshot={"before": previous_snapshot, "after": next_snapshot},
     )
     db.commit()

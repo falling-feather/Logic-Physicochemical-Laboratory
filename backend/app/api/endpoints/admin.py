@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
@@ -56,7 +56,7 @@ PENDING_SUBMISSION_STATUSES = ["submitted", "returned"]
 
 
 @router.post("/bootstrap", response_model=AdminUserRead, status_code=status.HTTP_201_CREATED)
-def bootstrap_admin(payload: AdminBootstrapRequest, db: Session = Depends(get_db)) -> User:
+def bootstrap_admin(payload: AdminBootstrapRequest, request: Request, db: Session = Depends(get_db)) -> User:
     if _active_admin_count(db) > 0:
         raise HTTPException(status_code=409, detail="Admin bootstrap is already complete")
 
@@ -90,6 +90,8 @@ def bootstrap_admin(payload: AdminBootstrapRequest, db: Session = Depends(get_db
         action="admin.bootstrap",
         resource_type="user",
         resource_id=user.id,
+        event_result="success",
+        request=request,
         snapshot={"after": {"username": user.username, "role": user.role, "status": user.status}},
     )
     db.commit()
@@ -125,6 +127,7 @@ def list_users(
 def update_user(
     user_id: int,
     payload: AdminUserUpdate,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> User:
@@ -154,6 +157,8 @@ def update_user(
         action="admin.user.update",
         resource_type="user",
         resource_id=user.id,
+        event_result="success",
+        request=request,
         snapshot=_change_snapshot(before, after),
     )
     db.commit()
@@ -418,6 +423,9 @@ def list_audit_logs(
     resource_id: str | None = Query(default=None),
     school_id: int | None = Query(default=None),
     class_id: int | None = Query(default=None),
+    event_result: str | None = Query(default=None),
+    failure_reason: str | None = Query(default=None),
+    request_id: str | None = Query(default=None),
     from_at: datetime | None = Query(default=None, alias="from"),
     to_at: datetime | None = Query(default=None, alias="to"),
     limit: int = Query(default=50, ge=1, le=200),
@@ -441,6 +449,12 @@ def list_audit_logs(
         statement = statement.where(AuditLog.school_id == school_id)
     if class_id is not None:
         statement = statement.where(AuditLog.class_id == class_id)
+    if event_result is not None:
+        statement = statement.where(AuditLog.event_result == event_result.strip())
+    if failure_reason is not None:
+        statement = statement.where(AuditLog.failure_reason == failure_reason.strip())
+    if request_id is not None:
+        statement = statement.where(AuditLog.request_id == request_id.strip())
     if from_at is not None:
         statement = statement.where(AuditLog.created_at >= from_at)
     if to_at is not None:
@@ -558,6 +572,7 @@ def list_bug_records(
 @router.post("/bugs", response_model=BugRecordRead, status_code=status.HTTP_201_CREATED)
 def create_bug_record(
     payload: BugRecordCreate,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> BugRecord:
@@ -579,6 +594,8 @@ def create_bug_record(
         action="admin.bug.create",
         resource_type="bug_record",
         resource_id=bug.id,
+        event_result="success",
+        request=request,
         snapshot={"after": _bug_snapshot(bug)},
     )
     db.commit()
@@ -590,6 +607,7 @@ def create_bug_record(
 def update_bug_record(
     bug_id: int,
     payload: BugRecordUpdate,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> BugRecord:
@@ -615,6 +633,8 @@ def update_bug_record(
         action="admin.bug.update",
         resource_type="bug_record",
         resource_id=bug.id,
+        event_result="success",
+        request=request,
         snapshot=_change_snapshot(before, after),
     )
     db.commit()

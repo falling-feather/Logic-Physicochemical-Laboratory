@@ -185,6 +185,13 @@ class AuditLogRead(BaseModel):
     resource_id: str | None = None
     school_id: int | None = None
     class_id: int | None = None
+    event_result: str | None = None
+    failure_reason: str | None = None
+    request_id: str | None = None
+    client_ip_hash: str | None = None
+    user_agent: str | None = None
+    request_method: str | None = None
+    request_path: str | None = None
     snapshot_json: dict
     created_at: datetime
 

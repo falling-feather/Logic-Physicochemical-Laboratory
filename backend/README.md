@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、密码策略、登录失败锁定、学校、班级、课程、作业、提交批改、积分流水、知识状态/班级规则统计、管理端基础 API、学校/班级深度统计、管理端列表分页搜索、待批改队列和组织/教学关键写操作审计等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、密码策略、登录失败锁定、学校、班级、课程、作业、提交批改、积分流水、知识状态/班级规则统计、管理端基础 API、学校/班级深度统计、管理端列表分页搜索、待批改队列、审计元数据和认证事件审计等能力。
 
 ## 本地启动
 
@@ -26,8 +26,8 @@ curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 | 方法 | 路径 | 说明 |
 | ---- | ---- | ---- |
 | POST | `/api/auth/register` | 本地账号注册；拒绝短密码、纯数字/纯字母、常见弱口令和包含用户名的密码 |
-| POST | `/api/auth/login` | 登录并返回 Bearer token，同时写入 HttpOnly cookie；连续失败达到阈值返回 `429` 与 `Retry-After` |
-| POST | `/api/auth/logout` | 注销当前用户所有活动会话 |
+| POST | `/api/auth/login` | 登录并返回 Bearer token，同时写入 HttpOnly cookie；连续失败达到阈值返回 `429` 与 `Retry-After`；成功、失败和锁定事件写入审计 |
+| POST | `/api/auth/logout` | 注销当前用户所有活动会话，并写入审计 |
 | GET | `/api/users/me` | 当前用户 |
 | POST | `/api/admin/bootstrap` | 首个管理员受控初始化；复用密码策略，公开注册仍拒绝 admin |
 | GET/PATCH | `/api/admin/users` / `/api/admin/users/{id}` | 管理端用户列表与角色/状态维护；列表返回 `items/total/limit/offset/next_offset` |
@@ -37,7 +37,7 @@ curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 | GET | `/api/admin/classes/{id}/stats` | 管理端班级深度统计，含预期提交、待批改比例、积分和平均得分 |
 | GET | `/api/admin/content/pages` | 管理端内容页状态查看；支持分页与 slug/title/galaxy/subject 搜索 |
 | GET | `/api/admin/stats` | 管理端全站统计摘要 |
-| GET | `/api/admin/audit-logs` | 管理端审计日志查询，分页返回，可按 actor/action/resource/时间窗过滤 |
+| GET | `/api/admin/audit-logs` | 管理端审计日志查询，分页返回，可按 actor/action/resource/request_id/event_result/failure_reason/时间窗过滤 |
 | GET | `/api/admin/submissions/pending` | 管理端待批改队列，支持 school/class/course/assignment/student/status/时间窗过滤和 limit/offset 分页 |
 | GET/POST/PATCH | `/api/admin/bugs` | 缺陷/风险清单基础维护；列表支持分页、状态过滤和关键字搜索 |
 | GET/POST | `/api/schools` | 当前用户可见学校 / 创建学校 |
@@ -92,6 +92,7 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 | `ASTRA_LOGIN_MAX_ATTEMPTS` | `5` | 登录失败锁定阈值 |
 | `ASTRA_LOGIN_LOCKOUT_SECONDS` | `900` | 达到失败阈值后的锁定秒数 |
 | `ASTRA_LOGIN_ATTEMPT_WINDOW_SECONDS` | `900` | 统计连续失败的时间窗口 |
+| `ASTRA_AUDIT_IP_HASH_SALT` | `astra-dev-audit-salt` | 审计中客户端 IP 哈希盐；生产环境应替换 |
 | `ASTRA_ADMIN_BOOTSTRAP_TOKEN` | 空 | 首个管理员初始化令牌；生产环境必须配置 |
 | `ASTRA_CORS_ORIGINS` | `http://127.0.0.1:8766,http://localhost:8766` | 允许访问 API 的前端来源白名单 |
 | `ASTRA_DATABASE_URL` | `mysql+pymysql://astra:astra@127.0.0.1:3306/astra?charset=utf8mb4` | MySQL 连接字符串 |

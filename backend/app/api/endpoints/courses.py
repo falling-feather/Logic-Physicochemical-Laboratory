@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -67,6 +67,7 @@ def list_courses(
 @router.post("", response_model=CourseRead, status_code=status.HTTP_201_CREATED)
 def create_course(
     payload: CourseCreate,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Course:
@@ -92,6 +93,8 @@ def create_course(
         resource_type="course",
         resource_id=course.id,
         school_id=course.school_id,
+        event_result="success",
+        request=request,
         snapshot={
             "after": {
                 "school_id": course.school_id,
@@ -111,6 +114,7 @@ def create_course(
 def attach_course_class(
     course_id: int,
     payload: CourseClassAttach,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CourseClass:
@@ -139,6 +143,8 @@ def attach_course_class(
         resource_id=course_class.id,
         school_id=course.school_id,
         class_id=class_group.id,
+        event_result="success",
+        request=request,
         snapshot={
             "after": {
                 "course_id": course_class.course_id,
@@ -168,6 +174,7 @@ def list_course_units(
 def create_course_unit(
     course_id: int,
     payload: CourseUnitCreate,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CourseUnit:
@@ -202,6 +209,8 @@ def create_course_unit(
         resource_type="course_unit",
         resource_id=unit.id,
         school_id=course.school_id,
+        event_result="success",
+        request=request,
         snapshot={
             "after": {
                 "course_id": unit.course_id,
@@ -243,6 +252,7 @@ def create_assignment(
     course_id: int,
     unit_id: int,
     payload: AssignmentCreate,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Assignment:
@@ -273,6 +283,8 @@ def create_assignment(
         resource_type="assignment",
         resource_id=assignment.id,
         school_id=course.school_id,
+        event_result="success",
+        request=request,
         snapshot={
             "after": {
                 "course_id": course.id,

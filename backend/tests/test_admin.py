@@ -116,9 +116,10 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     )
     assert last_admin_demotion.status_code == 409
 
+    school_request_id = "school-create-request"
     school = client.post(
         "/api/schools",
-        headers=_auth_header(admin_token),
+        headers={**_auth_header(admin_token), "X-Request-ID": school_request_id},
         json={"name": "Admin Visible School", "region": "Shanghai"},
     )
     assert school.status_code == 201
@@ -188,18 +189,20 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert stats.json()["total_learning_events"] == 0
     assert stats.json()["total_bug_records"] == 1
     assert stats.json()["open_bug_records"] == 0
-    assert stats.json()["total_audit_logs"] == 6
+    assert stats.json()["total_audit_logs"] == 10
 
     audit_forbidden = client.get("/api/admin/audit-logs", headers=_auth_header(student_token))
     assert audit_forbidden.status_code == 403
 
     audit_logs = client.get("/api/admin/audit-logs?limit=10", headers=_auth_header(admin_token))
     assert audit_logs.status_code == 200
-    assert audit_logs.json()["total"] == 6
+    assert audit_logs.json()["total"] == 10
     actions = {item["action"] for item in audit_logs.json()["items"]}
     assert actions == {
         "admin.bootstrap",
         "admin.user.update",
+        "auth.login.success",
+        "auth.login.failed",
         "school.create",
         "class.create",
         "admin.bug.create",
@@ -212,7 +215,28 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     )
     assert school_audit.status_code == 200
     assert school_audit.json()["total"] == 1
-    assert school_audit.json()["items"][0]["snapshot_json"]["after"]["name"] == "Admin Visible School"
+    school_audit_item = school_audit.json()["items"][0]
+    assert school_audit_item["snapshot_json"]["after"]["name"] == "Admin Visible School"
+    assert school_audit_item["event_result"] == "success"
+    assert school_audit_item["request_id"] == school_request_id
+    assert school_audit_item["request_method"] == "POST"
+    assert school_audit_item["request_path"] == "/api/schools"
+    assert school_audit_item["client_ip_hash"]
+
+    request_filtered_audit = client.get(
+        f"/api/admin/audit-logs?request_id={school_request_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert request_filtered_audit.status_code == 200
+    assert request_filtered_audit.json()["total"] == 1
+    assert request_filtered_audit.json()["items"][0]["action"] == "school.create"
+
+    disabled_login_audit = client.get(
+        "/api/admin/audit-logs?action=auth.login.failed&failure_reason=user_disabled&event_result=failure",
+        headers=_auth_header(admin_token),
+    )
+    assert disabled_login_audit.status_code == 200
+    assert disabled_login_audit.json()["total"] == 1
 
     class_audit = client.get(
         f"/api/admin/audit-logs?action=class.create&resource_id={class_group.json()['id']}",
