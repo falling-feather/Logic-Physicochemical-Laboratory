@@ -143,3 +143,47 @@ class ClassKnowledgeSnapshot(TimestampMixin, Base):
     average_points_per_student: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     knowledge_stats_json: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class UserKnowledgeSnapshot(TimestampMixin, Base):
+    __tablename__ = "user_knowledge_snapshots"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "class_scope_id",
+            "course_scope_id",
+            "granularity",
+            "period_start",
+            "period_end",
+            "rule_version",
+            name="uq_user_knowledge_snapshot_window",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    school_id: Mapped[int | None] = mapped_column(ForeignKey("schools.id"), index=True, nullable=True)
+    class_id: Mapped[int | None] = mapped_column(ForeignKey("class_groups.id"), index=True, nullable=True)
+    class_scope_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True, nullable=True)
+    course_scope_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    granularity: Mapped[str] = mapped_column(String(16), default="custom", index=True, nullable=False)
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    rule_version: Mapped[str] = mapped_column(String(32), default="v1", nullable=False)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    assignment_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    submitted_assignments: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    graded_assignments: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_events: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    visit_events: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    start_events: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    submit_events: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    complete_events: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    score_total: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_score_total: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    accuracy_percent: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    completion_percent: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    total_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    knowledge_stats_json: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)

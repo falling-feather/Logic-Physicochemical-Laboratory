@@ -19,6 +19,7 @@ from app.models import (
     SchoolMembership,
     Submission,
     User,
+    UserKnowledgeSnapshot,
 )
 from app.models.base import utc_now
 from app.schemas.knowledge import (
@@ -27,6 +28,8 @@ from app.schemas.knowledge import (
     ClassKnowledgeSnapshotRead,
     KnowledgeSnapshotGranularity,
     KnowledgeStatRead,
+    UserKnowledgeSnapshotPage,
+    UserKnowledgeSnapshotRead,
     UserKnowledgeRead,
 )
 from app.services.audit import record_audit_log
@@ -56,6 +59,114 @@ def get_my_knowledge(
         else _user_assignment_class_ids(db, current_user.id, class_id)
     )
     return _build_user_knowledge(db, current_user.id, assignment_class_ids, class_id, course_id, from_at, to_at)
+
+
+@router.post(
+    "/knowledge/me/snapshots",
+    response_model=UserKnowledgeSnapshotRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def rebuild_my_knowledge_snapshot(
+    request: Request,
+    class_id: int | None = Query(default=None),
+    course_id: int | None = Query(default=None),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    granularity: KnowledgeSnapshotGranularity = Query(default="custom"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserKnowledgeSnapshotRead:
+    _validate_snapshot_period(from_at, to_at)
+    class_group: ClassGroup | None = None
+    course: Course | None = None
+    if class_id is not None:
+        class_group = _require_class_member(db, current_user, class_id)
+    if course_id is not None:
+        course = _require_course_scope(db, current_user, class_group, course_id)
+    assignment_class_ids = (
+        None
+        if current_user.role == "admin" and class_id is None
+        else _user_assignment_class_ids(db, current_user.id, class_id)
+    )
+    aggregate = _build_user_knowledge(db, current_user.id, assignment_class_ids, class_id, course_id, from_at, to_at)
+    snapshot = _upsert_user_knowledge_snapshot(
+        db,
+        aggregate=aggregate,
+        current_user=current_user,
+        class_group=class_group,
+        course=course,
+        granularity=granularity,
+        from_at=from_at,
+        to_at=to_at,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="knowledge.user_snapshot.rebuild",
+        resource_type="user_knowledge_snapshot",
+        resource_id=snapshot.id,
+        school_id=snapshot.school_id,
+        class_id=snapshot.class_id,
+        event_result="success",
+        request=request,
+        snapshot={
+            "after": {
+                "user_id": current_user.id,
+                "class_id": class_id,
+                "course_id": course_id,
+                "granularity": granularity,
+                "period_start": from_at.isoformat() if from_at is not None else None,
+                "period_end": to_at.isoformat() if to_at is not None else None,
+                "rule_version": snapshot.rule_version,
+                "knowledge_stat_rules": [item.rule_code for item in aggregate.knowledge_stats],
+            }
+        },
+    )
+    db.commit()
+    db.refresh(snapshot)
+    return _user_snapshot_to_read(snapshot)
+
+
+@router.get("/knowledge/me/snapshots", response_model=UserKnowledgeSnapshotPage)
+def list_my_knowledge_snapshots(
+    class_id: int | None = Query(default=None),
+    course_id: int | None = Query(default=None),
+    granularity: KnowledgeSnapshotGranularity | None = Query(default=None),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserKnowledgeSnapshotPage:
+    _validate_period(from_at, to_at)
+    class_group: ClassGroup | None = None
+    if class_id is not None:
+        class_group = _require_class_member(db, current_user, class_id)
+    if course_id is not None:
+        _require_course_scope(db, current_user, class_group, course_id)
+
+    statement = select(UserKnowledgeSnapshot).where(UserKnowledgeSnapshot.user_id == current_user.id)
+    if class_id is not None:
+        statement = statement.where(UserKnowledgeSnapshot.class_id == class_id)
+    if course_id is not None:
+        statement = statement.where(UserKnowledgeSnapshot.course_id == course_id)
+    if granularity is not None:
+        statement = statement.where(UserKnowledgeSnapshot.granularity == granularity)
+    if from_at is not None:
+        statement = statement.where(UserKnowledgeSnapshot.period_start >= from_at)
+    if to_at is not None:
+        statement = statement.where(UserKnowledgeSnapshot.period_end <= to_at)
+    statement = statement.order_by(UserKnowledgeSnapshot.period_end.desc(), UserKnowledgeSnapshot.id.desc())
+    total = _statement_count(db, statement)
+    snapshots = list(db.scalars(statement.offset(offset).limit(limit)).all())
+    return UserKnowledgeSnapshotPage(
+        items=[_user_snapshot_to_read(snapshot) for snapshot in snapshots],
+        total=total,
+        limit=limit,
+        offset=offset,
+        next_offset=_next_offset(total, offset, len(snapshots)),
+    )
 
 
 @router.get("/classes/{class_id}/knowledge", response_model=ClassKnowledgeRead)
@@ -240,6 +351,103 @@ def _build_user_knowledge(
     )
 
 
+def _upsert_user_knowledge_snapshot(
+    db: Session,
+    *,
+    aggregate: UserKnowledgeRead,
+    current_user: User,
+    class_group: ClassGroup | None,
+    course: Course | None,
+    granularity: KnowledgeSnapshotGranularity,
+    from_at: datetime,
+    to_at: datetime,
+) -> UserKnowledgeSnapshot:
+    class_scope_id = aggregate.class_id or 0
+    course_scope_id = aggregate.course_id or 0
+    snapshot = db.scalar(
+        select(UserKnowledgeSnapshot).where(
+            UserKnowledgeSnapshot.user_id == current_user.id,
+            UserKnowledgeSnapshot.class_scope_id == class_scope_id,
+            UserKnowledgeSnapshot.course_scope_id == course_scope_id,
+            UserKnowledgeSnapshot.granularity == granularity,
+            UserKnowledgeSnapshot.period_start == from_at,
+            UserKnowledgeSnapshot.period_end == to_at,
+            UserKnowledgeSnapshot.rule_version == "v1",
+        )
+    )
+    if snapshot is None:
+        snapshot = UserKnowledgeSnapshot(
+            user_id=current_user.id,
+            school_id=_snapshot_school_id(class_group, course),
+            class_id=aggregate.class_id,
+            class_scope_id=class_scope_id,
+            course_id=aggregate.course_id,
+            course_scope_id=course_scope_id,
+            granularity=granularity,
+            period_start=from_at,
+            period_end=to_at,
+            rule_version="v1",
+            created_by_user_id=current_user.id,
+        )
+        db.add(snapshot)
+    else:
+        snapshot.created_by_user_id = current_user.id
+        snapshot.school_id = _snapshot_school_id(class_group, course)
+    _apply_user_knowledge_snapshot(snapshot, aggregate)
+    db.flush()
+    return snapshot
+
+
+def _apply_user_knowledge_snapshot(snapshot: UserKnowledgeSnapshot, aggregate: UserKnowledgeRead) -> None:
+    snapshot.assignment_count = aggregate.assignment_count
+    snapshot.submitted_assignments = aggregate.submitted_assignments
+    snapshot.graded_assignments = aggregate.graded_assignments
+    snapshot.total_events = aggregate.total_events
+    snapshot.visit_events = aggregate.visit_events
+    snapshot.start_events = aggregate.start_events
+    snapshot.submit_events = aggregate.submit_events
+    snapshot.complete_events = aggregate.complete_events
+    snapshot.score_total = aggregate.score_total
+    snapshot.max_score_total = aggregate.max_score_total
+    snapshot.accuracy_percent = aggregate.accuracy_percent
+    snapshot.completion_percent = aggregate.completion_percent
+    snapshot.total_points = aggregate.total_points
+    snapshot.knowledge_stats_json = [stat.model_dump() for stat in aggregate.knowledge_stats]
+    snapshot.calculated_at = utc_now()
+
+
+def _user_snapshot_to_read(snapshot: UserKnowledgeSnapshot) -> UserKnowledgeSnapshotRead:
+    return UserKnowledgeSnapshotRead(
+        id=snapshot.id,
+        user_id=snapshot.user_id,
+        school_id=snapshot.school_id,
+        class_id=snapshot.class_id,
+        course_id=snapshot.course_id,
+        granularity=snapshot.granularity,
+        period_start=snapshot.period_start,
+        period_end=snapshot.period_end,
+        rule_version=snapshot.rule_version,
+        created_by_user_id=snapshot.created_by_user_id,
+        calculated_at=snapshot.calculated_at,
+        created_at=snapshot.created_at,
+        updated_at=snapshot.updated_at,
+        assignment_count=snapshot.assignment_count,
+        submitted_assignments=snapshot.submitted_assignments,
+        graded_assignments=snapshot.graded_assignments,
+        total_events=snapshot.total_events,
+        visit_events=snapshot.visit_events,
+        start_events=snapshot.start_events,
+        submit_events=snapshot.submit_events,
+        complete_events=snapshot.complete_events,
+        score_total=snapshot.score_total,
+        max_score_total=snapshot.max_score_total,
+        accuracy_percent=snapshot.accuracy_percent,
+        completion_percent=snapshot.completion_percent,
+        total_points=snapshot.total_points,
+        knowledge_stats=snapshot.knowledge_stats_json,
+    )
+
+
 def _build_class_knowledge(
     db: Session,
     class_group: ClassGroup,
@@ -400,6 +608,14 @@ def _snapshot_to_read(snapshot: ClassKnowledgeSnapshot) -> ClassKnowledgeSnapsho
         average_points_per_student=snapshot.average_points_per_student,
         knowledge_stats=snapshot.knowledge_stats_json,
     )
+
+
+def _snapshot_school_id(class_group: ClassGroup | None, course: Course | None) -> int | None:
+    if class_group is not None:
+        return class_group.school_id
+    if course is not None:
+        return course.school_id
+    return None
 
 
 def _knowledge_stats(

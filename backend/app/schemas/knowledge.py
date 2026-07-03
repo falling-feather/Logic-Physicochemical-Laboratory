@@ -40,6 +40,44 @@ class UserKnowledgeRead(BaseModel):
     knowledge_stats: list[KnowledgeStatRead]
 
 
+class UserKnowledgeSnapshotRead(BaseModel):
+    id: int
+    user_id: int
+    school_id: int | None = None
+    class_id: int | None = None
+    course_id: int | None = None
+    granularity: KnowledgeSnapshotGranularity
+    period_start: datetime
+    period_end: datetime
+    rule_version: str
+    created_by_user_id: int
+    calculated_at: datetime
+    created_at: datetime
+    updated_at: datetime
+    assignment_count: int
+    submitted_assignments: int
+    graded_assignments: int
+    total_events: int
+    visit_events: int
+    start_events: int
+    submit_events: int
+    complete_events: int
+    score_total: int
+    max_score_total: int
+    accuracy_percent: float
+    completion_percent: float
+    total_points: int
+    knowledge_stats: list[KnowledgeStatRead]
+
+
+class UserKnowledgeSnapshotPage(BaseModel):
+    items: list[UserKnowledgeSnapshotRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
 class ClassKnowledgeRead(BaseModel):
     class_id: int
     school_id: int

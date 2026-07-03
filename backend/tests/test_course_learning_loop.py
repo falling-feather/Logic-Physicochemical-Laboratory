@@ -433,6 +433,72 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client):
     assert knowledge_stats["graded_score"]["sample_size"] == 20
     assert knowledge_stats["learning_completion"]["percent"] == 50
 
+    snapshot_params = {
+        "course_id": course_id,
+        "class_id": class_id,
+        "from": "2026-01-01T00:00:00",
+        "to": "2026-12-31T23:59:59",
+        "granularity": "day",
+    }
+    missing_period_user_snapshot = client.post(
+        "/api/knowledge/me/snapshots",
+        headers=_auth_header(student_token),
+    )
+    assert missing_period_user_snapshot.status_code == 422
+
+    user_snapshot = client.post(
+        "/api/knowledge/me/snapshots",
+        headers=_auth_header(student_token),
+        params=snapshot_params,
+    )
+    assert user_snapshot.status_code == 201
+    user_snapshot_body = user_snapshot.json()
+    assert user_snapshot_body["user_id"] == grade.json()["student_id"]
+    assert user_snapshot_body["class_id"] == class_id
+    assert user_snapshot_body["course_id"] == course_id
+    assert user_snapshot_body["granularity"] == "day"
+    assert user_snapshot_body["rule_version"] == "v1"
+    assert user_snapshot_body["assignment_count"] == knowledge_body["assignment_count"]
+    assert user_snapshot_body["submitted_assignments"] == knowledge_body["submitted_assignments"]
+    assert user_snapshot_body["graded_assignments"] == knowledge_body["graded_assignments"]
+    assert user_snapshot_body["total_events"] == knowledge_body["total_events"]
+    assert user_snapshot_body["complete_events"] == knowledge_body["complete_events"]
+    assert user_snapshot_body["score_total"] == knowledge_body["score_total"]
+    assert user_snapshot_body["accuracy_percent"] == knowledge_body["accuracy_percent"]
+    assert user_snapshot_body["completion_percent"] == knowledge_body["completion_percent"]
+    assert user_snapshot_body["total_points"] == knowledge_body["total_points"]
+    user_snapshot_stats = {item["rule_code"]: item for item in user_snapshot_body["knowledge_stats"]}
+    assert user_snapshot_stats["assignment_completion"]["percent"] == 100
+    assert user_snapshot_stats["graded_score"]["frequency"] == 18
+    assert "Mechanical energy decreases" not in str(user_snapshot_body)
+    assert "payload" not in str(user_snapshot_body)
+
+    duplicate_user_snapshot = client.post(
+        "/api/knowledge/me/snapshots",
+        headers=_auth_header(student_token),
+        params=snapshot_params,
+    )
+    assert duplicate_user_snapshot.status_code == 201
+    assert duplicate_user_snapshot.json()["id"] == user_snapshot_body["id"]
+
+    user_snapshot_list = client.get(
+        "/api/knowledge/me/snapshots",
+        headers=_auth_header(student_token),
+        params={"course_id": course_id, "class_id": class_id, "granularity": "day", "limit": 10},
+    )
+    assert user_snapshot_list.status_code == 200
+    user_snapshot_list_body = user_snapshot_list.json()
+    assert user_snapshot_list_body["total"] == 1
+    assert user_snapshot_list_body["next_offset"] is None
+    assert user_snapshot_list_body["items"][0]["id"] == user_snapshot_body["id"]
+
+    outsider_user_snapshot = client.post(
+        "/api/knowledge/me/snapshots",
+        headers=_auth_header(outsider_token),
+        params=snapshot_params,
+    )
+    assert outsider_user_snapshot.status_code == 403
+
     class_knowledge = client.get(
         f"/api/classes/{class_id}/knowledge?course_id={course_id}",
         headers=_auth_header(teacher_token),
@@ -453,7 +519,7 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client):
     assert class_stats["assignment_completion"]["sample_size"] == 1
     assert class_stats["graded_score"]["percent"] == 90
 
-    snapshot_params = {
+    class_snapshot_params = {
         "course_id": course_id,
         "from": "2026-01-01T00:00:00",
         "to": "2026-12-31T23:59:59",
@@ -462,7 +528,7 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client):
     class_snapshot = client.post(
         f"/api/classes/{class_id}/knowledge/snapshots",
         headers=_auth_header(teacher_token),
-        params=snapshot_params,
+        params=class_snapshot_params,
     )
     assert class_snapshot.status_code == 201
     class_snapshot_body = class_snapshot.json()
@@ -485,7 +551,7 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client):
     duplicate_snapshot = client.post(
         f"/api/classes/{class_id}/knowledge/snapshots",
         headers=_auth_header(teacher_token),
-        params=snapshot_params,
+        params=class_snapshot_params,
     )
     assert duplicate_snapshot.status_code == 201
     assert duplicate_snapshot.json()["id"] == class_snapshot_body["id"]
@@ -516,7 +582,7 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client):
     student_rebuild_snapshot = client.post(
         f"/api/classes/{class_id}/knowledge/snapshots",
         headers=_auth_header(student_token),
-        params=snapshot_params,
+        params=class_snapshot_params,
     )
     assert student_rebuild_snapshot.status_code == 403
 

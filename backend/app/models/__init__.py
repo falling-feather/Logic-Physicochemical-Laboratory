@@ -10,6 +10,7 @@ from app.models.course import (
     LearningEvent,
     PointLedger,
     Submission,
+    UserKnowledgeSnapshot,
 )
 from app.models.school import ClassGroup, ClassMembership, School, SchoolMembership
 from app.models.user import AuthSession, LoginAttempt, User
@@ -34,4 +35,5 @@ __all__ = [
     "SchoolMembership",
     "Submission",
     "User",
+    "UserKnowledgeSnapshot",
 ]
