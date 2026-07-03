@@ -150,7 +150,7 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert stats.json()["total_learning_events"] == 0
     assert stats.json()["total_bug_records"] == 1
     assert stats.json()["open_bug_records"] == 0
-    assert stats.json()["total_audit_logs"] == 4
+    assert stats.json()["total_audit_logs"] == 6
 
     audit_forbidden = client.get("/api/admin/audit-logs", headers=_auth_header(student_token))
     assert audit_forbidden.status_code == 403
@@ -158,7 +158,28 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     audit_logs = client.get("/api/admin/audit-logs?limit=10", headers=_auth_header(admin_token))
     assert audit_logs.status_code == 200
     actions = {item["action"] for item in audit_logs.json()}
-    assert actions == {"admin.bootstrap", "admin.user.update", "admin.bug.create", "admin.bug.update"}
+    assert actions == {
+        "admin.bootstrap",
+        "admin.user.update",
+        "school.create",
+        "class.create",
+        "admin.bug.create",
+        "admin.bug.update",
+    }
+
+    school_audit = client.get(
+        f"/api/admin/audit-logs?action=school.create&resource_id={school_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert school_audit.status_code == 200
+    assert school_audit.json()[0]["snapshot_json"]["after"]["name"] == "Admin Visible School"
+
+    class_audit = client.get(
+        f"/api/admin/audit-logs?action=class.create&resource_id={class_group.json()['id']}",
+        headers=_auth_header(admin_token),
+    )
+    assert class_audit.status_code == 200
+    assert class_audit.json()[0]["snapshot_json"]["after"]["name"] == "Admin Visible Class"
 
     update_audit = client.get(
         f"/api/admin/audit-logs?action=admin.user.update&resource_id={teacher['id']}",

@@ -81,6 +81,26 @@ def create_submission(
             occurred_at=now,
         )
     )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="submission.create",
+        resource_type="submission",
+        resource_id=submission.id,
+        school_id=course.school_id,
+        class_id=class_group.id,
+        snapshot={
+            "after": {
+                "assignment_id": assignment.id,
+                "student_id": current_user.id,
+                "class_id": class_group.id,
+                "course_id": course.id,
+                "unit_id": unit.id,
+                "status": submission.status,
+                "content_keys": sorted(payload.content.keys()),
+            }
+        },
+    )
     db.commit()
     db.refresh(submission)
     return submission

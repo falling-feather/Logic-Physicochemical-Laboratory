@@ -6,6 +6,7 @@ from app.api.deps.auth import get_current_user
 from app.db.session import get_db
 from app.models import ClassGroup, School, SchoolMembership, User
 from app.schemas.school import ClassRead, SchoolCreate, SchoolRead
+from app.services.audit import record_audit_log
 
 
 router = APIRouter()
@@ -42,12 +43,24 @@ def create_school(
     school = School(name=payload.name.strip(), region=(payload.region or "").strip() or None)
     db.add(school)
     db.flush()
-    db.add(
-        SchoolMembership(
-            school_id=school.id,
-            user_id=current_user.id,
-            role="admin" if current_user.role == "admin" else "teacher",
-        )
+    owner_role = "admin" if current_user.role == "admin" else "teacher"
+    db.add(SchoolMembership(school_id=school.id, user_id=current_user.id, role=owner_role))
+    db.flush()
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="school.create",
+        resource_type="school",
+        resource_id=school.id,
+        school_id=school.id,
+        snapshot={
+            "after": {
+                "name": school.name,
+                "region": school.region,
+                "status": school.status,
+                "creator_membership_role": owner_role,
+            }
+        },
     )
     db.commit()
     db.refresh(school)
@@ -80,4 +93,3 @@ def _require_school_member(db: Session, user: User, school_id: int) -> None:
     )
     if membership is None:
         raise HTTPException(status_code=403, detail="School is outside current user scope")
-

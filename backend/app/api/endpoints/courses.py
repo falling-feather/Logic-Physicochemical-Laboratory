@@ -24,6 +24,7 @@ from app.schemas.course import (
     CourseUnitCreate,
     CourseUnitRead,
 )
+from app.services.audit import record_audit_log
 
 
 router = APIRouter()
@@ -83,6 +84,24 @@ def create_course(
         status=payload.status,
     )
     db.add(course)
+    db.flush()
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="course.create",
+        resource_type="course",
+        resource_id=course.id,
+        school_id=course.school_id,
+        snapshot={
+            "after": {
+                "school_id": course.school_id,
+                "creator_user_id": course.creator_user_id,
+                "title": course.title,
+                "summary": course.summary,
+                "status": course.status,
+            }
+        },
+    )
     db.commit()
     db.refresh(course)
     return course
@@ -111,6 +130,23 @@ def attach_course_class(
 
     course_class = CourseClass(course_id=course.id, class_id=class_group.id)
     db.add(course_class)
+    db.flush()
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="course.class.attach",
+        resource_type="course_class",
+        resource_id=course_class.id,
+        school_id=course.school_id,
+        class_id=class_group.id,
+        snapshot={
+            "after": {
+                "course_id": course_class.course_id,
+                "class_id": course_class.class_id,
+                "status": course_class.status,
+            }
+        },
+    )
     db.commit()
     db.refresh(course_class)
     return course_class
@@ -158,6 +194,24 @@ def create_course_unit(
         status=payload.status,
     )
     db.add(unit)
+    db.flush()
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="course.unit.create",
+        resource_type="course_unit",
+        resource_id=unit.id,
+        school_id=course.school_id,
+        snapshot={
+            "after": {
+                "course_id": unit.course_id,
+                "title": unit.title,
+                "position": unit.position,
+                "content_slug": unit.content_slug,
+                "status": unit.status,
+            }
+        },
+    )
     db.commit()
     db.refresh(unit)
     return unit
@@ -211,6 +265,25 @@ def create_assignment(
         status=payload.status,
     )
     db.add(assignment)
+    db.flush()
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="assignment.create",
+        resource_type="assignment",
+        resource_id=assignment.id,
+        school_id=course.school_id,
+        snapshot={
+            "after": {
+                "course_id": course.id,
+                "unit_id": assignment.unit_id,
+                "title": assignment.title,
+                "due_at": assignment.due_at.isoformat() if assignment.due_at is not None else None,
+                "max_score": assignment.max_score,
+                "status": assignment.status,
+            }
+        },
+    )
     db.commit()
     db.refresh(assignment)
     return assignment

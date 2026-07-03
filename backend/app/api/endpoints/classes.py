@@ -6,6 +6,7 @@ from app.api.deps.auth import get_current_user
 from app.db.session import get_db
 from app.models import ClassGroup, ClassMembership, SchoolMembership, User
 from app.schemas.school import ClassCreate, ClassJoinRequest, ClassRead, MembershipRead
+from app.services.audit import record_audit_log
 
 
 router = APIRouter()
@@ -55,6 +56,25 @@ def create_class(
     db.flush()
     _ensure_school_membership(db, payload.school_id, current_user.id, "teacher")
     _ensure_class_membership(db, class_group.id, current_user.id, "teacher")
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="class.create",
+        resource_type="class",
+        resource_id=class_group.id,
+        school_id=class_group.school_id,
+        class_id=class_group.id,
+        snapshot={
+            "after": {
+                "school_id": class_group.school_id,
+                "name": class_group.name,
+                "grade": class_group.grade,
+                "term": class_group.term,
+                "status": class_group.status,
+                "creator_membership_role": "teacher",
+            }
+        },
+    )
     db.commit()
     db.refresh(class_group)
     return class_group
@@ -80,7 +100,25 @@ def join_class(
         _require_school_role(db, current_user, class_group.school_id, {"admin", "teacher"})
 
     _ensure_school_membership(db, class_group.school_id, current_user.id, role)
-    membership = _ensure_class_membership(db, class_group.id, current_user.id, role)
+    membership, membership_created = _ensure_class_membership(db, class_group.id, current_user.id, role)
+    if membership_created:
+        record_audit_log(
+            db,
+            actor=current_user,
+            action="class.join",
+            resource_type="class_membership",
+            resource_id=membership.id,
+            school_id=class_group.school_id,
+            class_id=class_group.id,
+            snapshot={
+                "after": {
+                    "class_id": membership.class_id,
+                    "user_id": membership.user_id,
+                    "role": membership.role,
+                    "status": membership.status,
+                }
+            },
+        )
     db.commit()
     db.refresh(membership)
     return membership
@@ -141,7 +179,7 @@ def _ensure_school_membership(db: Session, school_id: int, user_id: int, role: s
     return membership
 
 
-def _ensure_class_membership(db: Session, class_id: int, user_id: int, role: str) -> ClassMembership:
+def _ensure_class_membership(db: Session, class_id: int, user_id: int, role: str) -> tuple[ClassMembership, bool]:
     membership = db.scalar(
         select(ClassMembership).where(
             ClassMembership.class_id == class_id,
@@ -153,4 +191,5 @@ def _ensure_class_membership(db: Session, class_id: int, user_id: int, role: str
         membership = ClassMembership(class_id=class_id, user_id=user_id, role=role)
         db.add(membership)
         db.flush()
-    return membership
+        return membership, True
+    return membership, False

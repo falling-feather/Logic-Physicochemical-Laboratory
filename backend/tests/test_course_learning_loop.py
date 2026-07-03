@@ -91,6 +91,7 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client):
     )
     assert attach.status_code == 201
     assert attach.json()["class_id"] == class_id
+    course_class_id = attach.json()["id"]
 
     unit = client.post(
         f"/api/courses/{course_id}/units",
@@ -136,6 +137,15 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client):
         json={"role": "student"},
     )
     assert join.status_code == 201
+    membership_id = join.json()["id"]
+
+    duplicate_join = client.post(
+        f"/api/classes/{class_id}/join",
+        headers=_auth_header(student_token),
+        json={"role": "student"},
+    )
+    assert duplicate_join.status_code == 201
+    assert duplicate_join.json()["id"] == membership_id
 
     student_courses = client.get("/api/courses", headers=_auth_header(student_token))
     assert student_courses.status_code == 200
@@ -312,6 +322,54 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client):
     assert grade_snapshot["before"]["score"] is None
     assert grade_snapshot["after"]["score"] == 18
     assert grade_snapshot["after"]["score_delta"] == 18
+
+    course_audit = client.get(
+        f"/api/admin/audit-logs?action=course.create&resource_id={course_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert course_audit.status_code == 200
+    assert len(course_audit.json()) == 1
+    assert course_audit.json()[0]["snapshot_json"]["after"]["title"] == "Mechanics Path"
+
+    course_class_audit = client.get(
+        f"/api/admin/audit-logs?action=course.class.attach&resource_id={course_class_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert course_class_audit.status_code == 200
+    assert len(course_class_audit.json()) == 1
+    assert course_class_audit.json()[0]["snapshot_json"]["after"]["class_id"] == class_id
+
+    unit_audit = client.get(
+        f"/api/admin/audit-logs?action=course.unit.create&resource_id={unit_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert unit_audit.status_code == 200
+    assert len(unit_audit.json()) == 1
+    assert unit_audit.json()[0]["snapshot_json"]["after"]["course_id"] == course_id
+
+    assignment_audit = client.get(
+        f"/api/admin/audit-logs?action=assignment.create&resource_id={assignment_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert assignment_audit.status_code == 200
+    assert len(assignment_audit.json()) == 1
+    assert assignment_audit.json()[0]["snapshot_json"]["after"]["unit_id"] == unit_id
+
+    class_join_audit = client.get(
+        f"/api/admin/audit-logs?action=class.join&class_id={class_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert class_join_audit.status_code == 200
+    assert len(class_join_audit.json()) == 1
+    assert class_join_audit.json()[0]["snapshot_json"]["after"]["role"] == "student"
+
+    submission_create_audit = client.get(
+        f"/api/admin/audit-logs?action=submission.create&resource_id={submission_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert submission_create_audit.status_code == 200
+    assert len(submission_create_audit.json()) == 1
+    assert submission_create_audit.json()[0]["snapshot_json"]["after"]["content_keys"] == ["answer"]
 
     student_points = client.get("/api/points/ledger", headers=_auth_header(student_token))
     assert student_points.status_code == 200
