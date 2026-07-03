@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, utc_now
@@ -101,3 +101,45 @@ class LearningEvent(TimestampMixin, Base):
     event_type: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
     payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class ClassKnowledgeSnapshot(TimestampMixin, Base):
+    __tablename__ = "class_knowledge_snapshots"
+    __table_args__ = (
+        UniqueConstraint(
+            "class_id",
+            "course_scope_id",
+            "granularity",
+            "period_start",
+            "period_end",
+            "rule_version",
+            name="uq_class_knowledge_snapshot_window",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    school_id: Mapped[int] = mapped_column(ForeignKey("schools.id"), index=True, nullable=False)
+    class_id: Mapped[int] = mapped_column(ForeignKey("class_groups.id"), index=True, nullable=False)
+    course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True, nullable=True)
+    course_scope_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    granularity: Mapped[str] = mapped_column(String(16), default="custom", index=True, nullable=False)
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    rule_version: Mapped[str] = mapped_column(String(32), default="v1", nullable=False)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    students_total: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    students_active: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    assignment_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    expected_submissions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    submitted_assignments: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    graded_assignments: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_events: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    complete_events: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    score_total: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_score_total: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    average_score_percent: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    completion_percent: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    total_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    average_points_per_student: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    knowledge_stats_json: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)

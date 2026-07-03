@@ -1,7 +1,9 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+
+KnowledgeSnapshotGranularity = Literal["day", "week", "custom"]
 
 
 class KnowledgeStatRead(BaseModel):
@@ -59,3 +61,41 @@ class ClassKnowledgeRead(BaseModel):
     total_points: int
     average_points_per_student: float
     knowledge_stats: list[KnowledgeStatRead]
+
+
+class ClassKnowledgeSnapshotRead(BaseModel):
+    id: int
+    school_id: int
+    class_id: int
+    course_id: int | None = None
+    granularity: KnowledgeSnapshotGranularity
+    period_start: datetime
+    period_end: datetime
+    rule_version: str
+    created_by_user_id: int
+    calculated_at: datetime
+    created_at: datetime
+    updated_at: datetime
+    students_total: int
+    students_active: int
+    assignment_count: int
+    expected_submissions: int
+    submitted_assignments: int
+    graded_assignments: int
+    total_events: int
+    complete_events: int
+    score_total: int
+    max_score_total: int
+    average_score_percent: float
+    completion_percent: float
+    total_points: int
+    average_points_per_student: float
+    knowledge_stats: list[KnowledgeStatRead]
+
+
+class ClassKnowledgeSnapshotPage(BaseModel):
+    items: list[ClassKnowledgeSnapshotRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
