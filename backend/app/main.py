@@ -26,6 +26,9 @@ def create_app() -> FastAPI:
         request.state.request_id = request_id
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
+        if request.url.path.startswith(settings.api_prefix):
+            response.headers["Cache-Control"] = settings.api_cache_control
+            response.headers["Pragma"] = "no-cache"
         return response
 
     if settings.cors_origin_list:

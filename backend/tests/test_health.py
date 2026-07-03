@@ -1,7 +1,10 @@
 def test_health_reports_sqlite_test_database(client):
-    response = client.get("/api/health")
+    response = client.get("/api/health", headers={"X-Request-ID": "health-smoke"})
 
     assert response.status_code == 200
+    assert response.headers["X-Request-ID"] == "health-smoke"
+    assert response.headers["Cache-Control"] == "no-store"
+    assert response.headers["Pragma"] == "no-cache"
     payload = response.json()
     assert payload["status"] == "ok"
     assert payload["service"] == "astra-backend"
