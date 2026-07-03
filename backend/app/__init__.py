@@ -1,0 +1,2 @@
+"""Astra backend application package."""
+
