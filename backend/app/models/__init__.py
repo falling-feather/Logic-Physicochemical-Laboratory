@@ -1,4 +1,5 @@
 from app.models.base import Base
+from app.models.admin import BugRecord
 from app.models.content import ContentPageRecord
 from app.models.course import Assignment, Course, CourseClass, CourseUnit, LearningEvent, PointLedger, Submission
 from app.models.school import ClassGroup, ClassMembership, School, SchoolMembership
@@ -8,6 +9,7 @@ __all__ = [
     "Assignment",
     "AuthSession",
     "Base",
+    "BugRecord",
     "ClassGroup",
     "ClassMembership",
     "ContentPageRecord",

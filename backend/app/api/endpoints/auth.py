@@ -42,6 +42,8 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
     user = db.scalar(select(User).where(User.username == payload.username))
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+    if user.status != "active":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is disabled")
 
     settings = get_settings()
     token = create_session_token()

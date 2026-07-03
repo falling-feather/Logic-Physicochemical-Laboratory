@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     session_cookie_name: str = "astra_session"
     session_days: int = 7
     cors_origins: str = "http://127.0.0.1:8766,http://localhost:8766"
+    admin_bootstrap_token: str | None = None
     database_url: str = Field(
         default="mysql+pymysql://astra:astra@127.0.0.1:3306/astra?charset=utf8mb4",
         description="SQLAlchemy database URL. MySQL is the production target.",

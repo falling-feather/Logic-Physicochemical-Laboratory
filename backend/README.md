@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、学校、班级、课程、作业、提交批改、积分流水和学习统计等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、学校、班级、课程、作业、提交批改、积分流水、学习统计和管理端基础 API 等能力。
 
 ## 本地启动
 
@@ -29,6 +29,13 @@ curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 | POST | `/api/auth/login` | 登录并返回 Bearer token，同时写入 HttpOnly cookie |
 | POST | `/api/auth/logout` | 注销当前用户所有活动会话 |
 | GET | `/api/users/me` | 当前用户 |
+| POST | `/api/admin/bootstrap` | 首个管理员受控初始化；公开注册仍拒绝 admin |
+| GET/PATCH | `/api/admin/users` / `/api/admin/users/{id}` | 管理端用户列表与角色/状态维护 |
+| GET | `/api/admin/schools` | 管理端学校基础查看 |
+| GET | `/api/admin/classes` | 管理端班级基础查看，可按学校过滤 |
+| GET | `/api/admin/content/pages` | 管理端内容页状态查看 |
+| GET | `/api/admin/stats` | 管理端全站统计摘要 |
+| GET/POST/PATCH | `/api/admin/bugs` | 缺陷/风险清单基础维护 |
 | GET/POST | `/api/schools` | 当前用户可见学校 / 创建学校 |
 | GET | `/api/schools/{id}/classes` | 学校内班级 |
 | GET/POST | `/api/classes` | 当前用户可见班级 / 创建班级 |
@@ -74,6 +81,7 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 | `ASTRA_ENVIRONMENT` | `development` | 运行环境 |
 | `ASTRA_API_PREFIX` | `/api` | API 前缀 |
 | `ASTRA_AUTO_CREATE_TABLES` | `false` | 是否启动时自动建表，开发临时可用，正式迁移应使用 Alembic |
+| `ASTRA_ADMIN_BOOTSTRAP_TOKEN` | 空 | 首个管理员初始化令牌；生产环境必须配置 |
 | `ASTRA_CORS_ORIGINS` | `http://127.0.0.1:8766,http://localhost:8766` | 允许访问 API 的前端来源白名单 |
 | `ASTRA_DATABASE_URL` | `mysql+pymysql://astra:astra@127.0.0.1:3306/astra?charset=utf8mb4` | MySQL 连接字符串 |
 
