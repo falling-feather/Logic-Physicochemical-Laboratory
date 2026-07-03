@@ -19,7 +19,7 @@ const Router = {
     coursePages: ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology'],
     _activeGalaxy: null,
     _galaxyCacheKey: 'astra-galaxy-cache-meta',
-    _galaxyCacheVersion: '20260630mainV64',
+    _galaxyCacheVersion: '20260704qianduanV70',
     _galaxyPageMap: {
         planets: 'astra',
         home: 'englab',
@@ -68,8 +68,8 @@ const Router = {
         ]
     },
     pageScripts: {
-        home: 'pages/home/home.js?v=20260619v63StartupLazyP1',
-        planets: 'pages/planets/planets.js?v=20260630mainV64',
+        home: 'pages/home/home.js?v=20260704qianduanV70',
+        planets: 'pages/planets/planets.js?v=20260704qianduanV70',
         cosmos: 'pages/cosmos/earth-sun.js?v=20260630mainV64',
         datascience: 'pages/datascience/linear-regression.js?v=20260630mainV64',
         infotech: 'pages/infotech/network-layers.js?v=20260630mainV64',

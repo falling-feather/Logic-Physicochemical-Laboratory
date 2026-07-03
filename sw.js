@@ -1,11 +1,11 @@
-const CACHE_NAME = 'astra-static-v20260703v65BackendSchemaP4';
+const CACHE_NAME = 'astra-static-v20260704qianduanV70';
 const APP_SHELL = [
   './',
   './index.html',
   './shared/js/lucide.min.js?v=20260417d',
   './shared/js/config.js?v=20260703v65BackendSchemaP4',
-  './shared/js/router.js?v=20260703v65BackendSchemaP4',
-  './shared/js/main.js?v=20260703v65BackendSchemaP4',
+  './shared/js/router.js?v=20260704qianduanV70',
+  './shared/js/main.js?v=20260704qianduanV70',
   './shared/js/backend-content.js?v=20260703v65BackendSchemaP4',
   './shared/css/tokens.css?v=20260424ss',
   './shared/css/base.css?v=20260630mainV64',
@@ -13,9 +13,9 @@ const APP_SHELL = [
   './shared/css/navbar.css?v=20260630mainV64',
   './shared/css/page-layout.css?v=20260606v62e',
   './shared/css/backend-content.css?v=20260703v65BackendSchemaP4',
-  './shared/css/responsive.css?v=20260630mainV64',
-  './pages/planets/planets.css?v=20260630mainV64',
-  './pages/planets/planets.js?v=20260630mainV64',
+  './shared/css/responsive.css?v=20260704qianduanV70',
+  './pages/planets/planets.css?v=20260704qianduanV70',
+  './pages/planets/planets.js?v=20260704qianduanV70',
   './UI/future-galaxy/future-galaxy-hero-sky.png',
   './UI/future-galaxy/future-galaxy-hero-nebula.png',
 ];
