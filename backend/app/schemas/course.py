@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field
 CourseStatus = Literal["draft", "published", "archived"]
 UnitStatus = Literal["draft", "published", "archived"]
 AssignmentStatus = Literal["active", "closed", "archived"]
+SubmissionStatus = Literal["submitted", "graded", "returned"]
+SubmissionGradeStatus = Literal["graded", "returned"]
 LearningEventType = Literal["visit", "start", "submit", "complete"]
 
 
@@ -102,3 +104,55 @@ class LearningEventRead(BaseModel):
     event_type: str
     payload: dict[str, Any]
     occurred_at: datetime
+
+
+class SubmissionCreate(BaseModel):
+    class_id: int
+    content: dict[str, Any] = Field(default_factory=dict)
+
+
+class SubmissionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    assignment_id: int
+    student_id: int
+    class_id: int | None = None
+    content: dict[str, Any]
+    status: str
+    score: int | None = None
+    feedback: str | None = None
+    graded_by_user_id: int | None = None
+    submitted_at: datetime
+    graded_at: datetime | None = None
+
+
+class SubmissionGrade(BaseModel):
+    score: int = Field(ge=0, le=1000)
+    feedback: str | None = Field(default=None, max_length=4000)
+    status: SubmissionGradeStatus = "graded"
+
+
+class PointLedgerRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    school_id: int | None = None
+    class_id: int | None = None
+    assignment_id: int | None = None
+    submission_id: int | None = None
+    delta: int
+    reason: str
+    note: str | None = None
+    created_by_user_id: int | None = None
+
+
+class ProgressSummary(BaseModel):
+    user_id: int
+    submitted_assignments: int
+    graded_assignments: int
+    learning_events: int
+    completed_events: int
+    total_points: int
+    completion_percent: float

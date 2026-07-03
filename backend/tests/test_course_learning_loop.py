@@ -145,6 +145,82 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client):
     assert event.json()["event_type"] == "complete"
     assert event.json()["school_id"] == school_id
 
+    unscoped_assignment_event = client.post(
+        "/api/learning-events",
+        headers=_auth_header(student_token),
+        json={
+            "assignment_id": assignment_id,
+            "event_type": "submit",
+            "payload": {"missing": "class"},
+        },
+    )
+    assert unscoped_assignment_event.status_code == 422
+
+    submission = client.post(
+        f"/api/assignments/{assignment_id}/submissions",
+        headers=_auth_header(student_token),
+        json={
+            "class_id": class_id,
+            "content": {"answer": "Mechanical energy decreases; total energy stays conserved."},
+        },
+    )
+    assert submission.status_code == 201
+    submission_id = submission.json()["id"]
+
+    duplicate_submission = client.post(
+        f"/api/assignments/{assignment_id}/submissions",
+        headers=_auth_header(student_token),
+        json={"class_id": class_id, "content": {"answer": "duplicate"}},
+    )
+    assert duplicate_submission.status_code == 409
+
+    outsider_submission = client.post(
+        f"/api/assignments/{assignment_id}/submissions",
+        headers=_auth_header(outsider_token),
+        json={"class_id": class_id, "content": {"answer": "out of scope"}},
+    )
+    assert outsider_submission.status_code == 403
+
+    outsider_submission_list = client.get(
+        f"/api/assignments/{assignment_id}/submissions",
+        headers=_auth_header(outsider_token),
+    )
+    assert outsider_submission_list.status_code == 403
+
+    grade = client.patch(
+        f"/api/submissions/{submission_id}/grade",
+        headers=_auth_header(teacher_token),
+        json={"score": 18, "feedback": "Clear observation."},
+    )
+    assert grade.status_code == 200
+    assert grade.json()["status"] == "graded"
+    assert grade.json()["score"] == 18
+
+    student_points = client.get("/api/points/ledger", headers=_auth_header(student_token))
+    assert student_points.status_code == 200
+    assert student_points.json()[0]["delta"] == 18
+    assert student_points.json()[0]["submission_id"] == submission_id
+
+    teacher_points = client.get(
+        f"/api/points/ledger?class_id={class_id}",
+        headers=_auth_header(teacher_token),
+    )
+    assert teacher_points.status_code == 200
+    assert teacher_points.json()[0]["user_id"] == grade.json()["student_id"]
+
+    progress = client.get(f"/api/progress/me?class_id={class_id}", headers=_auth_header(student_token))
+    assert progress.status_code == 200
+    assert progress.json()["submitted_assignments"] == 1
+    assert progress.json()["graded_assignments"] == 1
+    assert progress.json()["total_points"] == 18
+
+    teacher_progress = client.get(
+        f"/api/progress/users/{grade.json()['student_id']}?class_id={class_id}",
+        headers=_auth_header(teacher_token),
+    )
+    assert teacher_progress.status_code == 200
+    assert teacher_progress.json()["user_id"] == grade.json()["student_id"]
+
     own_events = client.get("/api/learning-events", headers=_auth_header(student_token))
     assert own_events.status_code == 200
     assert own_events.json()[0]["payload"]["score"] == 18

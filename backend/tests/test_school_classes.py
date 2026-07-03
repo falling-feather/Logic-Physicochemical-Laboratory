@@ -64,3 +64,30 @@ def test_teacher_creates_school_class_and_student_joins(client):
     assert teacher_classes.status_code == 200
     assert teacher_classes.json()[0]["name"] == "Physics Class A"
 
+
+def test_teacher_cannot_self_join_other_school_class_as_teacher(client):
+    owner_token = _register_and_login(client, "teacher_owner_scope", "teacher")
+    outsider_teacher_token = _register_and_login(client, "teacher_outside_scope", "teacher")
+
+    school = client.post(
+        "/api/schools",
+        headers=_auth_header(owner_token),
+        json={"name": "Astra Scoped School", "region": "Shanghai"},
+    )
+    assert school.status_code == 201
+    school_id = school.json()["id"]
+
+    class_response = client.post(
+        "/api/classes",
+        headers=_auth_header(owner_token),
+        json={"school_id": school_id, "name": "Scoped Class", "grade": "10"},
+    )
+    assert class_response.status_code == 201
+    class_id = class_response.json()["id"]
+
+    join_as_teacher = client.post(
+        f"/api/classes/{class_id}/join",
+        headers=_auth_header(outsider_teacher_token),
+        json={"role": "teacher"},
+    )
+    assert join_as_teacher.status_code == 403

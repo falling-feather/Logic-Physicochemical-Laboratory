@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、学校、班级、课程、作业和学习事件等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、学校、班级、课程、作业、提交批改、积分流水和学习统计等能力。
 
 ## 本地启动
 
@@ -39,6 +39,12 @@ curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 | GET | `/api/courses/{id}/assignments` | 课程作业列表 |
 | POST | `/api/courses/{id}/units/{unit_id}/assignments` | 教师创建作业 |
 | GET/POST | `/api/learning-events` | 学习事件查询 / 记录访问、提交、完成等事件 |
+| POST | `/api/assignments/{id}/submissions` | 学生提交作业 |
+| GET | `/api/assignments/{id}/submissions` | 学生查看本人提交 / 教师查看作业提交 |
+| PATCH | `/api/submissions/{id}/grade` | 教师批改作业并生成积分流水 |
+| GET | `/api/points/ledger` | 查询个人或班级范围积分流水 |
+| GET | `/api/progress/me` | 当前用户个人进度摘要 |
+| GET | `/api/progress/users/{id}` | 教师查看班级内学生进度摘要 |
 | GET | `/api/content/pages` | 当前内容页摘要 |
 | GET | `/api/content/pages/{slug}` | 内容协议详情 |
 | GET | `/api/render/page/{slug}` | 前端可渲染页面结构 |

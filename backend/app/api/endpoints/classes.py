@@ -76,6 +76,8 @@ def join_class(
         raise HTTPException(status_code=422, detail="Unsupported class role")
     if role == "teacher" and current_user.role not in {"admin", "teacher"}:
         raise HTTPException(status_code=403, detail="Only teachers can join with teacher role")
+    if role == "teacher" and current_user.role != "admin":
+        _require_school_role(db, current_user, class_group.school_id, {"admin", "teacher"})
 
     _ensure_school_membership(db, class_group.school_id, current_user.id, role)
     membership = _ensure_class_membership(db, class_group.id, current_user.id, role)
@@ -152,4 +154,3 @@ def _ensure_class_membership(db: Session, class_id: int, user_id: int, role: str
         db.add(membership)
         db.flush()
     return membership
-

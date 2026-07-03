@@ -28,6 +28,8 @@ def create_learning_event(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> LearningEvent:
+    if payload.assignment_id is not None and payload.class_id is None:
+        raise HTTPException(status_code=422, detail="Assignment learning events require class_id")
     course, unit, assignment = _resolve_learning_scope(db, payload)
     if course is None:
         raise HTTPException(status_code=422, detail="Learning event must target a course, unit, or assignment")
