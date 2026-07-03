@@ -66,7 +66,20 @@ def test_admin_views_user_management_stats_and_bug_records(client):
 
     users = client.get("/api/admin/users", headers=_auth_header(admin_token))
     assert users.status_code == 200
-    teacher = next(item for item in users.json() if item["username"] == "teacher_admin_scope")
+    users_body = users.json()
+    assert users_body["total"] == 3
+    assert users_body["next_offset"] is None
+    teacher = next(item for item in users_body["items"] if item["username"] == "teacher_admin_scope")
+
+    paged_users = client.get("/api/admin/users?limit=2", headers=_auth_header(admin_token))
+    assert paged_users.status_code == 200
+    assert paged_users.json()["total"] == 3
+    assert paged_users.json()["next_offset"] == 2
+
+    searched_users = client.get("/api/admin/users?q=student_admin_scope", headers=_auth_header(admin_token))
+    assert searched_users.status_code == 200
+    assert searched_users.json()["total"] == 1
+    assert searched_users.json()["items"][0]["username"] == "student_admin_scope"
 
     disable_teacher = client.patch(
         f"/api/admin/users/{teacher['id']}",
@@ -106,18 +119,29 @@ def test_admin_views_user_management_stats_and_bug_records(client):
 
     admin_schools = client.get("/api/admin/schools", headers=_auth_header(admin_token))
     assert admin_schools.status_code == 200
-    assert admin_schools.json()[0]["name"] == "Admin Visible School"
+    assert admin_schools.json()["total"] == 1
+    assert admin_schools.json()["items"][0]["name"] == "Admin Visible School"
+
+    searched_schools = client.get("/api/admin/schools?q=Visible", headers=_auth_header(admin_token))
+    assert searched_schools.status_code == 200
+    assert searched_schools.json()["total"] == 1
 
     admin_classes = client.get(
         f"/api/admin/classes?school_id={school_id}",
         headers=_auth_header(admin_token),
     )
     assert admin_classes.status_code == 200
-    assert admin_classes.json()[0]["name"] == "Admin Visible Class"
+    assert admin_classes.json()["total"] == 1
+    assert admin_classes.json()["items"][0]["name"] == "Admin Visible Class"
 
-    pages = client.get("/api/admin/content/pages", headers=_auth_header(admin_token))
+    searched_classes = client.get("/api/admin/classes?q=Visible", headers=_auth_header(admin_token))
+    assert searched_classes.status_code == 200
+    assert searched_classes.json()["total"] == 1
+
+    pages = client.get("/api/admin/content/pages?q=energy", headers=_auth_header(admin_token))
     assert pages.status_code == 200
-    assert pages.json()[0]["slug"] == "physics/energy-conservation"
+    assert pages.json()["total"] >= 1
+    assert pages.json()["items"][0]["slug"] == "physics/energy-conservation"
 
     bug = client.post(
         "/api/admin/bugs",
@@ -157,7 +181,8 @@ def test_admin_views_user_management_stats_and_bug_records(client):
 
     audit_logs = client.get("/api/admin/audit-logs?limit=10", headers=_auth_header(admin_token))
     assert audit_logs.status_code == 200
-    actions = {item["action"] for item in audit_logs.json()}
+    assert audit_logs.json()["total"] == 6
+    actions = {item["action"] for item in audit_logs.json()["items"]}
     assert actions == {
         "admin.bootstrap",
         "admin.user.update",
@@ -172,23 +197,31 @@ def test_admin_views_user_management_stats_and_bug_records(client):
         headers=_auth_header(admin_token),
     )
     assert school_audit.status_code == 200
-    assert school_audit.json()[0]["snapshot_json"]["after"]["name"] == "Admin Visible School"
+    assert school_audit.json()["total"] == 1
+    assert school_audit.json()["items"][0]["snapshot_json"]["after"]["name"] == "Admin Visible School"
 
     class_audit = client.get(
         f"/api/admin/audit-logs?action=class.create&resource_id={class_group.json()['id']}",
         headers=_auth_header(admin_token),
     )
     assert class_audit.status_code == 200
-    assert class_audit.json()[0]["snapshot_json"]["after"]["name"] == "Admin Visible Class"
+    assert class_audit.json()["total"] == 1
+    assert class_audit.json()["items"][0]["snapshot_json"]["after"]["name"] == "Admin Visible Class"
 
     update_audit = client.get(
         f"/api/admin/audit-logs?action=admin.user.update&resource_id={teacher['id']}",
         headers=_auth_header(admin_token),
     )
     assert update_audit.status_code == 200
-    assert len(update_audit.json()) == 1
-    update_snapshot = update_audit.json()[0]["snapshot_json"]
+    assert update_audit.json()["total"] == 1
+    update_snapshot = update_audit.json()["items"][0]["snapshot_json"]
     assert update_snapshot["changes"]["status"] == {"from": "active", "to": "disabled"}
+
+    bug_page = client.get("/api/admin/bugs?q=smoke&limit=1", headers=_auth_header(admin_token))
+    assert bug_page.status_code == 200
+    assert bug_page.json()["total"] == 1
+    assert bug_page.json()["items"][0]["id"] == bug_id
+    assert bug_page.json()["next_offset"] is None
 
     student_forbidden = client.get("/api/admin/stats", headers=_auth_header(student_token))
     assert student_forbidden.status_code == 403

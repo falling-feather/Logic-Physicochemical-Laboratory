@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、学校、班级、课程、作业、提交批改、积分流水、知识状态/班级规则统计、管理端基础 API、学校/班级深度统计、待批改队列和组织/教学关键写操作审计等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、登录、学校、班级、课程、作业、提交批改、积分流水、知识状态/班级规则统计、管理端基础 API、学校/班级深度统计、管理端列表分页搜索、待批改队列和组织/教学关键写操作审计等能力。
 
 ## 本地启动
 
@@ -30,16 +30,16 @@ curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 | POST | `/api/auth/logout` | 注销当前用户所有活动会话 |
 | GET | `/api/users/me` | 当前用户 |
 | POST | `/api/admin/bootstrap` | 首个管理员受控初始化；公开注册仍拒绝 admin |
-| GET/PATCH | `/api/admin/users` / `/api/admin/users/{id}` | 管理端用户列表与角色/状态维护 |
-| GET | `/api/admin/schools` | 管理端学校基础查看 |
+| GET/PATCH | `/api/admin/users` / `/api/admin/users/{id}` | 管理端用户列表与角色/状态维护；列表返回 `items/total/limit/offset/next_offset` |
+| GET | `/api/admin/schools` | 管理端学校基础查看；支持分页与关键字搜索 |
 | GET | `/api/admin/schools/{id}/stats` | 管理端学校深度统计，聚合班级、成员、课程、作业、提交、事件和积分 |
-| GET | `/api/admin/classes` | 管理端班级基础查看，可按学校过滤 |
+| GET | `/api/admin/classes` | 管理端班级基础查看，可按学校过滤，支持分页与关键字搜索 |
 | GET | `/api/admin/classes/{id}/stats` | 管理端班级深度统计，含预期提交、待批改比例、积分和平均得分 |
-| GET | `/api/admin/content/pages` | 管理端内容页状态查看 |
+| GET | `/api/admin/content/pages` | 管理端内容页状态查看；支持分页与 slug/title/galaxy/subject 搜索 |
 | GET | `/api/admin/stats` | 管理端全站统计摘要 |
-| GET | `/api/admin/audit-logs` | 管理端审计日志查询，可按 actor/action/resource/时间窗过滤 |
+| GET | `/api/admin/audit-logs` | 管理端审计日志查询，分页返回，可按 actor/action/resource/时间窗过滤 |
 | GET | `/api/admin/submissions/pending` | 管理端待批改队列，支持 school/class/course/assignment/student/status/时间窗过滤和 limit/offset 分页 |
-| GET/POST/PATCH | `/api/admin/bugs` | 缺陷/风险清单基础维护 |
+| GET/POST/PATCH | `/api/admin/bugs` | 缺陷/风险清单基础维护；列表支持分页、状态过滤和关键字搜索 |
 | GET/POST | `/api/schools` | 当前用户可见学校 / 创建学校 |
 | GET | `/api/schools/{id}/classes` | 学校内班级 |
 | GET/POST | `/api/classes` | 当前用户可见班级 / 创建班级 |

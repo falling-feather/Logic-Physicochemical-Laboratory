@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.school import ClassRead, SchoolRead
+
 
 AdminUserRole = Literal["admin", "teacher", "student"]
 AdminUserStatus = Literal["active", "disabled"]
@@ -29,6 +31,14 @@ class AdminUserRead(BaseModel):
     updated_at: datetime
 
 
+class AdminUserPage(BaseModel):
+    items: list[AdminUserRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
 class AdminUserUpdate(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=120)
     role: AdminUserRole | None = None
@@ -47,6 +57,30 @@ class AdminContentPageRead(BaseModel):
     status: str
     version: str
     updated_at: datetime
+
+
+class AdminContentPagePage(BaseModel):
+    items: list[AdminContentPageRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class AdminSchoolPage(BaseModel):
+    items: list[SchoolRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class AdminClassPage(BaseModel):
+    items: list[ClassRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
 
 
 class AdminStats(BaseModel):
@@ -155,6 +189,14 @@ class AuditLogRead(BaseModel):
     created_at: datetime
 
 
+class AuditLogPage(BaseModel):
+    items: list[AuditLogRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
 class BugRecordCreate(BaseModel):
     title: str = Field(min_length=1, max_length=240)
     category: str = Field(default="general", min_length=1, max_length=80)
@@ -188,3 +230,11 @@ class BugRecordRead(BaseModel):
     notes: str | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class BugRecordPage(BaseModel):
+    items: list[BugRecordRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None

@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
@@ -28,20 +28,25 @@ from app.models import (
 )
 from app.schemas.admin import (
     AdminBootstrapRequest,
+    AdminClassPage,
     AdminClassStats,
     AdminContentPageRead,
+    AdminContentPagePage,
     AdminPendingSubmissionQueue,
     AdminPendingSubmissionRead,
+    AdminSchoolPage,
     AdminSchoolStats,
     AdminStats,
     AdminUserRead,
+    AdminUserPage,
     AdminUserUpdate,
+    AuditLogPage,
     AuditLogRead,
     BugRecordCreate,
+    BugRecordPage,
     BugRecordRead,
     BugRecordUpdate,
 )
-from app.schemas.school import ClassRead, SchoolRead
 from app.services.audit import record_audit_log
 from app.services.content_catalog import ensure_seed_pages
 
@@ -89,20 +94,28 @@ def bootstrap_admin(payload: AdminBootstrapRequest, db: Session = Depends(get_db
     return user
 
 
-@router.get("/users", response_model=list[AdminUserRead])
+@router.get("/users", response_model=AdminUserPage)
 def list_users(
     role: str | None = Query(default=None),
     status_filter: str | None = Query(default=None, alias="status"),
+    q: str | None = Query(default=None, max_length=120),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> list[User]:
+) -> AdminUserPage:
     _require_admin(current_user)
     statement = select(User).order_by(User.id)
     if role is not None:
         statement = statement.where(User.role == role.strip().lower())
     if status_filter is not None:
         statement = statement.where(User.status == status_filter.strip().lower())
-    return list(db.scalars(statement).all())
+    if q is not None and q.strip():
+        pattern = f"%{q.strip()}%"
+        statement = statement.where(or_(User.username.ilike(pattern), User.display_name.ilike(pattern)))
+    total = _statement_count(db, statement)
+    items = list(db.scalars(statement.offset(offset).limit(limit)).all())
+    return AdminUserPage(items=items, total=total, limit=limit, offset=offset, next_offset=_next_offset(total, offset, len(items)))
 
 
 @router.patch("/users/{user_id}", response_model=AdminUserRead)
@@ -145,13 +158,25 @@ def update_user(
     return user
 
 
-@router.get("/schools", response_model=list[SchoolRead])
+@router.get("/schools", response_model=AdminSchoolPage)
 def list_admin_schools(
+    status_filter: str | None = Query(default=None, alias="status"),
+    q: str | None = Query(default=None, max_length=160),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> list[School]:
+) -> AdminSchoolPage:
     _require_admin(current_user)
-    return list(db.scalars(select(School).order_by(School.id)).all())
+    statement = select(School).order_by(School.id)
+    if status_filter is not None:
+        statement = statement.where(School.status == status_filter.strip().lower())
+    if q is not None and q.strip():
+        pattern = f"%{q.strip()}%"
+        statement = statement.where(or_(School.name.ilike(pattern), School.region.ilike(pattern)))
+    total = _statement_count(db, statement)
+    items = list(db.scalars(statement.offset(offset).limit(limit)).all())
+    return AdminSchoolPage(items=items, total=total, limit=limit, offset=offset, next_offset=_next_offset(total, offset, len(items)))
 
 
 @router.get("/schools/{school_id}/stats", response_model=AdminSchoolStats)
@@ -202,17 +227,34 @@ def read_admin_school_stats(
     )
 
 
-@router.get("/classes", response_model=list[ClassRead])
+@router.get("/classes", response_model=AdminClassPage)
 def list_admin_classes(
     school_id: int | None = Query(default=None),
+    status_filter: str | None = Query(default=None, alias="status"),
+    q: str | None = Query(default=None, max_length=160),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> list[ClassGroup]:
+) -> AdminClassPage:
     _require_admin(current_user)
     statement = select(ClassGroup).order_by(ClassGroup.id)
     if school_id is not None:
         statement = statement.where(ClassGroup.school_id == school_id)
-    return list(db.scalars(statement).all())
+    if status_filter is not None:
+        statement = statement.where(ClassGroup.status == status_filter.strip().lower())
+    if q is not None and q.strip():
+        pattern = f"%{q.strip()}%"
+        statement = statement.where(
+            or_(
+                ClassGroup.name.ilike(pattern),
+                ClassGroup.grade.ilike(pattern),
+                ClassGroup.term.ilike(pattern),
+            )
+        )
+    total = _statement_count(db, statement)
+    items = list(db.scalars(statement.offset(offset).limit(limit)).all())
+    return AdminClassPage(items=items, total=total, limit=limit, offset=offset, next_offset=_next_offset(total, offset, len(items)))
 
 
 @router.get("/classes/{class_id}/stats", response_model=AdminClassStats)
@@ -285,15 +327,19 @@ def read_admin_class_stats(
     )
 
 
-@router.get("/content/pages", response_model=list[AdminContentPageRead])
+@router.get("/content/pages", response_model=AdminContentPagePage)
 def list_admin_content_pages(
+    status_filter: str | None = Query(default=None, alias="status"),
+    q: str | None = Query(default=None, max_length=160),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> list[AdminContentPageRead]:
+) -> AdminContentPagePage:
     _require_admin(current_user)
     ensure_seed_pages(db)
     records = db.scalars(select(ContentPageRecord).order_by(ContentPageRecord.slug)).all()
-    return [
+    items = [
         AdminContentPageRead(
             id=record.id,
             slug=record.slug,
@@ -307,6 +353,29 @@ def list_admin_content_pages(
         )
         for record in records
     ]
+    if status_filter is not None:
+        normalized_status = status_filter.strip().lower()
+        items = [item for item in items if item.status == normalized_status]
+    if q is not None and q.strip():
+        normalized_query = q.strip().lower()
+        items = [
+            item
+            for item in items
+            if normalized_query in item.slug.lower()
+            or normalized_query in item.title.lower()
+            or normalized_query in item.galaxy.lower()
+            or normalized_query in item.subject.lower()
+            or normalized_query in item.layout.lower()
+        ]
+    total = len(items)
+    page_items = items[offset : offset + limit]
+    return AdminContentPagePage(
+        items=page_items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        next_offset=_next_offset(total, offset, len(page_items)),
+    )
 
 
 @router.get("/stats", response_model=AdminStats)
@@ -338,7 +407,7 @@ def read_admin_stats(
     )
 
 
-@router.get("/audit-logs", response_model=list[AuditLogRead])
+@router.get("/audit-logs", response_model=AuditLogPage)
 def list_audit_logs(
     actor_user_id: int | None = Query(default=None),
     action: str | None = Query(default=None),
@@ -352,7 +421,7 @@ def list_audit_logs(
     offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> list[AuditLog]:
+) -> AuditLogPage:
     _require_admin(current_user)
     if from_at is not None and to_at is not None and from_at > to_at:
         raise HTTPException(status_code=422, detail="from must be earlier than to")
@@ -373,7 +442,9 @@ def list_audit_logs(
         statement = statement.where(AuditLog.created_at >= from_at)
     if to_at is not None:
         statement = statement.where(AuditLog.created_at <= to_at)
-    return list(db.scalars(statement.offset(offset).limit(limit)).all())
+    total = _statement_count(db, statement)
+    items = list(db.scalars(statement.offset(offset).limit(limit)).all())
+    return AuditLogPage(items=items, total=total, limit=limit, offset=offset, next_offset=_next_offset(total, offset, len(items)))
 
 
 @router.get("/submissions/pending", response_model=AdminPendingSubmissionQueue)
@@ -448,21 +519,37 @@ def list_pending_submissions(
         )
         for submission, assignment, course, class_group, student in rows
     ]
-    next_offset = offset + len(items) if offset + len(items) < total else None
+    next_offset = _next_offset(total, offset, len(items))
     return AdminPendingSubmissionQueue(items=items, total=total, limit=limit, offset=offset, next_offset=next_offset)
 
 
-@router.get("/bugs", response_model=list[BugRecordRead])
+@router.get("/bugs", response_model=BugRecordPage)
 def list_bug_records(
     status_filter: str | None = Query(default=None, alias="status"),
+    q: str | None = Query(default=None, max_length=160),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> list[BugRecord]:
+) -> BugRecordPage:
     _require_admin(current_user)
     statement = select(BugRecord).order_by(BugRecord.id)
     if status_filter is not None:
         statement = statement.where(BugRecord.status == status_filter.strip().lower())
-    return list(db.scalars(statement).all())
+    if q is not None and q.strip():
+        pattern = f"%{q.strip()}%"
+        statement = statement.where(
+            or_(
+                BugRecord.title.ilike(pattern),
+                BugRecord.category.ilike(pattern),
+                BugRecord.source.ilike(pattern),
+                BugRecord.evidence.ilike(pattern),
+                BugRecord.notes.ilike(pattern),
+            )
+        )
+    total = _statement_count(db, statement)
+    items = list(db.scalars(statement.offset(offset).limit(limit)).all())
+    return BugRecordPage(items=items, total=total, limit=limit, offset=offset, next_offset=_next_offset(total, offset, len(items)))
 
 
 @router.post("/bugs", response_model=BugRecordRead, status_code=status.HTTP_201_CREATED)
@@ -746,6 +833,16 @@ def _count(db: Session, model, *criteria: Any) -> int:
     for criterion in criteria:
         statement = statement.where(criterion)
     return int(db.scalar(statement) or 0)
+
+
+def _statement_count(db: Session, statement: Any) -> int:
+    count_statement = select(func.count()).select_from(statement.order_by(None).subquery())
+    return int(db.scalar(count_statement) or 0)
+
+
+def _next_offset(total: int, offset: int, item_count: int) -> int | None:
+    next_offset = offset + item_count
+    return next_offset if next_offset < total else None
 
 
 def _strip_optional(value: str | None) -> str | None:
