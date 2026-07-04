@@ -1,19 +1,36 @@
+from datetime import UTC, datetime
+import hashlib
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
 from app.db.session import get_db
-from app.models import ContentDraft, User
+from app.models import ContentDraft, ContentPageRecord, ContentPageVersion, User
 from app.models.base import utc_now
-from app.schemas.content import ContentDraftCreate, ContentDraftRead, ContentDraftScriptReview, ContentPage
+from app.schemas.content import (
+    ContentDraftCreate,
+    ContentDraftPublish,
+    ContentDraftRead,
+    ContentDraftScriptReview,
+    ContentPage,
+    ContentPageRollback,
+    ContentPublicationRead,
+)
 from app.services.audit import record_audit_log
 from app.services.content_catalog import get_page_schema, list_page_summaries
 
 
 router = APIRouter()
+CONTENT_DRAFT_STATUS_DRAFT = "draft"
+CONTENT_DRAFT_STATUS_PUBLISHED = "published"
+CONTENT_PAGE_STATUS_PUBLISHED = "published"
 SCRIPT_REVIEW_NOT_REQUIRED = "not_required"
 SCRIPT_REVIEW_PENDING = "pending"
+SCRIPT_REVIEW_APPROVED = "approved"
+SCRIPT_REFERENCE_KEYS = {"script", "scriptpath", "scripturl", "scriptsrc", "inlinescript"}
 
 
 @router.post("/drafts", response_model=ContentDraftRead, status_code=status.HTTP_201_CREATED)
@@ -29,11 +46,14 @@ def create_content_draft(
     page_schema = payload.page_schema
     if target_slug != page_schema.slug.strip():
         raise HTTPException(status_code=422, detail="target_slug must match schema.slug")
+    page_schema = page_schema.model_copy(update={"slug": target_slug})
+    if not payload.allow_script and _schema_contains_script_reference(page_schema):
+        raise HTTPException(status_code=422, detail="Content schema includes script references; allow_script is required")
     existing = db.scalar(
         select(ContentDraft).where(
             ContentDraft.author_user_id == current_user.id,
             ContentDraft.target_slug == target_slug,
-            ContentDraft.status == "draft",
+            ContentDraft.status == CONTENT_DRAFT_STATUS_DRAFT,
         )
     )
     if existing is not None:
@@ -43,7 +63,7 @@ def create_content_draft(
         author_user_id=current_user.id,
         target_slug=target_slug,
         title=page_schema.title.strip(),
-        status="draft",
+        status=CONTENT_DRAFT_STATUS_DRAFT,
         schema_json=page_schema.model_dump(mode="json"),
         allow_script=payload.allow_script,
         script_review_status=SCRIPT_REVIEW_PENDING if payload.allow_script else SCRIPT_REVIEW_NOT_REQUIRED,
@@ -77,6 +97,79 @@ def read_content_draft(
     if current_user.role != "admin" and draft.author_user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Content draft is outside your scope")
     return _content_draft_read(draft)
+
+
+@router.post("/drafts/{draft_id}/publish", response_model=ContentPublicationRead)
+def publish_content_draft(
+    draft_id: int,
+    payload: ContentDraftPublish,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ContentPublicationRead:
+    _require_admin(current_user)
+    draft = db.get(ContentDraft, draft_id)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Content draft not found")
+    if draft.status != CONTENT_DRAFT_STATUS_DRAFT:
+        raise HTTPException(status_code=409, detail="Content draft is not publishable")
+    if not draft.allow_script and _schema_contains_script_reference(ContentPage.model_validate(draft.schema_json)):
+        raise HTTPException(status_code=409, detail="Content schema includes script references; script review is required")
+    if draft.allow_script and draft.script_review_status != SCRIPT_REVIEW_APPROVED:
+        raise HTTPException(status_code=409, detail="Content draft script review must be approved before publishing")
+    _reject_stale_content_draft(db, draft)
+
+    target_slug = draft.target_slug.strip()
+    _validate_content_slug(target_slug)
+    version = _next_content_version(db, target_slug)
+    page_schema = _published_page_schema(draft.schema_json, target_slug, version)
+    page_payload = page_schema.model_dump(mode="json")
+    page = db.scalar(select(ContentPageRecord).where(ContentPageRecord.slug == target_slug))
+    page_before = _content_page_snapshot(page) if page is not None else None
+    if page is None:
+        page = ContentPageRecord(
+            slug=target_slug,
+            status=CONTENT_PAGE_STATUS_PUBLISHED,
+            version=version,
+            schema_json=page_payload,
+        )
+        db.add(page)
+    else:
+        page.status = CONTENT_PAGE_STATUS_PUBLISHED
+        page.version = version
+        page.schema_json = page_payload
+    db.flush()
+
+    version_record = _new_content_page_version(
+        db,
+        page=page,
+        page_schema=page_schema,
+        publisher=current_user,
+        note=payload.note,
+        source_draft_id=draft.id,
+        restored_from_version_id=None,
+    )
+    draft_before = _content_draft_snapshot(draft)
+    draft.status = CONTENT_DRAFT_STATUS_PUBLISHED
+    draft_after = _content_draft_snapshot(draft)
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="content.draft.publish",
+        resource_type="content_draft",
+        resource_id=draft.id,
+        event_result="success",
+        request=request,
+        snapshot={
+            "draft": _change_snapshot(draft_before, draft_after),
+            "page": {"before": page_before, "after": _content_page_snapshot(page)},
+            "version": _content_page_version_snapshot(version_record),
+        },
+    )
+    db.commit()
+    db.refresh(page)
+    db.refresh(version_record)
+    return _content_publication_read(page, version_record)
 
 
 @router.patch("/drafts/{draft_id}/script-review", response_model=ContentDraftRead)
@@ -115,6 +208,58 @@ def review_content_draft_script(
     db.commit()
     db.refresh(draft)
     return _content_draft_read(draft)
+
+
+@router.post("/page-versions/{version_id}/rollback", response_model=ContentPublicationRead)
+def rollback_content_page_version(
+    version_id: int,
+    payload: ContentPageRollback,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ContentPublicationRead:
+    _require_admin(current_user)
+    target_version = db.get(ContentPageVersion, version_id)
+    if target_version is None:
+        raise HTTPException(status_code=404, detail="Content page version not found")
+    page = db.get(ContentPageRecord, target_version.page_id)
+    if page is None:
+        raise HTTPException(status_code=409, detail="Published content page is missing")
+
+    page_before = _content_page_snapshot(page)
+    version = _next_content_version(db, target_version.slug)
+    page_schema = _published_page_schema(target_version.schema_json, target_version.slug, version)
+    page.status = CONTENT_PAGE_STATUS_PUBLISHED
+    page.version = version
+    page.schema_json = page_schema.model_dump(mode="json")
+    db.flush()
+    version_record = _new_content_page_version(
+        db,
+        page=page,
+        page_schema=page_schema,
+        publisher=current_user,
+        note=payload.note,
+        source_draft_id=None,
+        restored_from_version_id=target_version.id,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="content.page.rollback",
+        resource_type="content_page",
+        resource_id=page.id,
+        event_result="success",
+        request=request,
+        snapshot={
+            "page": {"before": page_before, "after": _content_page_snapshot(page)},
+            "restored_from": _content_page_version_snapshot(target_version),
+            "version": _content_page_version_snapshot(version_record),
+        },
+    )
+    db.commit()
+    db.refresh(page)
+    db.refresh(version_record)
+    return _content_publication_read(page, version_record)
 
 
 @router.get("/pages", response_model=list[dict])
@@ -170,6 +315,24 @@ def _content_draft_read(draft: ContentDraft) -> ContentDraftRead:
     )
 
 
+def _content_publication_read(
+    page: ContentPageRecord,
+    version_record: ContentPageVersion,
+) -> ContentPublicationRead:
+    return ContentPublicationRead(
+        id=page.id,
+        slug=page.slug,
+        title=str(page.schema_json.get("title", page.slug)),
+        status=page.status,
+        version=page.version,
+        schema_hash=version_record.schema_hash,
+        version_id=version_record.id,
+        source_draft_id=version_record.source_draft_id,
+        restored_from_version_id=version_record.restored_from_version_id,
+        updated_at=page.updated_at,
+    )
+
+
 def _content_draft_snapshot(draft: ContentDraft) -> dict:
     return {
         "author_user_id": draft.author_user_id,
@@ -181,6 +344,119 @@ def _content_draft_snapshot(draft: ContentDraft) -> dict:
         "script_reviewed_by_user_id": draft.script_reviewed_by_user_id,
         "script_review_note": draft.script_review_note,
     }
+
+
+def _content_page_snapshot(page: ContentPageRecord) -> dict:
+    return {
+        "id": page.id,
+        "slug": page.slug,
+        "title": page.schema_json.get("title", page.slug),
+        "status": page.status,
+        "version": page.version,
+    }
+
+
+def _content_page_version_snapshot(version_record: ContentPageVersion) -> dict:
+    return {
+        "id": version_record.id,
+        "page_id": version_record.page_id,
+        "slug": version_record.slug,
+        "title": version_record.schema_json.get("title", version_record.slug),
+        "status": version_record.status,
+        "version": version_record.version,
+        "schema_hash": version_record.schema_hash,
+        "source_draft_id": version_record.source_draft_id,
+        "restored_from_version_id": version_record.restored_from_version_id,
+        "published_by_user_id": version_record.published_by_user_id,
+        "note": version_record.note,
+    }
+
+
+def _published_page_schema(schema_json: dict, target_slug: str, version: str) -> ContentPage:
+    page_schema = ContentPage.model_validate(schema_json)
+    if page_schema.slug.strip() != target_slug:
+        raise HTTPException(status_code=422, detail="target_slug must match schema.slug")
+    normalized_schema = page_schema.model_copy(update={"slug": target_slug})
+    return normalized_schema.model_copy(update={"status": CONTENT_PAGE_STATUS_PUBLISHED, "version": version})
+
+
+def _new_content_page_version(
+    db: Session,
+    *,
+    page: ContentPageRecord,
+    page_schema: ContentPage,
+    publisher: User,
+    note: str | None,
+    source_draft_id: int | None,
+    restored_from_version_id: int | None,
+) -> ContentPageVersion:
+    version_payload = page_schema.model_dump(mode="json")
+    version_record = ContentPageVersion(
+        page_id=page.id,
+        slug=page.slug,
+        status=page.status,
+        version=page.version,
+        schema_hash=_schema_hash(version_payload),
+        schema_json=version_payload,
+        source_draft_id=source_draft_id,
+        restored_from_version_id=restored_from_version_id,
+        published_by_user_id=publisher.id,
+        published_at=utc_now(),
+        note=_strip_optional(note),
+    )
+    db.add(version_record)
+    db.flush()
+    return version_record
+
+
+def _next_content_version(db: Session, slug: str) -> str:
+    existing_versions = db.scalar(
+        select(func.count()).select_from(ContentPageVersion).where(ContentPageVersion.slug == slug)
+    )
+    return f"v{int(existing_versions or 0) + 1}"
+
+
+def _reject_stale_content_draft(db: Session, draft: ContentDraft) -> None:
+    latest_version = db.scalar(
+        select(ContentPageVersion)
+        .where(ContentPageVersion.slug == draft.target_slug)
+        .order_by(ContentPageVersion.published_at.desc(), ContentPageVersion.id.desc())
+        .limit(1)
+    )
+    if latest_version is None:
+        return
+    if _as_utc(latest_version.published_at) > _as_utc(draft.created_at):
+        raise HTTPException(status_code=409, detail="Content draft is based on an older published version")
+
+
+def _schema_contains_script_reference(page_schema: ContentPage) -> bool:
+    for section in page_schema.sections:
+        if _contains_script_reference(section.props):
+            return True
+    return False
+
+
+def _contains_script_reference(value) -> bool:
+    if isinstance(value, dict):
+        for key, nested_value in value.items():
+            if str(key).replace("_", "").replace("-", "").lower() in SCRIPT_REFERENCE_KEYS:
+                return True
+            if _contains_script_reference(nested_value):
+                return True
+    if isinstance(value, list):
+        return any(_contains_script_reference(item) for item in value)
+    return False
+
+
+def _schema_hash(payload: dict) -> str:
+    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _change_snapshot(before: dict, after: dict) -> dict:

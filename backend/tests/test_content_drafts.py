@@ -167,6 +167,15 @@ def test_content_draft_validates_schema_and_slug(client):
     )
     assert invalid_schema.status_code == 422
 
+    hidden_script = _draft_payload("physics/hidden-script")
+    hidden_script["schema"]["sections"][0]["props"]["scriptPath"] = "drafts/hidden.js"
+    hidden_script_response = client.post(
+        "/api/content/drafts",
+        headers=_auth_header(teacher_token),
+        json=hidden_script,
+    )
+    assert hidden_script_response.status_code == 422
+
 
 def test_admin_reviews_script_draft_and_records_audit(client):
     first_admin_token = _bootstrap_admin(client, username="admin_content_first")

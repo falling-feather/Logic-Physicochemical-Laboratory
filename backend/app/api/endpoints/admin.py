@@ -18,6 +18,7 @@ from app.models import (
     ClassMembership,
     ContentDraft,
     ContentPageRecord,
+    ContentPageVersion,
     Course,
     CourseClass,
     CourseUnit,
@@ -37,6 +38,8 @@ from app.schemas.admin import (
     AdminClassStats,
     AdminContentPageRead,
     AdminContentPagePage,
+    AdminContentPageVersionPage,
+    AdminContentPageVersionRead,
     AdminContentDraftPage,
     AdminContentDraftRead,
     AdminPendingSubmissionQueue,
@@ -540,6 +543,49 @@ def list_admin_content_drafts(
     )
 
 
+@router.get("/content/page-versions", response_model=AdminContentPageVersionPage)
+def list_admin_content_page_versions(
+    slug: str | None = Query(default=None, max_length=180),
+    source_draft_id: int | None = Query(default=None),
+    restored_from_version_id: int | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=160),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminContentPageVersionPage:
+    _require_admin(current_user)
+    statement = select(ContentPageVersion).order_by(
+        ContentPageVersion.published_at.desc(),
+        ContentPageVersion.id.desc(),
+    )
+    if slug is not None and slug.strip():
+        statement = statement.where(ContentPageVersion.slug == slug.strip("/"))
+    if source_draft_id is not None:
+        statement = statement.where(ContentPageVersion.source_draft_id == source_draft_id)
+    if restored_from_version_id is not None:
+        statement = statement.where(ContentPageVersion.restored_from_version_id == restored_from_version_id)
+    if q is not None and q.strip():
+        pattern = f"%{q.strip()}%"
+        statement = statement.where(
+            or_(
+                ContentPageVersion.slug.ilike(pattern),
+                ContentPageVersion.version.ilike(pattern),
+                ContentPageVersion.note.ilike(pattern),
+            )
+        )
+    total = _statement_count(db, statement)
+    versions = list(db.scalars(statement.offset(offset).limit(limit)).all())
+    items = [_admin_content_page_version_read(version) for version in versions]
+    return AdminContentPageVersionPage(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        next_offset=_next_offset(total, offset, len(items)),
+    )
+
+
 @router.get("/stats", response_model=AdminStats)
 def read_admin_stats(
     current_user: User = Depends(get_current_user),
@@ -559,6 +605,7 @@ def read_admin_stats(
         pending_class_join_requests=_count(db, ClassJoinRequest, ClassJoinRequest.status == "pending"),
         total_content_pages=_count(db, ContentPageRecord),
         total_content_drafts=_count(db, ContentDraft),
+        total_content_page_versions=_count(db, ContentPageVersion),
         pending_script_reviews=_count(db, ContentDraft, ContentDraft.script_review_status == "pending"),
         total_courses=_count(db, Course),
         total_assignments=_count(db, Assignment),
@@ -855,6 +902,24 @@ def _admin_content_draft_read(draft: ContentDraft, author: User) -> AdminContent
         script_review_note=draft.script_review_note,
         created_at=draft.created_at,
         updated_at=draft.updated_at,
+    )
+
+
+def _admin_content_page_version_read(version: ContentPageVersion) -> AdminContentPageVersionRead:
+    return AdminContentPageVersionRead(
+        id=version.id,
+        page_id=version.page_id,
+        slug=version.slug,
+        title=str(version.schema_json.get("title", version.slug)),
+        status=version.status,
+        version=version.version,
+        schema_hash=version.schema_hash,
+        source_draft_id=version.source_draft_id,
+        restored_from_version_id=version.restored_from_version_id,
+        published_by_user_id=version.published_by_user_id,
+        published_at=version.published_at,
+        note=version.note,
+        created_at=version.created_at,
     )
 
 

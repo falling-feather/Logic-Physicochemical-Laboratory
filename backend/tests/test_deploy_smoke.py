@@ -26,6 +26,7 @@ def test_deploy_smoke_reports_ready_database_and_api(monkeypatch):
         assert "users" in report["schema"]["actual_tables"]
         assert "content_pages" in report["schema"]["actual_tables"]
         assert "content_drafts" in report["schema"]["actual_tables"]
+        assert "content_page_versions" in report["schema"]["actual_tables"]
         assert report["api"]["status"] == "healthy"
         assert report["api"]["health"]["database"]["ok"] is True
     finally:

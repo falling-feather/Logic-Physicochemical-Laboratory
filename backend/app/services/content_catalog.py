@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import ContentPageRecord
+from app.models import ContentPageRecord, ContentPageVersion
 from app.schemas.content import ContentPage
 
 
@@ -11,7 +11,7 @@ ENERGY_CONSERVATION_PAGE = ContentPage(
     subject="physics",
     title="机械能守恒",
     layout="experiment-page",
-    status="draft",
+    status="published",
     version="2026.07-v6.5-schema.1",
     summary="以物理能量守恒实验为后端内容协议第一试点，保留现有实验交互并由后端提供页面结构。",
     sections=[
@@ -85,7 +85,7 @@ def ensure_seed_pages(db: Session) -> None:
                     schema_json=page.model_dump(mode="json"),
                 )
             )
-        elif existing.version != page.version:
+        elif existing.version != page.version and not _has_published_versions(db, page.slug):
             existing.status = page.status
             existing.version = page.version
             existing.schema_json = page.model_dump(mode="json")
@@ -93,14 +93,21 @@ def ensure_seed_pages(db: Session) -> None:
 
 
 def get_page_schema(db: Session, slug: str) -> ContentPage | None:
-    record = db.scalar(select(ContentPageRecord).where(ContentPageRecord.slug == slug.strip("/")))
+    record = db.scalar(
+        select(ContentPageRecord).where(
+            ContentPageRecord.slug == slug.strip("/"),
+            ContentPageRecord.status == "published",
+        )
+    )
     if record is None:
         return None
     return ContentPage.model_validate(record.schema_json)
 
 
 def list_page_summaries(db: Session) -> list[dict]:
-    records = db.scalars(select(ContentPageRecord).order_by(ContentPageRecord.slug)).all()
+    records = db.scalars(
+        select(ContentPageRecord).where(ContentPageRecord.status == "published").order_by(ContentPageRecord.slug)
+    ).all()
     return [
         {
             "slug": page.slug,
@@ -113,3 +120,8 @@ def list_page_summaries(db: Session) -> list[dict]:
         }
         for page in records
     ]
+
+
+def _has_published_versions(db: Session, slug: str) -> bool:
+    version_id = db.scalar(select(ContentPageVersion.id).where(ContentPageVersion.slug == slug).limit(1))
+    return version_id is not None

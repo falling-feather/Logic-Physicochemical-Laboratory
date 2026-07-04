@@ -61,6 +61,14 @@ class ContentDraftScriptReview(BaseModel):
     note: str | None = Field(default=None, max_length=1000)
 
 
+class ContentDraftPublish(BaseModel):
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class ContentPageRollback(BaseModel):
+    note: str | None = Field(default=None, max_length=1000)
+
+
 class ContentDraftRead(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -76,5 +84,18 @@ class ContentDraftRead(BaseModel):
     script_review_note: str | None = None
     page_schema: ContentPage = Field(alias="schema")
     created_at: datetime
+    updated_at: datetime
+
+
+class ContentPublicationRead(BaseModel):
+    id: int
+    slug: str
+    title: str
+    status: str
+    version: str
+    schema_hash: str
+    version_id: int
+    source_draft_id: int | None = None
+    restored_from_version_id: int | None = None
     updated_at: datetime
 

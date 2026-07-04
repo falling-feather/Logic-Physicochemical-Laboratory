@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -30,4 +30,26 @@ class ContentDraft(TimestampMixin, Base):
     script_reviewed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
     script_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     script_review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ContentPageVersion(TimestampMixin, Base):
+    __tablename__ = "content_page_versions"
+    __table_args__ = (UniqueConstraint("slug", "version", name="uq_content_page_versions_slug_version"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    page_id: Mapped[int] = mapped_column(ForeignKey("content_pages.id"), index=True, nullable=False)
+    slug: Mapped[str] = mapped_column(String(180), index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    version: Mapped[str] = mapped_column(String(64), nullable=False)
+    schema_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    schema_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    source_draft_id: Mapped[int | None] = mapped_column(ForeignKey("content_drafts.id"), index=True, nullable=True)
+    restored_from_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("content_page_versions.id"),
+        index=True,
+        nullable=True,
+    )
+    published_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
 

@@ -92,6 +92,30 @@ class AdminContentDraftPage(BaseModel):
     next_offset: int | None = None
 
 
+class AdminContentPageVersionRead(BaseModel):
+    id: int
+    page_id: int
+    slug: str
+    title: str
+    status: str
+    version: str
+    schema_hash: str
+    source_draft_id: int | None = None
+    restored_from_version_id: int | None = None
+    published_by_user_id: int
+    published_at: datetime
+    note: str | None = None
+    created_at: datetime
+
+
+class AdminContentPageVersionPage(BaseModel):
+    items: list[AdminContentPageVersionRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
 class AdminSchoolPage(BaseModel):
     items: list[SchoolRead]
     total: int
@@ -150,6 +174,7 @@ class AdminStats(BaseModel):
     pending_class_join_requests: int
     total_content_pages: int
     total_content_drafts: int
+    total_content_page_versions: int
     pending_script_reviews: int
     total_courses: int
     total_assignments: int

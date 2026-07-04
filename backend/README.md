@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、ContentDraft 草稿与脚本审核、登录、密码策略、登录失败锁定、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、待批改队列、审计元数据和认证事件审计等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、ContentDraft 草稿与脚本审核、内容发布/版本记录/回滚、登录、密码策略、登录失败锁定、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、待批改队列、审计元数据和认证事件审计等能力。
 
 ## 本地启动
 
@@ -38,6 +38,7 @@ curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 | GET/PATCH | `/api/admin/class-join-requests` / `/api/admin/class-join-requests/{id}` | 管理端班级加入申请队列与审批；队列支持 school/class/user/role/status/q/时间窗过滤 |
 | GET | `/api/admin/content/pages` | 管理端内容页状态查看；支持分页与 slug/title/galaxy/subject 搜索 |
 | GET | `/api/admin/content/drafts` | 管理端内容草稿队列；支持 status/script_review_status/author/q 分页过滤 |
+| GET | `/api/admin/content/page-versions` | 管理端内容版本历史；支持 slug/source_draft/restored_from/q 分页过滤 |
 | GET | `/api/admin/stats` | 管理端全站统计摘要 |
 | GET | `/api/admin/audit-logs` | 管理端审计日志查询，分页返回，可按 actor/action/resource/request_id/event_result/failure_reason/时间窗过滤 |
 | GET | `/api/admin/submissions/pending` | 管理端待批改队列，支持 school/class/course/assignment/student/status/时间窗过滤和 limit/offset 分页 |
@@ -67,11 +68,13 @@ curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 | GET | `/api/classes/{id}/knowledge` | 教师查看班级知识状态与作业/正确率聚合 |
 | POST | `/api/classes/{id}/knowledge/snapshots` | 教师或管理员按时间窗重算并写入班级知识快照，重复窗口幂等更新 |
 | GET | `/api/classes/{id}/knowledge/snapshots` | 教师或管理员分页查看班级知识快照，可按课程、粒度和时间窗过滤 |
-| GET | `/api/content/pages` | 当前内容页摘要 |
-| GET | `/api/content/pages/{slug}` | 内容协议详情 |
+| GET | `/api/content/pages` | 当前已发布内容页摘要 |
+| GET | `/api/content/pages/{slug}` | 已发布内容协议详情 |
 | POST | `/api/content/drafts` | 教师或管理员创建内容草稿；不会写入公开 `content_pages` |
 | GET | `/api/content/drafts/{id}` | 草稿作者或管理员读取单条草稿 |
+| POST | `/api/content/drafts/{id}/publish` | 管理员发布草稿到公开内容页，并写入不可变版本记录 |
 | PATCH | `/api/content/drafts/{id}/script-review` | 管理员审核允许脚本的草稿；作者不能自审 |
+| POST | `/api/content/page-versions/{id}/rollback` | 管理员按历史版本追加式回滚，生成新的当前版本 |
 | GET | `/api/render/page/{slug}` | 前端可渲染页面结构 |
 
 ## 前端 schema smoke
@@ -128,7 +131,8 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 - `app.services.access_control` 负责学校、班级和课程范围判断，普通业务端点不再各自复制 `_require_*` helper；后续权限矩阵扩展应优先在这里收口。
 - `app.services.class_join_requests` 负责加入申请审批状态流转和成员关系补齐。
 - `app.services.audit` 负责写入审计日志及 request_id、IP 哈希、user-agent 等请求元数据。
-- `app.services.content_catalog` 负责内容页 seed、schema 读取和内容页摘要；`/api/content/*` 与 `/api/render/*` 查询只读现有记录，不在 GET 路径隐式写库。
+- `app.services.content_catalog` 负责内容页 seed、已发布 schema 读取和内容页摘要；`/api/content/pages*` 与 `/api/render/*` 查询只读 published 当前记录，不在 GET 路径隐式写库；seed 在已有版本历史时不会覆盖同 slug 的发布内容。
+- `/api/content/drafts/{id}/publish` 与 `/api/content/page-versions/{id}/rollback` 负责内容生命周期写入：更新 `content_pages` 当前态、追加 `content_page_versions`，并在审计中只记录版本元数据与 schema hash，不记录完整 schema。
 - `app.services.knowledge_snapshot_runs` 与 `app.services.knowledge_snapshot_scheduler` 负责知识快照窗口重算、运行记录和单进程调度。
 
 ## 验证
@@ -151,7 +155,7 @@ $env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
 python -m alembic upgrade head
 ```
 
-当前 Alembic head：`20260704_0014`（ContentDraft 草稿与脚本审核）。
+当前 Alembic head：`20260704_0015`（内容版本记录与回滚）。
 
 知识快照周期重算：
 
