@@ -594,11 +594,11 @@ body.planets-scroll-locked .navbar {
     border-color: rgba(var(--g-color), 0.7);
 }
 
-/* ── 目录面板：右侧制图板，直角 + 角标托架 + 行分隔线 ── */
+/* ── 目录面板：聚焦行星右侧的制图板，直角 + 角标托架 + 行分隔线 ── */
 #page-planets .planets-menu {
     position: absolute;
     z-index: 40;
-    right: clamp(16px, 3vw, 44px);
+    left: clamp(400px, 42%, 700px);
     top: 50%;
     translate: 0 -50%;
     width: min(400px, calc(100vw - 32px));
@@ -607,12 +607,13 @@ body.planets-scroll-locked .navbar {
     padding: 26px 26px 22px;
     background: rgba(5, 9, 19, 0.78);
     border: 0;
+    contain: layout style;
     backdrop-filter: blur(20px) saturate(1.25);
     -webkit-backdrop-filter: blur(20px) saturate(1.25);
     opacity: 0;
-    transform: translateX(26px);
+    transform: translateX(-18px);
     pointer-events: none;
-    transition: opacity 0.32s cubic-bezier(0.16, 1, 0.3, 1), transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: opacity 0.36s cubic-bezier(0.16, 1, 0.3, 1), transform 0.36s cubic-bezier(0.16, 1, 0.3, 1);
     scrollbar-width: thin;
     scrollbar-color: rgba(147, 178, 218, 0.3) transparent;
     /* 角标托架（双向渐变边框模拟） */
@@ -866,7 +867,7 @@ body.planets-scroll-locked .navbar {
         bottom: 12px;
         translate: 0 0;
         width: auto;
-        max-height: 56vh;
+        max-height: 52vh;
         padding: 20px 18px 16px;
         transform: translateY(24px);
     }

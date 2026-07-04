@@ -69,7 +69,7 @@ const Router = {
     },
     pageScripts: {
         home: 'pages/home/home.js?v=20260704qianduanV70',
-        planets: 'pages/planets/planets.js?v=20260704qianduanV71',
+        planets: 'pages/planets/planets.js?v=20260704qianduanV72',
         cosmos: 'pages/cosmos/earth-sun.js?v=20260630mainV64',
         datascience: 'pages/datascience/linear-regression.js?v=20260630mainV64',
         infotech: 'pages/infotech/network-layers.js?v=20260630mainV64',

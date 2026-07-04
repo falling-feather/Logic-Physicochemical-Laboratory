@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════
-   星序 Astra · 总览星图  v7.1 (qianduan · 拨盘重构)
-   - StarfieldEngine : 视差星场 + 鼠标星座连线 + 流星 + 星云
-   - Dial            : 太阳系拨盘 — 主序星嵌于边缘，行星骑在轨道上，
-                       拖动轮盘旋转（老式拨号盘），准星对位选择星系
+   星序 Astra · 总览星图  v7.2 (qianduan · 环形拨盘)
+   - 环形拓扑：三颗行星按 120° 均布在逻辑环上，走到尽头绕回第一颗
+   - 待机自转：无操作时轮盘缓速自转（行星巡游 + 球面自旋）
+   - 选中动画：行星放大飞至左侧定位点 → 介绍面板滑入
+   - 性能：几何缓存 / visibilitychange 暂停 / 低端设备降级 / DPR 封顶
    契约: window.initPlanets / window.destroyPlanets 必须存在
    ═══════════════════════════════════════════════════════════════ */
 
@@ -11,17 +12,20 @@
 
     const TAU = Math.PI * 2;
     const DEG = Math.PI / 180;
+    const RING = TAU / 3;          // 相邻行星在逻辑环上的间距 (120°)
+    const VIS_K = 0.46;            // 逻辑角 → 视觉角压缩系数（±180° → ±83°扇区）
+    const IDLE_SPEED = 0.000055;   // 待机自转角速度 (rad/ms)
+    const LOW_END = (navigator.hardwareConcurrency || 8) <= 4 ||
+                    (navigator.deviceMemory && navigator.deviceMemory <= 4);
+
     const lerp = (a, b, t) => a + (b - a) * t;
-    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
     const wrapPi = (a) => {
         while (a > Math.PI) a -= TAU;
         while (a < -Math.PI) a += TAU;
         return a;
     };
 
-    /* 拨盘上行星的排列顺序（中间位默认选中工科试验室） */
     const GALAXY_ORDER = ['codespace', 'englab', 'frontier'];
-    const SPREAD = 55 * DEG;   // 相邻行星的角间距
 
     const GALAXIES = {
         englab: {
@@ -71,13 +75,6 @@
         }
     };
 
-    /* 每个星系行星的主题色 (r,g,b) */
-    const NODE_COLORS = {
-        englab: '120, 184, 255',
-        codespace: '94, 228, 208',
-        frontier: '240, 199, 120'
-    };
-
     /* ───────────────────── 星场引擎（Canvas 背景层） ───────────────────── */
     const StarfieldEngine = {
         canvas: null, ctx: null,
@@ -100,7 +97,7 @@
 
         resize(w, h) {
             if (!this.canvas || !this.ctx) return;
-            this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+            this.dpr = Math.min(window.devicePixelRatio || 1, LOW_END ? 1.25 : 2);
             this.W = w; this.H = h;
             this.canvas.width = Math.round(w * this.dpr);
             this.canvas.height = Math.round(h * this.dpr);
@@ -108,7 +105,7 @@
             this.canvas.style.height = h + 'px';
             this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
-            const count = w < 720 ? 130 : 220;
+            const count = LOW_END ? 90 : (w < 720 ? 130 : 220);
             this.stars = Array.from({ length: count }, () => {
                 const depth = Math.random();
                 return {
@@ -206,8 +203,8 @@
             }
             ctx.restore();
 
-            // ── 鼠标星座连线 ──
-            if (mouse.x > -9000) {
+            // ── 鼠标星座连线（低端设备省略） ──
+            if (!LOW_END && mouse.x > -9000) {
                 const R = 150, R2 = R * R;
                 const near = [];
                 for (const s of this.stars) {
@@ -250,8 +247,8 @@
                 ctx.restore();
             }
 
-            // ── 流星 ──
-            if (!this.reduceMotion) {
+            // ── 流星（低端设备省略） ──
+            if (!this.reduceMotion && !LOW_END) {
                 this._meteorTimer -= dt;
                 if (this._meteorTimer <= 0 && this.meteors.length < 3) {
                     this._spawnMeteor();
@@ -285,7 +282,7 @@
         }
     };
 
-    /* ───────────────────── 页面控制器（拨盘） ───────────────────── */
+    /* ───────────────────── 页面控制器（环形拨盘） ───────────────────── */
     window.PlanetsView = {
         root: null,
         stage: null,
@@ -301,15 +298,19 @@
         reduceMotion: false,
         rafId: 0,
 
-        /* 拨盘状态 */
-        bases: [-SPREAD, 0, SPREAD],
-        offset: 0,            // 当前轮盘转角
-        targetOffset: 0,      // 目标转角（磁吸）
-        selectedIndex: 1,     // 默认中位：工科试验室
+        /* 拨盘状态机: idle(待机自转) → settling(磁吸对位) → focus(放大展示) */
+        mode: 'idle',
+        focusKey: null,
+        bases: [0, RING, RING * 2],       // codespace / englab / frontier 逻辑环位
+        offset: 0,
+        targetOffset: 0,
+        selectedIndex: 1,
         dragging: false,
         velocity: 0,
         geom: null,
-        _lastOpenedIndex: 1,  // 初始不自动弹菜单
+        _geomTick: 0,
+        _nodeState: null,                 // 每行星 {x,y,scale,op,blend,prox}
+        _focusMax: 0,
         _dragMoved: false,
         _dragAcc: 0,
         _lastA: 0,
@@ -339,14 +340,19 @@
             window.scrollTo(0, 0);
             document.body.classList.add('planets-scroll-locked');
 
-            // 拨盘初始：轮盘从旋出位置转入（入场动效）
+            // 初始：待机巡游，工科试验室即将转入准星
+            this.mode = 'idle';
+            this.focusKey = null;
             this.selectedIndex = 1;
-            this.targetOffset = -this.bases[1];
-            this.offset = this.reduceMotion ? this.targetOffset : this.targetOffset + 0.55;
+            this.offset = -this.bases[1] - 0.5;
+            this.targetOffset = this.offset;
             this.velocity = 0;
             this.dragging = false;
-            this._lastOpenedIndex = 1;
             this._enterT = performance.now();
+            this._nodeState = {};
+            GALAXY_ORDER.forEach(key => {
+                this._nodeState[key] = { x: 0, y: 0, scale: 0.6, op: 0, blend: 0, prox: 0 };
+            });
 
             this._handlers = {
                 resize: this._onResize.bind(this),
@@ -361,6 +367,7 @@
                 mark: (e) => { e.preventDefault(); this.resetGalaxyView(); },
                 moduleLink: this._onModuleLinkClick.bind(this),
                 key: this._onKey.bind(this),
+                vis: this._onVisibility.bind(this),
                 loop: this._loop.bind(this)
             };
 
@@ -371,6 +378,7 @@
             document.addEventListener('mousemove', this._handlers.mouse);
             document.addEventListener('mouseleave', this._handlers.leave);
             document.addEventListener('keydown', this._handlers.key);
+            document.addEventListener('visibilitychange', this._handlers.vis);
             this.stage.addEventListener('pointerdown', this._handlers.pDown);
             window.addEventListener('pointermove', this._handlers.pMove);
             window.addEventListener('pointerup', this._handlers.pUp);
@@ -399,6 +407,7 @@
                 document.removeEventListener('mousemove', this._handlers.mouse);
                 document.removeEventListener('mouseleave', this._handlers.leave);
                 document.removeEventListener('keydown', this._handlers.key);
+                document.removeEventListener('visibilitychange', this._handlers.vis);
                 if (this.stage) {
                     this.stage.removeEventListener('pointerdown', this._handlers.pDown);
                     this.stage.removeEventListener('wheel', this._handlers.wheel);
@@ -419,31 +428,35 @@
             document.body.classList.remove('planets-scroll-locked');
         },
 
-        /* ── 几何：太阳中心 / 轨道椭圆 / 准星角（每帧刷新，兼容滚动） ── */
+        /* ── 几何缓存（仅 resize / 周期兜底时重算，避免每帧 reflow） ── */
         _computeGeometry() {
             const rect = this.stage.getBoundingClientRect();
             if (rect.width < 10) { this.geom = null; return; }
             const compact = rect.width < 680;
             let g;
             if (!compact) {
-                // 桌面：太阳嵌在右缘，准星落在约 48% 屏宽（避开左侧文案列）
                 g = {
                     sx: rect.left + rect.width * 1.10,
                     sy: rect.top + rect.height * 0.5,
                     rx: rect.width * 0.62,
                     ry: rect.height * 0.36,
                     sunR: Math.min(rect.height * 0.44, rect.width * 0.28),
-                    marker: Math.PI
+                    marker: Math.PI,
+                    fx: rect.width * 0.24,
+                    fy: rect.height * 0.46,
+                    fScale: 1.6
                 };
             } else {
-                // 移动端：太阳沉在底缘，准星指向上（拇指拨盘）
                 g = {
                     sx: rect.left + rect.width * 0.5,
                     sy: rect.top + rect.height * 1.22,
                     rx: rect.width * 0.46,
                     ry: rect.height * 0.78,
                     sunR: rect.width * 0.44,
-                    marker: -Math.PI / 2
+                    marker: -Math.PI / 2,
+                    fx: rect.width * 0.5,
+                    fy: rect.height * 0.27,
+                    fScale: 1.25
                 };
             }
             g.compact = compact;
@@ -454,6 +467,16 @@
         },
 
         /* ── 输入 ── */
+        _onVisibility() {
+            if (document.hidden) {
+                if (this.rafId) cancelAnimationFrame(this.rafId);
+                this.rafId = 0;
+            } else if (this._bound && !this.rafId) {
+                this._lastTime = 0;
+                this._loop(performance.now());
+            }
+        },
+
         _onMouseMove(e) {
             StarfieldEngine.onMouse(e.clientX, e.clientY);
             if (this.halo) {
@@ -494,49 +517,51 @@
         _onPointerMove(e) {
             if (!this.dragging || !this.geom) return;
             const a = this._pointerAngle(e);
-            const d = wrapPi(a - this._lastA);
+            const dVis = wrapPi(a - this._lastA);
             this._lastA = a;
             const now = performance.now();
             const dt = Math.max(8, now - this._lastT);
             this._lastT = now;
 
-            this._dragAcc += Math.abs(d);
-            if (this._dragAcc > 0.035 && !this._dragMoved) {
+            const dRel = dVis / VIS_K;                 // 视觉角 → 逻辑角
+            this._dragAcc += Math.abs(dRel);
+            if (this._dragAcc > 0.05 && !this._dragMoved) {
                 this._dragMoved = true;
-                if (this.activeGalaxy) this.resetGalaxyView();
+                if (this.activeGalaxy || this.mode === 'focus') this.resetGalaxyView();
             }
 
-            // 旋转 + 端点橡皮筋
-            let next = this.offset + d;
-            const S = SPREAD;
-            if (next > S) next = S + (next - S) * 0.22;
-            if (next < -S) next = -S + (next + S) * 0.22;
-            this.offset = next;
-            this.velocity = 0.8 * this.velocity + 0.2 * (d / dt);   // rad/ms
+            this.offset += dRel;                       // 环形：无限旋转，无端点
+            this.velocity = 0.8 * this.velocity + 0.2 * (dRel / dt);
         },
 
         _onPointerUp() {
             if (!this.dragging) return;
             this.dragging = false;
             this.stage.classList.remove('is-grabbing');
-            // 惯性甩动预测落点，磁吸到最近的行星档位
+            if (!this._dragMoved) return;              // 纯点击交给 click 处理
+            // 惯性预测落点 → 磁吸到最近行星（环形最短路径）
             const predicted = this.offset + this.velocity * 220;
-            const idx = clamp(Math.round(-predicted / SPREAD) + 1, 0, this.bases.length - 1);
-            this.selectedIndex = idx;
-            this.targetOffset = -this.bases[idx];
+            let best = 0, bestAbs = Infinity;
+            for (let i = 0; i < this.bases.length; i++) {
+                const d = Math.abs(wrapPi(this.bases[i] + predicted));
+                if (d < bestAbs) { bestAbs = d; best = i; }
+            }
+            this.selectedIndex = best;
+            this.targetOffset = this.offset - wrapPi(this.bases[best] + this.offset);
             this.velocity = 0;
+            this.mode = 'settling';
         },
 
         _onWheel(e) {
             e.preventDefault();
             const now = performance.now();
-            if (now - this._lastWheel < 240) return;
+            if (now - this._lastWheel < 260) return;
             this._lastWheel = now;
             this._step(e.deltaY > 0 ? 1 : -1);
         },
 
         _onKey(e) {
-            if (e.key === 'Escape' && this.activeGalaxy) {
+            if (e.key === 'Escape' && (this.activeGalaxy || this.mode === 'focus')) {
                 this.resetGalaxyView();
             } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
                 this._step(-1);
@@ -545,30 +570,36 @@
             }
         },
 
+        /* 环形换挡：越过尽头自动绕回（modulo）；从当前最近档位起步 */
         _step(dir) {
-            const idx = clamp(this.selectedIndex + dir, 0, this.bases.length - 1);
-            if (idx === this.selectedIndex) return;
-            this.selectedIndex = idx;
-            this.targetOffset = -this.bases[idx];
-            this._lastOpenedIndex = null;   // 换挡后落位自动开启目录
-            this.resetGalaxyView();
+            this._closePanelOnly();
+            const cur = this.mode === 'settling' ? this.targetOffset : this.offset;
+            let nearest = 0, bestAbs = Infinity;
+            for (let i = 0; i < this.bases.length; i++) {
+                const d = Math.abs(wrapPi(this.bases[i] + cur));
+                if (d < bestAbs) { bestAbs = d; nearest = i; }
+            }
+            this.selectedIndex = (nearest + dir + GALAXY_ORDER.length) % GALAXY_ORDER.length;
+            let rel = wrapPi(this.bases[this.selectedIndex] + cur);
+            if (dir > 0 && rel < 0) rel += TAU;      // 保证旋转方向与换挡方向一致
+            if (dir < 0 && rel > 0) rel -= TAU;
+            this.targetOffset = cur - rel;
+            this.mode = 'settling';
         },
 
         _onGalaxyClick(e) {
-            if (this._dragMoved) return;    // 拖动后不触发点击
+            if (this._dragMoved) return;
             const key = e.currentTarget.dataset.galaxy;
             const idx = GALAXY_ORDER.indexOf(key);
             if (idx < 0) return;
-            const settled = Math.abs(wrapPi(this.offset - this.targetOffset)) < 0.05;
-            if (idx === this.selectedIndex && settled) {
-                if (this.activeGalaxy === key) this.resetGalaxyView();
-                else this.openGalaxy(key);
-            } else {
-                this.selectedIndex = idx;
-                this.targetOffset = -this.bases[idx];
-                this._lastOpenedIndex = null;
-                this.resetGalaxyView();
+            if (this.mode === 'focus' && this.focusKey === key) {
+                this.resetGalaxyView();                // 再点一次已聚焦行星 → 收起
+                return;
             }
+            this._closePanelOnly();
+            this.selectedIndex = idx;
+            this.targetOffset = this.offset - wrapPi(this.bases[idx] + this.offset);
+            this.mode = 'settling';
         },
 
         /* ── 菜单 ── */
@@ -576,7 +607,6 @@
             const source = GALAXIES[key];
             if (!source || !this.menu || !this.moduleMenu) return;
             this.activeGalaxy = key;
-            this._lastOpenedIndex = GALAXY_ORDER.indexOf(key);
             if (this.menuState) this.menuState.textContent = source.state || 'SECTOR ' + source.no + ' · 已对准';
             this.menuTitle.textContent = source.title;
             this.menuCopy.textContent = source.copy;
@@ -587,12 +617,20 @@
             if (this.root) this.root.classList.add('has-menu');
         },
 
-        resetGalaxyView() {
+        /* 只收面板，不改变拨盘模式（供换挡时用） */
+        _closePanelOnly() {
             this.activeGalaxy = null;
+            this.focusKey = null;
             this.galaxyButtons.forEach(btn => btn.classList.remove('is-selected'));
             if (this.stage) this.stage.classList.remove('has-open-menu');
             if (this.menu) this.menu.classList.remove('is-open');
             if (this.root) this.root.classList.remove('has-menu');
+        },
+
+        /* 完整复位：收面板 + 回到待机巡游 */
+        resetGalaxyView() {
+            this._closePanelOnly();
+            this.mode = 'idle';
         },
 
         _renderModuleLink(item, index) {
@@ -676,65 +714,115 @@
 
         _onResize() {
             StarfieldEngine.resize(window.innerWidth, window.innerHeight);
+            this._computeGeometry();
         },
 
         /* ── 拨盘物理 ── */
-        _updatePhysics() {
+        _updatePhysics(dt) {
             if (this.dragging) return;
-            const ease = this.reduceMotion ? 1 : 0.095;
-            this.offset = lerp(this.offset, this.targetOffset, ease);
 
-            // 落位 → 自动展开该星系目录
-            if (Math.abs(wrapPi(this.offset - this.targetOffset)) < 0.012) {
-                if (this._lastOpenedIndex !== this.selectedIndex) {
-                    this.openGalaxy(GALAXY_ORDER[this.selectedIndex]);
+            if (this.mode === 'idle') {
+                // 待机自转：行星缓缓巡游过准星
+                if (!this.reduceMotion) this.offset += IDLE_SPEED * dt;
+                return;
+            }
+
+            if (this.mode === 'settling') {
+                const ease = this.reduceMotion ? 1 : 1 - Math.exp(-dt * 0.0075);
+                this.offset = lerp(this.offset, this.targetOffset, ease);
+                if (Math.abs(this.offset - this.targetOffset) < 0.008) {
+                    this.offset = this.targetOffset;
+                    this.mode = 'focus';
+                    this.focusKey = GALAXY_ORDER[this.selectedIndex];
                 }
             }
+            // focus 模式下轮盘静止，行星由 blend 动画接管
         },
 
-        /* ── 行星落位（DOM 节点每帧定位） ── */
-        _placeNodes(time) {
+        /* ── 每帧状态计算：环形位置 + 聚焦混合 ── */
+        _computeStates(time, dt) {
             const g = this.geom;
             if (!g) return;
-            const ramp = this.reduceMotion ? 1 : clamp((time - this._enterT) / 800, 0, 1);
+            const ramp = this.reduceMotion ? 1 : Math.min(1, (time - this._enterT) / 800);
+            const blendEase = this.reduceMotion ? 1 : 1 - Math.exp(-dt * 0.0072);
+            let focusMax = 0;
 
-            // 拖动中实时刷新"最近档位"（供准星连线用）
-            let nearest = this.selectedIndex;
-            if (this.dragging) {
-                nearest = clamp(Math.round(-this.offset / SPREAD) + 1, 0, this.bases.length - 1);
-                this.selectedIndex = nearest;
+            for (let i = 0; i < GALAXY_ORDER.length; i++) {
+                const key = GALAXY_ORDER[i];
+                const st = this._nodeState[key];
+                const rel = wrapPi(this.bases[i] + this.offset);
+                const a = g.marker + rel * VIS_K;
+
+                // 轨道位置（环形：|rel|→π 时淡出，从另一端淡入 → 无缝绕回）
+                const ox = g.localX + Math.cos(a) * g.rx;
+                const oy = g.localY + Math.sin(a) * g.ry;
+                const prox = Math.max(0, Math.cos(rel));
+                const edge = Math.max(0, Math.cos(rel * 0.5));
+                const oScale = 0.5 + 0.52 * Math.pow(prox, 1.5);
+                const oOp = (0.2 + 0.8 * Math.pow(prox, 1.3)) * Math.pow(edge, 1.5) * ramp;
+
+                // 聚焦混合（选中 → 放大飞向左侧定位点）
+                const target = (this.mode === 'focus' && key === this.focusKey) ? 1 : 0;
+                st.blend += (target - st.blend) * blendEase;
+                if (st.blend < 0.001 && target === 0) st.blend = 0;
+                const eB = st.blend * st.blend * (3 - 2 * st.blend);   // smoothstep
+
+                st.x = lerp(ox, g.fx, eB);
+                st.y = lerp(oy, g.fy, eB);
+                st.scale = lerp(oScale, g.fScale, eB);
+                st.op = lerp(oOp, 1, eB);
+                st.prox = prox;
+                if (st.blend > focusMax) focusMax = st.blend;
             }
 
-            this.galaxyButtons.forEach(btn => {
-                const key = btn.dataset.galaxy;
-                const i = GALAXY_ORDER.indexOf(key);
-                if (i < 0) return;
-                const a = g.marker + this.bases[i] + this.offset;
-                const x = g.localX + Math.cos(a) * g.rx;
-                const y = g.localY + Math.sin(a) * g.ry;
-                const prox = Math.max(0, Math.cos(wrapPi(a - g.marker)));
-                const scale = 0.52 + 0.5 * Math.pow(prox, 1.6);
-                const op = (0.25 + 0.75 * Math.pow(prox, 1.4)) * ramp;
+            // 聚焦时其余行星退暗
+            if (focusMax > 0.01) {
+                for (const key of GALAXY_ORDER) {
+                    if (key === this.focusKey) continue;
+                    this._nodeState[key].op *= (1 - 0.62 * focusMax);
+                }
+            }
+            this._focusMax = focusMax;
 
-                btn.style.transform = `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) translate(-50%, -50%) scale(${scale.toFixed(3)})`;
-                btn.style.opacity = op.toFixed(3);
-                btn.style.zIndex = String(10 + Math.round(prox * 10));
-                btn.classList.toggle('is-focus', i === this.selectedIndex && prox > 0.86);
-            });
+            // 行星就位后弹出介绍面板
+            if (this.mode === 'focus' && focusMax > 0.72 && !this.activeGalaxy && this.focusKey) {
+                this.openGalaxy(this.focusKey);
+            }
         },
 
-        /* ── 拨盘绘制（画在星场同一 canvas 上） ── */
+        /* ── DOM 应用（写在读之后，避免布局抖动） ── */
+        _applyNodes() {
+            const g = this.geom;
+            if (!g) return;
+            for (let i = 0; i < GALAXY_ORDER.length; i++) {
+                const key = GALAXY_ORDER[i];
+                const st = this._nodeState[key];
+                const btn = this.galaxyButtons[i] && this.galaxyButtons[i].dataset.galaxy === key
+                    ? this.galaxyButtons[i]
+                    : this.galaxyButtons.find(b => b.dataset.galaxy === key);
+                if (!btn) continue;
+                btn.style.transform =
+                    `translate3d(${st.x.toFixed(2)}px, ${st.y.toFixed(2)}px, 0) translate(-50%, -50%) scale(${st.scale.toFixed(3)})`;
+                btn.style.opacity = st.op.toFixed(3);
+                btn.style.zIndex = st.blend > 0.5 ? '30' : String(10 + Math.round(st.prox * 10));
+                btn.classList.toggle('is-focus',
+                    (this.mode === 'focus' && key === this.focusKey) || (this.mode !== 'focus' && st.prox > 0.92));
+            }
+        },
+
+        /* ── 拨盘绘制（星场同画布，节点位置复用 _nodeState） ── */
         _drawDial(time) {
             const ctx = StarfieldEngine.ctx;
             const g = this.geom;
             if (!ctx || !g) return;
             const { sx, sy, rx, ry, sunR, marker } = g;
-            const ramp = this.reduceMotion ? 1 : clamp((time - this._enterT) / 900, 0, 1);
+            const ramp = this.reduceMotion ? 1 : Math.min(1, (time - this._enterT) / 900);
+            const reticleA = 1 - this._focusMax;       // 聚焦时准星淡出
 
             ctx.save();
             ctx.globalAlpha = ramp;
 
-            /* 太阳辉光 */
+            /* 太阳辉光 + 本体 */
             let glow = ctx.createRadialGradient(sx, sy, sunR * 0.3, sx, sy, sunR * 2.3);
             glow.addColorStop(0, 'rgba(140, 190, 255, 0.16)');
             glow.addColorStop(0.5, 'rgba(120, 170, 240, 0.05)');
@@ -742,7 +830,6 @@
             ctx.fillStyle = glow;
             ctx.fillRect(sx - sunR * 2.3, sy - sunR * 2.3, sunR * 4.6, sunR * 4.6);
 
-            /* 太阳本体 */
             let body = ctx.createRadialGradient(sx - sunR * 0.28, sy - sunR * 0.22, sunR * 0.08, sx, sy, sunR);
             body.addColorStop(0, '#eaf4ff');
             body.addColorStop(0.3, '#a8ccf5');
@@ -753,7 +840,6 @@
             ctx.arc(sx, sy, sunR, 0, TAU);
             ctx.fill();
 
-            /* 太阳轮廓环 + 内环 */
             ctx.strokeStyle = 'rgba(160, 198, 240, 0.4)';
             ctx.lineWidth = 1;
             ctx.beginPath(); ctx.arc(sx, sy, sunR + 7, 0, TAU); ctx.stroke();
@@ -761,7 +847,7 @@
             ctx.beginPath(); ctx.arc(sx, sy, sunR * 0.72, 0, TAU); ctx.stroke();
             ctx.beginPath(); ctx.arc(sx, sy, sunR * 0.46, 0, TAU); ctx.stroke();
 
-            /* 太阳外圈刻度环（缓转，仪器感） */
+            /* 太阳刻度环（缓转） */
             const sunTickRot = this.reduceMotion ? 0 : time * 0.00005;
             ctx.strokeStyle = 'rgba(160, 198, 240, 0.30)';
             for (let k = 0; k < 40; k++) {
@@ -779,69 +865,69 @@
             ctx.strokeStyle = 'rgba(147, 178, 218, 0.07)';
             ctx.beginPath(); ctx.ellipse(sx, sy, rx * 0.82, ry * 0.82, 0, 0, TAU); ctx.stroke();
 
-            /* 轨道刻度（随轮盘转动 → 旋转反馈核心） */
+            /* 轨道刻度（随轮盘转动，视觉空间） */
+            const tickRot = this.offset * VIS_K;
             for (let k = 0; k < 72; k++) {
-                const a = k * TAU / 72 + this.offset;
+                const a = k * TAU / 72 + tickRot;
                 const cx = Math.cos(a), cy = Math.sin(a);
-                if (cx > 0.55) continue;   // 靠近太阳一侧不画
-                const px = sx + cx * rx, py = sy + cy * ry;
-                const nx = cx * ry, ny = cy * rx;   // 椭圆法线方向
+                if (cx > 0.55) continue;
+                const tx = sx + cx * rx, ty = sy + cy * ry;
+                const nx = cx * ry, ny = cy * rx;
                 const nl = Math.hypot(nx, ny) || 1;
                 const ux = nx / nl, uy = ny / nl;
                 const major = k % 6 === 0;
-                const len = major ? 12 : 6;
                 const prox = Math.max(0, Math.cos(wrapPi(a - marker)));
                 ctx.strokeStyle = `rgba(147, 178, 218, ${(0.10 + 0.35 * prox * prox).toFixed(3)})`;
                 ctx.lineWidth = major ? 1.2 : 1;
                 ctx.beginPath();
-                ctx.moveTo(px + ux * 4, py + uy * 4);
-                ctx.lineTo(px + ux * (4 + len), py + uy * (4 + len));
+                ctx.moveTo(tx + ux * 4, ty + uy * 4);
+                ctx.lineTo(tx + ux * (4 + (major ? 12 : 6)), ty + uy * (4 + (major ? 12 : 6)));
                 ctx.stroke();
             }
 
-            /* 准星（reticle）：框住落位行星 */
-            const mx = sx + Math.cos(marker) * rx;
-            const my = sy + Math.sin(marker) * ry;
-            const rr = g.compact ? 58 : 80;
-            ctx.strokeStyle = 'rgba(94, 228, 208, 0.55)';
-            ctx.lineWidth = 1;
-            // 四段圆弧（缺口在对角）
-            for (let q = 0; q < 4; q++) {
-                const c = q * Math.PI / 2;
+            /* 准星（聚焦时淡出） */
+            if (reticleA > 0.02) {
+                const mx = sx + Math.cos(marker) * rx;
+                const my = sy + Math.sin(marker) * ry;
+                const rr = g.compact ? 58 : 80;
+                ctx.strokeStyle = `rgba(94, 228, 208, ${(0.55 * reticleA).toFixed(3)})`;
+                ctx.lineWidth = 1;
+                for (let q = 0; q < 4; q++) {
+                    const c = q * Math.PI / 2;
+                    ctx.beginPath();
+                    ctx.arc(mx, my, rr, c - 0.42, c + 0.42);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(mx + Math.cos(c) * rr, my + Math.sin(c) * rr);
+                    ctx.lineTo(mx + Math.cos(c) * (rr + 10), my + Math.sin(c) * (rr + 10));
+                    ctx.stroke();
+                }
+                /* 角度读数 */
+                const degText = String(Math.round(((-this.offset / DEG) % 360 + 360) % 360));
+                ctx.font = '10px "JetBrains Mono", Consolas, monospace';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = `rgba(94, 228, 208, ${(0.66 * reticleA).toFixed(3)})`;
+                ctx.fillText(`DIAL ${degText.padStart(3, ' ')}°`, mx, my + rr + 26);
+            }
+
+            /* 太阳 → 当前行星虚线（聚焦时跟随飞行位置） */
+            const selKey = this.focusKey || GALAXY_ORDER[this.selectedIndex];
+            const selSt = this._nodeState[selKey];
+            if (selSt && selSt.op > 0.05) {
+                const nx = g.rect.left + selSt.x;
+                const ny = g.rect.top + selSt.y;
+                const dxs = sx - nx, dys = sy - ny;
+                const dl = Math.hypot(dxs, dys) || 1;
+                const dux = dxs / dl, duy = dys / dl;
+                const gap = 56 * selSt.scale;
+                ctx.strokeStyle = `rgba(94, 228, 208, ${(0.15 + 0.16 * selSt.blend).toFixed(3)})`;
+                ctx.setLineDash([4, 7]);
                 ctx.beginPath();
-                ctx.arc(mx, my, rr, c - 0.42, c + 0.42);
+                ctx.moveTo(nx + dux * gap, ny + duy * gap);
+                ctx.lineTo(sx - dux * (sunR + 10), sy - duy * (sunR + 10));
                 ctx.stroke();
+                ctx.setLineDash([]);
             }
-            // 四向刻度
-            for (let q = 0; q < 4; q++) {
-                const c = q * Math.PI / 2;
-                ctx.beginPath();
-                ctx.moveTo(mx + Math.cos(c) * rr, my + Math.sin(c) * rr);
-                ctx.lineTo(mx + Math.cos(c) * (rr + 10), my + Math.sin(c) * (rr + 10));
-                ctx.stroke();
-            }
-
-            /* 太阳 → 落位行星 连线（虚线） */
-            const selA = marker + this.bases[this.selectedIndex] + this.offset;
-            const npx = sx + Math.cos(selA) * rx;
-            const npy = sy + Math.sin(selA) * ry;
-            const dxs = sx - npx, dys = sy - npy;
-            const dl = Math.hypot(dxs, dys) || 1;
-            const dux = dxs / dl, duy = dys / dl;
-            ctx.strokeStyle = 'rgba(94, 228, 208, 0.28)';
-            ctx.setLineDash([4, 7]);
-            ctx.beginPath();
-            ctx.moveTo(npx + dux * 66, npy + duy * 66);
-            ctx.lineTo(sx - dux * (sunR + 10), sy - duy * (sunR + 10));
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            /* 角度读数（仪表盘） */
-            const degText = (-this.offset / DEG).toFixed(0);
-            ctx.font = '10px "JetBrains Mono", Consolas, monospace';
-            ctx.textAlign = 'center';
-            ctx.fillStyle = 'rgba(94, 228, 208, 0.66)';
-            ctx.fillText(`DIAL ${degText.padStart(3, ' ')}°`, mx, my + rr + 26);
 
             ctx.restore();
         },
@@ -851,11 +937,15 @@
             const dt = this._lastTime ? Math.min(64, time - this._lastTime) : 16;
             this._lastTime = time;
 
-            this._computeGeometry();
-            StarfieldEngine.draw(time, dt);
-            this._updatePhysics();
+            // 几何兜底重算（低频，防字体加载/布局漂移）
+            this._geomTick++;
+            if (!this.geom || this._geomTick % 90 === 0) this._computeGeometry();
+
+            this._updatePhysics(dt);
+            this._computeStates(time, dt);      // 先算（读几何缓存）
+            StarfieldEngine.draw(time, dt);     // 再画
             this._drawDial(time);
-            this._placeNodes(time);
+            this._applyNodes();                 // 最后写 DOM
 
             this.rafId = requestAnimationFrame(this._handlers.loop);
         }
