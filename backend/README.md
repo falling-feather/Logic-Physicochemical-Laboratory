@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、草稿编辑、提交/退回/撤回工作流、内容发布/版本记录/回滚、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 diff、登录、密码策略、登录失败锁定、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、待批改队列、审计元数据和认证事件审计等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、草稿编辑、提交/退回/撤回工作流、内容发布/版本记录/回滚、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 diff、登录、密码策略、登录失败锁定、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、待批改队列、审计元数据和认证事件审计等能力。
 
 ## 本地启动
 
@@ -20,6 +20,15 @@ curl http://127.0.0.1:8000/api/health
 ```bash
 curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 ```
+
+正式环境不会依赖启动时自动 seed。完成迁移、部署预检和首个 admin 初始化后，用显式脚本初始化内置内容页：
+
+```bash
+python -m scripts.init_content_pages --dry-run --publisher-user-id <admin_id>
+python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-reviewed-scripts
+```
+
+脚本默认先运行部署预检，再创建或修复 `content_pages` 与 `content_page_versions`。若已有同 slug 当前版本与内置 schema 不同，默认报告冲突；确认要追加新版本时再使用 `--upgrade-existing`。存在活跃草稿时升级会被阻断，只有明确接受草稿过期风险时才使用 `--allow-stale-drafts`。`--skip-preflight` 仅用于受控测试或恢复场景。
 
 本地账号与学校班级 API：
 
@@ -136,7 +145,7 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 - `app.services.access_control` 负责学校、班级和课程范围判断，普通业务端点不再各自复制 `_require_*` helper；后续权限矩阵扩展应优先在这里收口。
 - `app.services.class_join_requests` 负责加入申请审批状态流转和成员关系补齐。
 - `app.services.audit` 负责写入审计日志及 request_id、IP 哈希、user-agent 等请求元数据。
-- `app.services.content_catalog` 负责内容页 seed、已发布 schema 读取和内容页摘要；`/api/content/pages*` 与 `/api/render/*` 查询只读 published 当前记录，不在 GET 路径隐式写库；seed 在已有版本历史时不会覆盖同 slug 的发布内容。
+- `app.services.content_catalog` 负责内容页 seed、正式内容初始化、已发布 schema 读取和内容页摘要；`/api/content/pages*` 与 `/api/render/*` 查询只读 published 当前记录，不在 GET 路径隐式写库；正式初始化会显式创建/修复内置内容页版本，默认不覆盖已有差异版本。
 - `app.services.content_script_policy` 负责内容草稿脚本静态分析；当前识别脚本引用、外链脚本、事件处理器、阻断协议、路径穿越和内联 `<script>`，并输出 `script_risk_level` 与 `script_analysis`。这只是静态 policy scan，不是脚本沙箱执行。
 - `PATCH /api/content/drafts/{id}` 负责草稿编辑闭环：仅允许作者或管理员编辑 `draft` / `changes_requested` 草稿，禁止 retarget 到其他 slug，保存时重算 `schema_hash/script_analysis/script_risk_level`，并清空旧脚本审核元数据；`base_version_id/base_schema_hash` 保持创建时基线，发布前仍由 stale guard 拦截过期草稿。
 - `/api/content/drafts/{id}/submit`、`/request-changes`、`/withdraw` 与 `/publish` 负责草稿状态流转；创建草稿时绑定当前 published base 版本和 hash，记录脚本静态分析结果，发布前校验 base 未过期并复核脚本 policy，发布后回填 page/version/publisher 元数据，审计只记录状态和版本元数据，不记录完整 schema。
@@ -194,3 +203,13 @@ python -m scripts.deploy_smoke --require-mysql
 ```
 
 smoke 会复用部署预检，再检查当前模型期望表是否全部存在，并用同一配置启动 FastAPI TestClient 访问 `/api/health`。脚本运行时会临时关闭自动建表和知识快照调度器，只验证迁移后的现有状态。`--require-mysql` 用作生产门禁：如果当前连接不是 MySQL 方言会返回非零退出码；本地或 CI 需要覆盖临时库时可追加 `--database-url`。
+
+正式内容初始化：
+
+```bash
+cd backend
+python -m scripts.init_content_pages --dry-run --publisher-user-id <admin_id>
+python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-reviewed-scripts
+```
+
+脚本输出 JSON 报告；非 dry-run 写入前必须确认内置脚本引用已审核。若不传 `--publisher-user-id`，脚本会选择第一个 active admin 作为发布归因；生产环境建议显式传入。
