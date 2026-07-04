@@ -16,6 +16,7 @@ from app.models import (
     ClassGroup,
     ClassJoinRequest,
     ClassMembership,
+    ContentDraft,
     ContentPageRecord,
     Course,
     CourseClass,
@@ -36,6 +37,8 @@ from app.schemas.admin import (
     AdminClassStats,
     AdminContentPageRead,
     AdminContentPagePage,
+    AdminContentDraftPage,
+    AdminContentDraftRead,
     AdminPendingSubmissionQueue,
     AdminPendingSubmissionRead,
     AdminSchoolPage,
@@ -492,6 +495,51 @@ def list_admin_content_pages(
     )
 
 
+@router.get("/content/drafts", response_model=AdminContentDraftPage)
+def list_admin_content_drafts(
+    status_filter: str | None = Query(default=None, alias="status"),
+    script_review_status: str | None = Query(default=None),
+    author_user_id: int | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=160),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminContentDraftPage:
+    _require_admin(current_user)
+    statement = (
+        select(ContentDraft, User)
+        .join(User, User.id == ContentDraft.author_user_id)
+        .order_by(ContentDraft.created_at.desc(), ContentDraft.id.desc())
+    )
+    if status_filter is not None:
+        statement = statement.where(ContentDraft.status == status_filter.strip().lower())
+    if script_review_status is not None:
+        statement = statement.where(ContentDraft.script_review_status == script_review_status.strip().lower())
+    if author_user_id is not None:
+        statement = statement.where(ContentDraft.author_user_id == author_user_id)
+    if q is not None and q.strip():
+        pattern = f"%{q.strip()}%"
+        statement = statement.where(
+            or_(
+                ContentDraft.target_slug.ilike(pattern),
+                ContentDraft.title.ilike(pattern),
+                User.username.ilike(pattern),
+                User.display_name.ilike(pattern),
+            )
+        )
+    total = _statement_count(db, statement)
+    rows = db.execute(statement.offset(offset).limit(limit)).all()
+    items = [_admin_content_draft_read(draft, author) for draft, author in rows]
+    return AdminContentDraftPage(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        next_offset=_next_offset(total, offset, len(items)),
+    )
+
+
 @router.get("/stats", response_model=AdminStats)
 def read_admin_stats(
     current_user: User = Depends(get_current_user),
@@ -510,6 +558,8 @@ def read_admin_stats(
         total_classes=_count(db, ClassGroup),
         pending_class_join_requests=_count(db, ClassJoinRequest, ClassJoinRequest.status == "pending"),
         total_content_pages=_count(db, ContentPageRecord),
+        total_content_drafts=_count(db, ContentDraft),
+        pending_script_reviews=_count(db, ContentDraft, ContentDraft.script_review_status == "pending"),
         total_courses=_count(db, Course),
         total_assignments=_count(db, Assignment),
         total_learning_events=_count(db, LearningEvent),
@@ -786,6 +836,25 @@ def _admin_class_join_request_read(
         review_note=join_request.review_note,
         created_at=join_request.created_at,
         updated_at=join_request.updated_at,
+    )
+
+
+def _admin_content_draft_read(draft: ContentDraft, author: User) -> AdminContentDraftRead:
+    return AdminContentDraftRead(
+        id=draft.id,
+        author_user_id=draft.author_user_id,
+        author_username=author.username,
+        author_display_name=author.display_name,
+        target_slug=draft.target_slug,
+        title=draft.title,
+        status=draft.status,
+        allow_script=draft.allow_script,
+        script_review_status=draft.script_review_status,
+        script_reviewed_by_user_id=draft.script_reviewed_by_user_id,
+        script_reviewed_at=draft.script_reviewed_at,
+        script_review_note=draft.script_review_note,
+        created_at=draft.created_at,
+        updated_at=draft.updated_at,
     )
 
 

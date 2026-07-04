@@ -1,0 +1,269 @@
+from sqlalchemy import func, select
+
+from app.core.config import get_settings
+from app.db.session import get_session_factory
+from app.models import ContentPageRecord
+
+
+def _auth_header(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _bootstrap_admin(client, username: str = "admin_content") -> str:
+    response = client.post(
+        "/api/admin/bootstrap",
+        json={
+            "username": username,
+            "password": "secret123",
+            "display_name": "Content Admin",
+        },
+    )
+    assert response.status_code == 201
+    login = client.post("/api/auth/login", json={"username": username, "password": "secret123"})
+    assert login.status_code == 200
+    return login.json()["access_token"]
+
+
+def _register_and_login(client, username: str, role: str) -> tuple[int, str]:
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": username,
+            "password": "secret123",
+            "display_name": username.replace("_", " ").title(),
+            "role": role,
+        },
+    )
+    assert register.status_code == 201
+    login = client.post("/api/auth/login", json={"username": username, "password": "secret123"})
+    assert login.status_code == 200
+    return register.json()["id"], login.json()["access_token"]
+
+
+def _draft_payload(slug: str, *, allow_script: bool = False) -> dict:
+    return {
+        "target_slug": slug,
+        "allow_script": allow_script,
+        "schema": {
+            "slug": slug,
+            "galaxy": "englab",
+            "subject": "physics",
+            "title": "Teacher Draft Energy",
+            "layout": "experiment-page",
+            "status": "draft",
+            "version": "draft-1",
+            "summary": "A teacher-authored draft that is not public yet.",
+            "sections": [
+                {
+                    "type": "learning-task",
+                    "title": "Observe",
+                    "summary": "Explain what changes when friction is introduced.",
+                    "props": {"scriptPath": "drafts/custom-energy.js"} if allow_script else {},
+                }
+            ],
+            "sources": [],
+        },
+    }
+
+
+def test_teacher_creates_content_draft_without_publishing(client):
+    unauthenticated = client.post("/api/content/drafts", json=_draft_payload("physics/private-energy"))
+    assert unauthenticated.status_code == 401
+
+    admin_token = _bootstrap_admin(client)
+    teacher_id, teacher_token = _register_and_login(client, "teacher_content_draft", "teacher")
+    _, student_token = _register_and_login(client, "student_content_draft", "student")
+    before_page_count = _table_count(ContentPageRecord)
+
+    student_forbidden = client.post(
+        "/api/content/drafts",
+        headers=_auth_header(student_token),
+        json=_draft_payload("physics/private-energy"),
+    )
+    assert student_forbidden.status_code == 403
+
+    create = client.post(
+        "/api/content/drafts",
+        headers={**_auth_header(teacher_token), "X-Request-ID": "draft-create-request"},
+        json=_draft_payload("physics/private-energy"),
+    )
+    assert create.status_code == 201
+    draft = create.json()
+    draft_id = draft["id"]
+    assert draft["author_user_id"] == teacher_id
+    assert draft["target_slug"] == "physics/private-energy"
+    assert draft["status"] == "draft"
+    assert draft["allow_script"] is False
+    assert draft["script_review_status"] == "not_required"
+    assert draft["schema"]["slug"] == "physics/private-energy"
+
+    duplicate = client.post(
+        "/api/content/drafts",
+        headers=_auth_header(teacher_token),
+        json=_draft_payload("physics/private-energy"),
+    )
+    assert duplicate.status_code == 409
+
+    render = client.get("/api/render/page/physics/private-energy")
+    assert render.status_code == 404
+    content_page = client.get("/api/content/pages/physics/private-energy")
+    assert content_page.status_code == 404
+    assert _table_count(ContentPageRecord) == before_page_count
+
+    teacher_queue_forbidden = client.get("/api/admin/content/drafts", headers=_auth_header(teacher_token))
+    assert teacher_queue_forbidden.status_code == 403
+
+    admin_queue = client.get("/api/admin/content/drafts?q=private-energy", headers=_auth_header(admin_token))
+    assert admin_queue.status_code == 200
+    assert admin_queue.json()["total"] == 1
+    queue_item = admin_queue.json()["items"][0]
+    assert queue_item["id"] == draft_id
+    assert queue_item["author_username"] == "teacher_content_draft"
+
+    audit = client.get(
+        f"/api/admin/audit-logs?action=content.draft.create&resource_id={draft_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    audit_item = audit.json()["items"][0]
+    assert audit_item["request_id"] == "draft-create-request"
+    assert audit_item["resource_type"] == "content_draft"
+    assert audit_item["event_result"] == "success"
+    assert audit_item["snapshot_json"]["after"]["target_slug"] == "physics/private-energy"
+    assert "schema" not in audit_item["snapshot_json"]["after"]
+
+    review_no_script = client.patch(
+        f"/api/content/drafts/{draft_id}/script-review",
+        headers=_auth_header(admin_token),
+        json={"status": "approved", "note": "No script to review"},
+    )
+    assert review_no_script.status_code == 409
+
+
+def test_content_draft_validates_schema_and_slug(client):
+    _, teacher_token = _register_and_login(client, "teacher_content_validation", "teacher")
+
+    mismatch = client.post(
+        "/api/content/drafts",
+        headers=_auth_header(teacher_token),
+        json=_draft_payload("physics/target-mismatch") | {"schema": _draft_payload("physics/schema-mismatch")["schema"]},
+    )
+    assert mismatch.status_code == 422
+
+    invalid_slug = client.post(
+        "/api/content/drafts",
+        headers=_auth_header(teacher_token),
+        json=_draft_payload("../private"),
+    )
+    assert invalid_slug.status_code == 422
+
+    invalid_section = _draft_payload("physics/invalid-section")
+    invalid_section["schema"]["sections"][0]["type"] = "script"
+    invalid_schema = client.post(
+        "/api/content/drafts",
+        headers=_auth_header(teacher_token),
+        json=invalid_section,
+    )
+    assert invalid_schema.status_code == 422
+
+
+def test_admin_reviews_script_draft_and_records_audit(client):
+    first_admin_token = _bootstrap_admin(client, username="admin_content_first")
+    second_admin_id, second_admin_token = _register_and_login(client, "admin_content_second", "teacher")
+    promote_second_admin = client.patch(
+        f"/api/admin/users/{second_admin_id}",
+        headers=_auth_header(first_admin_token),
+        json={"role": "admin"},
+    )
+    assert promote_second_admin.status_code == 200
+    teacher_id, teacher_token = _register_and_login(client, "teacher_script_draft", "teacher")
+    _, student_token = _register_and_login(client, "student_script_draft", "student")
+
+    create = client.post(
+        "/api/content/drafts",
+        headers=_auth_header(teacher_token),
+        json=_draft_payload("physics/script-draft", allow_script=True),
+    )
+    assert create.status_code == 201
+    draft_id = create.json()["id"]
+    assert create.json()["script_review_status"] == "pending"
+    assert create.json()["author_user_id"] == teacher_id
+
+    teacher_review = client.patch(
+        f"/api/content/drafts/{draft_id}/script-review",
+        headers=_auth_header(teacher_token),
+        json={"status": "approved", "note": "self review"},
+    )
+    assert teacher_review.status_code == 403
+
+    student_review = client.patch(
+        f"/api/content/drafts/{draft_id}/script-review",
+        headers=_auth_header(student_token),
+        json={"status": "approved", "note": "student review"},
+    )
+    assert student_review.status_code == 403
+
+    approve = client.patch(
+        f"/api/content/drafts/{draft_id}/script-review",
+        headers={**_auth_header(second_admin_token), "X-Request-ID": "script-review-approve"},
+        json={"status": "approved", "note": "Script path approved for controlled trial"},
+    )
+    assert approve.status_code == 200
+    reviewed = approve.json()
+    assert reviewed["script_review_status"] == "approved"
+    assert reviewed["script_reviewed_by_user_id"] == second_admin_id
+    assert reviewed["script_reviewed_at"] is not None
+    assert reviewed["script_review_note"] == "Script path approved for controlled trial"
+
+    queue = client.get(
+        "/api/admin/content/drafts?script_review_status=approved&q=script-draft",
+        headers=_auth_header(first_admin_token),
+    )
+    assert queue.status_code == 200
+    assert queue.json()["total"] == 1
+    assert queue.json()["items"][0]["id"] == draft_id
+
+    stats = client.get("/api/admin/stats", headers=_auth_header(first_admin_token))
+    assert stats.status_code == 200
+    assert stats.json()["total_content_drafts"] == 1
+    assert stats.json()["pending_script_reviews"] == 0
+
+    audit = client.get(
+        f"/api/admin/audit-logs?action=content.draft.script_review.approved&resource_id={draft_id}",
+        headers=_auth_header(first_admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    audit_item = audit.json()["items"][0]
+    assert audit_item["request_id"] == "script-review-approve"
+    assert audit_item["snapshot_json"]["changes"]["script_review_status"] == {
+        "from": "pending",
+        "to": "approved",
+    }
+    assert "schema" not in audit_item["snapshot_json"]["before"]
+    assert "schema" not in audit_item["snapshot_json"]["after"]
+
+
+def test_admin_cannot_review_own_script_draft(client):
+    admin_token = _bootstrap_admin(client, username="admin_own_draft")
+    create = client.post(
+        "/api/content/drafts",
+        headers=_auth_header(admin_token),
+        json=_draft_payload("physics/admin-script-draft", allow_script=True),
+    )
+    assert create.status_code == 201
+    draft_id = create.json()["id"]
+
+    review = client.patch(
+        f"/api/content/drafts/{draft_id}/script-review",
+        headers=_auth_header(admin_token),
+        json={"status": "approved", "note": "own script"},
+    )
+    assert review.status_code == 403
+
+
+def _table_count(model) -> int:
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        return int(db.scalar(select(func.count()).select_from(model)) or 0)

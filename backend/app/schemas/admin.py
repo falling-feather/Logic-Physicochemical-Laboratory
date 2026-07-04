@@ -67,6 +67,31 @@ class AdminContentPagePage(BaseModel):
     next_offset: int | None = None
 
 
+class AdminContentDraftRead(BaseModel):
+    id: int
+    author_user_id: int
+    author_username: str
+    author_display_name: str
+    target_slug: str
+    title: str
+    status: str
+    allow_script: bool
+    script_review_status: str
+    script_reviewed_by_user_id: int | None = None
+    script_reviewed_at: datetime | None = None
+    script_review_note: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminContentDraftPage(BaseModel):
+    items: list[AdminContentDraftRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
 class AdminSchoolPage(BaseModel):
     items: list[SchoolRead]
     total: int
@@ -124,6 +149,8 @@ class AdminStats(BaseModel):
     total_classes: int
     pending_class_join_requests: int
     total_content_pages: int
+    total_content_drafts: int
+    pending_script_reviews: int
     total_courses: int
     total_assignments: int
     total_learning_events: int

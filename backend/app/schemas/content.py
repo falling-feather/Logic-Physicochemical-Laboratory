@@ -1,6 +1,7 @@
+from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 SectionType = Literal[
@@ -45,4 +46,35 @@ class ContentPage(BaseModel):
     sections: list[ContentSection]
     courseUnit: CourseUnitRef | None = None
     sources: list[SourceRef] = Field(default_factory=list)
+
+
+class ContentDraftCreate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    target_slug: str = Field(min_length=1, max_length=180)
+    page_schema: ContentPage = Field(alias="schema")
+    allow_script: bool = False
+
+
+class ContentDraftScriptReview(BaseModel):
+    status: Literal["approved", "rejected"]
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class ContentDraftRead(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: int
+    author_user_id: int
+    target_slug: str
+    title: str
+    status: str
+    allow_script: bool
+    script_review_status: str
+    script_reviewed_by_user_id: int | None = None
+    script_reviewed_at: datetime | None = None
+    script_review_note: str | None = None
+    page_schema: ContentPage = Field(alias="schema")
+    created_at: datetime
+    updated_at: datetime
 
