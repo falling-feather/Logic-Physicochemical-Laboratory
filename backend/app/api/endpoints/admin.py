@@ -509,6 +509,7 @@ def list_admin_content_pages(
 def list_admin_content_drafts(
     status_filter: str | None = Query(default=None, alias="status"),
     script_review_status: str | None = Query(default=None),
+    script_risk_level: str | None = Query(default=None),
     author_user_id: int | None = Query(default=None),
     q: str | None = Query(default=None, max_length=160),
     limit: int = Query(default=50, ge=1, le=200),
@@ -526,6 +527,8 @@ def list_admin_content_drafts(
         statement = statement.where(ContentDraft.status == status_filter.strip().lower())
     if script_review_status is not None:
         statement = statement.where(ContentDraft.script_review_status == script_review_status.strip().lower())
+    if script_risk_level is not None:
+        statement = statement.where(ContentDraft.script_risk_level == script_risk_level.strip().lower())
     if author_user_id is not None:
         statement = statement.where(ContentDraft.author_user_id == author_user_id)
     if q is not None and q.strip():
@@ -941,6 +944,8 @@ def _admin_content_draft_read(draft: ContentDraft, author: User) -> AdminContent
         schema_hash=draft.schema_hash,
         base_version_id=draft.base_version_id,
         base_schema_hash=draft.base_schema_hash,
+        script_risk_level=draft.script_risk_level,
+        script_analysis=draft.script_analysis_json,
         script_review_status=draft.script_review_status,
         script_reviewed_by_user_id=draft.script_reviewed_by_user_id,
         script_reviewed_at=draft.script_reviewed_at,

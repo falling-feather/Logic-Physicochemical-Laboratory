@@ -49,6 +49,8 @@ class ContentDraft(TimestampMixin, Base):
     )
     base_schema_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     allow_script: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    script_risk_level: Mapped[str | None] = mapped_column(String(32), default="none", index=True, nullable=True)
+    script_analysis_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     script_review_status: Mapped[str] = mapped_column(String(32), default="not_required", index=True, nullable=False)
     script_reviewed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
     script_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

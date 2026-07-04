@@ -97,6 +97,10 @@ def test_teacher_creates_content_draft_without_publishing(client):
     assert len(draft["schema_hash"]) == 64
     assert draft["base_version_id"] is None
     assert draft["base_schema_hash"] is None
+    assert draft["script_risk_level"] == "none"
+    assert draft["script_analysis"]["status"] == "clean"
+    assert draft["script_analysis"]["schema_hash"] == draft["schema_hash"]
+    assert draft["script_analysis"]["finding_count"] == 0
     assert draft["script_review_status"] == "not_required"
     assert draft["submitted_at"] is None
     assert draft["withdrawn_at"] is None
@@ -306,6 +310,16 @@ def test_content_draft_validates_schema_and_slug(client):
     )
     assert hidden_script_response.status_code == 422
 
+    blocked_script = _draft_payload("physics/blocked-script", allow_script=True)
+    blocked_script["schema"]["sections"][0]["props"]["scriptUrl"] = "javascript:alert(1)"
+    blocked_script_response = client.post(
+        "/api/content/drafts",
+        headers=_auth_header(teacher_token),
+        json=blocked_script,
+    )
+    assert blocked_script_response.status_code == 422
+    assert blocked_script_response.json()["detail"] == "Content schema contains blocked script policy findings"
+
 
 def test_admin_reviews_script_draft_and_records_audit(client):
     first_admin_token = _bootstrap_admin(client, username="admin_content_first")
@@ -327,6 +341,14 @@ def test_admin_reviews_script_draft_and_records_audit(client):
     assert create.status_code == 201
     draft_id = create.json()["id"]
     assert create.json()["script_review_status"] == "pending"
+    assert create.json()["script_risk_level"] == "medium"
+    assert create.json()["script_analysis"]["status"] == "review_required"
+    assert create.json()["script_analysis"]["schema_hash"] == create.json()["schema_hash"]
+    assert create.json()["script_analysis"]["finding_count"] == 1
+    finding = create.json()["script_analysis"]["findings"][0]
+    assert finding["code"] == "script_reference"
+    assert finding["path"] == "$.sections[0].props.scriptPath"
+    assert finding["value_preview"] == "drafts/custom-energy.js"
     assert create.json()["author_user_id"] == teacher_id
 
     teacher_review = client.patch(
@@ -356,12 +378,14 @@ def test_admin_reviews_script_draft_and_records_audit(client):
     assert reviewed["script_review_note"] == "Script path approved for controlled trial"
 
     queue = client.get(
-        "/api/admin/content/drafts?script_review_status=approved&q=script-draft",
+        "/api/admin/content/drafts?script_review_status=approved&script_risk_level=medium&q=script-draft",
         headers=_auth_header(first_admin_token),
     )
     assert queue.status_code == 200
     assert queue.json()["total"] == 1
     assert queue.json()["items"][0]["id"] == draft_id
+    assert queue.json()["items"][0]["script_risk_level"] == "medium"
+    assert queue.json()["items"][0]["script_analysis"]["finding_count"] == 1
 
     stats = client.get("/api/admin/stats", headers=_auth_header(first_admin_token))
     assert stats.status_code == 200
@@ -380,6 +404,7 @@ def test_admin_reviews_script_draft_and_records_audit(client):
         "from": "pending",
         "to": "approved",
     }
+    assert audit_item["snapshot_json"]["before"]["script_analysis"]["finding_count"] == 1
     assert "schema" not in audit_item["snapshot_json"]["before"]
     assert "schema" not in audit_item["snapshot_json"]["after"]
 

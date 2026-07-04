@@ -81,6 +81,26 @@ class ContentPageRollback(BaseModel):
     note: str | None = Field(default=None, max_length=1000)
 
 
+class ScriptAnalysisFindingRead(BaseModel):
+    code: str
+    severity: str
+    path: str
+    message: str
+    key: str | None = None
+    value_type: str | None = None
+    value_preview: str | None = None
+    value_sha256: str | None = None
+
+
+class ScriptAnalysisRead(BaseModel):
+    policy_version: str
+    schema_hash: str | None = None
+    status: str
+    risk_level: str
+    finding_count: int
+    findings: list[ScriptAnalysisFindingRead] = Field(default_factory=list)
+
+
 class ContentDraftRead(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -93,6 +113,8 @@ class ContentDraftRead(BaseModel):
     schema_hash: str | None = None
     base_version_id: int | None = None
     base_schema_hash: str | None = None
+    script_risk_level: str | None = None
+    script_analysis: ScriptAnalysisRead | None = None
     script_review_status: str
     script_reviewed_by_user_id: int | None = None
     script_reviewed_at: datetime | None = None

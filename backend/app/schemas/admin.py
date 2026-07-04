@@ -3,6 +3,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.content import ScriptAnalysisRead
 from app.schemas.school import ClassRead, SchoolRead
 
 
@@ -83,6 +84,8 @@ class AdminContentDraftRead(BaseModel):
     schema_hash: str | None = None
     base_version_id: int | None = None
     base_schema_hash: str | None = None
+    script_risk_level: str | None = None
+    script_analysis: ScriptAnalysisRead | None = None
     script_review_status: str
     script_reviewed_by_user_id: int | None = None
     script_reviewed_at: datetime | None = None

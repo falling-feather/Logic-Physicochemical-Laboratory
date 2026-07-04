@@ -24,6 +24,11 @@ from app.schemas.content import (
 )
 from app.services.audit import record_audit_log
 from app.services.content_catalog import get_page_schema, list_page_summaries
+from app.services.content_script_policy import (
+    SCRIPT_POLICY_VERSION,
+    analyze_content_script_policy,
+    script_policy_result_from_json,
+)
 
 
 router = APIRouter()
@@ -41,7 +46,6 @@ CONTENT_PAGE_STATUS_PUBLISHED = "published"
 SCRIPT_REVIEW_NOT_REQUIRED = "not_required"
 SCRIPT_REVIEW_PENDING = "pending"
 SCRIPT_REVIEW_APPROVED = "approved"
-SCRIPT_REFERENCE_KEYS = {"script", "scriptpath", "scripturl", "scriptsrc", "inlinescript"}
 
 
 @router.post("/drafts", response_model=ContentDraftRead, status_code=status.HTTP_201_CREATED)
@@ -58,7 +62,10 @@ def create_content_draft(
     if target_slug != page_schema.slug.strip():
         raise HTTPException(status_code=422, detail="target_slug must match schema.slug")
     page_schema = page_schema.model_copy(update={"slug": target_slug})
-    if not payload.allow_script and _schema_contains_script_reference(page_schema):
+    script_policy = analyze_content_script_policy(page_schema)
+    if script_policy.has_blocking_findings:
+        raise HTTPException(status_code=422, detail="Content schema contains blocked script policy findings")
+    if script_policy.has_script_findings and not payload.allow_script:
         raise HTTPException(status_code=422, detail="Content schema includes script references; allow_script is required")
     existing = db.scalar(
         select(ContentDraft).where(
@@ -71,6 +78,7 @@ def create_content_draft(
         raise HTTPException(status_code=409, detail="Active content draft already exists for this target")
 
     draft_payload = page_schema.model_dump(mode="json")
+    draft_schema_hash = _schema_hash(draft_payload)
     base_version = _current_content_page_version(db, target_slug)
     draft = ContentDraft(
         author_user_id=current_user.id,
@@ -78,11 +86,13 @@ def create_content_draft(
         title=page_schema.title.strip(),
         status=CONTENT_DRAFT_STATUS_DRAFT,
         schema_json=draft_payload,
-        schema_hash=_schema_hash(draft_payload),
+        schema_hash=draft_schema_hash,
         base_version_id=base_version.id if base_version is not None else None,
         base_schema_hash=base_version.schema_hash if base_version is not None else None,
         allow_script=payload.allow_script,
-        script_review_status=SCRIPT_REVIEW_PENDING if payload.allow_script else SCRIPT_REVIEW_NOT_REQUIRED,
+        script_risk_level=script_policy.risk_level,
+        script_analysis_json=script_policy.to_json(schema_hash=draft_schema_hash),
+        script_review_status=SCRIPT_REVIEW_PENDING if script_policy.requires_review else SCRIPT_REVIEW_NOT_REQUIRED,
     )
     db.add(draft)
     db.flush()
@@ -229,9 +239,12 @@ def publish_content_draft(
         raise HTTPException(status_code=404, detail="Content draft not found")
     if draft.status != CONTENT_DRAFT_STATUS_SUBMITTED:
         raise HTTPException(status_code=409, detail="Content draft must be submitted before publishing")
-    if not draft.allow_script and _schema_contains_script_reference(ContentPage.model_validate(draft.schema_json)):
+    script_policy = _content_draft_script_policy(draft)
+    if script_policy.has_blocking_findings:
+        raise HTTPException(status_code=409, detail="Content draft script policy findings must be resolved before publishing")
+    if script_policy.has_script_findings and not draft.allow_script:
         raise HTTPException(status_code=409, detail="Content schema includes script references; script review is required")
-    if draft.allow_script and draft.script_review_status != SCRIPT_REVIEW_APPROVED:
+    if script_policy.requires_review and draft.script_review_status != SCRIPT_REVIEW_APPROVED:
         raise HTTPException(status_code=409, detail="Content draft script review must be approved before publishing")
     _reject_stale_content_draft(db, draft)
 
@@ -316,6 +329,9 @@ def review_content_draft_script(
         raise HTTPException(status_code=409, detail="Content draft does not allow scripts")
     if draft.author_user_id == current_user.id:
         raise HTTPException(status_code=403, detail="Content draft authors cannot review their own scripts")
+    script_policy = _content_draft_script_policy(draft)
+    if script_policy.has_blocking_findings:
+        raise HTTPException(status_code=409, detail="Content draft script policy findings must be resolved before review")
 
     before = _content_draft_snapshot(draft)
     draft.script_review_status = payload.status
@@ -457,6 +473,8 @@ def _content_draft_read(draft: ContentDraft) -> ContentDraftRead:
         schema_hash=draft.schema_hash,
         base_version_id=draft.base_version_id,
         base_schema_hash=draft.base_schema_hash,
+        script_risk_level=draft.script_risk_level,
+        script_analysis=draft.script_analysis_json,
         script_review_status=draft.script_review_status,
         script_reviewed_by_user_id=draft.script_reviewed_by_user_id,
         script_reviewed_at=draft.script_reviewed_at,
@@ -505,6 +523,8 @@ def _content_draft_snapshot(draft: ContentDraft) -> dict:
         "schema_hash": draft.schema_hash,
         "base_version_id": draft.base_version_id,
         "base_schema_hash": draft.base_schema_hash,
+        "script_risk_level": draft.script_risk_level,
+        "script_analysis": _content_draft_script_analysis_snapshot(draft),
         "script_review_status": draft.script_review_status,
         "script_reviewed_by_user_id": draft.script_reviewed_by_user_id,
         "script_review_note": draft.script_review_note,
@@ -629,23 +649,32 @@ def _reject_stale_content_draft(db: Session, draft: ContentDraft) -> None:
         raise HTTPException(status_code=409, detail="Content draft is based on an older published version")
 
 
-def _schema_contains_script_reference(page_schema: ContentPage) -> bool:
-    for section in page_schema.sections:
-        if _contains_script_reference(section.props):
-            return True
-    return False
+def _content_draft_script_policy(draft: ContentDraft):
+    stored_analysis = draft.script_analysis_json if isinstance(draft.script_analysis_json, dict) else None
+    stored_policy = script_policy_result_from_json(stored_analysis)
+    stored_schema_hash = stored_analysis.get("schema_hash") if stored_analysis else None
+    stored_policy_version = stored_analysis.get("policy_version") if stored_analysis else None
+    if (
+        stored_policy is not None
+        and stored_schema_hash == draft.schema_hash
+        and stored_policy_version == SCRIPT_POLICY_VERSION
+    ):
+        return stored_policy
+    return analyze_content_script_policy(ContentPage.model_validate(draft.schema_json))
 
 
-def _contains_script_reference(value) -> bool:
-    if isinstance(value, dict):
-        for key, nested_value in value.items():
-            if str(key).replace("_", "").replace("-", "").lower() in SCRIPT_REFERENCE_KEYS:
-                return True
-            if _contains_script_reference(nested_value):
-                return True
-    if isinstance(value, list):
-        return any(_contains_script_reference(item) for item in value)
-    return False
+def _content_draft_script_analysis_snapshot(draft: ContentDraft) -> dict | None:
+    policy = _content_draft_script_policy(draft)
+    if policy is None:
+        return None
+    return {
+        "policy_version": policy.policy_version,
+        "schema_hash": draft.schema_hash,
+        "status": policy.status,
+        "risk_level": policy.risk_level,
+        "finding_count": len(policy.findings),
+        "findings": [finding.to_dict() for finding in policy.findings],
+    }
 
 
 def _schema_hash(payload: dict) -> str:

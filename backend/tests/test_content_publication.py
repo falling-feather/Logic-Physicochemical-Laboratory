@@ -289,6 +289,8 @@ def test_script_draft_requires_approved_review_before_publish(client):
     assert create.status_code == 201
     draft_id = create.json()["id"]
     assert create.json()["script_review_status"] == "pending"
+    assert create.json()["script_risk_level"] == "medium"
+    assert create.json()["script_analysis"]["status"] == "review_required"
     _submit_draft(client, teacher_token, draft_id)
 
     publish_before_review = client.post(
