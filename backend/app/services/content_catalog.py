@@ -93,7 +93,6 @@ def ensure_seed_pages(db: Session) -> None:
 
 
 def get_page_schema(db: Session, slug: str) -> ContentPage | None:
-    ensure_seed_pages(db)
     record = db.scalar(select(ContentPageRecord).where(ContentPageRecord.slug == slug.strip("/")))
     if record is None:
         return None
@@ -101,7 +100,6 @@ def get_page_schema(db: Session, slug: str) -> ContentPage | None:
 
 
 def list_page_summaries(db: Session) -> list[dict]:
-    ensure_seed_pages(db)
     records = db.scalars(select(ContentPageRecord).order_by(ContentPageRecord.slug)).all()
     return [
         {

@@ -57,7 +57,6 @@ from app.services.class_join_requests import (
     normalize_class_role,
     normalize_join_request_status,
 )
-from app.services.content_catalog import ensure_seed_pages
 
 
 router = APIRouter()
@@ -453,7 +452,6 @@ def list_admin_content_pages(
     db: Session = Depends(get_db),
 ) -> AdminContentPagePage:
     _require_admin(current_user)
-    ensure_seed_pages(db)
     records = db.scalars(select(ContentPageRecord).order_by(ContentPageRecord.slug)).all()
     items = [
         AdminContentPageRead(
@@ -500,7 +498,6 @@ def read_admin_stats(
     db: Session = Depends(get_db),
 ) -> AdminStats:
     _require_admin(current_user)
-    ensure_seed_pages(db)
     users_by_role = {
         str(role): int(count)
         for role, count in db.execute(select(User.role, func.count()).group_by(User.role)).all()

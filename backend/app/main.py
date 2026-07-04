@@ -7,7 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import get_settings
-from app.db.session import init_db
+from app.db.session import get_session_factory, init_db
+from app.services.content_catalog import ensure_seed_pages
 from app.services.knowledge_snapshot_scheduler import scheduler_from_settings
 
 
@@ -22,6 +23,9 @@ def create_app() -> FastAPI:
     )
     if settings.auto_create_tables:
         init_db(settings.database_url)
+        session_factory = get_session_factory(settings.database_url)
+        with session_factory() as db:
+            ensure_seed_pages(db)
 
     @app.middleware("http")
     async def attach_request_id(request: Request, call_next):
