@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
 from app.db.session import get_db
-from app.models import ClassGroup, ClassJoinRequest, ClassMembership, SchoolMembership, User
+from app.models import ClassGroup, ClassJoinRequest, ClassMembership, User
 from app.models.base import utc_now
 from app.schemas.school import (
     ClassCreate,
@@ -25,6 +25,12 @@ from app.services.class_join_requests import (
     normalize_join_request_status,
     trim_optional,
 )
+from app.services.access_control import (
+    require_class_teacher_or_admin,
+    require_school_member,
+    require_school_role,
+    visible_school_ids,
+)
 
 
 router = APIRouter()
@@ -38,10 +44,10 @@ def list_classes(
 ) -> list[ClassGroup]:
     statement = select(ClassGroup).order_by(ClassGroup.id)
     if school_id is not None:
-        _require_school_member(db, current_user, school_id)
+        require_school_member(db, current_user, school_id)
         statement = statement.where(ClassGroup.school_id == school_id)
     elif current_user.role != "admin":
-        school_ids = _visible_school_ids(db, current_user.id)
+        school_ids = visible_school_ids(db, current_user.id)
         if not school_ids:
             return []
         statement = statement.where(ClassGroup.school_id.in_(school_ids))
@@ -55,7 +61,7 @@ def create_class(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ClassGroup:
-    _require_school_role(db, current_user, payload.school_id, {"admin", "teacher"})
+    require_school_role(db, current_user, payload.school_id, {"admin", "teacher"})
     existing = db.scalar(
         select(ClassGroup).where(
             ClassGroup.school_id == payload.school_id,
@@ -117,7 +123,7 @@ def join_class(
     if role == "teacher" and current_user.role not in {"admin", "teacher"}:
         raise HTTPException(status_code=403, detail="Only teachers can join with teacher role")
     if role == "teacher" and current_user.role != "admin":
-        _require_school_role(db, current_user, class_group.school_id, {"admin", "teacher"})
+        require_school_role(db, current_user, class_group.school_id, {"admin", "teacher"})
 
     ensure_school_membership(db, class_group.school_id, current_user.id, role)
     membership, membership_created = ensure_class_membership(db, class_group.id, current_user.id, role)
@@ -206,7 +212,7 @@ def create_class_join_request(
     if role == "teacher" and current_user.role not in {"admin", "teacher"}:
         raise HTTPException(status_code=403, detail="Only teachers can request teacher role")
     if role == "teacher" and current_user.role != "admin":
-        _require_school_role(db, current_user, class_group.school_id, {"admin", "teacher"})
+        require_school_role(db, current_user, class_group.school_id, {"admin", "teacher"})
 
     if existing_active_class_membership(db, class_group.id, current_user.id, role) is not None:
         raise HTTPException(status_code=409, detail="Class membership already exists")
@@ -265,8 +271,6 @@ def create_class_join_request(
     db.commit()
     db.refresh(join_request)
     return join_request
-
-
 @router.get("/{class_id}/join-requests", response_model=list[ClassJoinRequestRead])
 def list_class_join_requests(
     class_id: int,
@@ -277,7 +281,12 @@ def list_class_join_requests(
     class_group = db.get(ClassGroup, class_id)
     if class_group is None:
         raise HTTPException(status_code=404, detail="Class not found")
-    _require_class_review_scope(db, current_user, class_group)
+    require_class_teacher_or_admin(
+        db,
+        current_user,
+        class_group,
+        detail="Class review scope requires class teacher role",
+    )
 
     statement = (
         select(ClassJoinRequest)
@@ -301,7 +310,12 @@ def review_class_join_request(
     class_group = db.get(ClassGroup, class_id)
     if class_group is None:
         raise HTTPException(status_code=404, detail="Class not found")
-    _require_class_review_scope(db, current_user, class_group)
+    require_class_teacher_or_admin(
+        db,
+        current_user,
+        class_group,
+        detail="Class review scope requires class teacher role",
+    )
 
     join_request = db.scalar(
         select(ClassJoinRequest).where(
@@ -324,58 +338,3 @@ def review_class_join_request(
     db.commit()
     db.refresh(join_request)
     return join_request
-
-
-def _visible_school_ids(db: Session, user_id: int) -> list[int]:
-    return list(
-        db.scalars(
-            select(SchoolMembership.school_id).where(
-                SchoolMembership.user_id == user_id,
-                SchoolMembership.status == "active",
-            )
-        ).all()
-    )
-
-
-def _require_school_member(db: Session, user: User, school_id: int) -> None:
-    if user.role == "admin":
-        return
-    membership = db.scalar(
-        select(SchoolMembership).where(
-            SchoolMembership.school_id == school_id,
-            SchoolMembership.user_id == user.id,
-            SchoolMembership.status == "active",
-        )
-    )
-    if membership is None:
-        raise HTTPException(status_code=403, detail="School is outside current user scope")
-
-
-def _require_school_role(db: Session, user: User, school_id: int, roles: set[str]) -> None:
-    if user.role == "admin":
-        return
-    membership = db.scalar(
-        select(SchoolMembership).where(
-            SchoolMembership.school_id == school_id,
-            SchoolMembership.user_id == user.id,
-            SchoolMembership.role.in_(roles),
-            SchoolMembership.status == "active",
-        )
-    )
-    if membership is None:
-        raise HTTPException(status_code=403, detail="School role is outside current user scope")
-
-
-def _require_class_review_scope(db: Session, user: User, class_group: ClassGroup) -> None:
-    if user.role == "admin":
-        return
-    membership = db.scalar(
-        select(ClassMembership).where(
-            ClassMembership.class_id == class_group.id,
-            ClassMembership.user_id == user.id,
-            ClassMembership.role == "teacher",
-            ClassMembership.status == "active",
-        )
-    )
-    if membership is None:
-        raise HTTPException(status_code=403, detail="Class review scope requires class teacher role")

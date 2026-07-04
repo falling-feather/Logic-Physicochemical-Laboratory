@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
 from app.db.session import get_db
-from app.models import ClassGroup, ClassMembership, LearningEvent, PointLedger, SchoolMembership, Submission, User
+from app.models import ClassMembership, LearningEvent, PointLedger, Submission, User
 from app.schemas.course import ProgressSummary
+from app.services.access_control import get_class, require_class_member, require_school_role
 
 
 router = APIRouter()
@@ -18,7 +19,7 @@ def get_my_progress(
     db: Session = Depends(get_db),
 ) -> ProgressSummary:
     if class_id is not None:
-        _require_class_member(db, current_user, class_id)
+        require_class_member(db, current_user, class_id)
     return _build_progress_summary(db, current_user.id, class_id)
 
 
@@ -29,8 +30,8 @@ def get_user_progress(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ProgressSummary:
-    class_group = _get_class(db, class_id)
-    _require_school_role(db, current_user, class_group.school_id, {"admin", "teacher"})
+    class_group = get_class(db, class_id)
+    require_school_role(db, current_user, class_group.school_id, {"admin", "teacher"})
     target_membership = db.scalar(
         select(ClassMembership).where(
             ClassMembership.class_id == class_id,
@@ -81,41 +82,3 @@ def _build_progress_summary(db: Session, user_id: int, class_id: int | None) -> 
 
 def _count(db: Session, statement) -> int:
     return int(db.scalar(select(func.count()).select_from(statement.subquery())) or 0)
-
-
-def _get_class(db: Session, class_id: int) -> ClassGroup:
-    class_group = db.get(ClassGroup, class_id)
-    if class_group is None:
-        raise HTTPException(status_code=404, detail="Class not found")
-    return class_group
-
-
-def _require_class_member(db: Session, user: User, class_id: int) -> ClassGroup:
-    class_group = _get_class(db, class_id)
-    if user.role == "admin":
-        return class_group
-    membership = db.scalar(
-        select(ClassMembership).where(
-            ClassMembership.class_id == class_id,
-            ClassMembership.user_id == user.id,
-            ClassMembership.status == "active",
-        )
-    )
-    if membership is None:
-        raise HTTPException(status_code=403, detail="Class is outside current user scope")
-    return class_group
-
-
-def _require_school_role(db: Session, user: User, school_id: int, roles: set[str]) -> None:
-    if user.role == "admin":
-        return
-    membership = db.scalar(
-        select(SchoolMembership).where(
-            SchoolMembership.school_id == school_id,
-            SchoolMembership.user_id == user.id,
-            SchoolMembership.role.in_(roles),
-            SchoolMembership.status == "active",
-        )
-    )
-    if membership is None:
-        raise HTTPException(status_code=403, detail="School role is outside current user scope")

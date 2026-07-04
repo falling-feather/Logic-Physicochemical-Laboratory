@@ -10,13 +10,11 @@ from app.models import (
     Assignment,
     ClassKnowledgeSnapshot,
     ClassGroup,
-    ClassMembership,
     Course,
     CourseClass,
     CourseUnit,
     LearningEvent,
     PointLedger,
-    SchoolMembership,
     Submission,
     User,
     UserKnowledgeSnapshot,
@@ -33,6 +31,15 @@ from app.schemas.knowledge import (
     UserKnowledgeRead,
 )
 from app.services.audit import record_audit_log
+from app.services.access_control import (
+    active_class_student_ids,
+    course_attached_to_class,
+    get_class,
+    require_class_member,
+    require_class_teacher_or_admin,
+    require_course_scope,
+    user_assignment_class_ids,
+)
 
 
 router = APIRouter()
@@ -50,13 +57,13 @@ def get_my_knowledge(
     _validate_period(from_at, to_at)
     class_group: ClassGroup | None = None
     if class_id is not None:
-        class_group = _require_class_member(db, current_user, class_id)
+        class_group = require_class_member(db, current_user, class_id)
     if course_id is not None:
-        _require_course_scope(db, current_user, class_group, course_id)
+        require_course_scope(db, current_user, class_group, course_id)
     assignment_class_ids = (
         None
         if current_user.role == "admin" and class_id is None
-        else _user_assignment_class_ids(db, current_user.id, class_id)
+        else user_assignment_class_ids(db, current_user.id, class_id)
     )
     return _build_user_knowledge(db, current_user.id, assignment_class_ids, class_id, course_id, from_at, to_at)
 
@@ -80,13 +87,13 @@ def rebuild_my_knowledge_snapshot(
     class_group: ClassGroup | None = None
     course: Course | None = None
     if class_id is not None:
-        class_group = _require_class_member(db, current_user, class_id)
+        class_group = require_class_member(db, current_user, class_id)
     if course_id is not None:
-        course = _require_course_scope(db, current_user, class_group, course_id)
+        course = require_course_scope(db, current_user, class_group, course_id)
     assignment_class_ids = (
         None
         if current_user.role == "admin" and class_id is None
-        else _user_assignment_class_ids(db, current_user.id, class_id)
+        else user_assignment_class_ids(db, current_user.id, class_id)
     )
     aggregate = _build_user_knowledge(db, current_user.id, assignment_class_ids, class_id, course_id, from_at, to_at)
     snapshot = _upsert_user_knowledge_snapshot(
@@ -142,9 +149,9 @@ def list_my_knowledge_snapshots(
     _validate_period(from_at, to_at)
     class_group: ClassGroup | None = None
     if class_id is not None:
-        class_group = _require_class_member(db, current_user, class_id)
+        class_group = require_class_member(db, current_user, class_id)
     if course_id is not None:
-        _require_course_scope(db, current_user, class_group, course_id)
+        require_course_scope(db, current_user, class_group, course_id)
 
     statement = select(UserKnowledgeSnapshot).where(UserKnowledgeSnapshot.user_id == current_user.id)
     if class_id is not None:
@@ -179,10 +186,10 @@ def get_class_knowledge(
     db: Session = Depends(get_db),
 ) -> ClassKnowledgeRead:
     _validate_period(from_at, to_at)
-    class_group = _get_class(db, class_id)
-    _require_class_teacher_or_admin(db, current_user, class_group)
+    class_group = get_class(db, class_id)
+    require_class_teacher_or_admin(db, current_user, class_group)
     if course_id is not None:
-        _require_course_scope(db, current_user, class_group, course_id)
+        require_course_scope(db, current_user, class_group, course_id)
     return _build_class_knowledge(db, class_group, course_id, from_at, to_at)
 
 
@@ -202,10 +209,10 @@ def rebuild_class_knowledge_snapshot(
     db: Session = Depends(get_db),
 ) -> ClassKnowledgeSnapshotRead:
     _validate_snapshot_period(from_at, to_at)
-    class_group = _get_class(db, class_id)
-    _require_class_teacher_or_admin(db, current_user, class_group)
+    class_group = get_class(db, class_id)
+    require_class_teacher_or_admin(db, current_user, class_group)
     if course_id is not None:
-        _require_course_scope(db, current_user, class_group, course_id)
+        require_course_scope(db, current_user, class_group, course_id)
 
     aggregate = _build_class_knowledge(db, class_group, course_id, from_at, to_at)
     snapshot = _upsert_class_knowledge_snapshot(
@@ -259,10 +266,10 @@ def list_class_knowledge_snapshots(
     db: Session = Depends(get_db),
 ) -> ClassKnowledgeSnapshotPage:
     _validate_period(from_at, to_at)
-    class_group = _get_class(db, class_id)
-    _require_class_teacher_or_admin(db, current_user, class_group)
+    class_group = get_class(db, class_id)
+    require_class_teacher_or_admin(db, current_user, class_group)
     if course_id is not None:
-        _require_course_scope(db, current_user, class_group, course_id)
+        require_course_scope(db, current_user, class_group, course_id)
 
     statement = select(ClassKnowledgeSnapshot).where(ClassKnowledgeSnapshot.class_id == class_group.id)
     if course_id is not None:
@@ -455,7 +462,7 @@ def _build_class_knowledge(
     from_at: datetime | None,
     to_at: datetime | None,
 ) -> ClassKnowledgeRead:
-    student_ids = _active_class_student_ids(db, class_group.id)
+    student_ids = active_class_student_ids(db, class_group.id)
     students_total = len(student_ids)
     assignment_count = _active_assignment_count(db, [class_group.id], course_id)
     submitted_assignments = _class_submission_count(db, class_group.id, course_id, from_at, to_at, graded=False)
@@ -863,18 +870,6 @@ def _point_total(
     return int(db.scalar(statement) or 0)
 
 
-def _active_class_student_ids(db: Session, class_id: int) -> list[int]:
-    return list(
-        db.scalars(
-            select(ClassMembership.user_id).where(
-                ClassMembership.class_id == class_id,
-                ClassMembership.role == "student",
-                ClassMembership.status == "active",
-            )
-        ).all()
-    )
-
-
 def _class_active_user_ids(
     db: Session,
     class_id: int,
@@ -903,125 +898,6 @@ def _class_active_user_ids(
         submission_statement = submission_statement.where(Submission.submitted_at <= to_at)
 
     return set(db.scalars(event_statement).all()).union(db.scalars(submission_statement).all())
-
-
-def _get_class(db: Session, class_id: int) -> ClassGroup:
-    class_group = db.get(ClassGroup, class_id)
-    if class_group is None:
-        raise HTTPException(status_code=404, detail="Class not found")
-    return class_group
-
-
-def _get_course(db: Session, course_id: int) -> Course:
-    course = db.get(Course, course_id)
-    if course is None:
-        raise HTTPException(status_code=404, detail="Course not found")
-    return course
-
-
-def _require_course_scope(
-    db: Session,
-    user: User,
-    class_group: ClassGroup | None,
-    course_id: int,
-) -> Course:
-    course = _get_course(db, course_id)
-    if class_group is not None:
-        if class_group.school_id != course.school_id:
-            raise HTTPException(status_code=422, detail="Class does not belong to course school")
-        if not _course_attached_to_class(db, course.id, class_group.id):
-            raise HTTPException(status_code=403, detail="Course is not attached to this class")
-        return course
-    return _require_course_visible(db, user, course_id)
-
-
-def _require_course_visible(db: Session, user: User, course_id: int) -> Course:
-    course = _get_course(db, course_id)
-    if user.role == "admin":
-        return course
-    school_membership = db.scalar(
-        select(SchoolMembership).where(
-            SchoolMembership.school_id == course.school_id,
-            SchoolMembership.user_id == user.id,
-            SchoolMembership.role.in_(["admin", "teacher"]),
-            SchoolMembership.status == "active",
-        )
-    )
-    if school_membership is not None:
-        return course
-    class_ids = _visible_class_ids(db, user.id)
-    if class_ids:
-        course_class = db.scalar(
-            select(CourseClass).where(
-                CourseClass.course_id == course.id,
-                CourseClass.class_id.in_(class_ids),
-                CourseClass.status == "active",
-            )
-        )
-        if course_class is not None:
-            return course
-    raise HTTPException(status_code=403, detail="Course is outside current user scope")
-
-
-def _require_class_member(db: Session, user: User, class_id: int) -> ClassGroup:
-    class_group = _get_class(db, class_id)
-    if user.role == "admin":
-        return class_group
-    membership = db.scalar(
-        select(ClassMembership).where(
-            ClassMembership.class_id == class_id,
-            ClassMembership.user_id == user.id,
-            ClassMembership.status == "active",
-        )
-    )
-    if membership is None:
-        raise HTTPException(status_code=403, detail="Class is outside current user scope")
-    return class_group
-
-
-def _require_class_teacher_or_admin(db: Session, user: User, class_group: ClassGroup) -> None:
-    if user.role == "admin":
-        return
-    membership = db.scalar(
-        select(ClassMembership).where(
-            ClassMembership.class_id == class_group.id,
-            ClassMembership.user_id == user.id,
-            ClassMembership.role == "teacher",
-            ClassMembership.status == "active",
-        )
-    )
-    if membership is None:
-        raise HTTPException(status_code=403, detail="Class statistics require teacher scope")
-
-
-def _visible_class_ids(db: Session, user_id: int) -> list[int]:
-    return list(
-        db.scalars(
-            select(ClassMembership.class_id).where(
-                ClassMembership.user_id == user_id,
-                ClassMembership.status == "active",
-            )
-        ).all()
-    )
-
-
-def _user_assignment_class_ids(db: Session, user_id: int, class_id: int | None) -> list[int]:
-    if class_id is not None:
-        return [class_id]
-    return _visible_class_ids(db, user_id)
-
-
-def _course_attached_to_class(db: Session, course_id: int, class_id: int) -> bool:
-    return (
-        db.scalar(
-            select(CourseClass).where(
-                CourseClass.course_id == course_id,
-                CourseClass.class_id == class_id,
-                CourseClass.status == "active",
-            )
-        )
-        is not None
-    )
 
 
 def _validate_period(from_at: datetime | None, to_at: datetime | None) -> None:

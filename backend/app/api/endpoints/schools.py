@@ -7,6 +7,7 @@ from app.db.session import get_db
 from app.models import ClassGroup, School, SchoolMembership, User
 from app.schemas.school import ClassRead, SchoolCreate, SchoolRead
 from app.services.audit import record_audit_log
+from app.services.access_control import require_school_member
 
 
 router = APIRouter()
@@ -76,23 +77,9 @@ def list_school_classes(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[ClassGroup]:
-    _require_school_member(db, current_user, school_id)
+    require_school_member(db, current_user, school_id)
     return list(
         db.scalars(
             select(ClassGroup).where(ClassGroup.school_id == school_id).order_by(ClassGroup.id)
         ).all()
     )
-
-
-def _require_school_member(db: Session, user: User, school_id: int) -> None:
-    if user.role == "admin":
-        return
-    membership = db.scalar(
-        select(SchoolMembership).where(
-            SchoolMembership.school_id == school_id,
-            SchoolMembership.user_id == user.id,
-            SchoolMembership.status == "active",
-        )
-    )
-    if membership is None:
-        raise HTTPException(status_code=403, detail="School is outside current user scope")

@@ -7,11 +7,9 @@ from app.db.session import get_db
 from app.models import (
     Assignment,
     ClassGroup,
-    ClassMembership,
     Course,
     CourseClass,
     CourseUnit,
-    SchoolMembership,
     User,
 )
 from app.schemas.course import (
@@ -25,6 +23,15 @@ from app.schemas.course import (
     CourseUnitRead,
 )
 from app.services.audit import record_audit_log
+from app.services.access_control import (
+    get_course,
+    require_class_member,
+    require_course_visible,
+    require_school_member,
+    require_school_role,
+    teacher_school_ids,
+    visible_class_ids,
+)
 
 
 router = APIRouter()
@@ -39,7 +46,7 @@ def list_courses(
 ) -> list[Course]:
     statement = select(Course).order_by(Course.id)
     if class_id is not None:
-        class_group = _require_class_member(db, current_user, class_id)
+        class_group = require_class_member(db, current_user, class_id)
         if school_id is not None and class_group.school_id != school_id:
             raise HTTPException(status_code=422, detail="Class does not belong to requested school")
         statement = statement.join(CourseClass, CourseClass.course_id == Course.id).where(
@@ -47,14 +54,14 @@ def list_courses(
             CourseClass.status == "active",
         )
     elif school_id is not None:
-        _require_school_member(db, current_user, school_id)
+        require_school_member(db, current_user, school_id)
         statement = statement.where(Course.school_id == school_id)
     elif current_user.role != "admin":
-        teacher_school_ids = _teacher_school_ids(db, current_user.id)
-        if teacher_school_ids:
-            statement = statement.where(Course.school_id.in_(teacher_school_ids))
+        school_ids = teacher_school_ids(db, current_user.id)
+        if school_ids:
+            statement = statement.where(Course.school_id.in_(school_ids))
             return list(db.scalars(statement).all())
-        class_ids = _visible_class_ids(db, current_user.id)
+        class_ids = visible_class_ids(db, current_user.id)
         if not class_ids:
             return []
         statement = statement.join(CourseClass, CourseClass.course_id == Course.id).where(
@@ -71,7 +78,7 @@ def create_course(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Course:
-    _require_school_role(db, current_user, payload.school_id, {"admin", "teacher"})
+    require_school_role(db, current_user, payload.school_id, {"admin", "teacher"})
     title = payload.title.strip()
     existing = db.scalar(select(Course).where(Course.school_id == payload.school_id, Course.title == title))
     if existing is not None:
@@ -118,8 +125,8 @@ def attach_course_class(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CourseClass:
-    course = _get_course(db, course_id)
-    _require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    course = get_course(db, course_id)
+    require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
     class_group = db.get(ClassGroup, payload.class_id)
     if class_group is None:
         raise HTTPException(status_code=404, detail="Class not found")
@@ -164,7 +171,7 @@ def list_course_units(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[CourseUnit]:
-    _require_course_visible(db, current_user, course_id)
+    require_course_visible(db, current_user, course_id)
     return list(
         db.scalars(select(CourseUnit).where(CourseUnit.course_id == course_id).order_by(CourseUnit.position)).all()
     )
@@ -178,8 +185,8 @@ def create_course_unit(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CourseUnit:
-    course = _get_course(db, course_id)
-    _require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    course = get_course(db, course_id)
+    require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
     content_slug = (payload.content_slug or "").strip() or None
     existing_position = db.scalar(
         select(CourseUnit).where(CourseUnit.course_id == course_id, CourseUnit.position == payload.position)
@@ -232,7 +239,7 @@ def list_course_assignments(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[Assignment]:
-    _require_course_visible(db, current_user, course_id)
+    require_course_visible(db, current_user, course_id)
     return list(
         db.scalars(
             select(Assignment)
@@ -256,8 +263,8 @@ def create_assignment(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Assignment:
-    course = _get_course(db, course_id)
-    _require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    course = get_course(db, course_id)
+    require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
     unit = db.get(CourseUnit, unit_id)
     if unit is None or unit.course_id != course_id:
         raise HTTPException(status_code=404, detail="Course unit not found")
@@ -299,108 +306,3 @@ def create_assignment(
     db.commit()
     db.refresh(assignment)
     return assignment
-
-
-def _get_course(db: Session, course_id: int) -> Course:
-    course = db.get(Course, course_id)
-    if course is None:
-        raise HTTPException(status_code=404, detail="Course not found")
-    return course
-
-
-def _visible_class_ids(db: Session, user_id: int) -> list[int]:
-    return list(
-        db.scalars(
-            select(ClassMembership.class_id).where(
-                ClassMembership.user_id == user_id,
-                ClassMembership.status == "active",
-            )
-        ).all()
-    )
-
-
-def _teacher_school_ids(db: Session, user_id: int) -> list[int]:
-    return list(
-        db.scalars(
-            select(SchoolMembership.school_id).where(
-                SchoolMembership.user_id == user_id,
-                SchoolMembership.role.in_(["admin", "teacher"]),
-                SchoolMembership.status == "active",
-            )
-        ).all()
-    )
-
-
-def _require_course_visible(db: Session, user: User, course_id: int) -> Course:
-    course = _get_course(db, course_id)
-    if user.role == "admin":
-        return course
-    school_membership = db.scalar(
-        select(SchoolMembership).where(
-            SchoolMembership.school_id == course.school_id,
-            SchoolMembership.user_id == user.id,
-            SchoolMembership.role.in_(["admin", "teacher"]),
-            SchoolMembership.status == "active",
-        )
-    )
-    if school_membership is not None:
-        return course
-    class_ids = _visible_class_ids(db, user.id)
-    if class_ids:
-        course_class = db.scalar(
-            select(CourseClass).where(
-                CourseClass.course_id == course.id,
-                CourseClass.class_id.in_(class_ids),
-                CourseClass.status == "active",
-            )
-        )
-        if course_class is not None:
-            return course
-    raise HTTPException(status_code=403, detail="Course is outside current user scope")
-
-
-def _require_class_member(db: Session, user: User, class_id: int) -> ClassGroup:
-    class_group = db.get(ClassGroup, class_id)
-    if class_group is None:
-        raise HTTPException(status_code=404, detail="Class not found")
-    if user.role == "admin":
-        return class_group
-    membership = db.scalar(
-        select(ClassMembership).where(
-            ClassMembership.class_id == class_id,
-            ClassMembership.user_id == user.id,
-            ClassMembership.status == "active",
-        )
-    )
-    if membership is None:
-        raise HTTPException(status_code=403, detail="Class is outside current user scope")
-    return class_group
-
-
-def _require_school_member(db: Session, user: User, school_id: int) -> None:
-    if user.role == "admin":
-        return
-    membership = db.scalar(
-        select(SchoolMembership).where(
-            SchoolMembership.school_id == school_id,
-            SchoolMembership.user_id == user.id,
-            SchoolMembership.status == "active",
-        )
-    )
-    if membership is None:
-        raise HTTPException(status_code=403, detail="School is outside current user scope")
-
-
-def _require_school_role(db: Session, user: User, school_id: int, roles: set[str]) -> None:
-    if user.role == "admin":
-        return
-    membership = db.scalar(
-        select(SchoolMembership).where(
-            SchoolMembership.school_id == school_id,
-            SchoolMembership.user_id == user.id,
-            SchoolMembership.role.in_(roles),
-            SchoolMembership.status == "active",
-        )
-    )
-    if membership is None:
-        raise HTTPException(status_code=403, detail="School role is outside current user scope")
