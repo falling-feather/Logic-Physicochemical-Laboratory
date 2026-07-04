@@ -95,6 +95,10 @@ def test_teacher_creates_content_draft_without_publishing(client):
     assert draft["status"] == "draft"
     assert draft["allow_script"] is False
     assert draft["script_review_status"] == "not_required"
+    assert draft["submitted_at"] is None
+    assert draft["withdrawn_at"] is None
+    assert draft["change_requested_at"] is None
+    assert draft["published_version_id"] is None
     assert draft["schema"]["slug"] == "physics/private-energy"
 
     duplicate = client.post(
@@ -139,6 +143,129 @@ def test_teacher_creates_content_draft_without_publishing(client):
         json={"status": "approved", "note": "No script to review"},
     )
     assert review_no_script.status_code == 409
+
+
+def test_content_draft_submit_request_changes_resubmit_and_withdraw(client):
+    admin_token = _bootstrap_admin(client, username="admin_workflow")
+    _, teacher_token = _register_and_login(client, "teacher_workflow", "teacher")
+    _, other_teacher_token = _register_and_login(client, "teacher_workflow_other", "teacher")
+    slug = "physics/workflow-draft"
+
+    create = client.post(
+        "/api/content/drafts",
+        headers=_auth_header(teacher_token),
+        json=_draft_payload(slug),
+    )
+    assert create.status_code == 201
+    draft_id = create.json()["id"]
+
+    non_author_submit = client.post(
+        f"/api/content/drafts/{draft_id}/submit",
+        headers=_auth_header(other_teacher_token),
+        json={"note": "I should not submit this"},
+    )
+    assert non_author_submit.status_code == 403
+
+    submit = client.post(
+        f"/api/content/drafts/{draft_id}/submit",
+        headers={**_auth_header(teacher_token), "X-Request-ID": "draft-submit-request"},
+        json={"note": "Ready for review"},
+    )
+    assert submit.status_code == 200
+    submitted = submit.json()
+    assert submitted["status"] == "submitted"
+    assert submitted["submitted_at"] is not None
+
+    duplicate_active = client.post(
+        "/api/content/drafts",
+        headers=_auth_header(teacher_token),
+        json=_draft_payload(slug),
+    )
+    assert duplicate_active.status_code == 409
+
+    queue = client.get(
+        "/api/admin/content/drafts?status=submitted&q=workflow-draft",
+        headers=_auth_header(admin_token),
+    )
+    assert queue.status_code == 200
+    assert queue.json()["total"] == 1
+    assert queue.json()["items"][0]["submitted_at"] is not None
+
+    teacher_request_changes = client.post(
+        f"/api/content/drafts/{draft_id}/request-changes",
+        headers=_auth_header(teacher_token),
+        json={"note": "please revise"},
+    )
+    assert teacher_request_changes.status_code == 403
+
+    request_changes = client.post(
+        f"/api/content/drafts/{draft_id}/request-changes",
+        headers={**_auth_header(admin_token), "X-Request-ID": "draft-request-changes"},
+        json={"note": "Add clearer evidence prompts"},
+    )
+    assert request_changes.status_code == 200
+    changed = request_changes.json()
+    assert changed["status"] == "changes_requested"
+    assert changed["change_requested_by_user_id"] is not None
+    assert changed["change_requested_at"] is not None
+    assert changed["change_request_note"] == "Add clearer evidence prompts"
+
+    publish_changes_requested = client.post(
+        f"/api/content/drafts/{draft_id}/publish",
+        headers=_auth_header(admin_token),
+        json={"note": "publish too soon"},
+    )
+    assert publish_changes_requested.status_code == 409
+
+    resubmit = client.post(
+        f"/api/content/drafts/{draft_id}/submit",
+        headers=_auth_header(teacher_token),
+        json={"note": "Revised"},
+    )
+    assert resubmit.status_code == 200
+    assert resubmit.json()["status"] == "submitted"
+
+    withdraw = client.post(
+        f"/api/content/drafts/{draft_id}/withdraw",
+        headers=_auth_header(teacher_token),
+        json={"note": "Use a fresh version instead"},
+    )
+    assert withdraw.status_code == 200
+    assert withdraw.json()["status"] == "withdrawn"
+    assert withdraw.json()["withdrawn_at"] is not None
+
+    submit_withdrawn = client.post(
+        f"/api/content/drafts/{draft_id}/submit",
+        headers=_auth_header(teacher_token),
+        json={"note": "revive"},
+    )
+    assert submit_withdrawn.status_code == 409
+
+    publish_withdrawn = client.post(
+        f"/api/content/drafts/{draft_id}/publish",
+        headers=_auth_header(admin_token),
+        json={"note": "cannot publish"},
+    )
+    assert publish_withdrawn.status_code == 409
+
+    replacement = client.post(
+        "/api/content/drafts",
+        headers=_auth_header(teacher_token),
+        json=_draft_payload(slug),
+    )
+    assert replacement.status_code == 201
+
+    audit = client.get(
+        f"/api/admin/audit-logs?action=content.draft.request_changes&resource_id={draft_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    audit_item = audit.json()["items"][0]
+    assert audit_item["request_id"] == "draft-request-changes"
+    assert audit_item["snapshot_json"]["note"] == "Add clearer evidence prompts"
+    assert "schema" not in audit_item["snapshot_json"]["before"]
+    assert "schema" not in audit_item["snapshot_json"]["after"]
 
 
 def test_content_draft_validates_schema_and_slug(client):

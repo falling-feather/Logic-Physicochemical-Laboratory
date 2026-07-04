@@ -13,8 +13,11 @@ from app.models.base import utc_now
 from app.schemas.content import (
     ContentDraftCreate,
     ContentDraftPublish,
+    ContentDraftRequestChanges,
     ContentDraftRead,
     ContentDraftScriptReview,
+    ContentDraftSubmit,
+    ContentDraftWithdraw,
     ContentPage,
     ContentPageRollback,
     ContentPublicationRead,
@@ -25,7 +28,15 @@ from app.services.content_catalog import get_page_schema, list_page_summaries
 
 router = APIRouter()
 CONTENT_DRAFT_STATUS_DRAFT = "draft"
+CONTENT_DRAFT_STATUS_SUBMITTED = "submitted"
+CONTENT_DRAFT_STATUS_CHANGES_REQUESTED = "changes_requested"
+CONTENT_DRAFT_STATUS_WITHDRAWN = "withdrawn"
 CONTENT_DRAFT_STATUS_PUBLISHED = "published"
+CONTENT_DRAFT_ACTIVE_STATUSES = {
+    CONTENT_DRAFT_STATUS_DRAFT,
+    CONTENT_DRAFT_STATUS_SUBMITTED,
+    CONTENT_DRAFT_STATUS_CHANGES_REQUESTED,
+}
 CONTENT_PAGE_STATUS_PUBLISHED = "published"
 SCRIPT_REVIEW_NOT_REQUIRED = "not_required"
 SCRIPT_REVIEW_PENDING = "pending"
@@ -53,7 +64,7 @@ def create_content_draft(
         select(ContentDraft).where(
             ContentDraft.author_user_id == current_user.id,
             ContentDraft.target_slug == target_slug,
-            ContentDraft.status == CONTENT_DRAFT_STATUS_DRAFT,
+            ContentDraft.status.in_(CONTENT_DRAFT_ACTIVE_STATUSES),
         )
     )
     if existing is not None:
@@ -99,6 +110,106 @@ def read_content_draft(
     return _content_draft_read(draft)
 
 
+@router.post("/drafts/{draft_id}/submit", response_model=ContentDraftRead)
+def submit_content_draft(
+    draft_id: int,
+    payload: ContentDraftSubmit,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ContentDraftRead:
+    draft = _get_content_draft_for_transition(db, draft_id)
+    _require_draft_author_or_admin(draft, current_user)
+    if draft.status not in {CONTENT_DRAFT_STATUS_DRAFT, CONTENT_DRAFT_STATUS_CHANGES_REQUESTED}:
+        raise HTTPException(status_code=409, detail="Content draft cannot be submitted from its current status")
+
+    before = _content_draft_snapshot(draft)
+    draft.status = CONTENT_DRAFT_STATUS_SUBMITTED
+    draft.submitted_at = utc_now()
+    draft.withdrawn_at = None
+    after = _content_draft_snapshot(draft)
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="content.draft.submit",
+        resource_type="content_draft",
+        resource_id=draft.id,
+        event_result="success",
+        request=request,
+        snapshot=_transition_snapshot(before, after, payload.note),
+    )
+    db.commit()
+    db.refresh(draft)
+    return _content_draft_read(draft)
+
+
+@router.post("/drafts/{draft_id}/withdraw", response_model=ContentDraftRead)
+def withdraw_content_draft(
+    draft_id: int,
+    payload: ContentDraftWithdraw,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ContentDraftRead:
+    draft = _get_content_draft_for_transition(db, draft_id)
+    _require_draft_author_or_admin(draft, current_user)
+    if draft.status not in CONTENT_DRAFT_ACTIVE_STATUSES:
+        raise HTTPException(status_code=409, detail="Content draft cannot be withdrawn from its current status")
+
+    before = _content_draft_snapshot(draft)
+    draft.status = CONTENT_DRAFT_STATUS_WITHDRAWN
+    draft.withdrawn_at = utc_now()
+    after = _content_draft_snapshot(draft)
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="content.draft.withdraw",
+        resource_type="content_draft",
+        resource_id=draft.id,
+        event_result="success",
+        request=request,
+        snapshot=_transition_snapshot(before, after, payload.note),
+    )
+    db.commit()
+    db.refresh(draft)
+    return _content_draft_read(draft)
+
+
+@router.post("/drafts/{draft_id}/request-changes", response_model=ContentDraftRead)
+def request_content_draft_changes(
+    draft_id: int,
+    payload: ContentDraftRequestChanges,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ContentDraftRead:
+    _require_admin(current_user)
+    draft = _get_content_draft_for_transition(db, draft_id)
+    if draft.status != CONTENT_DRAFT_STATUS_SUBMITTED:
+        raise HTTPException(status_code=409, detail="Content draft must be submitted before requesting changes")
+    note = _strip_required(payload.note)
+
+    before = _content_draft_snapshot(draft)
+    draft.status = CONTENT_DRAFT_STATUS_CHANGES_REQUESTED
+    draft.change_requested_by_user_id = current_user.id
+    draft.change_requested_at = utc_now()
+    draft.change_request_note = note
+    after = _content_draft_snapshot(draft)
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="content.draft.request_changes",
+        resource_type="content_draft",
+        resource_id=draft.id,
+        event_result="success",
+        request=request,
+        snapshot=_transition_snapshot(before, after, note),
+    )
+    db.commit()
+    db.refresh(draft)
+    return _content_draft_read(draft)
+
+
 @router.post("/drafts/{draft_id}/publish", response_model=ContentPublicationRead)
 def publish_content_draft(
     draft_id: int,
@@ -111,8 +222,8 @@ def publish_content_draft(
     draft = db.get(ContentDraft, draft_id)
     if draft is None:
         raise HTTPException(status_code=404, detail="Content draft not found")
-    if draft.status != CONTENT_DRAFT_STATUS_DRAFT:
-        raise HTTPException(status_code=409, detail="Content draft is not publishable")
+    if draft.status != CONTENT_DRAFT_STATUS_SUBMITTED:
+        raise HTTPException(status_code=409, detail="Content draft must be submitted before publishing")
     if not draft.allow_script and _schema_contains_script_reference(ContentPage.model_validate(draft.schema_json)):
         raise HTTPException(status_code=409, detail="Content schema includes script references; script review is required")
     if draft.allow_script and draft.script_review_status != SCRIPT_REVIEW_APPROVED:
@@ -151,6 +262,10 @@ def publish_content_draft(
     )
     draft_before = _content_draft_snapshot(draft)
     draft.status = CONTENT_DRAFT_STATUS_PUBLISHED
+    draft.published_page_id = page.id
+    draft.published_version_id = version_record.id
+    draft.published_by_user_id = current_user.id
+    draft.published_at = version_record.published_at
     draft_after = _content_draft_snapshot(draft)
     record_audit_log(
         db,
@@ -184,6 +299,8 @@ def review_content_draft_script(
     draft = db.get(ContentDraft, draft_id)
     if draft is None:
         raise HTTPException(status_code=404, detail="Content draft not found")
+    if draft.status in {CONTENT_DRAFT_STATUS_WITHDRAWN, CONTENT_DRAFT_STATUS_PUBLISHED}:
+        raise HTTPException(status_code=409, detail="Content draft is closed")
     if not draft.allow_script:
         raise HTTPException(status_code=409, detail="Content draft does not allow scripts")
     if draft.author_user_id == current_user.id:
@@ -285,6 +402,21 @@ def _require_admin(user: User) -> None:
         raise HTTPException(status_code=403, detail="Admin role required")
 
 
+def _require_draft_author_or_admin(draft: ContentDraft, user: User) -> None:
+    if user.role == "admin":
+        return
+    if draft.author_user_id != user.id:
+        raise HTTPException(status_code=403, detail="Content draft is outside your scope")
+    _require_content_author(user)
+
+
+def _get_content_draft_for_transition(db: Session, draft_id: int) -> ContentDraft:
+    draft = db.get(ContentDraft, draft_id)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Content draft not found")
+    return draft
+
+
 def _validate_content_slug(slug: str) -> None:
     if (
         not slug
@@ -309,6 +441,15 @@ def _content_draft_read(draft: ContentDraft) -> ContentDraftRead:
         script_reviewed_by_user_id=draft.script_reviewed_by_user_id,
         script_reviewed_at=draft.script_reviewed_at,
         script_review_note=draft.script_review_note,
+        submitted_at=draft.submitted_at,
+        withdrawn_at=draft.withdrawn_at,
+        change_requested_by_user_id=draft.change_requested_by_user_id,
+        change_requested_at=draft.change_requested_at,
+        change_request_note=draft.change_request_note,
+        published_page_id=draft.published_page_id,
+        published_version_id=draft.published_version_id,
+        published_by_user_id=draft.published_by_user_id,
+        published_at=draft.published_at,
         page_schema=ContentPage.model_validate(draft.schema_json),
         created_at=draft.created_at,
         updated_at=draft.updated_at,
@@ -343,6 +484,15 @@ def _content_draft_snapshot(draft: ContentDraft) -> dict:
         "script_review_status": draft.script_review_status,
         "script_reviewed_by_user_id": draft.script_reviewed_by_user_id,
         "script_review_note": draft.script_review_note,
+        "submitted_at": _isoformat(draft.submitted_at),
+        "withdrawn_at": _isoformat(draft.withdrawn_at),
+        "change_requested_by_user_id": draft.change_requested_by_user_id,
+        "change_requested_at": _isoformat(draft.change_requested_at),
+        "change_request_note": draft.change_request_note,
+        "published_page_id": draft.published_page_id,
+        "published_version_id": draft.published_version_id,
+        "published_by_user_id": draft.published_by_user_id,
+        "published_at": _isoformat(draft.published_at),
     }
 
 
@@ -468,7 +618,28 @@ def _change_snapshot(before: dict, after: dict) -> dict:
     return {"before": before, "after": after, "changes": changes}
 
 
+def _transition_snapshot(before: dict, after: dict, note: str | None) -> dict:
+    snapshot = _change_snapshot(before, after)
+    stripped_note = _strip_optional(note)
+    if stripped_note is not None:
+        snapshot["note"] = stripped_note
+    return snapshot
+
+
+def _isoformat(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.isoformat()
+
+
 def _strip_optional(value: str | None) -> str | None:
     if value is None:
         return None
     return value.strip() or None
+
+
+def _strip_required(value: str) -> str:
+    stripped = value.strip()
+    if not stripped:
+        raise HTTPException(status_code=422, detail="Note is required")
+    return stripped

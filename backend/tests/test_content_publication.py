@@ -90,6 +90,17 @@ def test_admin_publishes_draft_to_public_page_and_version_history(client):
     )
     assert teacher_publish.status_code == 403
 
+    publish_before_submit = client.post(
+        f"/api/content/drafts/{draft_id}/publish",
+        headers=_auth_header(admin_token),
+        json={"note": "too early"},
+    )
+    assert publish_before_submit.status_code == 409
+
+    submit = _submit_draft(client, teacher_token, draft_id, note="Ready for publication")
+    assert submit["status"] == "submitted"
+    assert submit["submitted_at"] is not None
+
     publish = client.post(
         f"/api/content/drafts/{draft_id}/publish",
         headers={**_auth_header(admin_token), "X-Request-ID": "content-publish-request"},
@@ -120,7 +131,12 @@ def test_admin_publishes_draft_to_public_page_and_version_history(client):
 
     draft_read = client.get(f"/api/content/drafts/{draft_id}", headers=_auth_header(teacher_token))
     assert draft_read.status_code == 200
-    assert draft_read.json()["status"] == "published"
+    draft_after_publish = draft_read.json()
+    assert draft_after_publish["status"] == "published"
+    assert draft_after_publish["published_page_id"] == publication["id"]
+    assert draft_after_publish["published_version_id"] == publication["version_id"]
+    assert draft_after_publish["published_by_user_id"] is not None
+    assert draft_after_publish["published_at"] is not None
 
     versions = client.get(f"/api/admin/content/page-versions?slug={slug}", headers=_auth_header(admin_token))
     assert versions.status_code == 200
@@ -131,6 +147,14 @@ def test_admin_publishes_draft_to_public_page_and_version_history(client):
     assert version_item["source_draft_id"] == draft_id
     assert version_item["restored_from_version_id"] is None
     assert version_item["note"] == "Ship first version"
+
+    first_diff = client.get(
+        f"/api/admin/content/page-versions/{publication['version_id']}/diff",
+        headers=_auth_header(admin_token),
+    )
+    assert first_diff.status_code == 200
+    assert first_diff.json()["base_version_id"] == publication["version_id"]
+    assert first_diff.json()["change_count"] == 0
 
     stats = client.get("/api/admin/stats", headers=_auth_header(admin_token))
     assert stats.status_code == 200
@@ -144,7 +168,7 @@ def test_admin_publishes_draft_to_public_page_and_version_history(client):
     assert audit.json()["total"] == 1
     audit_item = audit.json()["items"][0]
     assert audit_item["request_id"] == "content-publish-request"
-    assert audit_item["snapshot_json"]["draft"]["changes"]["status"] == {"from": "draft", "to": "published"}
+    assert audit_item["snapshot_json"]["draft"]["changes"]["status"] == {"from": "submitted", "to": "published"}
     assert audit_item["snapshot_json"]["version"]["version"] == "v1"
     assert audit_item["snapshot_json"]["version"]["schema_hash"] == publication["schema_hash"]
     assert "schema" not in audit_item["snapshot_json"]["version"]
@@ -161,6 +185,8 @@ def test_stale_parallel_draft_cannot_overwrite_newer_published_version(client):
 
     first_draft_id = _create_draft(client, first_teacher_token, slug, "First Parallel Page")
     second_draft_id = _create_draft(client, second_teacher_token, slug, "Second Parallel Page")
+    _submit_draft(client, first_teacher_token, first_draft_id)
+    _submit_draft(client, second_teacher_token, second_draft_id)
 
     first_publish = client.post(
         f"/api/content/drafts/{first_draft_id}/publish",
@@ -202,6 +228,7 @@ def test_script_draft_requires_approved_review_before_publish(client):
     assert create.status_code == 201
     draft_id = create.json()["id"]
     assert create.json()["script_review_status"] == "pending"
+    _submit_draft(client, teacher_token, draft_id)
 
     publish_before_review = client.post(
         f"/api/content/drafts/{draft_id}/publish",
@@ -232,6 +259,7 @@ def test_admin_rolls_back_by_creating_new_content_version(client):
     slug = "physics/rollback-energy"
 
     first_draft_id = _create_draft(client, teacher_token, slug, "Stable Energy Page")
+    _submit_draft(client, teacher_token, first_draft_id)
     first_publish = client.post(
         f"/api/content/drafts/{first_draft_id}/publish",
         headers=_auth_header(admin_token),
@@ -242,13 +270,42 @@ def test_admin_rolls_back_by_creating_new_content_version(client):
     assert first_publish.json()["version"] == "v1"
 
     second_draft_id = _create_draft(client, teacher_token, slug, "Experimental Energy Page")
+    _submit_draft(client, teacher_token, second_draft_id)
     second_publish = client.post(
         f"/api/content/drafts/{second_draft_id}/publish",
         headers=_auth_header(admin_token),
         json={"note": "experiment"},
     )
     assert second_publish.status_code == 200
+    second_version_id = second_publish.json()["version_id"]
     assert second_publish.json()["version"] == "v2"
+
+    teacher_diff = client.get(
+        f"/api/admin/content/page-versions/{second_version_id}/diff?base_version_id={first_version_id}",
+        headers=_auth_header(teacher_token),
+    )
+    assert teacher_diff.status_code == 403
+
+    diff = client.get(
+        f"/api/admin/content/page-versions/{second_version_id}/diff?base_version_id={first_version_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert diff.status_code == 200
+    diff_body = diff.json()
+    assert diff_body["slug"] == slug
+    assert diff_body["base_version_id"] == first_version_id
+    assert diff_body["target_version_id"] == second_version_id
+    assert diff_body["change_count"] >= 1
+    title_change = next(change for change in diff_body["changes"] if change["path"] == "$.title")
+    assert title_change["before"] == "Stable Energy Page"
+    assert title_change["after"] == "Experimental Energy Page"
+
+    default_diff = client.get(
+        f"/api/admin/content/page-versions/{second_version_id}/diff",
+        headers=_auth_header(admin_token),
+    )
+    assert default_diff.status_code == 200
+    assert default_diff.json()["base_version_id"] == first_version_id
 
     render_second = client.get(f"/api/render/page/{slug}")
     assert render_second.status_code == 200
@@ -299,6 +356,45 @@ def test_admin_rolls_back_by_creating_new_content_version(client):
     assert _table_count(ContentPageVersion) == 3
 
 
+def test_admin_content_page_version_diff_rejects_cross_slug_base(client):
+    admin_token = _bootstrap_admin(client, username="admin_diff_cross_slug")
+    _, teacher_token = _register_and_login(client, "teacher_diff_cross_slug", "teacher")
+
+    first_version_id = _create_submit_publish(
+        client,
+        admin_token,
+        teacher_token,
+        "physics/diff-a",
+        "Diff A First",
+    )["version_id"]
+    second_version_id = _create_submit_publish(
+        client,
+        admin_token,
+        teacher_token,
+        "physics/diff-a",
+        "Diff A Second",
+    )["version_id"]
+    other_version_id = _create_submit_publish(
+        client,
+        admin_token,
+        teacher_token,
+        "physics/diff-b",
+        "Diff B First",
+    )["version_id"]
+
+    diff = client.get(
+        f"/api/admin/content/page-versions/{second_version_id}/diff?base_version_id={first_version_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert diff.status_code == 200
+
+    cross_slug = client.get(
+        f"/api/admin/content/page-versions/{second_version_id}/diff?base_version_id={other_version_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert cross_slug.status_code == 422
+
+
 def _create_draft(client, teacher_token: str, slug: str, title: str) -> int:
     create = client.post(
         "/api/content/drafts",
@@ -307,6 +403,38 @@ def _create_draft(client, teacher_token: str, slug: str, title: str) -> int:
     )
     assert create.status_code == 201
     return int(create.json()["id"])
+
+
+def _submit_draft(client, teacher_token: str, draft_id: int, note: str = "Ready") -> dict:
+    submit = client.post(
+        f"/api/content/drafts/{draft_id}/submit",
+        headers=_auth_header(teacher_token),
+        json={"note": note},
+    )
+    assert submit.status_code == 200
+    return submit.json()
+
+
+def _publish_draft(client, admin_token: str, draft_id: int, note: str = "Publish") -> dict:
+    publish = client.post(
+        f"/api/content/drafts/{draft_id}/publish",
+        headers=_auth_header(admin_token),
+        json={"note": note},
+    )
+    assert publish.status_code == 200
+    return publish.json()
+
+
+def _create_submit_publish(
+    client,
+    admin_token: str,
+    teacher_token: str,
+    slug: str,
+    title: str,
+) -> dict:
+    draft_id = _create_draft(client, teacher_token, slug, title)
+    _submit_draft(client, teacher_token, draft_id)
+    return _publish_draft(client, admin_token, draft_id, note=title)
 
 
 def _table_count(model) -> int:

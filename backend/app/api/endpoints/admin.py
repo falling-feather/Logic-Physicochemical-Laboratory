@@ -38,6 +38,8 @@ from app.schemas.admin import (
     AdminClassStats,
     AdminContentPageRead,
     AdminContentPagePage,
+    AdminContentPageVersionDiff,
+    AdminContentPageVersionDiffItem,
     AdminContentPageVersionPage,
     AdminContentPageVersionRead,
     AdminContentDraftPage,
@@ -67,6 +69,7 @@ from app.services.class_join_requests import (
 
 router = APIRouter()
 PENDING_SUBMISSION_STATUSES = ["submitted", "returned"]
+_DIFF_MISSING = object()
 
 
 @router.post("/bootstrap", response_model=AdminUserRead, status_code=status.HTTP_201_CREATED)
@@ -586,6 +589,41 @@ def list_admin_content_page_versions(
     )
 
 
+@router.get("/content/page-versions/{version_id}/diff", response_model=AdminContentPageVersionDiff)
+def read_admin_content_page_version_diff(
+    version_id: int,
+    base_version_id: int | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminContentPageVersionDiff:
+    _require_admin(current_user)
+    target_version = db.get(ContentPageVersion, version_id)
+    if target_version is None:
+        raise HTTPException(status_code=404, detail="Content page version not found")
+
+    if base_version_id is None:
+        base_version = _previous_content_page_version(db, target_version) or target_version
+    else:
+        base_version = db.get(ContentPageVersion, base_version_id)
+    if base_version is None:
+        raise HTTPException(status_code=404, detail="Base content page version not found")
+    if base_version.slug != target_version.slug:
+        raise HTTPException(status_code=422, detail="Content page versions must share the same slug")
+
+    changes = _content_schema_diff(base_version.schema_json, target_version.schema_json)
+    return AdminContentPageVersionDiff(
+        slug=target_version.slug,
+        base_version_id=base_version.id,
+        base_version=base_version.version,
+        base_schema_hash=base_version.schema_hash,
+        target_version_id=target_version.id,
+        target_version=target_version.version,
+        target_schema_hash=target_version.schema_hash,
+        change_count=len(changes),
+        changes=changes,
+    )
+
+
 @router.get("/stats", response_model=AdminStats)
 def read_admin_stats(
     current_user: User = Depends(get_current_user),
@@ -900,6 +938,15 @@ def _admin_content_draft_read(draft: ContentDraft, author: User) -> AdminContent
         script_reviewed_by_user_id=draft.script_reviewed_by_user_id,
         script_reviewed_at=draft.script_reviewed_at,
         script_review_note=draft.script_review_note,
+        submitted_at=draft.submitted_at,
+        withdrawn_at=draft.withdrawn_at,
+        change_requested_by_user_id=draft.change_requested_by_user_id,
+        change_requested_at=draft.change_requested_at,
+        change_request_note=draft.change_request_note,
+        published_page_id=draft.published_page_id,
+        published_version_id=draft.published_version_id,
+        published_by_user_id=draft.published_by_user_id,
+        published_at=draft.published_at,
         created_at=draft.created_at,
         updated_at=draft.updated_at,
     )
@@ -921,6 +968,51 @@ def _admin_content_page_version_read(version: ContentPageVersion) -> AdminConten
         note=version.note,
         created_at=version.created_at,
     )
+
+
+def _previous_content_page_version(db: Session, version: ContentPageVersion) -> ContentPageVersion | None:
+    return db.scalar(
+        select(ContentPageVersion)
+        .where(
+            ContentPageVersion.slug == version.slug,
+            ContentPageVersion.id < version.id,
+        )
+        .order_by(ContentPageVersion.id.desc())
+    )
+
+
+def _content_schema_diff(before: Any, after: Any, path: str = "$") -> list[AdminContentPageVersionDiffItem]:
+    if isinstance(before, dict) and isinstance(after, dict):
+        changes: list[AdminContentPageVersionDiffItem] = []
+        for key in sorted(set(before) | set(after)):
+            before_value = before.get(key, _DIFF_MISSING)
+            after_value = after.get(key, _DIFF_MISSING)
+            changes.extend(_content_schema_diff(before_value, after_value, f"{path}.{key}"))
+        return changes
+
+    if isinstance(before, list) and isinstance(after, list):
+        changes = []
+        for index in range(max(len(before), len(after))):
+            before_value = before[index] if index < len(before) else _DIFF_MISSING
+            after_value = after[index] if index < len(after) else _DIFF_MISSING
+            changes.extend(_content_schema_diff(before_value, after_value, f"{path}[{index}]"))
+        return changes
+
+    if before != after:
+        return [
+            AdminContentPageVersionDiffItem(
+                path=path,
+                before=_diff_value(before),
+                after=_diff_value(after),
+            )
+        ]
+    return []
+
+
+def _diff_value(value: Any) -> Any:
+    if value is _DIFF_MISSING:
+        return None
+    return value
 
 
 def _distinct_count(db: Session, column: Any, *criteria: Any) -> int:

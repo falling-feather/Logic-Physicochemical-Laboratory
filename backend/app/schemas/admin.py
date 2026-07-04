@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -80,6 +80,15 @@ class AdminContentDraftRead(BaseModel):
     script_reviewed_by_user_id: int | None = None
     script_reviewed_at: datetime | None = None
     script_review_note: str | None = None
+    submitted_at: datetime | None = None
+    withdrawn_at: datetime | None = None
+    change_requested_by_user_id: int | None = None
+    change_requested_at: datetime | None = None
+    change_request_note: str | None = None
+    published_page_id: int | None = None
+    published_version_id: int | None = None
+    published_by_user_id: int | None = None
+    published_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -114,6 +123,24 @@ class AdminContentPageVersionPage(BaseModel):
     limit: int
     offset: int
     next_offset: int | None = None
+
+
+class AdminContentPageVersionDiffItem(BaseModel):
+    path: str
+    before: Any = None
+    after: Any = None
+
+
+class AdminContentPageVersionDiff(BaseModel):
+    slug: str
+    base_version_id: int
+    base_version: str
+    base_schema_hash: str
+    target_version_id: int
+    target_version: str
+    target_schema_hash: str
+    change_count: int
+    changes: list[AdminContentPageVersionDiffItem]
 
 
 class AdminSchoolPage(BaseModel):

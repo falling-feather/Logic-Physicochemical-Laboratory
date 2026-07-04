@@ -61,6 +61,18 @@ class ContentDraftScriptReview(BaseModel):
     note: str | None = Field(default=None, max_length=1000)
 
 
+class ContentDraftSubmit(BaseModel):
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class ContentDraftWithdraw(BaseModel):
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class ContentDraftRequestChanges(BaseModel):
+    note: str = Field(min_length=1, max_length=1000)
+
+
 class ContentDraftPublish(BaseModel):
     note: str | None = Field(default=None, max_length=1000)
 
@@ -82,6 +94,15 @@ class ContentDraftRead(BaseModel):
     script_reviewed_by_user_id: int | None = None
     script_reviewed_at: datetime | None = None
     script_review_note: str | None = None
+    submitted_at: datetime | None = None
+    withdrawn_at: datetime | None = None
+    change_requested_by_user_id: int | None = None
+    change_requested_at: datetime | None = None
+    change_request_note: str | None = None
+    published_page_id: int | None = None
+    published_version_id: int | None = None
+    published_by_user_id: int | None = None
+    published_at: datetime | None = None
     page_schema: ContentPage = Field(alias="schema")
     created_at: datetime
     updated_at: datetime

@@ -30,6 +30,23 @@ class ContentDraft(TimestampMixin, Base):
     script_reviewed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
     script_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     script_review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
+    withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    change_requested_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+    change_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    change_request_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    published_page_id: Mapped[int | None] = mapped_column(ForeignKey("content_pages.id"), index=True, nullable=True)
+    published_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "content_page_versions.id",
+            name="fk_content_drafts_published_version_id_content_page_versions",
+            use_alter=True,
+        ),
+        index=True,
+        nullable=True,
+    )
+    published_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ContentPageVersion(TimestampMixin, Base):
