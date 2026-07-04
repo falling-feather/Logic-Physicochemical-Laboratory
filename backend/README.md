@@ -133,6 +133,12 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 python -m pytest backend
 ```
 
+权限范围回归可单独运行：
+
+```bash
+python -m pytest backend/tests/test_access_control.py
+```
+
 迁移烟测：
 
 ```bash
