@@ -90,6 +90,9 @@ class ContentDraftRead(BaseModel):
     title: str
     status: str
     allow_script: bool
+    schema_hash: str | None = None
+    base_version_id: int | None = None
+    base_schema_hash: str | None = None
     script_review_status: str
     script_reviewed_by_user_id: int | None = None
     script_reviewed_at: datetime | None = None
@@ -116,6 +119,7 @@ class ContentPublicationRead(BaseModel):
     version: str
     schema_hash: str
     version_id: int
+    previous_version_id: int | None = None
     source_draft_id: int | None = None
     restored_from_version_id: int | None = None
     updated_at: datetime

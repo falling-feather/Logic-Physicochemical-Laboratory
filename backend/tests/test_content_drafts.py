@@ -94,6 +94,9 @@ def test_teacher_creates_content_draft_without_publishing(client):
     assert draft["target_slug"] == "physics/private-energy"
     assert draft["status"] == "draft"
     assert draft["allow_script"] is False
+    assert len(draft["schema_hash"]) == 64
+    assert draft["base_version_id"] is None
+    assert draft["base_schema_hash"] is None
     assert draft["script_review_status"] == "not_required"
     assert draft["submitted_at"] is None
     assert draft["withdrawn_at"] is None

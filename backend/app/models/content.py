@@ -14,6 +14,18 @@ class ContentPageRecord(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(32), default="draft", nullable=False)
     version: Mapped[str] = mapped_column(String(64), nullable=False)
     schema_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    schema_hash: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    current_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "content_page_versions.id",
+            name="fk_content_pages_current_version_id_content_page_versions",
+            use_alter=True,
+        ),
+        index=True,
+        nullable=True,
+    )
+    published_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
 
 
 class ContentDraft(TimestampMixin, Base):
@@ -25,6 +37,17 @@ class ContentDraft(TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(240), nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True, nullable=False)
     schema_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    schema_hash: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    base_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "content_page_versions.id",
+            name="fk_content_drafts_base_version_id_content_page_versions",
+            use_alter=True,
+        ),
+        index=True,
+        nullable=True,
+    )
+    base_schema_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     allow_script: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     script_review_status: Mapped[str] = mapped_column(String(32), default="not_required", index=True, nullable=False)
     script_reviewed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
@@ -62,6 +85,11 @@ class ContentPageVersion(TimestampMixin, Base):
     schema_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     source_draft_id: Mapped[int | None] = mapped_column(ForeignKey("content_drafts.id"), index=True, nullable=True)
     restored_from_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("content_page_versions.id"),
+        index=True,
+        nullable=True,
+    )
+    previous_version_id: Mapped[int | None] = mapped_column(
         ForeignKey("content_page_versions.id"),
         index=True,
         nullable=True,

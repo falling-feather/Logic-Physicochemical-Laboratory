@@ -1,3 +1,6 @@
+import hashlib
+import json
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -75,6 +78,8 @@ _SEED_PAGES = {
 
 def ensure_seed_pages(db: Session) -> None:
     for page in _SEED_PAGES.values():
+        page_payload = page.model_dump(mode="json")
+        schema_hash = _schema_hash(page_payload)
         existing = db.scalar(select(ContentPageRecord).where(ContentPageRecord.slug == page.slug))
         if existing is None:
             db.add(
@@ -82,13 +87,17 @@ def ensure_seed_pages(db: Session) -> None:
                     slug=page.slug,
                     status=page.status,
                     version=page.version,
-                    schema_json=page.model_dump(mode="json"),
+                    schema_json=page_payload,
+                    schema_hash=schema_hash,
                 )
             )
         elif existing.version != page.version and not _has_published_versions(db, page.slug):
             existing.status = page.status
             existing.version = page.version
-            existing.schema_json = page.model_dump(mode="json")
+            existing.schema_json = page_payload
+            existing.schema_hash = schema_hash
+        elif existing.schema_hash is None:
+            existing.schema_hash = schema_hash
     db.commit()
 
 
@@ -125,3 +134,8 @@ def list_page_summaries(db: Session) -> list[dict]:
 def _has_published_versions(db: Session, slug: str) -> bool:
     version_id = db.scalar(select(ContentPageVersion.id).where(ContentPageVersion.slug == slug).limit(1))
     return version_id is not None
+
+
+def _schema_hash(payload: dict) -> str:
+    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()

@@ -472,6 +472,10 @@ def list_admin_content_pages(
             layout=str(record.schema_json.get("layout", "")),
             status=record.status,
             version=record.version,
+            schema_hash=record.schema_hash,
+            current_version_id=record.current_version_id,
+            published_by_user_id=record.published_by_user_id,
+            published_at=record.published_at,
             updated_at=record.updated_at,
         )
         for record in records
@@ -602,7 +606,7 @@ def read_admin_content_page_version_diff(
         raise HTTPException(status_code=404, detail="Content page version not found")
 
     if base_version_id is None:
-        base_version = _previous_content_page_version(db, target_version) or target_version
+        base_version = _linked_previous_content_page_version(db, target_version) or target_version
     else:
         base_version = db.get(ContentPageVersion, base_version_id)
     if base_version is None:
@@ -934,6 +938,9 @@ def _admin_content_draft_read(draft: ContentDraft, author: User) -> AdminContent
         title=draft.title,
         status=draft.status,
         allow_script=draft.allow_script,
+        schema_hash=draft.schema_hash,
+        base_version_id=draft.base_version_id,
+        base_schema_hash=draft.base_schema_hash,
         script_review_status=draft.script_review_status,
         script_reviewed_by_user_id=draft.script_reviewed_by_user_id,
         script_reviewed_at=draft.script_reviewed_at,
@@ -961,6 +968,7 @@ def _admin_content_page_version_read(version: ContentPageVersion) -> AdminConten
         status=version.status,
         version=version.version,
         schema_hash=version.schema_hash,
+        previous_version_id=version.previous_version_id,
         source_draft_id=version.source_draft_id,
         restored_from_version_id=version.restored_from_version_id,
         published_by_user_id=version.published_by_user_id,
@@ -979,6 +987,14 @@ def _previous_content_page_version(db: Session, version: ContentPageVersion) -> 
         )
         .order_by(ContentPageVersion.id.desc())
     )
+
+
+def _linked_previous_content_page_version(db: Session, version: ContentPageVersion) -> ContentPageVersion | None:
+    if version.previous_version_id is not None:
+        linked_version = db.get(ContentPageVersion, version.previous_version_id)
+        if linked_version is not None:
+            return linked_version
+    return _previous_content_page_version(db, version)
 
 
 def _content_schema_diff(before: Any, after: Any, path: str = "$") -> list[AdminContentPageVersionDiffItem]:

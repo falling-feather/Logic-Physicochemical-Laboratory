@@ -70,12 +70,17 @@ def create_content_draft(
     if existing is not None:
         raise HTTPException(status_code=409, detail="Active content draft already exists for this target")
 
+    draft_payload = page_schema.model_dump(mode="json")
+    base_version = _current_content_page_version(db, target_slug)
     draft = ContentDraft(
         author_user_id=current_user.id,
         target_slug=target_slug,
         title=page_schema.title.strip(),
         status=CONTENT_DRAFT_STATUS_DRAFT,
-        schema_json=page_schema.model_dump(mode="json"),
+        schema_json=draft_payload,
+        schema_hash=_schema_hash(draft_payload),
+        base_version_id=base_version.id if base_version is not None else None,
+        base_schema_hash=base_version.schema_hash if base_version is not None else None,
         allow_script=payload.allow_script,
         script_review_status=SCRIPT_REVIEW_PENDING if payload.allow_script else SCRIPT_REVIEW_NOT_REQUIRED,
     )
@@ -232,6 +237,7 @@ def publish_content_draft(
 
     target_slug = draft.target_slug.strip()
     _validate_content_slug(target_slug)
+    previous_version = _current_content_page_version(db, target_slug)
     version = _next_content_version(db, target_slug)
     page_schema = _published_page_schema(draft.schema_json, target_slug, version)
     page_payload = page_schema.model_dump(mode="json")
@@ -259,7 +265,12 @@ def publish_content_draft(
         note=payload.note,
         source_draft_id=draft.id,
         restored_from_version_id=None,
+        previous_version_id=previous_version.id if previous_version is not None else None,
     )
+    page.schema_hash = version_record.schema_hash
+    page.current_version_id = version_record.id
+    page.published_by_user_id = current_user.id
+    page.published_at = version_record.published_at
     draft_before = _content_draft_snapshot(draft)
     draft.status = CONTENT_DRAFT_STATUS_PUBLISHED
     draft.published_page_id = page.id
@@ -343,6 +354,7 @@ def rollback_content_page_version(
     if page is None:
         raise HTTPException(status_code=409, detail="Published content page is missing")
 
+    previous_version = _current_content_page_version(db, target_version.slug)
     page_before = _content_page_snapshot(page)
     version = _next_content_version(db, target_version.slug)
     page_schema = _published_page_schema(target_version.schema_json, target_version.slug, version)
@@ -358,7 +370,12 @@ def rollback_content_page_version(
         note=payload.note,
         source_draft_id=None,
         restored_from_version_id=target_version.id,
+        previous_version_id=previous_version.id if previous_version is not None else None,
     )
+    page.schema_hash = version_record.schema_hash
+    page.current_version_id = version_record.id
+    page.published_by_user_id = current_user.id
+    page.published_at = version_record.published_at
     record_audit_log(
         db,
         actor=current_user,
@@ -437,6 +454,9 @@ def _content_draft_read(draft: ContentDraft) -> ContentDraftRead:
         title=draft.title,
         status=draft.status,
         allow_script=draft.allow_script,
+        schema_hash=draft.schema_hash,
+        base_version_id=draft.base_version_id,
+        base_schema_hash=draft.base_schema_hash,
         script_review_status=draft.script_review_status,
         script_reviewed_by_user_id=draft.script_reviewed_by_user_id,
         script_reviewed_at=draft.script_reviewed_at,
@@ -468,6 +488,7 @@ def _content_publication_read(
         version=page.version,
         schema_hash=version_record.schema_hash,
         version_id=version_record.id,
+        previous_version_id=version_record.previous_version_id,
         source_draft_id=version_record.source_draft_id,
         restored_from_version_id=version_record.restored_from_version_id,
         updated_at=page.updated_at,
@@ -481,6 +502,9 @@ def _content_draft_snapshot(draft: ContentDraft) -> dict:
         "title": draft.title,
         "status": draft.status,
         "allow_script": draft.allow_script,
+        "schema_hash": draft.schema_hash,
+        "base_version_id": draft.base_version_id,
+        "base_schema_hash": draft.base_schema_hash,
         "script_review_status": draft.script_review_status,
         "script_reviewed_by_user_id": draft.script_reviewed_by_user_id,
         "script_review_note": draft.script_review_note,
@@ -503,6 +527,10 @@ def _content_page_snapshot(page: ContentPageRecord) -> dict:
         "title": page.schema_json.get("title", page.slug),
         "status": page.status,
         "version": page.version,
+        "schema_hash": page.schema_hash,
+        "current_version_id": page.current_version_id,
+        "published_by_user_id": page.published_by_user_id,
+        "published_at": _isoformat(page.published_at),
     }
 
 
@@ -515,6 +543,7 @@ def _content_page_version_snapshot(version_record: ContentPageVersion) -> dict:
         "status": version_record.status,
         "version": version_record.version,
         "schema_hash": version_record.schema_hash,
+        "previous_version_id": version_record.previous_version_id,
         "source_draft_id": version_record.source_draft_id,
         "restored_from_version_id": version_record.restored_from_version_id,
         "published_by_user_id": version_record.published_by_user_id,
@@ -539,6 +568,7 @@ def _new_content_page_version(
     note: str | None,
     source_draft_id: int | None,
     restored_from_version_id: int | None,
+    previous_version_id: int | None,
 ) -> ContentPageVersion:
     version_payload = page_schema.model_dump(mode="json")
     version_record = ContentPageVersion(
@@ -550,6 +580,7 @@ def _new_content_page_version(
         schema_json=version_payload,
         source_draft_id=source_draft_id,
         restored_from_version_id=restored_from_version_id,
+        previous_version_id=previous_version_id,
         published_by_user_id=publisher.id,
         published_at=utc_now(),
         note=_strip_optional(note),
@@ -566,16 +597,35 @@ def _next_content_version(db: Session, slug: str) -> str:
     return f"v{int(existing_versions or 0) + 1}"
 
 
-def _reject_stale_content_draft(db: Session, draft: ContentDraft) -> None:
-    latest_version = db.scalar(
+def _latest_content_page_version(db: Session, slug: str) -> ContentPageVersion | None:
+    return db.scalar(
         select(ContentPageVersion)
-        .where(ContentPageVersion.slug == draft.target_slug)
+        .where(ContentPageVersion.slug == slug)
         .order_by(ContentPageVersion.published_at.desc(), ContentPageVersion.id.desc())
         .limit(1)
     )
-    if latest_version is None:
+
+
+def _current_content_page_version(db: Session, slug: str) -> ContentPageVersion | None:
+    page = db.scalar(select(ContentPageRecord).where(ContentPageRecord.slug == slug))
+    if page is not None and page.current_version_id is not None:
+        current_version = db.get(ContentPageVersion, page.current_version_id)
+        if current_version is not None and current_version.slug == slug:
+            return current_version
+    return _latest_content_page_version(db, slug)
+
+
+def _reject_stale_content_draft(db: Session, draft: ContentDraft) -> None:
+    current_version = _current_content_page_version(db, draft.target_slug)
+    if current_version is None:
         return
-    if _as_utc(latest_version.published_at) > _as_utc(draft.created_at):
+    if draft.base_version_id is not None:
+        if current_version.id != draft.base_version_id:
+            raise HTTPException(status_code=409, detail="Content draft is based on an older published version")
+        if draft.base_schema_hash is not None and current_version.schema_hash != draft.base_schema_hash:
+            raise HTTPException(status_code=409, detail="Content draft base schema hash is stale")
+        return
+    if _as_utc(current_version.published_at) > _as_utc(draft.created_at):
         raise HTTPException(status_code=409, detail="Content draft is based on an older published version")
 
 

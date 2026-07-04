@@ -113,6 +113,7 @@ def test_admin_publishes_draft_to_public_page_and_version_history(client):
     assert publication["status"] == "published"
     assert publication["version"] == "v1"
     assert len(publication["schema_hash"]) == 64
+    assert publication["previous_version_id"] is None
     assert publication["source_draft_id"] == draft_id
     assert publication["restored_from_version_id"] is None
 
@@ -137,6 +138,9 @@ def test_admin_publishes_draft_to_public_page_and_version_history(client):
     assert draft_after_publish["published_version_id"] == publication["version_id"]
     assert draft_after_publish["published_by_user_id"] is not None
     assert draft_after_publish["published_at"] is not None
+    assert draft_after_publish["base_version_id"] is None
+    assert draft_after_publish["base_schema_hash"] is None
+    assert len(draft_after_publish["schema_hash"]) == 64
 
     versions = client.get(f"/api/admin/content/page-versions?slug={slug}", headers=_auth_header(admin_token))
     assert versions.status_code == 200
@@ -144,6 +148,7 @@ def test_admin_publishes_draft_to_public_page_and_version_history(client):
     version_item = versions.json()["items"][0]
     assert version_item["id"] == publication["version_id"]
     assert version_item["schema_hash"] == publication["schema_hash"]
+    assert version_item["previous_version_id"] is None
     assert version_item["source_draft_id"] == draft_id
     assert version_item["restored_from_version_id"] is None
     assert version_item["note"] == "Ship first version"
@@ -155,6 +160,14 @@ def test_admin_publishes_draft_to_public_page_and_version_history(client):
     assert first_diff.status_code == 200
     assert first_diff.json()["base_version_id"] == publication["version_id"]
     assert first_diff.json()["change_count"] == 0
+
+    pages = client.get(f"/api/admin/content/pages?q={slug}", headers=_auth_header(admin_token))
+    assert pages.status_code == 200
+    page_item = pages.json()["items"][0]
+    assert page_item["current_version_id"] == publication["version_id"]
+    assert page_item["schema_hash"] == publication["schema_hash"]
+    assert page_item["published_by_user_id"] is not None
+    assert page_item["published_at"] is not None
 
     stats = client.get("/api/admin/stats", headers=_auth_header(admin_token))
     assert stats.status_code == 200
@@ -206,6 +219,54 @@ def test_stale_parallel_draft_cannot_overwrite_newer_published_version(client):
     assert render.status_code == 200
     assert render.json()["title"] == "First Parallel Page"
     assert _table_count(ContentPageVersion) == 1
+
+
+def test_draft_bound_to_previous_base_version_cannot_publish_after_current_advances(client):
+    admin_token = _bootstrap_admin(client, username="admin_stale_base")
+    _, first_teacher_token = _register_and_login(client, "teacher_stale_base_one", "teacher")
+    _, second_teacher_token = _register_and_login(client, "teacher_stale_base_two", "teacher")
+    slug = "physics/stale-base-version"
+
+    first_draft_id = _create_draft(client, first_teacher_token, slug, "Stable Base Version")
+    _submit_draft(client, first_teacher_token, first_draft_id)
+    first_publish = client.post(
+        f"/api/content/drafts/{first_draft_id}/publish",
+        headers=_auth_header(admin_token),
+        json={"note": "publish base"},
+    )
+    assert first_publish.status_code == 200
+    base_version_id = first_publish.json()["version_id"]
+    base_schema_hash = first_publish.json()["schema_hash"]
+
+    stale_create = _create_draft_body(client, first_teacher_token, slug, "Stale Base Edit")
+    fresh_create = _create_draft_body(client, second_teacher_token, slug, "Fresh Base Edit")
+    assert stale_create["base_version_id"] == base_version_id
+    assert stale_create["base_schema_hash"] == base_schema_hash
+    assert fresh_create["base_version_id"] == base_version_id
+    assert fresh_create["base_schema_hash"] == base_schema_hash
+
+    _submit_draft(client, second_teacher_token, fresh_create["id"])
+    fresh_publish = client.post(
+        f"/api/content/drafts/{fresh_create['id']}/publish",
+        headers=_auth_header(admin_token),
+        json={"note": "advance current"},
+    )
+    assert fresh_publish.status_code == 200
+    assert fresh_publish.json()["previous_version_id"] == base_version_id
+
+    _submit_draft(client, first_teacher_token, stale_create["id"])
+    stale_publish = client.post(
+        f"/api/content/drafts/{stale_create['id']}/publish",
+        headers=_auth_header(admin_token),
+        json={"note": "should conflict with v2"},
+    )
+    assert stale_publish.status_code == 409
+    assert stale_publish.json()["detail"] == "Content draft is based on an older published version"
+
+    render = client.get(f"/api/render/page/{slug}")
+    assert render.status_code == 200
+    assert render.json()["title"] == "Fresh Base Edit"
+    assert _table_count(ContentPageVersion) == 2
 
 
 def test_script_draft_requires_approved_review_before_publish(client):
@@ -267,9 +328,14 @@ def test_admin_rolls_back_by_creating_new_content_version(client):
     )
     assert first_publish.status_code == 200
     first_version_id = first_publish.json()["version_id"]
+    first_schema_hash = first_publish.json()["schema_hash"]
     assert first_publish.json()["version"] == "v1"
 
-    second_draft_id = _create_draft(client, teacher_token, slug, "Experimental Energy Page")
+    second_create = _create_draft_body(client, teacher_token, slug, "Experimental Energy Page")
+    second_draft_id = second_create["id"]
+    assert second_create["base_version_id"] == first_version_id
+    assert second_create["base_schema_hash"] == first_schema_hash
+    assert len(second_create["schema_hash"]) == 64
     _submit_draft(client, teacher_token, second_draft_id)
     second_publish = client.post(
         f"/api/content/drafts/{second_draft_id}/publish",
@@ -278,6 +344,7 @@ def test_admin_rolls_back_by_creating_new_content_version(client):
     )
     assert second_publish.status_code == 200
     second_version_id = second_publish.json()["version_id"]
+    assert second_publish.json()["previous_version_id"] == first_version_id
     assert second_publish.json()["version"] == "v2"
 
     teacher_diff = client.get(
@@ -328,6 +395,7 @@ def test_admin_rolls_back_by_creating_new_content_version(client):
     rollback_body = rollback.json()
     assert rollback_body["version"] == "v3"
     assert rollback_body["title"] == "Stable Energy Page"
+    assert rollback_body["previous_version_id"] == second_version_id
     assert rollback_body["source_draft_id"] is None
     assert rollback_body["restored_from_version_id"] == first_version_id
 
@@ -340,7 +408,12 @@ def test_admin_rolls_back_by_creating_new_content_version(client):
     assert versions.status_code == 200
     assert versions.json()["total"] == 3
     assert versions.json()["items"][0]["version"] == "v3"
+    assert versions.json()["items"][0]["previous_version_id"] == second_version_id
     assert versions.json()["items"][0]["restored_from_version_id"] == first_version_id
+    assert versions.json()["items"][1]["version"] == "v2"
+    assert versions.json()["items"][1]["previous_version_id"] == first_version_id
+    assert versions.json()["items"][2]["version"] == "v1"
+    assert versions.json()["items"][2]["previous_version_id"] is None
 
     rollback_audit = client.get(
         f"/api/admin/audit-logs?action=content.page.rollback&request_id=content-rollback-request",
@@ -396,13 +469,17 @@ def test_admin_content_page_version_diff_rejects_cross_slug_base(client):
 
 
 def _create_draft(client, teacher_token: str, slug: str, title: str) -> int:
+    return int(_create_draft_body(client, teacher_token, slug, title)["id"])
+
+
+def _create_draft_body(client, teacher_token: str, slug: str, title: str) -> dict:
     create = client.post(
         "/api/content/drafts",
         headers=_auth_header(teacher_token),
         json=_draft_payload(slug, title=title),
     )
     assert create.status_code == 201
-    return int(create.json()["id"])
+    return create.json()
 
 
 def _submit_draft(client, teacher_token: str, draft_id: int, note: str = "Ready") -> dict:
