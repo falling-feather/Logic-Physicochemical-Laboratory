@@ -59,6 +59,7 @@ def get_db():
 
 def check_database(database_url: str) -> dict:
     safe_url = _safe_url(database_url)
+    engine = None
     try:
         engine = make_engine(database_url)
         with engine.connect() as connection:
@@ -89,6 +90,9 @@ def check_database(database_url: str) -> dict:
             "url": safe_url,
             "error": exc.__class__.__name__,
         }
+    finally:
+        if engine is not None:
+            engine.dispose()
 
 
 def _safe_url(database_url: str) -> str:

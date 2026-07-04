@@ -35,6 +35,7 @@ def _migration_report(database_url: str, backend_root: Path) -> dict[str, Any]:
     config = _alembic_config(backend_root)
     script = ScriptDirectory.from_config(config)
     heads = sorted(script.get_heads())
+    engine = None
     try:
         engine = make_engine(database_url)
         with engine.connect() as connection:
@@ -48,6 +49,9 @@ def _migration_report(database_url: str, backend_root: Path) -> dict[str, Any]:
             "current": [],
             "error": exc.__class__.__name__,
         }
+    finally:
+        if engine is not None:
+            engine.dispose()
     ok = current == heads
     return {
         "ok": ok,

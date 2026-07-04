@@ -169,3 +169,12 @@ python -m scripts.deploy_preflight
 ```
 
 预检会检查 `ASTRA_DATABASE_URL` 可连通，并确认数据库 Alembic 当前 revision 已到 head；失败时返回非零退出码和 JSON 报告。正式部署应先执行 `python -m alembic upgrade head`，再执行预检。
+
+部署 smoke：
+
+```bash
+cd backend
+python -m scripts.deploy_smoke --require-mysql
+```
+
+smoke 会复用部署预检，再检查当前模型期望表是否全部存在，并用同一配置启动 FastAPI TestClient 访问 `/api/health`。脚本运行时会临时关闭自动建表和知识快照调度器，只验证迁移后的现有状态。`--require-mysql` 用作生产门禁：如果当前连接不是 MySQL 方言会返回非零退出码；本地或 CI 需要覆盖临时库时可追加 `--database-url`。
