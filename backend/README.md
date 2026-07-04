@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、提交/退回/撤回工作流、内容发布/版本记录/回滚、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 diff、登录、密码策略、登录失败锁定、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、待批改队列、审计元数据和认证事件审计等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、草稿编辑、提交/退回/撤回工作流、内容发布/版本记录/回滚、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 diff、登录、密码策略、登录失败锁定、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、待批改队列、审计元数据和认证事件审计等能力。
 
 ## 本地启动
 
@@ -73,6 +73,7 @@ curl http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 | GET | `/api/content/pages/{slug}` | 已发布内容协议详情 |
 | POST | `/api/content/drafts` | 教师或管理员创建内容草稿；不会写入公开 `content_pages`，会记录草稿 schema hash、当前 published base 版本和脚本静态分析结果 |
 | GET | `/api/content/drafts/{id}` | 草稿作者或管理员读取单条草稿 |
+| PATCH | `/api/content/drafts/{id}` | 草稿作者或管理员编辑 `draft` / `changes_requested` 草稿；`schema.slug` 必须保持目标 slug，更新会重算 schema hash、脚本分析与脚本审核状态，且不会自动 rebase |
 | POST | `/api/content/drafts/{id}/submit` | 草稿作者或管理员提交审核；允许 `draft` / `changes_requested` 进入 `submitted` |
 | POST | `/api/content/drafts/{id}/withdraw` | 草稿作者或管理员撤回活跃草稿；撤回后不再发布，可重新创建同目标草稿 |
 | POST | `/api/content/drafts/{id}/request-changes` | 管理员退回已提交草稿，记录退回人、时间和必填备注 |
@@ -137,6 +138,7 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 - `app.services.audit` 负责写入审计日志及 request_id、IP 哈希、user-agent 等请求元数据。
 - `app.services.content_catalog` 负责内容页 seed、已发布 schema 读取和内容页摘要；`/api/content/pages*` 与 `/api/render/*` 查询只读 published 当前记录，不在 GET 路径隐式写库；seed 在已有版本历史时不会覆盖同 slug 的发布内容。
 - `app.services.content_script_policy` 负责内容草稿脚本静态分析；当前识别脚本引用、外链脚本、事件处理器、阻断协议、路径穿越和内联 `<script>`，并输出 `script_risk_level` 与 `script_analysis`。这只是静态 policy scan，不是脚本沙箱执行。
+- `PATCH /api/content/drafts/{id}` 负责草稿编辑闭环：仅允许作者或管理员编辑 `draft` / `changes_requested` 草稿，禁止 retarget 到其他 slug，保存时重算 `schema_hash/script_analysis/script_risk_level`，并清空旧脚本审核元数据；`base_version_id/base_schema_hash` 保持创建时基线，发布前仍由 stale guard 拦截过期草稿。
 - `/api/content/drafts/{id}/submit`、`/request-changes`、`/withdraw` 与 `/publish` 负责草稿状态流转；创建草稿时绑定当前 published base 版本和 hash，记录脚本静态分析结果，发布前校验 base 未过期并复核脚本 policy，发布后回填 page/version/publisher 元数据，审计只记录状态和版本元数据，不记录完整 schema。
 - `/api/content/page-versions/{id}/rollback` 负责内容版本追加式回滚：更新 `content_pages.current_version_id/schema_hash/published_*` 当前态、追加带 `previous_version_id` 的 `content_page_versions`，并在审计中只记录版本元数据与 schema hash，不记录完整 schema。
 - `app.services.knowledge_snapshot_runs` 与 `app.services.knowledge_snapshot_scheduler` 负责知识快照窗口重算、运行记录和单进程调度。

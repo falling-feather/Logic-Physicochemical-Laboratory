@@ -269,6 +269,56 @@ def test_draft_bound_to_previous_base_version_cannot_publish_after_current_advan
     assert _table_count(ContentPageVersion) == 2
 
 
+def test_content_draft_update_preserves_base_version_after_current_advances(client):
+    admin_token = _bootstrap_admin(client, username="admin_update_stale_base")
+    _, first_teacher_token = _register_and_login(client, "teacher_update_stale_one", "teacher")
+    _, second_teacher_token = _register_and_login(client, "teacher_update_stale_two", "teacher")
+    slug = "physics/update-stale-base"
+
+    first_draft_id = _create_draft(client, first_teacher_token, slug, "Update Base Version")
+    _submit_draft(client, first_teacher_token, first_draft_id)
+    first_publish = client.post(
+        f"/api/content/drafts/{first_draft_id}/publish",
+        headers=_auth_header(admin_token),
+        json={"note": "publish base"},
+    )
+    assert first_publish.status_code == 200
+    base_version_id = first_publish.json()["version_id"]
+    base_schema_hash = first_publish.json()["schema_hash"]
+
+    stale_create = _create_draft_body(client, first_teacher_token, slug, "Editable Stale Draft")
+    fresh_create = _create_draft_body(client, second_teacher_token, slug, "Fresh Current Draft")
+    _submit_draft(client, second_teacher_token, fresh_create["id"])
+    fresh_publish = client.post(
+        f"/api/content/drafts/{fresh_create['id']}/publish",
+        headers=_auth_header(admin_token),
+        json={"note": "advance current before stale edit"},
+    )
+    assert fresh_publish.status_code == 200
+    assert fresh_publish.json()["previous_version_id"] == base_version_id
+
+    update = client.patch(
+        f"/api/content/drafts/{stale_create['id']}",
+        headers=_auth_header(first_teacher_token),
+        json=_draft_update_payload(slug, title="Edited Stale Draft"),
+    )
+    assert update.status_code == 200
+    updated = update.json()
+    assert updated["title"] == "Edited Stale Draft"
+    assert updated["base_version_id"] == base_version_id
+    assert updated["base_schema_hash"] == base_schema_hash
+    assert updated["schema_hash"] != stale_create["schema_hash"]
+
+    _submit_draft(client, first_teacher_token, stale_create["id"])
+    stale_publish = client.post(
+        f"/api/content/drafts/{stale_create['id']}/publish",
+        headers=_auth_header(admin_token),
+        json={"note": "should still conflict"},
+    )
+    assert stale_publish.status_code == 409
+    assert stale_publish.json()["detail"] == "Content draft is based on an older published version"
+
+
 def test_script_draft_requires_approved_review_before_publish(client):
     first_admin_token = _bootstrap_admin(client, username="admin_publish_first")
     second_admin_id, second_admin_token = _register_and_login(client, "admin_publish_second", "teacher")
@@ -482,6 +532,11 @@ def _create_draft_body(client, teacher_token: str, slug: str, title: str) -> dic
     )
     assert create.status_code == 201
     return create.json()
+
+
+def _draft_update_payload(slug: str, title: str) -> dict:
+    payload = _draft_payload(slug, title=title)
+    return {"schema": payload["schema"], "allow_script": payload["allow_script"]}
 
 
 def _submit_draft(client, teacher_token: str, draft_id: int, note: str = "Ready") -> dict:

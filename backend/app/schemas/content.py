@@ -56,6 +56,14 @@ class ContentDraftCreate(BaseModel):
     allow_script: bool = False
 
 
+class ContentDraftUpdate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    page_schema: ContentPage = Field(alias="schema")
+    allow_script: bool | None = None
+    note: str | None = Field(default=None, max_length=1000)
+
+
 class ContentDraftScriptReview(BaseModel):
     status: Literal["approved", "rejected"]
     note: str | None = Field(default=None, max_length=1000)

@@ -66,6 +66,13 @@ def _draft_payload(slug: str, *, allow_script: bool = False) -> dict:
     }
 
 
+def _draft_update_payload(slug: str, *, allow_script: bool | None = None) -> dict:
+    payload = {"schema": _draft_payload(slug, allow_script=bool(allow_script))["schema"]}
+    if allow_script is not None:
+        payload["allow_script"] = allow_script
+    return payload
+
+
 def test_teacher_creates_content_draft_without_publishing(client):
     unauthenticated = client.post("/api/content/drafts", json=_draft_payload("physics/private-energy"))
     assert unauthenticated.status_code == 401
@@ -275,6 +282,114 @@ def test_content_draft_submit_request_changes_resubmit_and_withdraw(client):
     assert "schema" not in audit_item["snapshot_json"]["after"]
 
 
+def test_content_draft_update_resets_script_review_and_records_audit(client):
+    admin_token = _bootstrap_admin(client, username="admin_update_draft")
+    _, teacher_token = _register_and_login(client, "teacher_update_draft", "teacher")
+    _, other_teacher_token = _register_and_login(client, "teacher_update_other", "teacher")
+    slug = "physics/update-draft"
+
+    create = client.post(
+        "/api/content/drafts",
+        headers=_auth_header(teacher_token),
+        json=_draft_payload(slug, allow_script=True),
+    )
+    assert create.status_code == 201
+    draft_id = create.json()["id"]
+    original_hash = create.json()["schema_hash"]
+
+    approve = client.patch(
+        f"/api/content/drafts/{draft_id}/script-review",
+        headers=_auth_header(admin_token),
+        json={"status": "approved", "note": "Temporary script approved"},
+    )
+    assert approve.status_code == 200
+    assert approve.json()["script_review_status"] == "approved"
+    assert approve.json()["script_reviewed_by_user_id"] is not None
+
+    other_teacher_update = client.patch(
+        f"/api/content/drafts/{draft_id}",
+        headers=_auth_header(other_teacher_token),
+        json=_draft_update_payload(slug) | {"note": "Out of scope"},
+    )
+    assert other_teacher_update.status_code == 403
+
+    submit = client.post(
+        f"/api/content/drafts/{draft_id}/submit",
+        headers=_auth_header(teacher_token),
+        json={"note": "Ready"},
+    )
+    assert submit.status_code == 200
+    submitted_update = client.patch(
+        f"/api/content/drafts/{draft_id}",
+        headers=_auth_header(teacher_token),
+        json=_draft_update_payload(slug) | {"note": "Edit during review"},
+    )
+    assert submitted_update.status_code == 409
+    assert submitted_update.json()["detail"] == "Content draft cannot be updated from its current status"
+
+    request_changes = client.post(
+        f"/api/content/drafts/{draft_id}/request-changes",
+        headers=_auth_header(admin_token),
+        json={"note": "Remove custom script before publishing"},
+    )
+    assert request_changes.status_code == 200
+    assert request_changes.json()["status"] == "changes_requested"
+
+    revised_payload = _draft_update_payload(slug, allow_script=False)
+    revised_payload["schema"]["title"] = "Revised Teacher Draft Energy"
+    revised_payload["schema"]["summary"] = "A script-free revision after review feedback."
+    revised_payload["schema"]["sections"][0]["summary"] = "Explain the friction tradeoff without custom code."
+    revised_payload["note"] = "Removed script and clarified task"
+    update = client.patch(
+        f"/api/content/drafts/{draft_id}",
+        headers={**_auth_header(teacher_token), "X-Request-ID": "draft-update-request"},
+        json=revised_payload,
+    )
+    assert update.status_code == 200
+    updated = update.json()
+    assert updated["status"] == "changes_requested"
+    assert updated["title"] == "Revised Teacher Draft Energy"
+    assert updated["schema_hash"] != original_hash
+    assert updated["schema"]["summary"] == "A script-free revision after review feedback."
+    assert updated["base_version_id"] is None
+    assert updated["base_schema_hash"] is None
+    assert updated["allow_script"] is False
+    assert updated["script_risk_level"] == "none"
+    assert updated["script_analysis"]["status"] == "clean"
+    assert updated["script_analysis"]["schema_hash"] == updated["schema_hash"]
+    assert updated["script_review_status"] == "not_required"
+    assert updated["script_reviewed_by_user_id"] is None
+    assert updated["script_reviewed_at"] is None
+    assert updated["script_review_note"] is None
+
+    blocked_payload = _draft_update_payload(slug, allow_script=True)
+    blocked_payload["schema"]["sections"][0]["props"]["scriptUrl"] = "javascript:alert(1)"
+    blocked_update = client.patch(
+        f"/api/content/drafts/{draft_id}",
+        headers=_auth_header(teacher_token),
+        json=blocked_payload,
+    )
+    assert blocked_update.status_code == 422
+    assert blocked_update.json()["detail"] == "Content schema contains blocked script policy findings"
+
+    audit = client.get(
+        f"/api/admin/audit-logs?action=content.draft.update&resource_id={draft_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    audit_item = audit.json()["items"][0]
+    assert audit_item["request_id"] == "draft-update-request"
+    assert audit_item["snapshot_json"]["note"] == "Removed script and clarified task"
+    assert audit_item["snapshot_json"]["changes"]["schema_hash"]["from"] == original_hash
+    assert audit_item["snapshot_json"]["changes"]["script_review_status"] == {
+        "from": "approved",
+        "to": "not_required",
+    }
+    assert "schema" not in audit_item["snapshot_json"]["before"]
+    assert "schema" not in audit_item["snapshot_json"]["after"]
+
+
 def test_content_draft_validates_schema_and_slug(client):
     _, teacher_token = _register_and_login(client, "teacher_content_validation", "teacher")
 
@@ -319,6 +434,31 @@ def test_content_draft_validates_schema_and_slug(client):
     )
     assert blocked_script_response.status_code == 422
     assert blocked_script_response.json()["detail"] == "Content schema contains blocked script policy findings"
+
+    create = client.post(
+        "/api/content/drafts",
+        headers=_auth_header(teacher_token),
+        json=_draft_payload("physics/update-validation"),
+    )
+    assert create.status_code == 201
+    draft_id = create.json()["id"]
+
+    update_mismatch = _draft_update_payload("physics/retargeted-update")
+    update_slug_mismatch = client.patch(
+        f"/api/content/drafts/{draft_id}",
+        headers=_auth_header(teacher_token),
+        json=update_mismatch,
+    )
+    assert update_slug_mismatch.status_code == 422
+    assert update_slug_mismatch.json()["detail"] == "schema.slug must match draft target_slug"
+
+    forbidden_field = _draft_update_payload("physics/update-validation") | {"target_slug": "physics/other-target"}
+    forbidden_field_response = client.patch(
+        f"/api/content/drafts/{draft_id}",
+        headers=_auth_header(teacher_token),
+        json=forbidden_field,
+    )
+    assert forbidden_field_response.status_code == 422
 
 
 def test_admin_reviews_script_draft_and_records_audit(client):

@@ -17,6 +17,7 @@ from app.schemas.content import (
     ContentDraftRead,
     ContentDraftScriptReview,
     ContentDraftSubmit,
+    ContentDraftUpdate,
     ContentDraftWithdraw,
     ContentPage,
     ContentPageRollback,
@@ -122,6 +123,60 @@ def read_content_draft(
         raise HTTPException(status_code=404, detail="Content draft not found")
     if current_user.role != "admin" and draft.author_user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Content draft is outside your scope")
+    return _content_draft_read(draft)
+
+
+@router.patch("/drafts/{draft_id}", response_model=ContentDraftRead)
+def update_content_draft(
+    draft_id: int,
+    payload: ContentDraftUpdate,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ContentDraftRead:
+    draft = _get_content_draft_for_transition(db, draft_id)
+    _require_draft_author_or_admin(draft, current_user)
+    if draft.status not in {CONTENT_DRAFT_STATUS_DRAFT, CONTENT_DRAFT_STATUS_CHANGES_REQUESTED}:
+        raise HTTPException(status_code=409, detail="Content draft cannot be updated from its current status")
+
+    target_slug = draft.target_slug.strip()
+    page_schema = payload.page_schema
+    if target_slug != page_schema.slug.strip():
+        raise HTTPException(status_code=422, detail="schema.slug must match draft target_slug")
+    page_schema = page_schema.model_copy(update={"slug": target_slug})
+    script_policy = analyze_content_script_policy(page_schema)
+    if script_policy.has_blocking_findings:
+        raise HTTPException(status_code=422, detail="Content schema contains blocked script policy findings")
+    allow_script = draft.allow_script if payload.allow_script is None else payload.allow_script
+    if script_policy.has_script_findings and not allow_script:
+        raise HTTPException(status_code=422, detail="Content schema includes script references; allow_script is required")
+
+    before = _content_draft_snapshot(draft)
+    draft_payload = page_schema.model_dump(mode="json")
+    draft_schema_hash = _schema_hash(draft_payload)
+    draft.title = page_schema.title.strip()
+    draft.schema_json = draft_payload
+    draft.schema_hash = draft_schema_hash
+    draft.allow_script = allow_script
+    draft.script_risk_level = script_policy.risk_level
+    draft.script_analysis_json = script_policy.to_json(schema_hash=draft_schema_hash)
+    draft.script_review_status = SCRIPT_REVIEW_PENDING if script_policy.requires_review else SCRIPT_REVIEW_NOT_REQUIRED
+    draft.script_reviewed_by_user_id = None
+    draft.script_reviewed_at = None
+    draft.script_review_note = None
+    after = _content_draft_snapshot(draft)
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="content.draft.update",
+        resource_type="content_draft",
+        resource_id=draft.id,
+        event_result="success",
+        request=request,
+        snapshot=_transition_snapshot(before, after, payload.note),
+    )
+    db.commit()
+    db.refresh(draft)
     return _content_draft_read(draft)
 
 
@@ -527,6 +582,7 @@ def _content_draft_snapshot(draft: ContentDraft) -> dict:
         "script_analysis": _content_draft_script_analysis_snapshot(draft),
         "script_review_status": draft.script_review_status,
         "script_reviewed_by_user_id": draft.script_reviewed_by_user_id,
+        "script_reviewed_at": _isoformat(draft.script_reviewed_at),
         "script_review_note": draft.script_review_note,
         "submitted_at": _isoformat(draft.submitted_at),
         "withdrawn_at": _isoformat(draft.withdrawn_at),
