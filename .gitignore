@@ -1,5 +1,6 @@
 # Build outputs
 server/build/
+dist/
 node_modules/
 __pycache__/
 *.py[cod]
@@ -10,6 +11,7 @@ venv/
 
 # IDE
 .vscode/
+.claude/
 
 # OS files
 Thumbs.db
