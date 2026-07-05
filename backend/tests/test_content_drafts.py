@@ -41,6 +41,10 @@ def _register_and_login(client, username: str, role: str) -> tuple[int, str]:
 
 
 def _draft_payload(slug: str, *, allow_script: bool = False) -> dict:
+    script_props = {
+        "scriptPath": "drafts/custom-energy.js",
+        "scriptSandbox": {"mode": "isolated-iframe", "network": "same-origin", "storage": "none"},
+    }
     return {
         "target_slug": slug,
         "allow_script": allow_script,
@@ -58,7 +62,7 @@ def _draft_payload(slug: str, *, allow_script: bool = False) -> dict:
                     "type": "learning-task",
                     "title": "Observe",
                     "summary": "Explain what changes when friction is introduced.",
-                    "props": {"scriptPath": "drafts/custom-energy.js"} if allow_script else {},
+                    "props": script_props if allow_script else {},
                 }
             ],
             "sources": [],
@@ -106,6 +110,7 @@ def test_teacher_creates_content_draft_without_publishing(client):
     assert draft["base_schema_hash"] is None
     assert draft["script_risk_level"] == "none"
     assert draft["script_analysis"]["status"] == "clean"
+    assert draft["script_analysis"]["sandbox"]["status"] == "not_required"
     assert draft["script_analysis"]["schema_hash"] == draft["schema_hash"]
     assert draft["script_analysis"]["finding_count"] == 0
     assert draft["script_review_status"] == "not_required"
@@ -356,6 +361,7 @@ def test_content_draft_update_resets_script_review_and_records_audit(client):
     assert updated["allow_script"] is False
     assert updated["script_risk_level"] == "none"
     assert updated["script_analysis"]["status"] == "clean"
+    assert updated["script_analysis"]["sandbox"]["status"] == "not_required"
     assert updated["script_analysis"]["schema_hash"] == updated["schema_hash"]
     assert updated["script_review_status"] == "not_required"
     assert updated["script_reviewed_by_user_id"] is None
@@ -484,6 +490,7 @@ def test_admin_reviews_script_draft_and_records_audit(client):
     assert create.json()["script_risk_level"] == "medium"
     assert create.json()["script_analysis"]["status"] == "review_required"
     assert create.json()["script_analysis"]["schema_hash"] == create.json()["schema_hash"]
+    assert create.json()["script_analysis"]["sandbox"]["status"] == "isolated"
     assert create.json()["script_analysis"]["finding_count"] == 1
     finding = create.json()["script_analysis"]["findings"][0]
     assert finding["code"] == "script_reference"

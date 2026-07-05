@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 import hashlib
 from typing import Any
@@ -7,12 +8,22 @@ from typing import Any
 from app.schemas.content import ContentPage
 
 
-SCRIPT_POLICY_VERSION = "2026-07-04.1"
+SCRIPT_POLICY_VERSION = "2026-07-05.1"
 MAX_FINDINGS = 50
 SCRIPT_REFERENCE_KEYS = {"script", "scriptpath", "scripturl", "scriptsrc", "inlinescript"}
 INLINE_SCRIPT_KEYS = {"inlinescript"}
 SCRIPT_LOCATION_KEYS = {"script", "scriptpath", "scripturl", "scriptsrc"}
+SCRIPT_SANDBOX_KEYS = {"scriptsandbox"}
+SCRIPT_SANDBOX_MODE = "isolated-iframe"
+SCRIPT_SANDBOX_IFRAME_DIRECTIVE = "allow-scripts"
+SCRIPT_SANDBOX_CSP = "default-src 'none'; script-src 'self'; connect-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
 BLOCKED_PROTOCOLS = ("javascript:", "data:", "vbscript:")
+BLOCKED_SANDBOX_CAPABILITIES = {
+    "allowSameOrigin": "Script sandboxes cannot grant same-origin access with allow-scripts.",
+    "allowTopNavigation": "Script sandboxes cannot navigate the top-level browsing context.",
+    "allowPopups": "Script sandboxes cannot open popups in the first content protocol phase.",
+    "allowDownloads": "Script sandboxes cannot trigger downloads in the first content protocol phase.",
+}
 
 _SEVERITY_ORDER = {"info": 0, "medium": 1, "high": 2, "blocked": 3}
 _RISK_BY_SEVERITY = {
@@ -57,6 +68,7 @@ class ScriptPolicyResult:
     status: str
     risk_level: str
     findings: list[ScriptPolicyFinding]
+    sandbox: dict[str, Any]
 
     @property
     def requires_review(self) -> bool:
@@ -77,6 +89,7 @@ class ScriptPolicyResult:
             "status": self.status,
             "risk_level": self.risk_level,
             "finding_count": len(self.findings),
+            "sandbox": self.sandbox,
             "findings": [finding.to_dict() for finding in self.findings],
         }
 
@@ -90,11 +103,13 @@ def analyze_content_script_policy(page_schema: ContentPage | dict[str, Any]) -> 
     _scan_value(payload, "$", findings)
     risk_level = _risk_level(findings)
     status = "blocked" if risk_level == "blocked" else "review_required" if findings else "clean"
+    sandbox = _sandbox_summary(findings)
     return ScriptPolicyResult(
         policy_version=SCRIPT_POLICY_VERSION,
         status=status,
         risk_level=risk_level,
         findings=findings,
+        sandbox=sandbox,
     )
 
 
@@ -120,7 +135,14 @@ def script_policy_result_from_json(payload: dict[str, Any] | None) -> ScriptPoli
         status=str(payload.get("status", "clean")),
         risk_level=str(payload.get("risk_level", _risk_level(findings))),
         findings=findings,
+        sandbox=payload.get("sandbox") if isinstance(payload.get("sandbox"), dict) else _sandbox_summary(findings),
     )
+
+
+def public_content_page_schema(page_schema: ContentPage | dict[str, Any]) -> ContentPage:
+    payload = page_schema.model_dump(mode="json") if isinstance(page_schema, ContentPage) else deepcopy(page_schema)
+    _strip_public_script_fields(payload)
+    return ContentPage.model_validate(payload)
 
 
 def _scan_value(value: Any, path: str, findings: list[ScriptPolicyFinding], key: str | None = None) -> None:
@@ -136,6 +158,8 @@ def _scan_value(value: Any, path: str, findings: list[ScriptPolicyFinding], key:
             if normalized_key in SCRIPT_REFERENCE_KEYS:
                 findings.append(_script_reference_finding(child_path, child_key, nested_value, normalized_key))
                 _scan_script_reference_value(nested_value, child_path, child_key, normalized_key, findings)
+                if normalized_key in SCRIPT_LOCATION_KEYS:
+                    _scan_script_sandbox_contract(value, path, child_path, findings)
             elif _looks_like_event_handler(child_key):
                 findings.append(
                     _finding(
@@ -246,6 +270,180 @@ def _scan_string(value: str, path: str, key: str | None, findings: list[ScriptPo
         )
 
 
+def _scan_script_sandbox_contract(
+    container: dict[str, Any],
+    container_path: str,
+    script_path: str,
+    findings: list[ScriptPolicyFinding],
+) -> None:
+    sandbox_key, sandbox = _script_sandbox_contract(container)
+    if sandbox_key is None:
+        findings.append(
+            _finding(
+                code="script_sandbox_missing",
+                severity="blocked",
+                path=script_path,
+                message="Script references must declare a scriptSandbox contract for isolated execution.",
+            )
+        )
+        return
+    sandbox_path = f"{container_path}.{sandbox_key}"
+    if not isinstance(sandbox, dict):
+        findings.append(
+            _finding(
+                code="script_sandbox_invalid",
+                severity="blocked",
+                path=sandbox_path,
+                key=sandbox_key,
+                value=sandbox,
+                message="scriptSandbox must be an object with an isolated-iframe mode.",
+            )
+        )
+        return
+    mode = sandbox.get("mode")
+    if mode != SCRIPT_SANDBOX_MODE:
+        findings.append(
+            _finding(
+                code="script_sandbox_invalid_mode",
+                severity="blocked",
+                path=f"{sandbox_path}.mode",
+                key="mode",
+                value=mode,
+                message="scriptSandbox.mode must be isolated-iframe.",
+            )
+        )
+    for capability, message in BLOCKED_SANDBOX_CAPABILITIES.items():
+        if _is_enabled(sandbox.get(capability)):
+            findings.append(
+                _finding(
+                    code="script_sandbox_unsafe_capability",
+                    severity="blocked",
+                    path=f"{sandbox_path}.{capability}",
+                    key=capability,
+                    value=sandbox.get(capability),
+                    message=message,
+                )
+            )
+    network = sandbox.get("network", "none")
+    if network not in {"none", "same-origin"}:
+        findings.append(
+            _finding(
+                code="script_sandbox_unsafe_network",
+                severity="blocked",
+                path=f"{sandbox_path}.network",
+                key="network",
+                value=network,
+                message="scriptSandbox.network must be none or same-origin.",
+            )
+        )
+    storage = sandbox.get("storage", "none")
+    if storage != "none":
+        findings.append(
+            _finding(
+                code="script_sandbox_unsafe_storage",
+                severity="blocked",
+                path=f"{sandbox_path}.storage",
+                key="storage",
+                value=storage,
+                message="scriptSandbox.storage must be none for reviewed content scripts.",
+            )
+        )
+
+
+def _script_sandbox_contract(container: dict[str, Any]) -> tuple[str | None, Any]:
+    for key, value in container.items():
+        if _normalize_key(str(key)) in SCRIPT_SANDBOX_KEYS:
+            return str(key), value
+    return None, None
+
+
+def _sandbox_summary(findings: list[ScriptPolicyFinding]) -> dict[str, Any]:
+    script_reference_count = sum(1 for finding in findings if finding.code == "script_reference")
+    sandbox_violation_count = sum(1 for finding in findings if finding.code.startswith("script_sandbox_"))
+    if script_reference_count == 0:
+        return {
+            "required": False,
+            "status": "not_required",
+            "script_reference_count": 0,
+            "violation_count": sandbox_violation_count,
+        }
+    blocked = any(finding.severity == "blocked" for finding in findings)
+    status = "blocked" if blocked or sandbox_violation_count else "isolated"
+    summary: dict[str, Any] = {
+        "required": True,
+        "status": status,
+        "script_reference_count": script_reference_count,
+        "violation_count": sandbox_violation_count,
+    }
+    if status == "isolated":
+        summary.update(
+            {
+                "mode": SCRIPT_SANDBOX_MODE,
+                "iframe_sandbox": SCRIPT_SANDBOX_IFRAME_DIRECTIVE,
+                "csp": SCRIPT_SANDBOX_CSP,
+            }
+        )
+    return summary
+
+
+def _strip_public_script_fields(value: Any) -> None:
+    if isinstance(value, list):
+        for item in value:
+            _strip_public_script_fields(item)
+        return
+    if not isinstance(value, dict):
+        return
+
+    script_references: list[dict[str, Any]] = []
+    sandbox: dict[str, Any] | None = None
+    for raw_key in list(value):
+        normalized_key = _normalize_key(str(raw_key))
+        nested_value = value[raw_key]
+        if normalized_key in SCRIPT_REFERENCE_KEYS:
+            script_references.append(_public_script_reference(str(raw_key), nested_value))
+            del value[raw_key]
+            continue
+        if normalized_key in SCRIPT_SANDBOX_KEYS:
+            sandbox = nested_value if isinstance(nested_value, dict) else None
+            del value[raw_key]
+            continue
+        _strip_public_script_fields(nested_value)
+
+    if script_references:
+        value["scriptManifest"] = {
+            "executionMode": "sandbox-required",
+            "sandbox": _public_sandbox_manifest(sandbox),
+            "referenceCount": len(script_references),
+            "references": script_references,
+        }
+
+
+def _public_script_reference(key: str, value: Any) -> dict[str, Any]:
+    value_text = value if isinstance(value, str) else None
+    return {
+        key: item
+        for key, item in {
+            "key": key,
+            "valueType": type(value).__name__,
+            "valueSha256": _sha256(value_text),
+        }.items()
+        if item is not None
+    }
+
+
+def _public_sandbox_manifest(sandbox: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(sandbox, dict) or sandbox.get("mode") != SCRIPT_SANDBOX_MODE:
+        return {"status": "blocked"}
+    return {
+        "status": "isolated",
+        "mode": SCRIPT_SANDBOX_MODE,
+        "iframeSandbox": SCRIPT_SANDBOX_IFRAME_DIRECTIVE,
+        "csp": SCRIPT_SANDBOX_CSP,
+        "network": sandbox.get("network", "none"),
+        "storage": "none",
+    }
+
+
 def _script_reference_finding(path: str, key: str, value: Any, normalized_key: str) -> ScriptPolicyFinding:
     if normalized_key in INLINE_SCRIPT_KEYS:
         return _finding(
@@ -304,6 +502,14 @@ def _normalize_key(key: str) -> str:
 
 def _looks_like_event_handler(key: str) -> bool:
     return len(key) > 2 and key.lower().startswith("on") and key[2:3].isalpha()
+
+
+def _is_enabled(value: Any) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() in {"true", "1", "yes", "allow", "allowed", "enabled"}
+    return False
 
 
 def _uses_blocked_protocol(value: str) -> bool:

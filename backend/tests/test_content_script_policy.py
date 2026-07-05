@@ -6,16 +6,39 @@ def test_script_policy_accepts_clean_schema():
 
     assert result.status == "clean"
     assert result.risk_level == "none"
+    assert result.sandbox["status"] == "not_required"
     assert result.findings == []
 
 
-def test_script_policy_marks_local_script_reference_for_review():
+def test_script_policy_blocks_script_reference_without_sandbox_contract():
     payload = _page_payload({"scriptPath": "drafts/custom-energy.js"})
+
+    result = analyze_content_script_policy(payload)
+
+    codes = {finding.code for finding in result.findings}
+    assert result.status == "blocked"
+    assert result.risk_level == "blocked"
+    assert result.sandbox["status"] == "blocked"
+    assert result.sandbox["required"] is True
+    assert "script_reference" in codes
+    assert "script_sandbox_missing" in codes
+
+
+def test_script_policy_marks_local_script_reference_with_sandbox_for_review():
+    payload = _page_payload(
+        {
+            "scriptPath": "drafts/custom-energy.js",
+            "scriptSandbox": {"mode": "isolated-iframe", "network": "same-origin", "storage": "none"},
+        }
+    )
 
     result = analyze_content_script_policy(payload)
 
     assert result.status == "review_required"
     assert result.risk_level == "medium"
+    assert result.sandbox["status"] == "isolated"
+    assert result.sandbox["mode"] == "isolated-iframe"
+    assert result.sandbox["iframe_sandbox"] == "allow-scripts"
     assert result.requires_review is True
     assert result.has_blocking_findings is False
     assert result.findings[0].code == "script_reference"
@@ -23,16 +46,46 @@ def test_script_policy_marks_local_script_reference_for_review():
 
 
 def test_script_policy_flags_external_script_url_as_high_risk_without_query_preview():
-    payload = _page_payload({"scriptUrl": "https://cdn.example.test/tool.js?token=secret#frag"})
+    payload = _page_payload(
+        {
+            "scriptUrl": "https://cdn.example.test/tool.js?token=secret#frag",
+            "scriptSandbox": {"mode": "isolated-iframe", "network": "none", "storage": "none"},
+        }
+    )
 
     result = analyze_content_script_policy(payload)
 
     codes = {finding.code for finding in result.findings}
     external_finding = next(finding for finding in result.findings if finding.code == "external_script_url")
     assert result.risk_level == "high"
+    assert result.sandbox["status"] == "isolated"
     assert "script_reference" in codes
     assert "external_script_url" in codes
     assert external_finding.value_preview == "https://cdn.example.test/tool.js"
+
+
+def test_script_policy_blocks_unsafe_sandbox_capabilities():
+    payload = _page_payload(
+        {
+            "scriptPath": "drafts/custom-energy.js",
+            "scriptSandbox": {
+                "mode": "isolated-iframe",
+                "allowSameOrigin": True,
+                "allowTopNavigation": "true",
+                "network": "external",
+                "storage": "local",
+            },
+        }
+    )
+
+    result = analyze_content_script_policy(payload)
+
+    codes = {finding.code for finding in result.findings}
+    assert result.status == "blocked"
+    assert result.sandbox["status"] == "blocked"
+    assert "script_sandbox_unsafe_capability" in codes
+    assert "script_sandbox_unsafe_network" in codes
+    assert "script_sandbox_unsafe_storage" in codes
 
 
 def test_script_policy_blocks_inline_script_body_event_handler_and_script_tag():

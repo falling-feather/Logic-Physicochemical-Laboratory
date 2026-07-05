@@ -424,6 +424,14 @@ def rollback_content_page_version(
     page = db.get(ContentPageRecord, target_version.page_id)
     if page is None:
         raise HTTPException(status_code=409, detail="Published content page is missing")
+    target_script_policy = analyze_content_script_policy(ContentPage.model_validate(target_version.schema_json))
+    if target_script_policy.has_blocking_findings:
+        raise HTTPException(status_code=409, detail="Content page version script policy findings must be resolved before rollback")
+    if target_script_policy.findings:
+        raise HTTPException(
+            status_code=409,
+            detail="Content page version includes script policy findings; create a reviewed draft before rollback",
+        )
 
     previous_version = _current_content_page_version(db, target_version.slug)
     page_before = _content_page_snapshot(page)
@@ -729,6 +737,7 @@ def _content_draft_script_analysis_snapshot(draft: ContentDraft) -> dict | None:
         "status": policy.status,
         "risk_level": policy.risk_level,
         "finding_count": len(policy.findings),
+        "sandbox": policy.sandbox,
         "findings": [finding.to_dict() for finding in policy.findings],
     }
 

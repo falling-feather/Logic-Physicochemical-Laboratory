@@ -16,6 +16,13 @@ def test_energy_conservation_render_schema(client):
     assert payload["layout"] == "experiment-page"
     assert payload["sections"][2]["type"] == "experiment"
     assert payload["sections"][2]["experimentId"] == "energy-conservation"
+    experiment_props = payload["sections"][2]["props"]
+    assert "scriptPath" not in experiment_props
+    assert "scriptSandbox" not in experiment_props
+    assert experiment_props["scriptManifest"]["executionMode"] == "sandbox-required"
+    assert experiment_props["scriptManifest"]["sandbox"]["status"] == "isolated"
+    assert experiment_props["scriptManifest"]["referenceCount"] == 1
+    assert len(experiment_props["scriptManifest"]["references"][0]["valueSha256"]) == 64
     assert payload["courseUnit"]["unitId"] == "physics-energy-conservation"
 
 

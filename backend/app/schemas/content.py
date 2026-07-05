@@ -106,6 +106,7 @@ class ScriptAnalysisRead(BaseModel):
     status: str
     risk_level: str
     finding_count: int
+    sandbox: dict[str, Any] | None = None
     findings: list[ScriptAnalysisFindingRead] = Field(default_factory=list)
 
 

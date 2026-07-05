@@ -9,7 +9,7 @@ from app.models import ContentDraft, ContentPageRecord, ContentPageVersion, User
 from app.models.base import utc_now
 from app.schemas.content import ContentPage
 from app.services.audit import record_audit_log
-from app.services.content_script_policy import analyze_content_script_policy
+from app.services.content_script_policy import analyze_content_script_policy, public_content_page_schema
 
 
 ENERGY_CONSERVATION_PAGE = ContentPage(
@@ -44,6 +44,11 @@ ENERGY_CONSERVATION_PAGE = ContentPage(
             "props": {
                 "moduleSelectorId": "energy-conservation",
                 "scriptPath": "pages/physics/energy-conservation.js",
+                "scriptSandbox": {
+                    "mode": "isolated-iframe",
+                    "network": "same-origin",
+                    "storage": "none",
+                },
                 "defaultFriction": 0.1,
                 "fallbackHash": "#physics/energy-conservation",
             },
@@ -167,7 +172,7 @@ def get_page_schema(db: Session, slug: str) -> ContentPage | None:
     )
     if record is None:
         return None
-    return ContentPage.model_validate(record.schema_json)
+    return public_content_page_schema(ContentPage.model_validate(record.schema_json))
 
 
 def list_page_summaries(db: Session) -> list[dict]:
@@ -638,6 +643,7 @@ def _initialization_context(
             "status": script_policy.status,
             "risk_level": script_policy.risk_level,
             "finding_count": len(script_policy.findings),
+            "sandbox": script_policy.sandbox,
         },
     }
 

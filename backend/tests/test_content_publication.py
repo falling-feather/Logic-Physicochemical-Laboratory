@@ -41,6 +41,10 @@ def _register_and_login(client, username: str, role: str) -> tuple[int, str]:
 
 
 def _draft_payload(slug: str, *, title: str, allow_script: bool = False) -> dict:
+    script_props = {
+        "scriptPath": "drafts/custom-publish.js",
+        "scriptSandbox": {"mode": "isolated-iframe", "network": "same-origin", "storage": "none"},
+    }
     return {
         "target_slug": slug,
         "allow_script": allow_script,
@@ -58,7 +62,7 @@ def _draft_payload(slug: str, *, title: str, allow_script: bool = False) -> dict
                     "type": "learning-task",
                     "title": "Observe",
                     "summary": "Compare the observed trend and explain the evidence.",
-                    "props": {"scriptPath": "drafts/custom-publish.js"} if allow_script else {},
+                    "props": script_props if allow_script else {},
                 }
             ],
             "sources": [],
@@ -341,6 +345,7 @@ def test_script_draft_requires_approved_review_before_publish(client):
     assert create.json()["script_review_status"] == "pending"
     assert create.json()["script_risk_level"] == "medium"
     assert create.json()["script_analysis"]["status"] == "review_required"
+    assert create.json()["script_analysis"]["sandbox"]["status"] == "isolated"
     _submit_draft(client, teacher_token, draft_id)
 
     publish_before_review = client.post(
@@ -364,6 +369,54 @@ def test_script_draft_requires_approved_review_before_publish(client):
     )
     assert publish_after_review.status_code == 200
     assert publish_after_review.json()["version"] == "v1"
+
+
+def test_scripted_content_version_requires_new_review_before_rollback(client):
+    first_admin_token = _bootstrap_admin(client, username="admin_script_rollback_first")
+    second_admin_id, second_admin_token = _register_and_login(client, "admin_script_rollback_second", "teacher")
+    promote_second_admin = client.patch(
+        f"/api/admin/users/{second_admin_id}",
+        headers=_auth_header(first_admin_token),
+        json={"role": "admin"},
+    )
+    assert promote_second_admin.status_code == 200
+    _, teacher_token = _register_and_login(client, "teacher_script_rollback", "teacher")
+    slug = "physics/script-rollback"
+
+    script_draft_id = _create_draft_from_payload(
+        client,
+        teacher_token,
+        _draft_payload(slug, title="Scripted Version", allow_script=True),
+    )
+    approve = client.patch(
+        f"/api/content/drafts/{script_draft_id}/script-review",
+        headers=_auth_header(second_admin_token),
+        json={"status": "approved", "note": "Sandbox contract reviewed"},
+    )
+    assert approve.status_code == 200
+    _submit_draft(client, teacher_token, script_draft_id)
+    script_publish = _publish_draft(client, first_admin_token, script_draft_id, note="publish scripted version")
+    assert script_publish["version"] == "v1"
+
+    plain_draft_id = _create_draft(client, teacher_token, slug, "Plain Version")
+    _submit_draft(client, teacher_token, plain_draft_id)
+    plain_publish = _publish_draft(client, first_admin_token, plain_draft_id, note="publish plain version")
+    assert plain_publish["version"] == "v2"
+
+    rollback = client.post(
+        f"/api/content/page-versions/{script_publish['version_id']}/rollback",
+        headers=_auth_header(first_admin_token),
+        json={"note": "restore scripted version"},
+    )
+
+    assert rollback.status_code == 409
+    assert rollback.json()["detail"] == (
+        "Content page version includes script policy findings; create a reviewed draft before rollback"
+    )
+    render = client.get(f"/api/render/page/{slug}")
+    assert render.status_code == 200
+    assert render.json()["title"] == "Plain Version"
+    assert render.json()["version"] == "v2"
 
 
 def test_admin_rolls_back_by_creating_new_content_version(client):
