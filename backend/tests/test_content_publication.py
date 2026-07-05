@@ -520,18 +520,137 @@ def test_admin_content_page_version_diff_rejects_cross_slug_base(client):
     assert cross_slug.status_code == 422
 
 
+def test_admin_content_page_version_diff_includes_semantic_schema_summary(client):
+    admin_token = _bootstrap_admin(client, username="admin_semantic_diff")
+    _, teacher_token = _register_and_login(client, "teacher_semantic_diff", "teacher")
+    slug = "physics/semantic-diff"
+
+    base_payload = _draft_payload(slug, title="Semantic Base")
+    base_payload["schema"]["summary"] = "Base learning path."
+    base_payload["schema"]["courseUnit"] = {
+        "courseId": "physics-course",
+        "unitId": "energy-unit",
+        "order": 1,
+        "title": "Energy",
+    }
+    base_payload["schema"]["sections"] = [
+        {
+            "type": "learning-task",
+            "title": "Observe",
+            "summary": "Compare the baseline observation.",
+            "props": {},
+        },
+        {
+            "type": "experiment",
+            "title": "Energy Lab",
+            "summary": "Run the basic model.",
+            "experimentId": "energy-conservation",
+            "props": {"mode": "basic"},
+        },
+    ]
+    base_payload["schema"]["sources"] = [
+        {"label": "Teacher Guide", "url": "https://example.com/guide-v1"},
+    ]
+    base_draft_id = _create_draft_from_payload(client, teacher_token, base_payload)
+    _submit_draft(client, teacher_token, base_draft_id)
+    base_publish = _publish_draft(client, admin_token, base_draft_id, note="base semantic")
+
+    target_payload = _draft_payload(slug, title="Semantic Target")
+    target_payload["schema"]["summary"] = "Target learning path."
+    target_payload["schema"]["courseUnit"] = {
+        "courseId": "physics-course",
+        "unitId": "energy-unit",
+        "order": 2,
+        "title": "Energy Extension",
+    }
+    target_payload["schema"]["sections"] = [
+        {
+            "type": "experiment",
+            "title": "Energy Lab",
+            "summary": "Run the guided model.",
+            "experimentId": "energy-conservation",
+            "props": {"mode": "guided"},
+        },
+        {
+            "type": "assessment",
+            "title": "Checkpoint",
+            "summary": "Check conservation evidence.",
+            "questionSetId": "energy-check",
+            "props": {},
+        },
+        {
+            "type": "learning-task",
+            "title": "Observe",
+            "summary": "Compare the baseline observation.",
+            "props": {},
+        },
+    ]
+    target_payload["schema"]["sources"] = [
+        {"label": "Teacher Guide", "url": "https://example.com/guide-v2"},
+        {"label": "Simulation Notes", "url": "https://example.com/sim-notes"},
+    ]
+    target_draft_id = _create_draft_from_payload(client, teacher_token, target_payload)
+    _submit_draft(client, teacher_token, target_draft_id)
+    target_publish = _publish_draft(client, admin_token, target_draft_id, note="target semantic")
+
+    diff = client.get(
+        f"/api/admin/content/page-versions/{target_publish['version_id']}/diff"
+        f"?base_version_id={base_publish['version_id']}",
+        headers=_auth_header(admin_token),
+    )
+
+    assert diff.status_code == 200
+    body = diff.json()
+    assert body["change_count"] >= 1
+    semantic = body["semantic"]
+    assert semantic["summary"]["semantic_changes"] >= 6
+    assert {"field": "title", "before": "Semantic Base", "after": "Semantic Target"} in semantic["metadata_changes"]
+    assert {"field": "summary", "before": "Base learning path.", "after": "Target learning path."} in semantic[
+        "metadata_changes"
+    ]
+    assert {"field": "order", "before": 1, "after": 2} in semantic["course_unit_changes"]
+    assert {"field": "title", "before": "Energy", "after": "Energy Extension"} in semantic["course_unit_changes"]
+
+    sections = {change["key"]: change for change in semantic["section_changes"]}
+    experiment = sections["section:experiment:energy-conservation"]
+    assert experiment["action"] == "modified"
+    assert experiment["moved"] is True
+    assert experiment["index_before"] == 1
+    assert experiment["index_after"] == 0
+    assert {"field": "summary", "before": "Run the basic model.", "after": "Run the guided model."} in experiment[
+        "field_changes"
+    ]
+    assert {"field": "props.mode", "before": "basic", "after": "guided"} in experiment["prop_changes"]
+    assert sections["section:question-set:energy-check"]["action"] == "added"
+    assert sections["section:learning-task:observe"]["action"] == "moved"
+
+    sources = {change["key"]: change for change in semantic["source_changes"]}
+    guide = sources["source:label:teacher guide"]
+    assert guide["action"] == "modified"
+    assert {
+        "field": "url",
+        "before": "https://example.com/guide-v1",
+        "after": "https://example.com/guide-v2",
+    } in guide["field_changes"]
+    assert sources["source:label:simulation notes"]["action"] == "added"
+
+
 def _create_draft(client, teacher_token: str, slug: str, title: str) -> int:
     return int(_create_draft_body(client, teacher_token, slug, title)["id"])
 
 
 def _create_draft_body(client, teacher_token: str, slug: str, title: str) -> dict:
+    return _create_draft_from_payload(client, teacher_token, _draft_payload(slug, title=title), return_id=False)
+
+
+def _create_draft_from_payload(client, teacher_token: str, payload: dict, *, return_id: bool = True) -> int | dict:
     create = client.post(
         "/api/content/drafts",
         headers=_auth_header(teacher_token),
-        json=_draft_payload(slug, title=title),
+        json=payload,
     )
     assert create.status_code == 201
-    return create.json()
+    return int(create.json()["id"]) if return_id else create.json()
 
 
 def _draft_update_payload(slug: str, title: str) -> dict:

@@ -142,6 +142,47 @@ class AdminContentPageVersionDiffItem(BaseModel):
     after: Any = None
 
 
+class AdminContentPageVersionSemanticFieldChange(BaseModel):
+    field: str
+    before: Any = None
+    after: Any = None
+
+
+class AdminContentPageVersionSemanticSectionChange(BaseModel):
+    action: Literal["added", "removed", "modified", "moved"]
+    key: str
+    index_before: int | None = None
+    index_after: int | None = None
+    type_before: str | None = None
+    type_after: str | None = None
+    title_before: str | None = None
+    title_after: str | None = None
+    moved: bool = False
+    field_changes: list[AdminContentPageVersionSemanticFieldChange] = Field(default_factory=list)
+    prop_changes: list[AdminContentPageVersionSemanticFieldChange] = Field(default_factory=list)
+
+
+class AdminContentPageVersionSemanticSourceChange(BaseModel):
+    action: Literal["added", "removed", "modified", "moved"]
+    key: str
+    index_before: int | None = None
+    index_after: int | None = None
+    label_before: str | None = None
+    label_after: str | None = None
+    url_before: str | None = None
+    url_after: str | None = None
+    moved: bool = False
+    field_changes: list[AdminContentPageVersionSemanticFieldChange] = Field(default_factory=list)
+
+
+class AdminContentPageVersionSemanticDiff(BaseModel):
+    metadata_changes: list[AdminContentPageVersionSemanticFieldChange] = Field(default_factory=list)
+    course_unit_changes: list[AdminContentPageVersionSemanticFieldChange] = Field(default_factory=list)
+    section_changes: list[AdminContentPageVersionSemanticSectionChange] = Field(default_factory=list)
+    source_changes: list[AdminContentPageVersionSemanticSourceChange] = Field(default_factory=list)
+    summary: dict[str, int]
+
+
 class AdminContentPageVersionDiff(BaseModel):
     slug: str
     base_version_id: int
@@ -152,6 +193,7 @@ class AdminContentPageVersionDiff(BaseModel):
     target_schema_hash: str
     change_count: int
     changes: list[AdminContentPageVersionDiffItem]
+    semantic: AdminContentPageVersionSemanticDiff
 
 
 class AdminSchoolPage(BaseModel):
