@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from fastapi import Depends, HTTPException, Request, status
@@ -10,7 +11,13 @@ from app.db.session import get_db
 from app.models import AuthSession, User
 
 
-def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
+@dataclass(frozen=True)
+class AuthContext:
+    user: User
+    session: AuthSession
+
+
+def get_current_auth_context(request: Request, db: Session = Depends(get_db)) -> AuthContext:
     token = _read_token(request)
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
@@ -30,7 +37,11 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     user = db.get(User, auth_session.user_id)
     if user is None or user.status != "active":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user")
-    return user
+    return AuthContext(user=user, session=auth_session)
+
+
+def get_current_user(context: AuthContext = Depends(get_current_auth_context)) -> User:
+    return context.user
 
 
 def _read_token(request: Request) -> str | None:

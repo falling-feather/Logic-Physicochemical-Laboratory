@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与 semantic 富语义摘要、登录、密码策略、登录失败锁定、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、跨班级提交唯一性、学生资源状态可见性、学生侧作业历史/复盘只读入口、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、中文路径/中文 slug 回归、待批改队列、审计元数据、认证事件审计、审计日志 JSON 导出和导出行为审计留痕等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与 semantic 富语义摘要、登录、密码策略、登录失败锁定、活动会话列表与单会话撤销、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、跨班级提交唯一性、学生资源状态可见性、学生侧作业历史/复盘只读入口、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、中文路径/中文 slug 回归、待批改队列、审计元数据、认证事件审计、审计日志 JSON 导出和导出行为审计留痕等能力。
 
 ## 本地启动
 
@@ -39,6 +39,8 @@ python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-revi
 | POST | `/api/auth/register` | 本地账号注册；用户名会修剪并小写落库，重复校验大小写不敏感；拒绝短密码、纯数字/纯字母、常见弱口令和包含用户名的密码 |
 | POST | `/api/auth/login` | 登录并返回 Bearer token，同时写入 HttpOnly cookie；用户名按规范化值大小写不敏感匹配，连续失败达到阈值返回 `429` 与 `Retry-After`；成功、失败和锁定事件写入审计 |
 | POST | `/api/auth/logout` | 注销当前用户所有活动会话，并写入审计 |
+| GET | `/api/auth/sessions` | 当前用户活动会话列表；只返回未撤销、未过期会话，并标记 `is_current` |
+| DELETE | `/api/auth/sessions/{id}` | 撤销当前用户自己的单个活动会话；撤销当前会话会清理 cookie，并写入 `auth.session.revoke` 审计 |
 | GET | `/api/users/me` | 当前用户；已撤销、过期或非 active 用户会话返回 `401` |
 | POST | `/api/admin/bootstrap` | 首个管理员受控初始化；用户名会修剪并小写落库，复用密码策略，公开注册仍拒绝 admin |
 | GET/PATCH | `/api/admin/users` / `/api/admin/users/{id}` | 管理端用户列表与角色/状态维护；列表返回 `items/total/limit/offset/next_offset`；把用户置为 `disabled` 时撤销未撤销会话，并在 `admin.user.update` 快照记录 `revoked_sessions` |

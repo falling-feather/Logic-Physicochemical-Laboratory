@@ -6,12 +6,19 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps.auth import get_current_user
+from app.api.deps.auth import AuthContext, get_current_auth_context, get_current_user
 from app.core.config import get_settings
 from app.core.security import create_session_token, hash_password, hash_token, password_strength_errors, verify_password
 from app.db.session import get_db
 from app.models import AuthSession, LoginAttempt, User
-from app.schemas.auth import LoginRequest, LoginResponse, RegisterRequest, UserPublic
+from app.schemas.auth import (
+    AuthSessionPublic,
+    AuthSessionRevokeResponse,
+    LoginRequest,
+    LoginResponse,
+    RegisterRequest,
+    UserPublic,
+)
 from app.services.audit import record_audit_log
 from app.services.text import require_trimmed_text
 from app.services.users import find_user_by_normalized_username, require_normalized_username
@@ -159,6 +166,66 @@ def logout(
     return {"status": "ok"}
 
 
+@router.get("/sessions", response_model=list[AuthSessionPublic])
+def list_sessions(
+    context: AuthContext = Depends(get_current_auth_context),
+    db: Session = Depends(get_db),
+) -> list[AuthSessionPublic]:
+    now = datetime.now(UTC)
+    auth_sessions = db.scalars(
+        select(AuthSession)
+        .where(
+            AuthSession.user_id == context.user.id,
+            AuthSession.revoked_at.is_(None),
+            AuthSession.expires_at > now,
+        )
+        .order_by(AuthSession.created_at.desc(), AuthSession.id.desc())
+    ).all()
+    return [_session_public(auth_session, context.session.id) for auth_session in auth_sessions]
+
+
+@router.delete("/sessions/{session_id}", response_model=AuthSessionRevokeResponse)
+def revoke_session(
+    session_id: int,
+    request: Request,
+    response: Response,
+    context: AuthContext = Depends(get_current_auth_context),
+    db: Session = Depends(get_db),
+) -> AuthSessionRevokeResponse:
+    now = datetime.now(UTC)
+    auth_session = db.scalar(
+        select(AuthSession).where(
+            AuthSession.id == session_id,
+            AuthSession.user_id == context.user.id,
+            AuthSession.revoked_at.is_(None),
+            AuthSession.expires_at > now,
+        )
+    )
+    if auth_session is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+    auth_session.revoked_at = now
+    is_current = auth_session.id == context.session.id
+    record_audit_log(
+        db,
+        actor=context.user,
+        action="auth.session.revoke",
+        resource_type="auth_session",
+        resource_id=auth_session.id,
+        event_result="success",
+        request=request,
+        snapshot={
+            "revoked_session_id": auth_session.id,
+            "is_current": is_current,
+            "revoked_sessions": 1,
+        },
+    )
+    db.commit()
+    if is_current:
+        response.delete_cookie(get_settings().session_cookie_name)
+    return AuthSessionRevokeResponse(revoked_session_id=auth_session.id, is_current=is_current)
+
+
 def _enforce_password_strength(password: str, username: str) -> None:
     errors = password_strength_errors(password, username=username)
     if errors:
@@ -265,6 +332,16 @@ def _revoke_expired_sessions(db: Session, now: datetime) -> None:
     ).all()
     for auth_session in expired_sessions:
         auth_session.revoked_at = now
+
+
+def _session_public(auth_session: AuthSession, current_session_id: int) -> AuthSessionPublic:
+    return AuthSessionPublic(
+        id=auth_session.id,
+        created_at=auth_session.created_at,
+        expires_at=auth_session.expires_at,
+        revoked_at=auth_session.revoked_at,
+        is_current=auth_session.id == current_session_id,
+    )
 
 
 def _as_utc(value: datetime) -> datetime:

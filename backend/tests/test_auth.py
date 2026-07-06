@@ -45,6 +45,201 @@ def test_register_login_me_logout(client):
     assert after_logout.status_code == 401
 
 
+def test_session_management_requires_authentication(client):
+    sessions = client.get("/api/auth/sessions")
+    assert sessions.status_code == 401
+
+    revoke = client.delete("/api/auth/sessions/1")
+    assert revoke.status_code == 401
+
+
+def test_user_can_list_and_revoke_individual_sessions(client):
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "session_owner",
+            "password": "secret123",
+            "display_name": "Session Owner",
+            "role": "teacher",
+        },
+    )
+    assert register.status_code == 201
+    first_login = client.post("/api/auth/login", json={"username": "session_owner", "password": "secret123"})
+    assert first_login.status_code == 200
+    first_token = first_login.json()["access_token"]
+    second_login = client.post("/api/auth/login", json={"username": "session_owner", "password": "secret123"})
+    assert second_login.status_code == 200
+    second_token = second_login.json()["access_token"]
+
+    sessions_response = client.get("/api/auth/sessions", headers=_auth_header(second_token))
+    assert sessions_response.status_code == 200
+    sessions = sessions_response.json()
+    assert len(sessions) == 2
+    assert sum(1 for auth_session in sessions if auth_session["is_current"]) == 1
+    old_session = next(auth_session for auth_session in sessions if not auth_session["is_current"])
+
+    revoke = client.delete(
+        f"/api/auth/sessions/{old_session['id']}",
+        headers={**_auth_header(second_token), "X-Request-ID": "session-revoke-request"},
+    )
+    assert revoke.status_code == 200
+    assert revoke.json() == {
+        "status": "ok",
+        "revoked_session_id": old_session["id"],
+        "is_current": False,
+    }
+
+    old_token_me = client.get("/api/users/me", headers=_auth_header(first_token))
+    assert old_token_me.status_code == 401
+    current_token_me = client.get("/api/users/me", headers=_auth_header(second_token))
+    assert current_token_me.status_code == 200
+
+    active_sessions = client.get("/api/auth/sessions", headers=_auth_header(second_token))
+    assert active_sessions.status_code == 200
+    assert len(active_sessions.json()) == 1
+    assert active_sessions.json()[0]["is_current"] is True
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        revoked_session = db.get(AuthSession, old_session["id"])
+        assert revoked_session is not None
+        assert revoked_session.revoked_at is not None
+        audit = db.scalar(select(AuditLog).where(AuditLog.action == "auth.session.revoke"))
+        assert audit is not None
+        assert audit.resource_type == "auth_session"
+        assert audit.resource_id == str(old_session["id"])
+        assert audit.request_id == "session-revoke-request"
+        assert audit.snapshot_json == {
+            "revoked_session_id": old_session["id"],
+            "is_current": False,
+            "revoked_sessions": 1,
+        }
+
+
+def test_user_can_revoke_current_session(client):
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "current_session_owner",
+            "password": "secret123",
+            "display_name": "Current Session Owner",
+            "role": "student",
+        },
+    )
+    assert register.status_code == 201
+    login = client.post("/api/auth/login", json={"username": "current_session_owner", "password": "secret123"})
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+
+    sessions_response = client.get("/api/auth/sessions", headers=_auth_header(token))
+    assert sessions_response.status_code == 200
+    current_session = sessions_response.json()[0]
+    assert current_session["is_current"] is True
+
+    revoke = client.delete(f"/api/auth/sessions/{current_session['id']}", headers=_auth_header(token))
+    assert revoke.status_code == 200
+    assert revoke.json()["is_current"] is True
+    assert get_settings().session_cookie_name in revoke.headers["set-cookie"]
+
+    after_revoke = client.get("/api/users/me", headers=_auth_header(token))
+    assert after_revoke.status_code == 401
+    sessions_after_revoke = client.get("/api/auth/sessions", headers=_auth_header(token))
+    assert sessions_after_revoke.status_code == 401
+
+
+def test_user_cannot_revoke_another_users_session(client):
+    owner_register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "session_boundary_owner",
+            "password": "secret123",
+            "display_name": "Session Boundary Owner",
+            "role": "teacher",
+        },
+    )
+    assert owner_register.status_code == 201
+    other_register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "session_boundary_other",
+            "password": "secret123",
+            "display_name": "Session Boundary Other",
+            "role": "teacher",
+        },
+    )
+    assert other_register.status_code == 201
+    owner_login = client.post(
+        "/api/auth/login",
+        json={"username": "session_boundary_owner", "password": "secret123"},
+    )
+    assert owner_login.status_code == 200
+    owner_token = owner_login.json()["access_token"]
+    other_login = client.post(
+        "/api/auth/login",
+        json={"username": "session_boundary_other", "password": "secret123"},
+    )
+    assert other_login.status_code == 200
+    other_token = other_login.json()["access_token"]
+
+    other_sessions = client.get("/api/auth/sessions", headers=_auth_header(other_token))
+    assert other_sessions.status_code == 200
+    other_session_id = other_sessions.json()[0]["id"]
+
+    revoke = client.delete(f"/api/auth/sessions/{other_session_id}", headers=_auth_header(owner_token))
+    assert revoke.status_code == 404
+
+    other_me = client.get("/api/users/me", headers=_auth_header(other_token))
+    assert other_me.status_code == 200
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        other_session = db.get(AuthSession, other_session_id)
+        assert other_session is not None
+        assert other_session.revoked_at is None
+        audits = db.scalars(select(AuditLog).where(AuditLog.action == "auth.session.revoke")).all()
+        assert audits == []
+
+
+def test_user_cannot_revoke_expired_session(client):
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "expired_session_owner",
+            "password": "secret123",
+            "display_name": "Expired Session Owner",
+            "role": "student",
+        },
+    )
+    assert register.status_code == 201
+    first_login = client.post("/api/auth/login", json={"username": "expired_session_owner", "password": "secret123"})
+    assert first_login.status_code == 200
+    second_login = client.post("/api/auth/login", json={"username": "expired_session_owner", "password": "secret123"})
+    assert second_login.status_code == 200
+    second_token = second_login.json()["access_token"]
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        sessions = db.scalars(select(AuthSession).order_by(AuthSession.id)).all()
+        assert len(sessions) == 2
+        expired_session_id = sessions[0].id
+        active_session_id = sessions[1].id
+        sessions[0].expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        db.commit()
+
+    listed = client.get("/api/auth/sessions", headers=_auth_header(second_token))
+    assert listed.status_code == 200
+    assert [auth_session["id"] for auth_session in listed.json()] == [active_session_id]
+
+    revoke = client.delete(f"/api/auth/sessions/{expired_session_id}", headers=_auth_header(second_token))
+    assert revoke.status_code == 404
+
+    with session_factory() as db:
+        expired_session = db.get(AuthSession, expired_session_id)
+        assert expired_session is not None
+        assert expired_session.revoked_at is None
+        audits = db.scalars(select(AuditLog).where(AuditLog.action == "auth.session.revoke")).all()
+        assert audits == []
+
+
 def test_auth_events_record_audit_metadata(client):
     register = client.post(
         "/api/auth/register",

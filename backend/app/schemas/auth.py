@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -27,3 +29,17 @@ class LoginResponse(BaseModel):
     user: UserPublic
     access_token: str
     token_type: str = "bearer"
+
+
+class AuthSessionPublic(BaseModel):
+    id: int
+    created_at: datetime
+    expires_at: datetime
+    revoked_at: datetime | None = None
+    is_current: bool
+
+
+class AuthSessionRevokeResponse(BaseModel):
+    status: str = "ok"
+    revoked_session_id: int
+    is_current: bool
