@@ -57,6 +57,14 @@ def list_courses(
     elif school_id is not None:
         require_school_member(db, current_user, school_id)
         statement = statement.where(Course.school_id == school_id)
+        if current_user.role == "student":
+            class_ids = visible_class_ids(db, current_user.id)
+            if not class_ids:
+                return []
+            statement = statement.join(CourseClass, CourseClass.course_id == Course.id).where(
+                CourseClass.class_id.in_(class_ids),
+                CourseClass.status == "active",
+            )
     elif current_user.role != "admin":
         school_ids = teacher_school_ids(db, current_user.id)
         if school_ids:
@@ -69,6 +77,8 @@ def list_courses(
             CourseClass.class_id.in_(class_ids),
             CourseClass.status == "active",
         )
+    if current_user.role == "student":
+        statement = statement.where(Course.status == "published").distinct()
     return list(db.scalars(statement).all())
 
 
@@ -173,9 +183,10 @@ def list_course_units(
     db: Session = Depends(get_db),
 ) -> list[CourseUnit]:
     require_course_visible(db, current_user, course_id)
-    return list(
-        db.scalars(select(CourseUnit).where(CourseUnit.course_id == course_id).order_by(CourseUnit.position)).all()
-    )
+    statement = select(CourseUnit).where(CourseUnit.course_id == course_id).order_by(CourseUnit.position)
+    if current_user.role == "student":
+        statement = statement.where(CourseUnit.status == "published")
+    return list(db.scalars(statement).all())
 
 
 @router.post("/{course_id}/units", response_model=CourseUnitRead, status_code=status.HTTP_201_CREATED)
@@ -242,14 +253,15 @@ def list_course_assignments(
     db: Session = Depends(get_db),
 ) -> list[Assignment]:
     require_course_visible(db, current_user, course_id)
-    return list(
-        db.scalars(
-            select(Assignment)
-            .join(CourseUnit, CourseUnit.id == Assignment.unit_id)
-            .where(CourseUnit.course_id == course_id)
-            .order_by(Assignment.id)
-        ).all()
+    statement = (
+        select(Assignment)
+        .join(CourseUnit, CourseUnit.id == Assignment.unit_id)
+        .where(CourseUnit.course_id == course_id)
+        .order_by(Assignment.id)
     )
+    if current_user.role == "student":
+        statement = statement.where(CourseUnit.status == "published", Assignment.status == "active")
+    return list(db.scalars(statement).all())
 
 
 @router.post(

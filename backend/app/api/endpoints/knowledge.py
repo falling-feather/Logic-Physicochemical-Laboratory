@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
@@ -65,7 +65,16 @@ def get_my_knowledge(
         if current_user.role == "admin" and class_id is None
         else user_assignment_class_ids(db, current_user.id, class_id)
     )
-    return _build_user_knowledge(db, current_user.id, assignment_class_ids, class_id, course_id, from_at, to_at)
+    return _build_user_knowledge(
+        db,
+        current_user.id,
+        assignment_class_ids,
+        class_id,
+        course_id,
+        from_at,
+        to_at,
+        student_visible_resources=current_user.role == "student",
+    )
 
 
 @router.post(
@@ -95,7 +104,16 @@ def rebuild_my_knowledge_snapshot(
         if current_user.role == "admin" and class_id is None
         else user_assignment_class_ids(db, current_user.id, class_id)
     )
-    aggregate = _build_user_knowledge(db, current_user.id, assignment_class_ids, class_id, course_id, from_at, to_at)
+    aggregate = _build_user_knowledge(
+        db,
+        current_user.id,
+        assignment_class_ids,
+        class_id,
+        course_id,
+        from_at,
+        to_at,
+        student_visible_resources=current_user.role == "student",
+    )
     snapshot = _upsert_user_knowledge_snapshot(
         db,
         aggregate=aggregate,
@@ -164,6 +182,10 @@ def list_my_knowledge_snapshots(
         statement = statement.where(UserKnowledgeSnapshot.period_start >= from_at)
     if to_at is not None:
         statement = statement.where(UserKnowledgeSnapshot.period_end <= to_at)
+    if current_user.role == "student":
+        statement = statement.outerjoin(Course, Course.id == UserKnowledgeSnapshot.course_id).where(
+            or_(UserKnowledgeSnapshot.course_id.is_(None), Course.status == "published")
+        )
     statement = statement.order_by(UserKnowledgeSnapshot.period_end.desc(), UserKnowledgeSnapshot.id.desc())
     total = _statement_count(db, statement)
     snapshots = list(db.scalars(statement.offset(offset).limit(limit)).all())
@@ -300,11 +322,44 @@ def _build_user_knowledge(
     course_id: int | None,
     from_at: datetime | None,
     to_at: datetime | None,
+    *,
+    student_visible_resources: bool = False,
 ) -> UserKnowledgeRead:
-    assignment_count = _active_assignment_count(db, assignment_class_ids, course_id)
-    submitted_assignments = _submission_count(db, user_id, class_id, course_id, from_at, to_at, graded=False)
-    graded_assignments = _submission_count(db, user_id, class_id, course_id, from_at, to_at, graded=True)
-    score_total, max_score_total = _score_totals(db, user_id, class_id, course_id, from_at, to_at)
+    assignment_count = _active_assignment_count(
+        db,
+        assignment_class_ids,
+        course_id,
+        student_visible_resources=student_visible_resources,
+    )
+    submitted_assignments = _submission_count(
+        db,
+        user_id,
+        class_id,
+        course_id,
+        from_at,
+        to_at,
+        graded=False,
+        student_visible_resources=student_visible_resources,
+    )
+    graded_assignments = _submission_count(
+        db,
+        user_id,
+        class_id,
+        course_id,
+        from_at,
+        to_at,
+        graded=True,
+        student_visible_resources=student_visible_resources,
+    )
+    score_total, max_score_total = _score_totals(
+        db,
+        user_id,
+        class_id,
+        course_id,
+        from_at,
+        to_at,
+        student_visible_resources=student_visible_resources,
+    )
     event_counts = _event_counts(
         db,
         user_id=user_id,
@@ -312,6 +367,7 @@ def _build_user_knowledge(
         course_id=course_id,
         from_at=from_at,
         to_at=to_at,
+        student_visible_resources=student_visible_resources,
     )
     total_points = _point_total(
         db,
@@ -320,6 +376,7 @@ def _build_user_knowledge(
         course_id=course_id,
         from_at=from_at,
         to_at=to_at,
+        student_visible_resources=student_visible_resources,
     )
     accuracy_percent = _percent(score_total, max_score_total)
     completion_percent = _percent(event_counts["complete"], event_counts["total"])
@@ -682,7 +739,13 @@ def _knowledge_stats(
     ]
 
 
-def _active_assignment_count(db: Session, class_ids: list[int] | None, course_id: int | None) -> int:
+def _active_assignment_count(
+    db: Session,
+    class_ids: list[int] | None,
+    course_id: int | None,
+    *,
+    student_visible_resources: bool = False,
+) -> int:
     statement = (
         select(func.count(func.distinct(Assignment.id)))
         .select_from(Assignment)
@@ -691,10 +754,14 @@ def _active_assignment_count(db: Session, class_ids: list[int] | None, course_id
     )
     if course_id is not None:
         statement = statement.where(CourseUnit.course_id == course_id)
+    if class_ids is not None or student_visible_resources:
+        statement = statement.join(Course, Course.id == CourseUnit.course_id)
+    if student_visible_resources:
+        statement = statement.where(Course.status == "published", CourseUnit.status == "published")
     if class_ids is not None:
         if not class_ids:
             return 0
-        statement = statement.join(Course, Course.id == CourseUnit.course_id).join(
+        statement = statement.join(
             CourseClass,
             CourseClass.course_id == Course.id,
         )
@@ -711,10 +778,19 @@ def _submission_count(
     to_at: datetime | None,
     *,
     graded: bool,
+    student_visible_resources: bool = False,
 ) -> int:
     statement = select(func.count(func.distinct(Submission.id))).select_from(Submission)
     statement = statement.where(Submission.student_id == user_id)
-    statement = _apply_submission_filters(statement, class_id, course_id, from_at, to_at, graded)
+    statement = _apply_submission_filters(
+        statement,
+        class_id,
+        course_id,
+        from_at,
+        to_at,
+        graded,
+        student_visible_resources=student_visible_resources,
+    )
     return int(db.scalar(statement) or 0)
 
 
@@ -739,6 +815,8 @@ def _score_totals(
     course_id: int | None,
     from_at: datetime | None,
     to_at: datetime | None,
+    *,
+    student_visible_resources: bool = False,
 ) -> tuple[int, int]:
     statement = (
         select(func.coalesce(func.sum(Submission.score), 0), func.coalesce(func.sum(Assignment.max_score), 0))
@@ -754,6 +832,7 @@ def _score_totals(
         to_at,
         graded=True,
         assignment_joined=True,
+        student_visible_resources=student_visible_resources,
     )
     score_total, max_score_total = db.execute(statement).one()
     return int(score_total or 0), int(max_score_total or 0)
@@ -793,14 +872,23 @@ def _apply_submission_filters(
     graded: bool,
     *,
     assignment_joined: bool = False,
+    student_visible_resources: bool = False,
 ):
     if class_id is not None:
         statement = statement.where(Submission.class_id == class_id)
-    if course_id is not None:
+    if course_id is not None or student_visible_resources:
         if not assignment_joined:
             statement = statement.join(Assignment, Assignment.id == Submission.assignment_id)
         statement = statement.join(CourseUnit, CourseUnit.id == Assignment.unit_id)
+    if course_id is not None:
         statement = statement.where(CourseUnit.course_id == course_id)
+    if student_visible_resources:
+        statement = statement.join(Course, Course.id == CourseUnit.course_id)
+        statement = statement.where(
+            Course.status == "published",
+            CourseUnit.status == "published",
+            Assignment.status == "active",
+        )
     if graded:
         statement = statement.where(Submission.score.is_not(None), Submission.graded_at.is_not(None))
         if from_at is not None:
@@ -823,6 +911,7 @@ def _event_counts(
     course_id: int | None,
     from_at: datetime | None,
     to_at: datetime | None,
+    student_visible_resources: bool = False,
 ) -> dict[str, int]:
     statement = select(LearningEvent.event_type, func.count()).group_by(LearningEvent.event_type)
     if user_id is not None:
@@ -835,6 +924,17 @@ def _event_counts(
         statement = statement.where(LearningEvent.occurred_at >= from_at)
     if to_at is not None:
         statement = statement.where(LearningEvent.occurred_at <= to_at)
+    if student_visible_resources:
+        statement = (
+            statement.outerjoin(Course, Course.id == LearningEvent.course_id)
+            .outerjoin(CourseUnit, CourseUnit.id == LearningEvent.unit_id)
+            .outerjoin(Assignment, Assignment.id == LearningEvent.assignment_id)
+            .where(
+                or_(LearningEvent.course_id.is_(None), Course.status == "published"),
+                or_(LearningEvent.unit_id.is_(None), CourseUnit.status == "published"),
+                or_(LearningEvent.assignment_id.is_(None), Assignment.status == "active"),
+            )
+        )
     counts = {"visit": 0, "start": 0, "submit": 0, "complete": 0}
     for event_type, count in db.execute(statement).all():
         if event_type in counts:
@@ -851,18 +951,31 @@ def _point_total(
     course_id: int | None,
     from_at: datetime | None,
     to_at: datetime | None,
+    student_visible_resources: bool = False,
 ) -> int:
     statement = select(func.coalesce(func.sum(PointLedger.delta), 0)).select_from(PointLedger)
     if user_id is not None:
         statement = statement.where(PointLedger.user_id == user_id)
     if class_id is not None:
         statement = statement.where(PointLedger.class_id == class_id)
-    if course_id is not None:
-        statement = statement.join(Assignment, Assignment.id == PointLedger.assignment_id).join(
+    if course_id is not None or student_visible_resources:
+        statement = statement.outerjoin(Assignment, Assignment.id == PointLedger.assignment_id).outerjoin(
             CourseUnit,
             CourseUnit.id == Assignment.unit_id,
         )
+    if course_id is not None:
         statement = statement.where(CourseUnit.course_id == course_id)
+    if student_visible_resources:
+        statement = statement.outerjoin(Course, Course.id == CourseUnit.course_id).where(
+            or_(
+                PointLedger.assignment_id.is_(None),
+                and_(
+                    Course.status == "published",
+                    CourseUnit.status == "published",
+                    Assignment.status == "active",
+                ),
+            )
+        )
     if from_at is not None:
         statement = statement.where(PointLedger.created_at >= from_at)
     if to_at is not None:

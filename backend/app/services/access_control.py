@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import ClassGroup, ClassMembership, Course, CourseClass, SchoolMembership, User
+from app.models import Assignment, ClassGroup, ClassMembership, Course, CourseClass, CourseUnit, SchoolMembership, User
 
 
 def get_class(db: Session, class_id: int) -> ClassGroup:
@@ -161,6 +161,7 @@ def require_course_visible(db: Session, user: User, course_id: int) -> Course:
             )
         )
         if course_class is not None:
+            require_student_course_published(user, course)
             return course
     raise HTTPException(status_code=403, detail="Course is outside current user scope")
 
@@ -177,6 +178,7 @@ def require_course_scope(
             raise HTTPException(status_code=422, detail="Class does not belong to course school")
         if not course_attached_to_class(db, course.id, class_group.id):
             raise HTTPException(status_code=403, detail="Course is not attached to this class")
+        require_student_course_published(user, course)
         return course
     return require_course_visible(db, user, course_id)
 
@@ -192,3 +194,18 @@ def course_attached_to_class(db: Session, course_id: int, class_id: int) -> bool
         )
         is not None
     )
+
+
+def require_student_course_published(user: User, course: Course) -> None:
+    if user.role == "student" and course.status != "published":
+        raise HTTPException(status_code=403, detail="Course is not published")
+
+
+def require_student_unit_published(user: User, unit: CourseUnit) -> None:
+    if user.role == "student" and unit.status != "published":
+        raise HTTPException(status_code=403, detail="Course unit is not published")
+
+
+def require_student_assignment_active(user: User, assignment: Assignment) -> None:
+    if user.role == "student" and assignment.status != "active":
+        raise HTTPException(status_code=409, detail="Assignment is not active")

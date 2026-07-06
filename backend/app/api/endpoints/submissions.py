@@ -22,6 +22,7 @@ from app.services.access_control import (
     require_class_member,
     require_course_visible,
     require_school_role,
+    require_student_unit_published,
 )
 
 
@@ -46,6 +47,7 @@ def create_submission(
     if assignment.status != "active":
         raise HTTPException(status_code=409, detail="Assignment is not active")
     require_course_visible(db, current_user, course.id)
+    require_student_unit_published(current_user, unit)
     class_group = require_class_member(db, current_user, payload.class_id)
     if class_group.school_id != course.school_id:
         raise HTTPException(status_code=422, detail="Class does not belong to assignment school")
@@ -124,6 +126,7 @@ def read_assignment_review(
         raise HTTPException(status_code=403, detail="Only students can review their assignment history")
     assignment, unit, course = _resolve_assignment(db, assignment_id)
     require_course_visible(db, current_user, course.id)
+    require_student_unit_published(current_user, unit)
     statement = (
         select(Submission)
         .where(
@@ -160,11 +163,12 @@ def list_assignment_submissions(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[Submission]:
-    assignment, _, course = _resolve_assignment(db, assignment_id)
+    assignment, unit, course = _resolve_assignment(db, assignment_id)
     statement = select(Submission).where(Submission.assignment_id == assignment.id).order_by(Submission.id)
 
     if current_user.role == "student":
         require_course_visible(db, current_user, course.id)
+        require_student_unit_published(current_user, unit)
         statement = statement.where(Submission.student_id == current_user.id)
         if class_id is not None:
             require_class_member(db, current_user, class_id)

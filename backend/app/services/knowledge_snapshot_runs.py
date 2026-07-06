@@ -126,6 +126,8 @@ def _rebuild_window(
             to_at=period_end,
         )
         class_snapshot_count += 1
+        if course.status != "published":
+            continue
         for student in _active_class_students(db, class_group.id):
             user_aggregate = knowledge_endpoint._build_user_knowledge(  # noqa: SLF001
                 db,
@@ -135,6 +137,7 @@ def _rebuild_window(
                 course.id,
                 period_start,
                 period_end,
+                student_visible_resources=True,
             )
             knowledge_endpoint._upsert_user_knowledge_snapshot(  # noqa: SLF001
                 db,

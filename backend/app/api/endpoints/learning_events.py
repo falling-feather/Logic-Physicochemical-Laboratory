@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
@@ -20,6 +20,8 @@ from app.services.access_control import (
     require_class_member,
     require_course_visible,
     require_school_role,
+    require_student_assignment_active,
+    require_student_unit_published,
     teacher_school_ids,
 )
 
@@ -39,6 +41,10 @@ def create_learning_event(
     if course is None:
         raise HTTPException(status_code=422, detail="Learning event must target a course, unit, or assignment")
     require_course_visible(db, current_user, course.id)
+    if unit is not None:
+        require_student_unit_published(current_user, unit)
+    if assignment is not None:
+        require_student_assignment_active(current_user, assignment)
 
     class_group: ClassGroup | None = None
     if payload.class_id is not None:
@@ -87,6 +93,7 @@ def list_learning_events(
         if class_id is not None:
             require_class_member(db, current_user, class_id)
             statement = statement.where(LearningEvent.class_id == class_id)
+        statement = _apply_student_visible_event_filters(statement)
         return list(db.scalars(statement).all())
 
     if class_id is not None:
@@ -137,3 +144,16 @@ def _resolve_learning_scope(
     if payload.unit_id is not None and unit is not None and unit.id != payload.unit_id:
         raise HTTPException(status_code=422, detail="Unit scope does not match referenced resource")
     return course, unit, assignment
+
+
+def _apply_student_visible_event_filters(statement):
+    return (
+        statement.outerjoin(Course, Course.id == LearningEvent.course_id)
+        .outerjoin(CourseUnit, CourseUnit.id == LearningEvent.unit_id)
+        .outerjoin(Assignment, Assignment.id == LearningEvent.assignment_id)
+        .where(
+            or_(LearningEvent.course_id.is_(None), Course.status == "published"),
+            or_(LearningEvent.unit_id.is_(None), CourseUnit.status == "published"),
+            or_(LearningEvent.assignment_id.is_(None), Assignment.status == "active"),
+        )
+    )

@@ -1,5 +1,12 @@
 from datetime import datetime
 
+from sqlalchemy import select
+
+from app.core.config import get_settings
+from app.db.session import get_session_factory
+from app.models import Course, CourseUnit, UserKnowledgeSnapshot
+from app.services import knowledge_snapshot_runs
+
 
 def _auth_header(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
@@ -238,3 +245,410 @@ def test_class_members_can_access_their_scoped_course_resources(client):
     assert archived_review_body["can_submit"] is False
     assert archived_review_body["read_only"] is True
     assert archived_review_body["submit_block_reason"] == "assignment_archived"
+
+
+def test_students_only_see_published_course_content_and_active_assignments(client):
+    teacher = _register_and_login(client, "visibility_teacher", "teacher")
+    student = _register_and_login(client, "visibility_student", "student")
+    teacher_headers = _auth_header(teacher["token"])
+    student_headers = _auth_header(student["token"])
+
+    school = client.post("/api/schools", headers=teacher_headers, json={"name": "Visibility School"})
+    assert school.status_code == 201
+    school_id = school.json()["id"]
+    class_response = client.post(
+        "/api/classes",
+        headers=teacher_headers,
+        json={"school_id": school_id, "name": "Visibility Class"},
+    )
+    assert class_response.status_code == 201
+    class_id = class_response.json()["id"]
+    join = client.post(f"/api/classes/{class_id}/join", headers=student_headers, json={"role": "student"})
+    assert join.status_code == 201
+
+    published_course = client.post(
+        "/api/courses",
+        headers=teacher_headers,
+        json={"school_id": school_id, "title": "Published Visibility Course", "status": "published"},
+    )
+    assert published_course.status_code == 201
+    published_course_id = published_course.json()["id"]
+    draft_course = client.post(
+        "/api/courses",
+        headers=teacher_headers,
+        json={"school_id": school_id, "title": "Draft Visibility Course", "status": "draft"},
+    )
+    assert draft_course.status_code == 201
+    draft_course_id = draft_course.json()["id"]
+    unattached_course = client.post(
+        "/api/courses",
+        headers=teacher_headers,
+        json={"school_id": school_id, "title": "Unattached Published Course", "status": "published"},
+    )
+    assert unattached_course.status_code == 201
+
+    for course_id in (published_course_id, draft_course_id):
+        attach = client.post(
+            f"/api/courses/{course_id}/classes",
+            headers=teacher_headers,
+            json={"class_id": class_id},
+        )
+        assert attach.status_code == 201
+
+    published_unit = client.post(
+        f"/api/courses/{published_course_id}/units",
+        headers=teacher_headers,
+        json={"title": "Visible Unit", "position": 1, "status": "published"},
+    )
+    assert published_unit.status_code == 201
+    published_unit_id = published_unit.json()["id"]
+    draft_unit = client.post(
+        f"/api/courses/{published_course_id}/units",
+        headers=teacher_headers,
+        json={"title": "Hidden Draft Unit", "position": 2, "status": "draft"},
+    )
+    assert draft_unit.status_code == 201
+    draft_unit_id = draft_unit.json()["id"]
+    draft_course_unit = client.post(
+        f"/api/courses/{draft_course_id}/units",
+        headers=teacher_headers,
+        json={"title": "Draft Course Unit", "position": 1, "status": "published"},
+    )
+    assert draft_course_unit.status_code == 201
+    draft_course_unit_id = draft_course_unit.json()["id"]
+
+    visible_assignment = client.post(
+        f"/api/courses/{published_course_id}/units/{published_unit_id}/assignments",
+        headers=teacher_headers,
+        json={"title": "Visible Active Assignment", "max_score": 20, "status": "active"},
+    )
+    assert visible_assignment.status_code == 201
+    visible_assignment_id = visible_assignment.json()["id"]
+    closed_assignment = client.post(
+        f"/api/courses/{published_course_id}/units/{published_unit_id}/assignments",
+        headers=teacher_headers,
+        json={"title": "Closed Assignment", "max_score": 20, "status": "closed"},
+    )
+    assert closed_assignment.status_code == 201
+    closed_assignment_id = closed_assignment.json()["id"]
+    hidden_unit_assignment = client.post(
+        f"/api/courses/{published_course_id}/units/{draft_unit_id}/assignments",
+        headers=teacher_headers,
+        json={"title": "Hidden Unit Assignment", "max_score": 20, "status": "active"},
+    )
+    assert hidden_unit_assignment.status_code == 201
+    hidden_unit_assignment_id = hidden_unit_assignment.json()["id"]
+    draft_course_assignment = client.post(
+        f"/api/courses/{draft_course_id}/units/{draft_course_unit_id}/assignments",
+        headers=teacher_headers,
+        json={"title": "Draft Course Assignment", "max_score": 20, "status": "active"},
+    )
+    assert draft_course_assignment.status_code == 201
+    draft_course_assignment_id = draft_course_assignment.json()["id"]
+
+    for path in ("/api/courses", f"/api/courses?school_id={school_id}", f"/api/courses?class_id={class_id}"):
+        student_courses = client.get(path, headers=student_headers)
+        assert student_courses.status_code == 200
+        assert [item["id"] for item in student_courses.json()] == [published_course_id]
+
+    teacher_class_courses = client.get(f"/api/courses?class_id={class_id}", headers=teacher_headers)
+    assert teacher_class_courses.status_code == 200
+    assert [item["id"] for item in teacher_class_courses.json()] == [published_course_id, draft_course_id]
+
+    student_units = client.get(f"/api/courses/{published_course_id}/units", headers=student_headers)
+    assert student_units.status_code == 200
+    assert [item["id"] for item in student_units.json()] == [published_unit_id]
+    teacher_units = client.get(f"/api/courses/{published_course_id}/units", headers=teacher_headers)
+    assert teacher_units.status_code == 200
+    assert [item["id"] for item in teacher_units.json()] == [published_unit_id, draft_unit_id]
+    draft_course_units = client.get(f"/api/courses/{draft_course_id}/units", headers=student_headers)
+    assert draft_course_units.status_code == 403
+    assert draft_course_units.json()["detail"] == "Course is not published"
+
+    student_assignments = client.get(f"/api/courses/{published_course_id}/assignments", headers=student_headers)
+    assert student_assignments.status_code == 200
+    assert [item["id"] for item in student_assignments.json()] == [visible_assignment_id]
+    teacher_assignments = client.get(f"/api/courses/{published_course_id}/assignments", headers=teacher_headers)
+    assert teacher_assignments.status_code == 200
+    assert [item["id"] for item in teacher_assignments.json()] == [
+        visible_assignment_id,
+        closed_assignment_id,
+        hidden_unit_assignment_id,
+    ]
+
+    visible_event = client.post(
+        "/api/learning-events",
+        headers=student_headers,
+        json={"class_id": class_id, "assignment_id": visible_assignment_id, "event_type": "complete", "payload": {}},
+    )
+    assert visible_event.status_code == 201
+    hidden_unit_event = client.post(
+        "/api/learning-events",
+        headers=student_headers,
+        json={"class_id": class_id, "assignment_id": hidden_unit_assignment_id, "event_type": "complete", "payload": {}},
+    )
+    assert hidden_unit_event.status_code == 403
+    assert hidden_unit_event.json()["detail"] == "Course unit is not published"
+    closed_event = client.post(
+        "/api/learning-events",
+        headers=student_headers,
+        json={"class_id": class_id, "assignment_id": closed_assignment_id, "event_type": "complete", "payload": {}},
+    )
+    assert closed_event.status_code == 409
+    assert closed_event.json()["detail"] == "Assignment is not active"
+    draft_course_event = client.post(
+        "/api/learning-events",
+        headers=student_headers,
+        json={"class_id": class_id, "assignment_id": draft_course_assignment_id, "event_type": "complete", "payload": {}},
+    )
+    assert draft_course_event.status_code == 403
+    assert draft_course_event.json()["detail"] == "Course is not published"
+
+    hidden_unit_submission = client.post(
+        f"/api/assignments/{hidden_unit_assignment_id}/submissions",
+        headers=student_headers,
+        json={"class_id": class_id, "content": {"answer": "hidden unit"}},
+    )
+    assert hidden_unit_submission.status_code == 403
+    assert hidden_unit_submission.json()["detail"] == "Course unit is not published"
+    closed_submission = client.post(
+        f"/api/assignments/{closed_assignment_id}/submissions",
+        headers=student_headers,
+        json={"class_id": class_id, "content": {"answer": "closed"}},
+    )
+    assert closed_submission.status_code == 409
+    assert closed_submission.json()["detail"] == "Assignment is not active"
+    draft_course_submission = client.post(
+        f"/api/assignments/{draft_course_assignment_id}/submissions",
+        headers=student_headers,
+        json={"class_id": class_id, "content": {"answer": "draft course"}},
+    )
+    assert draft_course_submission.status_code == 403
+    assert draft_course_submission.json()["detail"] == "Course is not published"
+
+    hidden_review = client.get(f"/api/assignments/{hidden_unit_assignment_id}/review", headers=student_headers)
+    assert hidden_review.status_code == 403
+    assert hidden_review.json()["detail"] == "Course unit is not published"
+    closed_review = client.get(f"/api/assignments/{closed_assignment_id}/review", headers=student_headers)
+    assert closed_review.status_code == 200
+    assert closed_review.json()["submit_block_reason"] == "assignment_closed"
+    draft_course_review = client.get(f"/api/assignments/{draft_course_assignment_id}/review", headers=student_headers)
+    assert draft_course_review.status_code == 403
+    assert draft_course_review.json()["detail"] == "Course is not published"
+
+
+def test_student_personal_progress_and_knowledge_exclude_hidden_resource_history(client):
+    teacher = _register_and_login(client, "visibility_history_teacher", "teacher")
+    student = _register_and_login(client, "visibility_history_student", "student")
+    teacher_headers = _auth_header(teacher["token"])
+    student_headers = _auth_header(student["token"])
+
+    school = client.post("/api/schools", headers=teacher_headers, json={"name": "Visibility History School"})
+    assert school.status_code == 201
+    school_id = school.json()["id"]
+    class_response = client.post(
+        "/api/classes",
+        headers=teacher_headers,
+        json={"school_id": school_id, "name": "Visibility History Class"},
+    )
+    assert class_response.status_code == 201
+    class_id = class_response.json()["id"]
+    join = client.post(f"/api/classes/{class_id}/join", headers=student_headers, json={"role": "student"})
+    assert join.status_code == 201
+
+    course = client.post(
+        "/api/courses",
+        headers=teacher_headers,
+        json={"school_id": school_id, "title": "Visible History Course", "status": "published"},
+    )
+    assert course.status_code == 201
+    course_id = course.json()["id"]
+    soon_hidden_course = client.post(
+        "/api/courses",
+        headers=teacher_headers,
+        json={"school_id": school_id, "title": "Soon Hidden Course", "status": "published"},
+    )
+    assert soon_hidden_course.status_code == 201
+    soon_hidden_course_id = soon_hidden_course.json()["id"]
+    for course_to_attach in (course_id, soon_hidden_course_id):
+        attach = client.post(
+            f"/api/courses/{course_to_attach}/classes",
+            headers=teacher_headers,
+            json={"class_id": class_id},
+        )
+        assert attach.status_code == 201
+
+    visible_unit = client.post(
+        f"/api/courses/{course_id}/units",
+        headers=teacher_headers,
+        json={"title": "Visible History Unit", "position": 1, "status": "published"},
+    )
+    assert visible_unit.status_code == 201
+    hidden_unit = client.post(
+        f"/api/courses/{course_id}/units",
+        headers=teacher_headers,
+        json={"title": "Soon Hidden Unit", "position": 2, "status": "published"},
+    )
+    assert hidden_unit.status_code == 201
+    hidden_course_unit = client.post(
+        f"/api/courses/{soon_hidden_course_id}/units",
+        headers=teacher_headers,
+        json={"title": "Soon Hidden Course Unit", "position": 1, "status": "published"},
+    )
+    assert hidden_course_unit.status_code == 201
+
+    visible_assignment = client.post(
+        f"/api/courses/{course_id}/units/{visible_unit.json()['id']}/assignments",
+        headers=teacher_headers,
+        json={"title": "Visible History Assignment", "max_score": 10, "status": "active"},
+    )
+    assert visible_assignment.status_code == 201
+    visible_assignment_id = visible_assignment.json()["id"]
+    hidden_assignment = client.post(
+        f"/api/courses/{course_id}/units/{hidden_unit.json()['id']}/assignments",
+        headers=teacher_headers,
+        json={"title": "Soon Hidden Assignment", "max_score": 10, "status": "active"},
+    )
+    assert hidden_assignment.status_code == 201
+    hidden_assignment_id = hidden_assignment.json()["id"]
+    hidden_course_assignment = client.post(
+        f"/api/courses/{soon_hidden_course_id}/units/{hidden_course_unit.json()['id']}/assignments",
+        headers=teacher_headers,
+        json={"title": "Soon Hidden Course Assignment", "max_score": 10, "status": "active"},
+    )
+    assert hidden_course_assignment.status_code == 201
+
+    for assignment_id, score in ((visible_assignment_id, 7), (hidden_assignment_id, 9)):
+        event = client.post(
+            "/api/learning-events",
+            headers=student_headers,
+            json={"class_id": class_id, "assignment_id": assignment_id, "event_type": "complete", "payload": {}},
+        )
+        assert event.status_code == 201
+        submission = client.post(
+            f"/api/assignments/{assignment_id}/submissions",
+            headers=student_headers,
+            json={"class_id": class_id, "content": {"answer": f"score {score}"}},
+        )
+        assert submission.status_code == 201
+        grade = client.patch(
+            f"/api/submissions/{submission.json()['id']}/grade",
+            headers=teacher_headers,
+            json={"score": score, "feedback": "graded"},
+        )
+        assert grade.status_code == 200
+
+    snapshot_params = {
+        "course_id": soon_hidden_course_id,
+        "class_id": class_id,
+        "from": "2026-01-01T00:00:00",
+        "to": "2026-12-31T23:59:59",
+        "granularity": "day",
+    }
+    hidden_course_snapshot = client.post(
+        "/api/knowledge/me/snapshots",
+        headers=student_headers,
+        params=snapshot_params,
+    )
+    assert hidden_course_snapshot.status_code == 201
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        stored_unit = db.get(CourseUnit, hidden_unit.json()["id"])
+        assert stored_unit is not None
+        stored_unit.status = "draft"
+        stored_course = db.get(Course, soon_hidden_course_id)
+        assert stored_course is not None
+        stored_course.status = "draft"
+        db.commit()
+
+    own_events = client.get("/api/learning-events", headers=student_headers)
+    assert own_events.status_code == 200
+    assert {item["assignment_id"] for item in own_events.json()} == {visible_assignment_id}
+
+    progress = client.get(f"/api/progress/me?class_id={class_id}", headers=student_headers)
+    assert progress.status_code == 200
+    assert progress.json()["submitted_assignments"] == 1
+    assert progress.json()["graded_assignments"] == 1
+    assert progress.json()["learning_events"] == 2
+    assert progress.json()["completed_events"] == 1
+    assert progress.json()["total_points"] == 7
+
+    teacher_progress = client.get(
+        f"/api/progress/users/{student['id']}?class_id={class_id}",
+        headers=teacher_headers,
+    )
+    assert teacher_progress.status_code == 200
+    assert teacher_progress.json()["submitted_assignments"] == 2
+    assert teacher_progress.json()["graded_assignments"] == 2
+    assert teacher_progress.json()["learning_events"] == 4
+    assert teacher_progress.json()["completed_events"] == 2
+    assert teacher_progress.json()["total_points"] == 16
+
+    knowledge = client.get(f"/api/knowledge/me?class_id={class_id}&course_id={course_id}", headers=student_headers)
+    assert knowledge.status_code == 200
+    assert knowledge.json()["assignment_count"] == 1
+    assert knowledge.json()["submitted_assignments"] == 1
+    assert knowledge.json()["graded_assignments"] == 1
+    assert knowledge.json()["total_events"] == 2
+    assert knowledge.json()["complete_events"] == 1
+    assert knowledge.json()["score_total"] == 7
+    assert knowledge.json()["max_score_total"] == 10
+    assert knowledge.json()["total_points"] == 7
+
+    visible_snapshot = client.post(
+        "/api/knowledge/me/snapshots",
+        headers=student_headers,
+        params={
+            "course_id": course_id,
+            "class_id": class_id,
+            "from": "2026-01-01T00:00:00",
+            "to": "2026-12-31T23:59:59",
+            "granularity": "day",
+        },
+    )
+    assert visible_snapshot.status_code == 201
+    assert visible_snapshot.json()["assignment_count"] == 1
+    assert visible_snapshot.json()["total_points"] == 7
+
+    hidden_course_knowledge = client.get(
+        f"/api/knowledge/me?class_id={class_id}&course_id={soon_hidden_course_id}",
+        headers=student_headers,
+    )
+    assert hidden_course_knowledge.status_code == 403
+    assert hidden_course_knowledge.json()["detail"] == "Course is not published"
+    hidden_course_snapshot_retry = client.post(
+        "/api/knowledge/me/snapshots",
+        headers=student_headers,
+        params=snapshot_params,
+    )
+    assert hidden_course_snapshot_retry.status_code == 403
+    assert hidden_course_snapshot_retry.json()["detail"] == "Course is not published"
+
+    snapshot_list = client.get(
+        "/api/knowledge/me/snapshots",
+        headers=student_headers,
+        params={"class_id": class_id, "limit": 10},
+    )
+    assert snapshot_list.status_code == 200
+    assert [item["course_id"] for item in snapshot_list.json()["items"]] == [course_id]
+
+    with session_factory() as db:
+        run = knowledge_snapshot_runs.rebuild_periodic_knowledge_snapshots(
+            db,
+            granularity="day",
+            reference_date=datetime(2026, 7, 6),
+            trigger_source="pytest",
+        )
+        assert run.status == "success"
+        assert run.class_snapshot_count == 2
+        assert run.user_snapshot_count == 1
+        hidden_user_snapshot = db.scalar(
+            select(UserKnowledgeSnapshot).where(
+                UserKnowledgeSnapshot.user_id == student["id"],
+                UserKnowledgeSnapshot.course_id == soon_hidden_course_id,
+                UserKnowledgeSnapshot.period_start == run.period_start,
+                UserKnowledgeSnapshot.period_end == run.period_end,
+            )
+        )
+        assert hidden_user_snapshot is None
