@@ -11,6 +11,7 @@ from app.core.config import get_settings
 from app.core.security import hash_password, password_strength_errors
 from app.db.session import get_db
 from app.models import (
+    AuthSession,
     AuditLog,
     Assignment,
     BugRecord,
@@ -189,6 +190,10 @@ def update_user(
         user.status = payload.status
 
     after = _user_snapshot(user)
+    snapshot = _change_snapshot(before, after)
+    revoked_sessions = _revoke_user_sessions(db, user) if payload.status == "disabled" else 0
+    if revoked_sessions:
+        snapshot["revoked_sessions"] = revoked_sessions
     record_audit_log(
         db,
         actor=current_user,
@@ -197,7 +202,7 @@ def update_user(
         resource_id=user.id,
         event_result="success",
         request=request,
-        snapshot=_change_snapshot(before, after),
+        snapshot=snapshot,
     )
     db.commit()
     db.refresh(user)
@@ -1753,3 +1758,13 @@ def _change_snapshot(before: dict[str, Any], after: dict[str, Any]) -> dict[str,
         if before.get(key) != after.get(key)
     }
     return {"before": before, "after": after, "changes": changes}
+
+
+def _revoke_user_sessions(db: Session, user: User) -> int:
+    now = datetime.now(UTC)
+    sessions = db.scalars(
+        select(AuthSession).where(AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None))
+    ).all()
+    for auth_session in sessions:
+        auth_session.revoked_at = now
+    return len(sessions)

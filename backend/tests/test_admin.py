@@ -2,7 +2,7 @@ from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import ContentPageRecord, User
+from app.models import AuthSession, ContentPageRecord, User
 
 
 def _auth_header(token: str) -> dict:
@@ -148,6 +148,13 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     )
     assert disable_teacher.status_code == 200
     assert disable_teacher.json()["status"] == "disabled"
+    disabled_teacher_me = client.get("/api/users/me", headers=_auth_header(teacher_token))
+    assert disabled_teacher_me.status_code == 401
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        teacher_session = db.scalar(select(AuthSession).where(AuthSession.user_id == teacher["id"]))
+        assert teacher_session is not None
+        assert teacher_session.revoked_at is not None
 
     blank_display = client.patch(
         f"/api/admin/users/{teacher['id']}",
@@ -439,6 +446,7 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert update_audit.json()["total"] == 1
     update_snapshot = update_audit.json()["items"][0]["snapshot_json"]
     assert update_snapshot["changes"]["status"] == {"from": "active", "to": "disabled"}
+    assert update_snapshot["revoked_sessions"] == 1
 
     bug_page = client.get("/api/admin/bugs?q=smoke&limit=1", headers=_auth_header(admin_token))
     assert bug_page.status_code == 200
