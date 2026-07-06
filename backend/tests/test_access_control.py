@@ -145,6 +145,10 @@ def test_outside_users_cannot_cross_school_class_course_boundaries(client):
             ),
         ),
         (
+            "student cannot read outside assignment review",
+            lambda: client.get(f"/api/assignments/{assignment_id}/review", headers=outside_student_headers),
+        ),
+        (
             "teacher cannot read outside student progress",
             lambda: client.get(
                 f"/api/progress/users/{scope['student']['id']}?class_id={class_id}",
@@ -197,3 +201,40 @@ def test_class_members_can_access_their_scoped_course_resources(client):
 
     class_knowledge = client.get(f"/api/classes/{scope['class_id']}/knowledge", headers=teacher_headers)
     assert class_knowledge.status_code == 200
+
+    review = client.get(f"/api/assignments/{scope['assignment_id']}/review", headers=student_headers)
+    assert review.status_code == 200
+    review_body = review.json()
+    assert review_body["assignment"]["id"] == scope["assignment_id"]
+    assert review_body["submission"] is None
+    assert review_body["can_submit"] is True
+    assert review_body["read_only"] is False
+    assert review_body["submit_block_reason"] is None
+
+    closed_assignment = client.post(
+        f"/api/courses/{scope['course_id']}/units/{scope['unit_id']}/assignments",
+        headers=teacher_headers,
+        json={"title": "Closed Empty Assignment", "max_score": 20, "status": "closed"},
+    )
+    assert closed_assignment.status_code == 201
+    closed_review = client.get(f"/api/assignments/{closed_assignment.json()['id']}/review", headers=student_headers)
+    assert closed_review.status_code == 200
+    closed_review_body = closed_review.json()
+    assert closed_review_body["submission"] is None
+    assert closed_review_body["can_submit"] is False
+    assert closed_review_body["read_only"] is True
+    assert closed_review_body["submit_block_reason"] == "assignment_closed"
+
+    archived_assignment = client.post(
+        f"/api/courses/{scope['course_id']}/units/{scope['unit_id']}/assignments",
+        headers=teacher_headers,
+        json={"title": "Archived Empty Assignment", "max_score": 20, "status": "archived"},
+    )
+    assert archived_assignment.status_code == 201
+    archived_review = client.get(f"/api/assignments/{archived_assignment.json()['id']}/review", headers=student_headers)
+    assert archived_review.status_code == 200
+    archived_review_body = archived_review.json()
+    assert archived_review_body["submission"] is None
+    assert archived_review_body["can_submit"] is False
+    assert archived_review_body["read_only"] is True
+    assert archived_review_body["submit_block_reason"] == "assignment_archived"

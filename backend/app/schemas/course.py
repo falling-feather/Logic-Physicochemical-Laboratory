@@ -127,6 +127,16 @@ class SubmissionRead(BaseModel):
     graded_at: datetime | None = None
 
 
+class AssignmentReviewRead(BaseModel):
+    course_id: int
+    unit_id: int
+    assignment: AssignmentRead
+    submission: SubmissionRead | None = None
+    can_submit: bool
+    read_only: bool
+    submit_block_reason: str | None = None
+
+
 class SubmissionGrade(BaseModel):
     score: int = Field(ge=0, le=1000)
     feedback: str | None = Field(default=None, max_length=4000)

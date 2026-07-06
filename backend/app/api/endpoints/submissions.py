@@ -14,7 +14,7 @@ from app.models import (
     User,
 )
 from app.models.base import utc_now
-from app.schemas.course import SubmissionCreate, SubmissionGrade, SubmissionRead
+from app.schemas.course import AssignmentRead, AssignmentReviewRead, SubmissionCreate, SubmissionGrade, SubmissionRead
 from app.services.audit import record_audit_log
 from app.services.access_control import (
     course_attached_to_class,
@@ -110,6 +110,35 @@ def create_submission(
     db.commit()
     db.refresh(submission)
     return submission
+
+
+@router.get("/assignments/{assignment_id}/review", response_model=AssignmentReviewRead)
+def read_assignment_review(
+    assignment_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AssignmentReviewRead:
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Only students can review their assignment history")
+    assignment, unit, course = _resolve_assignment(db, assignment_id)
+    require_course_visible(db, current_user, course.id)
+    submission = db.scalar(
+        select(Submission).where(
+            Submission.assignment_id == assignment.id,
+            Submission.student_id == current_user.id,
+        )
+    )
+    submit_block_reason = _assignment_submit_block_reason(assignment, submission)
+    can_submit = submit_block_reason is None
+    return AssignmentReviewRead(
+        course_id=course.id,
+        unit_id=unit.id,
+        assignment=AssignmentRead.model_validate(assignment),
+        submission=SubmissionRead.model_validate(submission) if submission is not None else None,
+        can_submit=can_submit,
+        read_only=not can_submit,
+        submit_block_reason=submit_block_reason,
+    )
 
 
 @router.get("/assignments/{assignment_id}/submissions", response_model=list[SubmissionRead])
@@ -209,6 +238,18 @@ def grade_submission(
     db.commit()
     db.refresh(submission)
     return submission
+
+
+def _assignment_submit_block_reason(assignment: Assignment, submission: Submission | None) -> str | None:
+    if assignment.status == "closed":
+        return "assignment_closed"
+    if assignment.status == "archived":
+        return "assignment_archived"
+    if assignment.status != "active":
+        return "assignment_not_active"
+    if submission is not None:
+        return "already_submitted"
+    return None
 
 
 def _resolve_assignment(db: Session, assignment_id: int) -> tuple[Assignment, CourseUnit, Course]:

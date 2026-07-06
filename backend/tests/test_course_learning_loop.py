@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import ClassKnowledgeSnapshot, KnowledgeSnapshotRun, UserKnowledgeSnapshot
+from app.models import Assignment, ClassKnowledgeSnapshot, KnowledgeSnapshotRun, UserKnowledgeSnapshot
 from app.models.base import utc_now
 from app.services import knowledge_snapshot_runs
 
@@ -293,6 +293,107 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client, monke
     assert grade.status_code == 200
     assert grade.json()["status"] == "graded"
     assert grade.json()["score"] == 18
+
+    active_review = client.get(
+        f"/api/assignments/{assignment_id}/review",
+        headers=_auth_header(student_token),
+    )
+    assert active_review.status_code == 200
+    active_review_body = active_review.json()
+    assert active_review_body["course_id"] == course_id
+    assert active_review_body["unit_id"] == unit_id
+    assert active_review_body["assignment"]["id"] == assignment_id
+    assert active_review_body["assignment"]["status"] == "active"
+    assert active_review_body["submission"]["id"] == submission_id
+    assert active_review_body["submission"]["score"] == 18
+    assert active_review_body["submission"]["feedback"] == "Clear observation."
+    assert active_review_body["can_submit"] is False
+    assert active_review_body["read_only"] is True
+    assert active_review_body["submit_block_reason"] == "already_submitted"
+
+    teacher_review = client.get(
+        f"/api/assignments/{assignment_id}/review",
+        headers=_auth_header(teacher_token),
+    )
+    assert teacher_review.status_code == 403
+    admin_review = client.get(
+        f"/api/assignments/{assignment_id}/review",
+        headers=_auth_header(admin_token),
+    )
+    assert admin_review.status_code == 403
+
+    with get_session_factory(get_settings().database_url)() as db:
+        stored_assignment = db.get(Assignment, assignment_id)
+        assert stored_assignment is not None
+        stored_assignment.status = "closed"
+        db.commit()
+
+    closed_review = client.get(
+        f"/api/assignments/{assignment_id}/review",
+        headers=_auth_header(student_token),
+    )
+    assert closed_review.status_code == 200
+    closed_review_body = closed_review.json()
+    assert closed_review_body["assignment"]["status"] == "closed"
+    assert closed_review_body["submission"]["id"] == submission_id
+    assert closed_review_body["submission"]["score"] == 18
+    assert closed_review_body["submission"]["feedback"] == "Clear observation."
+    assert closed_review_body["can_submit"] is False
+    assert closed_review_body["read_only"] is True
+    assert closed_review_body["submit_block_reason"] == "assignment_closed"
+
+    closed_teacher_submissions = client.get(
+        f"/api/assignments/{assignment_id}/submissions",
+        headers=_auth_header(teacher_token),
+    )
+    assert closed_teacher_submissions.status_code == 200
+    assert [item["id"] for item in closed_teacher_submissions.json()] == [submission_id]
+    closed_admin_submissions = client.get(
+        f"/api/assignments/{assignment_id}/submissions",
+        headers=_auth_header(admin_token),
+    )
+    assert closed_admin_submissions.status_code == 200
+    assert [item["id"] for item in closed_admin_submissions.json()] == [submission_id]
+
+    closed_resubmit = client.post(
+        f"/api/assignments/{assignment_id}/submissions",
+        headers=_auth_header(student_token),
+        json={"class_id": class_id, "content": {"answer": "late retry"}},
+    )
+    assert closed_resubmit.status_code == 409
+    assert closed_resubmit.json()["detail"] == "Assignment is not active"
+
+    with get_session_factory(get_settings().database_url)() as db:
+        stored_assignment = db.get(Assignment, assignment_id)
+        assert stored_assignment is not None
+        stored_assignment.status = "archived"
+        db.commit()
+
+    archived_review = client.get(
+        f"/api/assignments/{assignment_id}/review",
+        headers=_auth_header(student_token),
+    )
+    assert archived_review.status_code == 200
+    archived_review_body = archived_review.json()
+    assert archived_review_body["assignment"]["status"] == "archived"
+    assert archived_review_body["submission"]["id"] == submission_id
+    assert archived_review_body["can_submit"] is False
+    assert archived_review_body["read_only"] is True
+    assert archived_review_body["submit_block_reason"] == "assignment_archived"
+
+    archived_resubmit = client.post(
+        f"/api/assignments/{assignment_id}/submissions",
+        headers=_auth_header(student_token),
+        json={"class_id": class_id, "content": {"answer": "archived retry"}},
+    )
+    assert archived_resubmit.status_code == 409
+    assert archived_resubmit.json()["detail"] == "Assignment is not active"
+
+    with get_session_factory(get_settings().database_url)() as db:
+        stored_assignment = db.get(Assignment, assignment_id)
+        assert stored_assignment is not None
+        stored_assignment.status = "active"
+        db.commit()
 
     pending_after_grade = client.get(
         f"/api/admin/submissions/pending?class_id={class_id}",
