@@ -331,7 +331,7 @@ def publish_content_draft(
         page.status = CONTENT_PAGE_STATUS_PUBLISHED
         page.version = version
         page.schema_json = page_payload
-    db.flush()
+    _flush_or_raise_publication_conflict(db)
 
     version_record = _new_content_page_version(
         db,
@@ -369,7 +369,7 @@ def publish_content_draft(
             "version": _content_page_version_snapshot(version_record),
         },
     )
-    db.commit()
+    _commit_or_raise_publication_conflict(db)
     db.refresh(page)
     db.refresh(version_record)
     return _content_publication_read(page, version_record)
@@ -449,7 +449,7 @@ def rollback_content_page_version(
     page.status = CONTENT_PAGE_STATUS_PUBLISHED
     page.version = version
     page.schema_json = page_schema.model_dump(mode="json")
-    db.flush()
+    _flush_or_raise_publication_conflict(db)
     version_record = _new_content_page_version(
         db,
         page=page,
@@ -478,7 +478,7 @@ def rollback_content_page_version(
             "version": _content_page_version_snapshot(version_record),
         },
     )
-    db.commit()
+    _commit_or_raise_publication_conflict(db)
     db.refresh(page)
     db.refresh(version_record)
     return _content_publication_read(page, version_record)
@@ -680,7 +680,7 @@ def _new_content_page_version(
         note=_strip_optional(note),
     )
     db.add(version_record)
-    db.flush()
+    _flush_or_raise_publication_conflict(db)
     return version_record
 
 
@@ -689,6 +689,28 @@ def _next_content_version(db: Session, slug: str) -> str:
         select(func.count()).select_from(ContentPageVersion).where(ContentPageVersion.slug == slug)
     )
     return f"v{int(existing_versions or 0) + 1}"
+
+
+def _flush_or_raise_publication_conflict(db: Session) -> None:
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Content publication conflict; refresh the current version and retry",
+        ) from exc
+
+
+def _commit_or_raise_publication_conflict(db: Session) -> None:
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Content publication conflict; refresh the current version and retry",
+        ) from exc
 
 
 def _latest_content_page_version(db: Session, slug: str) -> ContentPageVersion | None:

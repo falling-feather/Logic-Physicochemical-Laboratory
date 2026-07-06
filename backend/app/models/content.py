@@ -85,7 +85,10 @@ class ContentDraft(TimestampMixin, Base):
 
 class ContentPageVersion(TimestampMixin, Base):
     __tablename__ = "content_page_versions"
-    __table_args__ = (UniqueConstraint("slug", "version", name="uq_content_page_versions_slug_version"),)
+    __table_args__ = (
+        UniqueConstraint("slug", "version", name="uq_content_page_versions_slug_version"),
+        UniqueConstraint("source_draft_id", name="uq_content_page_versions_source_draft_id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     page_id: Mapped[int] = mapped_column(ForeignKey("content_pages.id"), index=True, nullable=False)

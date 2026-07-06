@@ -1,8 +1,12 @@
+import pytest
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
+from app.api.endpoints import content as content_endpoint
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import ContentPageRecord, ContentPageVersion
+from app.models import ContentDraft, ContentPageRecord, ContentPageVersion
+from app.models.base import utc_now
 
 
 def _auth_header(token: str) -> dict:
@@ -225,6 +229,53 @@ def test_stale_parallel_draft_cannot_overwrite_newer_published_version(client):
     assert _table_count(ContentPageVersion) == 1
 
 
+def test_publish_integrity_conflict_returns_409(client, monkeypatch):
+    admin_token = _bootstrap_admin(client, username="admin_publish_conflict")
+    _, first_teacher_token = _register_and_login(client, "teacher_publish_conflict_one", "teacher")
+    _, second_teacher_token = _register_and_login(client, "teacher_publish_conflict_two", "teacher")
+    slug = "physics/publish-integrity-conflict"
+
+    first_publish = _create_submit_publish(client, admin_token, first_teacher_token, slug, "Published Conflict Base")
+    second_draft_id = _create_draft(client, second_teacher_token, slug, "Concurrent Conflict Draft")
+    _submit_draft(client, second_teacher_token, second_draft_id)
+
+    monkeypatch.setattr(content_endpoint, "_next_content_version", lambda db, target_slug: first_publish["version"])
+    conflict = client.post(
+        f"/api/content/drafts/{second_draft_id}/publish",
+        headers=_auth_header(admin_token),
+        json={"note": "simulate concurrent version insert"},
+    )
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"] == "Content publication conflict; refresh the current version and retry"
+
+    render = client.get(f"/api/render/page/{slug}")
+    assert render.status_code == 200
+    assert render.json()["title"] == "Published Conflict Base"
+    assert _table_count(ContentPageVersion) == 1
+
+    draft_after_conflict = client.get(f"/api/content/drafts/{second_draft_id}", headers=_auth_header(second_teacher_token))
+    assert draft_after_conflict.status_code == 200
+    assert draft_after_conflict.json()["status"] == "submitted"
+    assert draft_after_conflict.json()["published_version_id"] is None
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        draft = db.get(ContentDraft, second_draft_id)
+        assert draft is not None
+        assert draft.status == "submitted"
+        assert draft.active_key == "active"
+        page = db.scalar(select(ContentPageRecord).where(ContentPageRecord.slug == slug))
+        assert page is not None
+        assert page.current_version_id == first_publish["version_id"]
+
+    audit = client.get(
+        f"/api/admin/audit-logs?action=content.draft.publish&resource_id={second_draft_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 0
+
+
 def test_draft_bound_to_previous_base_version_cannot_publish_after_current_advances(client):
     admin_token = _bootstrap_admin(client, username="admin_stale_base")
     _, first_teacher_token = _register_and_login(client, "teacher_stale_base_one", "teacher")
@@ -321,6 +372,104 @@ def test_content_draft_update_preserves_base_version_after_current_advances(clie
     )
     assert stale_publish.status_code == 409
     assert stale_publish.json()["detail"] == "Content draft is based on an older published version"
+
+
+def test_content_page_version_source_draft_id_is_unique(client):
+    admin_token = _bootstrap_admin(client, username="admin_source_draft_unique")
+    _, teacher_token = _register_and_login(client, "teacher_source_draft_unique", "teacher")
+    slug = "physics/source-draft-unique"
+
+    publish = _create_submit_publish(client, admin_token, teacher_token, slug, "Unique Source Draft")
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        original = db.get(ContentPageVersion, publish["version_id"])
+        assert original is not None
+        assert original.source_draft_id is not None
+        duplicate = ContentPageVersion(
+            page_id=original.page_id,
+            slug=original.slug,
+            status=original.status,
+            version="v-source-duplicate",
+            schema_hash=original.schema_hash,
+            schema_json=original.schema_json,
+            source_draft_id=original.source_draft_id,
+            restored_from_version_id=None,
+            previous_version_id=original.id,
+            published_by_user_id=original.published_by_user_id,
+            published_at=original.published_at,
+            note="duplicate source draft should fail",
+        )
+        db.add(duplicate)
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+
+
+def test_publish_source_draft_integrity_conflict_returns_409(client):
+    admin_token = _bootstrap_admin(client, username="admin_source_draft_conflict")
+    teacher_id, teacher_token = _register_and_login(client, "teacher_source_draft_conflict", "teacher")
+    slug = "physics/source-draft-api-conflict"
+
+    draft_id = _create_draft(client, teacher_token, slug, "Source Draft API Conflict")
+    _submit_draft(client, teacher_token, draft_id)
+
+    reserved_slug = "physics/source-draft-api-reserved"
+    reserved_schema = _draft_payload(reserved_slug, title="Reserved Source Draft")["schema"]
+    reserved_schema["status"] = "published"
+    reserved_schema["version"] = "v1"
+    reserved_hash = content_endpoint._schema_hash(reserved_schema)
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        page = ContentPageRecord(
+            slug=reserved_slug,
+            status="published",
+            version="v1",
+            schema_json=reserved_schema,
+            schema_hash=reserved_hash,
+            published_by_user_id=teacher_id,
+            published_at=utc_now(),
+        )
+        db.add(page)
+        db.flush()
+        version = ContentPageVersion(
+            page_id=page.id,
+            slug=reserved_slug,
+            status="published",
+            version="v1",
+            schema_hash=reserved_hash,
+            schema_json=reserved_schema,
+            source_draft_id=draft_id,
+            restored_from_version_id=None,
+            previous_version_id=None,
+            published_by_user_id=teacher_id,
+            published_at=page.published_at,
+            note="reserve source draft id",
+        )
+        db.add(version)
+        db.flush()
+        page.current_version_id = version.id
+        db.commit()
+
+    conflict = client.post(
+        f"/api/content/drafts/{draft_id}/publish",
+        headers=_auth_header(admin_token),
+        json={"note": "source draft id already used"},
+    )
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"] == "Content publication conflict; refresh the current version and retry"
+
+    draft_after_conflict = client.get(f"/api/content/drafts/{draft_id}", headers=_auth_header(teacher_token))
+    assert draft_after_conflict.status_code == 200
+    assert draft_after_conflict.json()["status"] == "submitted"
+    assert draft_after_conflict.json()["published_version_id"] is None
+
+    audit = client.get(
+        f"/api/admin/audit-logs?action=content.draft.publish&resource_id={draft_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 0
 
 
 def test_script_draft_requires_approved_review_before_publish(client):
@@ -532,6 +681,37 @@ def test_admin_rolls_back_by_creating_new_content_version(client):
     assert "schema" not in snapshot["version"]
     assert "schema_json" not in snapshot["version"]
     assert _table_count(ContentPageVersion) == 3
+
+
+def test_rollback_integrity_conflict_returns_409(client, monkeypatch):
+    admin_token = _bootstrap_admin(client, username="admin_rollback_conflict")
+    _, teacher_token = _register_and_login(client, "teacher_rollback_conflict", "teacher")
+    slug = "physics/rollback-integrity-conflict"
+
+    first_publish = _create_submit_publish(client, admin_token, teacher_token, slug, "Rollback Conflict Base")
+    second_publish = _create_submit_publish(client, admin_token, teacher_token, slug, "Rollback Conflict Current")
+
+    monkeypatch.setattr(content_endpoint, "_next_content_version", lambda db, target_slug: second_publish["version"])
+    rollback = client.post(
+        f"/api/content/page-versions/{first_publish['version_id']}/rollback",
+        headers=_auth_header(admin_token),
+        json={"note": "simulate concurrent rollback version insert"},
+    )
+    assert rollback.status_code == 409
+    assert rollback.json()["detail"] == "Content publication conflict; refresh the current version and retry"
+
+    render = client.get(f"/api/render/page/{slug}")
+    assert render.status_code == 200
+    assert render.json()["title"] == "Rollback Conflict Current"
+    assert render.json()["version"] == "v2"
+    assert _table_count(ContentPageVersion) == 2
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        page = db.scalar(select(ContentPageRecord).where(ContentPageRecord.slug == slug))
+        assert page is not None
+        assert page.current_version_id == second_publish["version_id"]
+        assert page.version == "v2"
 
 
 def test_admin_content_page_version_diff_rejects_cross_slug_base(client):
