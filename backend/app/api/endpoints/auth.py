@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.models import AuthSession, LoginAttempt, User
 from app.schemas.auth import LoginRequest, LoginResponse, RegisterRequest, UserPublic
 from app.services.audit import record_audit_log
+from app.services.text import require_trimmed_text
 
 
 router = APIRouter()
@@ -21,6 +22,7 @@ REGISTER_ROLES = {"teacher", "student"}
 @router.post("/register", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> User:
     username = payload.username.strip()
+    display_name = require_trimmed_text(payload.display_name, "Display name is required")
     role = payload.role.strip().lower()
     if not username:
         raise HTTPException(status_code=422, detail="Username is required")
@@ -33,7 +35,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> User:
 
     user = User(
         username=username,
-        display_name=payload.display_name.strip(),
+        display_name=display_name,
         role=role,
         password_hash=hash_password(payload.password),
     )

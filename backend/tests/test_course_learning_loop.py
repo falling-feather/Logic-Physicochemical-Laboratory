@@ -61,6 +61,79 @@ def test_knowledge_snapshot_period_windows_align_day_and_week():
     assert week_end.isoformat() == "2026-07-05T23:59:59.999999"
 
 
+def test_learning_scope_rejects_blank_required_text_after_trimming(client):
+    teacher_token = _register_and_login(client, "teacher_blank_required", "teacher")
+    headers = _auth_header(teacher_token)
+
+    blank_school = client.post("/api/schools", headers=headers, json={"name": "   "})
+    assert blank_school.status_code == 422
+    assert blank_school.json()["detail"] == "School name is required"
+
+    school = client.post("/api/schools", headers=headers, json={"name": "Blank Required School", "region": "   "})
+    assert school.status_code == 201
+    assert school.json()["region"] is None
+    school_id = school.json()["id"]
+
+    blank_class = client.post("/api/classes", headers=headers, json={"school_id": school_id, "name": "   "})
+    assert blank_class.status_code == 422
+    assert blank_class.json()["detail"] == "Class name is required"
+
+    class_group = client.post(
+        "/api/classes",
+        headers=headers,
+        json={"school_id": school_id, "name": "Real Class", "grade": "   ", "term": "   "},
+    )
+    assert class_group.status_code == 201
+    assert class_group.json()["grade"] is None
+    assert class_group.json()["term"] is None
+
+    blank_course = client.post("/api/courses", headers=headers, json={"school_id": school_id, "title": "   "})
+    assert blank_course.status_code == 422
+    assert blank_course.json()["detail"] == "Course title is required"
+
+    course = client.post(
+        "/api/courses",
+        headers=headers,
+        json={"school_id": school_id, "title": "Real Course", "summary": "   ", "status": "published"},
+    )
+    assert course.status_code == 201
+    assert course.json()["summary"] is None
+    course_id = course.json()["id"]
+
+    blank_unit = client.post(
+        f"/api/courses/{course_id}/units",
+        headers=headers,
+        json={"title": "   ", "position": 1},
+    )
+    assert blank_unit.status_code == 422
+    assert blank_unit.json()["detail"] == "Course unit title is required"
+
+    unit = client.post(
+        f"/api/courses/{course_id}/units",
+        headers=headers,
+        json={"title": "Real Unit", "position": 1, "content_slug": "   "},
+    )
+    assert unit.status_code == 201
+    assert unit.json()["content_slug"] is None
+    unit_id = unit.json()["id"]
+
+    blank_assignment = client.post(
+        f"/api/courses/{course_id}/units/{unit_id}/assignments",
+        headers=headers,
+        json={"title": "   "},
+    )
+    assert blank_assignment.status_code == 422
+    assert blank_assignment.json()["detail"] == "Assignment title is required"
+
+    assignment = client.post(
+        f"/api/courses/{course_id}/units/{unit_id}/assignments",
+        headers=headers,
+        json={"title": "Real Assignment", "description": "   "},
+    )
+    assert assignment.status_code == 201
+    assert assignment.json()["description"] is None
+
+
 def test_teacher_course_assignment_and_student_learning_event_loop(client, monkeypatch):
     teacher_token = _register_and_login(client, "teacher_course", "teacher")
     student_token = _register_and_login(client, "student_course", "student")

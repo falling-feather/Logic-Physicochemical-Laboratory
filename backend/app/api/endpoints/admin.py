@@ -69,6 +69,7 @@ from app.services.class_join_requests import (
     normalize_class_role,
     normalize_join_request_status,
 )
+from app.services.text import require_trimmed_text
 
 
 router = APIRouter()
@@ -93,6 +94,7 @@ def bootstrap_admin(payload: AdminBootstrapRequest, request: Request, db: Sessio
         raise HTTPException(status_code=403, detail="Admin bootstrap token is required in production")
 
     username = payload.username.strip()
+    display_name = require_trimmed_text(payload.display_name, "Display name is required")
     if not username:
         raise HTTPException(status_code=422, detail="Username is required")
     _enforce_password_strength(payload.password, username)
@@ -102,7 +104,7 @@ def bootstrap_admin(payload: AdminBootstrapRequest, request: Request, db: Sessio
 
     user = User(
         username=username,
-        display_name=payload.display_name.strip(),
+        display_name=display_name,
         role="admin",
         status="active",
         password_hash=hash_password(payload.password),
@@ -169,7 +171,7 @@ def update_user(
             raise HTTPException(status_code=409, detail="Cannot remove the last active admin")
 
     if payload.display_name is not None:
-        user.display_name = payload.display_name.strip()
+        user.display_name = require_trimmed_text(payload.display_name, "Display name is required")
     if payload.role is not None:
         user.role = payload.role
     if payload.status is not None:
@@ -834,9 +836,11 @@ def create_bug_record(
     db: Session = Depends(get_db),
 ) -> BugRecord:
     _require_admin(current_user)
+    title = require_trimmed_text(payload.title, "Bug title is required")
+    category = require_trimmed_text(payload.category, "Bug category is required")
     bug = BugRecord(
-        title=payload.title.strip(),
-        category=payload.category.strip(),
+        title=title,
+        category=category,
         severity=payload.severity,
         status=payload.status,
         source=_strip_optional(payload.source),
@@ -877,7 +881,13 @@ def update_bug_record(
     for field in ("title", "category", "source", "evidence", "notes"):
         value = getattr(payload, field)
         if value is not None:
-            setattr(bug, field, _strip_required(value) if field in {"title", "category"} else _strip_optional(value))
+            if field == "title":
+                value = require_trimmed_text(value, "Bug title is required")
+            elif field == "category":
+                value = require_trimmed_text(value, "Bug category is required")
+            else:
+                value = _strip_optional(value)
+            setattr(bug, field, value)
     if payload.severity is not None:
         bug.severity = payload.severity
     if payload.status is not None:
@@ -1531,10 +1541,6 @@ def _strip_optional(value: str | None) -> str | None:
     if value is None:
         return None
     return value.strip() or None
-
-
-def _strip_required(value: str) -> str:
-    return value.strip()
 
 
 def _contains_pattern(value: str) -> str:

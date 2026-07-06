@@ -57,6 +57,20 @@ def test_admin_bootstrap_rejects_weak_password(client):
     assert "Password must include at least one letter" in response.json()["detail"]["password"]
 
 
+def test_admin_bootstrap_rejects_blank_display_name_after_trimming(client):
+    response = client.post(
+        "/api/admin/bootstrap",
+        json={
+            "username": "admin_blank_display",
+            "password": "secret123",
+            "display_name": "   ",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Display name is required"
+
+
 def test_admin_bootstrap_is_single_use(client):
     admin_token = _bootstrap_admin(client)
 
@@ -107,6 +121,14 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     )
     assert disable_teacher.status_code == 200
     assert disable_teacher.json()["status"] == "disabled"
+
+    blank_display = client.patch(
+        f"/api/admin/users/{teacher['id']}",
+        headers=_auth_header(admin_token),
+        json={"display_name": "   "},
+    )
+    assert blank_display.status_code == 422
+    assert blank_display.json()["detail"] == "Display name is required"
 
     disabled_login = client.post(
         "/api/auth/login",
@@ -175,6 +197,38 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     )
     assert bug.status_code == 201
     bug_id = bug.json()["id"]
+
+    blank_bug_title = client.post(
+        "/api/admin/bugs",
+        headers=_auth_header(admin_token),
+        json={"title": "   ", "category": "BE"},
+    )
+    assert blank_bug_title.status_code == 422
+    assert blank_bug_title.json()["detail"] == "Bug title is required"
+
+    blank_bug_category = client.post(
+        "/api/admin/bugs",
+        headers=_auth_header(admin_token),
+        json={"title": "Category blank risk", "category": "   "},
+    )
+    assert blank_bug_category.status_code == 422
+    assert blank_bug_category.json()["detail"] == "Bug category is required"
+
+    blank_bug_title_update = client.patch(
+        f"/api/admin/bugs/{bug_id}",
+        headers=_auth_header(admin_token),
+        json={"title": "   "},
+    )
+    assert blank_bug_title_update.status_code == 422
+    assert blank_bug_title_update.json()["detail"] == "Bug title is required"
+
+    blank_bug_category_update = client.patch(
+        f"/api/admin/bugs/{bug_id}",
+        headers=_auth_header(admin_token),
+        json={"category": "   "},
+    )
+    assert blank_bug_category_update.status_code == 422
+    assert blank_bug_category_update.json()["detail"] == "Bug category is required"
 
     close_bug = client.patch(
         f"/api/admin/bugs/{bug_id}",

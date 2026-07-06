@@ -8,6 +8,7 @@ from app.models import ClassGroup, School, SchoolMembership, User
 from app.schemas.school import ClassRead, SchoolCreate, SchoolRead
 from app.services.audit import record_audit_log
 from app.services.access_control import require_school_member
+from app.services.text import require_trimmed_text
 
 
 router = APIRouter()
@@ -38,11 +39,12 @@ def create_school(
 ) -> School:
     if current_user.role not in {"admin", "teacher"}:
         raise HTTPException(status_code=403, detail="Only admins or teachers can create schools")
-    existing = db.scalar(select(School).where(School.name == payload.name.strip()))
+    name = require_trimmed_text(payload.name, "School name is required")
+    existing = db.scalar(select(School).where(School.name == name))
     if existing is not None:
         raise HTTPException(status_code=409, detail="School already exists")
 
-    school = School(name=payload.name.strip(), region=(payload.region or "").strip() or None)
+    school = School(name=name, region=(payload.region or "").strip() or None)
     db.add(school)
     db.flush()
     owner_role = "admin" if current_user.role == "admin" else "teacher"

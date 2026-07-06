@@ -31,6 +31,7 @@ from app.services.access_control import (
     require_school_role,
     visible_school_ids,
 )
+from app.services.text import require_trimmed_text
 
 
 router = APIRouter()
@@ -62,10 +63,11 @@ def create_class(
     db: Session = Depends(get_db),
 ) -> ClassGroup:
     require_school_role(db, current_user, payload.school_id, {"admin", "teacher"})
+    name = require_trimmed_text(payload.name, "Class name is required")
     existing = db.scalar(
         select(ClassGroup).where(
             ClassGroup.school_id == payload.school_id,
-            ClassGroup.name == payload.name.strip(),
+            ClassGroup.name == name,
         )
     )
     if existing is not None:
@@ -73,7 +75,7 @@ def create_class(
 
     class_group = ClassGroup(
         school_id=payload.school_id,
-        name=payload.name.strip(),
+        name=name,
         grade=(payload.grade or "").strip() or None,
         term=(payload.term or "").strip() or None,
     )

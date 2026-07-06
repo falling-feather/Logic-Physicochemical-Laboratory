@@ -32,6 +32,7 @@ from app.services.access_control import (
     teacher_school_ids,
     visible_class_ids,
 )
+from app.services.text import require_trimmed_text
 
 
 router = APIRouter()
@@ -79,7 +80,7 @@ def create_course(
     db: Session = Depends(get_db),
 ) -> Course:
     require_school_role(db, current_user, payload.school_id, {"admin", "teacher"})
-    title = payload.title.strip()
+    title = require_trimmed_text(payload.title, "Course title is required")
     existing = db.scalar(select(Course).where(Course.school_id == payload.school_id, Course.title == title))
     if existing is not None:
         raise HTTPException(status_code=409, detail="Course already exists in this school")
@@ -188,6 +189,7 @@ def create_course_unit(
     course = get_course(db, course_id)
     require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
     content_slug = (payload.content_slug or "").strip() or None
+    title = require_trimmed_text(payload.title, "Course unit title is required")
     existing_position = db.scalar(
         select(CourseUnit).where(CourseUnit.course_id == course_id, CourseUnit.position == payload.position)
     )
@@ -202,7 +204,7 @@ def create_course_unit(
 
     unit = CourseUnit(
         course_id=course_id,
-        title=payload.title.strip(),
+        title=title,
         position=payload.position,
         content_slug=content_slug,
         status=payload.status,
@@ -268,7 +270,7 @@ def create_assignment(
     unit = db.get(CourseUnit, unit_id)
     if unit is None or unit.course_id != course_id:
         raise HTTPException(status_code=404, detail="Course unit not found")
-    title = payload.title.strip()
+    title = require_trimmed_text(payload.title, "Assignment title is required")
     existing = db.scalar(select(Assignment).where(Assignment.unit_id == unit_id, Assignment.title == title))
     if existing is not None:
         raise HTTPException(status_code=409, detail="Assignment already exists in this unit")

@@ -140,6 +140,21 @@ def test_register_rejects_blank_username_after_trimming(client):
     assert response.json()["detail"] == "Username is required"
 
 
+def test_register_rejects_blank_display_name_after_trimming(client):
+    response = client.post(
+        "/api/auth/register",
+        json={
+            "username": "blank_display_teacher",
+            "password": "secret123",
+            "display_name": "   ",
+            "role": "teacher",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Display name is required"
+
+
 def test_login_rate_limit_locks_and_recovers_after_window(client):
     register = client.post(
         "/api/auth/register",
