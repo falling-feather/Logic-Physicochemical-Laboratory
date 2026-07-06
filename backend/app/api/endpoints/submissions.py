@@ -56,6 +56,7 @@ def create_submission(
         select(Submission).where(
             Submission.assignment_id == assignment.id,
             Submission.student_id == current_user.id,
+            Submission.class_id == class_group.id,
         )
     )
     if existing is not None:
@@ -115,6 +116,7 @@ def create_submission(
 @router.get("/assignments/{assignment_id}/review", response_model=AssignmentReviewRead)
 def read_assignment_review(
     assignment_id: int,
+    class_id: int | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AssignmentReviewRead:
@@ -122,12 +124,22 @@ def read_assignment_review(
         raise HTTPException(status_code=403, detail="Only students can review their assignment history")
     assignment, unit, course = _resolve_assignment(db, assignment_id)
     require_course_visible(db, current_user, course.id)
-    submission = db.scalar(
-        select(Submission).where(
+    statement = (
+        select(Submission)
+        .where(
             Submission.assignment_id == assignment.id,
             Submission.student_id == current_user.id,
         )
+        .order_by(Submission.submitted_at.desc(), Submission.id.desc())
     )
+    if class_id is not None:
+        class_group = require_class_member(db, current_user, class_id)
+        if class_group.school_id != course.school_id:
+            raise HTTPException(status_code=422, detail="Class does not belong to assignment school")
+        if not course_attached_to_class(db, course.id, class_group.id):
+            raise HTTPException(status_code=403, detail="Course is not attached to this class")
+        statement = statement.where(Submission.class_id == class_group.id)
+    submission = db.scalars(statement.limit(1)).first()
     submit_block_reason = _assignment_submit_block_reason(assignment, submission)
     can_submit = submit_block_reason is None
     return AssignmentReviewRead(

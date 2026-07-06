@@ -802,3 +802,107 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client, monke
     )
     assert teacher_events.status_code == 200
     assert teacher_events.json()[0]["user_id"] == event.json()["user_id"]
+
+
+def test_same_assignment_can_be_submitted_once_per_class(client):
+    teacher_token = _register_and_login(client, "teacher_multi_class_submit", "teacher")
+    student_token = _register_and_login(client, "student_multi_class_submit", "student")
+
+    school = client.post(
+        "/api/schools",
+        headers=_auth_header(teacher_token),
+        json={"name": "Astra Multi Class School"},
+    )
+    assert school.status_code == 201
+    school_id = school.json()["id"]
+
+    first_class = client.post(
+        "/api/classes",
+        headers=_auth_header(teacher_token),
+        json={"school_id": school_id, "name": "Class A"},
+    )
+    assert first_class.status_code == 201
+    first_class_id = first_class.json()["id"]
+
+    second_class = client.post(
+        "/api/classes",
+        headers=_auth_header(teacher_token),
+        json={"school_id": school_id, "name": "Class B"},
+    )
+    assert second_class.status_code == 201
+    second_class_id = second_class.json()["id"]
+
+    course = client.post(
+        "/api/courses",
+        headers=_auth_header(teacher_token),
+        json={"school_id": school_id, "title": "Shared Assignment Course", "status": "published"},
+    )
+    assert course.status_code == 201
+    course_id = course.json()["id"]
+
+    for class_id in (first_class_id, second_class_id):
+        attach = client.post(
+            f"/api/courses/{course_id}/classes",
+            headers=_auth_header(teacher_token),
+            json={"class_id": class_id},
+        )
+        assert attach.status_code == 201
+        join = client.post(
+            f"/api/classes/{class_id}/join",
+            headers=_auth_header(student_token),
+            json={"role": "student"},
+        )
+        assert join.status_code == 201
+
+    unit = client.post(
+        f"/api/courses/{course_id}/units",
+        headers=_auth_header(teacher_token),
+        json={"title": "Shared Unit", "position": 1, "status": "published"},
+    )
+    assert unit.status_code == 201
+    unit_id = unit.json()["id"]
+
+    assignment = client.post(
+        f"/api/courses/{course_id}/units/{unit_id}/assignments",
+        headers=_auth_header(teacher_token),
+        json={"title": "Shared Assignment", "max_score": 10},
+    )
+    assert assignment.status_code == 201
+    assignment_id = assignment.json()["id"]
+
+    first_submission = client.post(
+        f"/api/assignments/{assignment_id}/submissions",
+        headers=_auth_header(student_token),
+        json={"class_id": first_class_id, "content": {"answer": "first class"}},
+    )
+    assert first_submission.status_code == 201
+
+    second_submission = client.post(
+        f"/api/assignments/{assignment_id}/submissions",
+        headers=_auth_header(student_token),
+        json={"class_id": second_class_id, "content": {"answer": "second class"}},
+    )
+    assert second_submission.status_code == 201
+    assert second_submission.json()["id"] != first_submission.json()["id"]
+
+    duplicate_first_class = client.post(
+        f"/api/assignments/{assignment_id}/submissions",
+        headers=_auth_header(student_token),
+        json={"class_id": first_class_id, "content": {"answer": "duplicate"}},
+    )
+    assert duplicate_first_class.status_code == 409
+
+    first_review = client.get(
+        f"/api/assignments/{assignment_id}/review?class_id={first_class_id}",
+        headers=_auth_header(student_token),
+    )
+    assert first_review.status_code == 200
+    assert first_review.json()["submission"]["id"] == first_submission.json()["id"]
+    assert first_review.json()["submit_block_reason"] == "already_submitted"
+
+    second_review = client.get(
+        f"/api/assignments/{assignment_id}/review?class_id={second_class_id}",
+        headers=_auth_header(student_token),
+    )
+    assert second_review.status_code == 200
+    assert second_review.json()["submission"]["id"] == second_submission.json()["id"]

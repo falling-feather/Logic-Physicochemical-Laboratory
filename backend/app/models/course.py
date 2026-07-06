@@ -58,7 +58,14 @@ class Assignment(TimestampMixin, Base):
 
 class Submission(TimestampMixin, Base):
     __tablename__ = "submissions"
-    __table_args__ = (UniqueConstraint("assignment_id", "student_id", name="uq_submissions_assignment_student"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "assignment_id",
+            "student_id",
+            "class_id",
+            name="uq_submissions_assignment_student_class",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     assignment_id: Mapped[int] = mapped_column(ForeignKey("assignments.id"), index=True, nullable=False)

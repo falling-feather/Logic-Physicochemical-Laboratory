@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与 semantic 富语义摘要、登录、密码策略、登录失败锁定、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、学生侧作业历史/复盘只读入口、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、待批改队列、审计元数据和认证事件审计等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与 semantic 富语义摘要、登录、密码策略、登录失败锁定、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、跨班级提交唯一性、学生侧作业历史/复盘只读入口、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、待批改队列、审计元数据和认证事件审计等能力。
 
 ## 本地启动
 
@@ -66,8 +66,8 @@ python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-revi
 | GET | `/api/courses/{id}/assignments` | 课程作业列表 |
 | POST | `/api/courses/{id}/units/{unit_id}/assignments` | 教师创建作业 |
 | GET/POST | `/api/learning-events` | 学习事件查询 / 记录访问、提交、完成等事件 |
-| POST | `/api/assignments/{id}/submissions` | 学生提交作业 |
-| GET | `/api/assignments/{id}/review` | 学生侧作业复盘入口；active 未提交返回可提交，已提交、closed 或 archived 返回只读和 `submit_block_reason` |
+| POST | `/api/assignments/{id}/submissions` | 学生按 `class_id` 提交作业；同一 `assignment/student/class` 只能提交一次，同一作业挂到多个班级时可分别提交 |
+| GET | `/api/assignments/{id}/review` | 学生侧作业复盘入口；可用 `class_id` 定位班级提交，active 未提交返回可提交，已提交、closed 或 archived 返回只读和 `submit_block_reason` |
 | GET | `/api/assignments/{id}/submissions` | 学生查看本人提交 / 教师查看作业提交 |
 | PATCH | `/api/submissions/{id}/grade` | 教师批改作业并生成积分流水 |
 | GET | `/api/points/ledger` | 查询个人或班级范围积分流水 |
@@ -154,7 +154,8 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 - `/api/content/drafts/{id}/submit`、`/request-changes`、`/withdraw` 与 `/publish` 负责草稿状态流转；创建草稿时绑定当前 published base 版本和 hash，写入 `active_key='active'`，并由 `(author_user_id, target_slug, active_key)` 唯一约束防止同一作者同一目标页并发创建多个 active 草稿；撤回或发布会清空 active key。发布前校验 base 未过期并复核脚本 policy，脚本引用必须带 `scriptSandbox.mode=isolated-iframe` 且不能声明危险能力，发布后回填 page/version/publisher 元数据，审计只记录状态和版本元数据，不记录完整 schema。
 - `/api/content/page-versions/{id}/rollback` 负责内容版本追加式回滚：更新 `content_pages.current_version_id/schema_hash/published_*` 当前态、追加带 `previous_version_id` 的 `content_page_versions`，并在审计中只记录版本元数据与 schema hash，不记录完整 schema。
 - `app.services.knowledge_snapshot_runs` 与 `app.services.knowledge_snapshot_scheduler` 负责知识快照窗口重算、运行记录和单进程调度。
-- `GET /api/assignments/{id}/review` 是学生侧只读复盘入口：只允许 student 访问自己的提交历史，closed / archived 作业不允许再次提交但仍返回题目、成绩和反馈；教师和管理员继续使用 submissions 列表与批改接口。
+- `POST /api/assignments/{id}/submissions` 的提交唯一性按 `assignment_id + student_id + class_id` 收口；同一课程作业挂到多个班级时，学生可在不同班级各提交一次，同班级重复提交仍返回 `409`。
+- `GET /api/assignments/{id}/review` 是学生侧只读复盘入口：只允许 student 访问自己的提交历史，可用 `class_id` 定位班级提交；closed / archived 作业不允许再次提交但仍返回题目、成绩和反馈；教师和管理员继续使用 submissions 列表与批改接口。
 
 ## 验证
 
@@ -176,7 +177,7 @@ $env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
 python -m alembic upgrade head
 ```
 
-当前 Alembic head：`20260706_0019`（内容草稿 active key 唯一约束）。
+当前 Alembic head：`20260706_0020`（作业提交唯一性按班级 scope 收口）。
 
 知识快照周期重算：
 
