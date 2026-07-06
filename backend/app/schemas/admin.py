@@ -370,6 +370,36 @@ class AuditLogPage(BaseModel):
     next_offset: int | None = None
 
 
+class AuditLogExportItem(BaseModel):
+    id: int
+    actor_user_id: int | None = None
+    actor_role: str | None = None
+    action: str
+    resource: str
+    resource_type: str
+    resource_id: str | None = None
+    school_id: int | None = None
+    class_id: int | None = None
+    event_result: str | None = None
+    failure_reason: str | None = None
+    request_id: str | None = None
+    client_ip_hash: str | None = None
+    user_agent: str | None = None
+    request_method: str | None = None
+    request_path: str | None = None
+    snapshot_json: dict | None = None
+    created_at: datetime
+
+
+class AuditLogExport(BaseModel):
+    items: list[AuditLogExportItem]
+    total: int
+    limit: int
+    truncated: bool
+    include_snapshot: bool
+    exported_at: datetime
+
+
 class BugRecordCreate(BaseModel):
     title: str = Field(min_length=1, max_length=240)
     category: str = Field(default="general", min_length=1, max_length=80)

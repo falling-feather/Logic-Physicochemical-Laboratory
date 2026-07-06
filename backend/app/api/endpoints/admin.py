@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -32,13 +32,13 @@ from app.models import (
 )
 from app.schemas.admin import (
     AdminBootstrapRequest,
-    AdminClassPage,
     AdminClassJoinRequestPage,
     AdminClassJoinRequestRead,
     AdminClassJoinRequestReview,
+    AdminClassPage,
     AdminClassStats,
-    AdminContentPageRead,
     AdminContentPagePage,
+    AdminContentPageRead,
     AdminContentPageVersionDiff,
     AdminContentPageVersionDiffItem,
     AdminContentPageVersionSemanticDiff,
@@ -54,9 +54,11 @@ from app.schemas.admin import (
     AdminSchoolPage,
     AdminSchoolStats,
     AdminStats,
-    AdminUserRead,
     AdminUserPage,
+    AdminUserRead,
     AdminUserUpdate,
+    AuditLogExport,
+    AuditLogExportItem,
     AuditLogPage,
     AuditLogRead,
     BugRecordCreate,
@@ -702,34 +704,66 @@ def list_audit_logs(
     db: Session = Depends(get_db),
 ) -> AuditLogPage:
     _require_admin(current_user)
-    if from_at is not None and to_at is not None and from_at > to_at:
-        raise HTTPException(status_code=422, detail="from must be earlier than to")
-    statement = select(AuditLog).order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
-    if actor_user_id is not None:
-        statement = statement.where(AuditLog.actor_user_id == actor_user_id)
-    if action is not None:
-        statement = statement.where(AuditLog.action == action.strip())
-    if resource_type is not None:
-        statement = statement.where(AuditLog.resource_type == resource_type.strip())
-    if resource_id is not None:
-        statement = statement.where(AuditLog.resource_id == resource_id.strip())
-    if school_id is not None:
-        statement = statement.where(AuditLog.school_id == school_id)
-    if class_id is not None:
-        statement = statement.where(AuditLog.class_id == class_id)
-    if event_result is not None:
-        statement = statement.where(AuditLog.event_result == event_result.strip())
-    if failure_reason is not None:
-        statement = statement.where(AuditLog.failure_reason == failure_reason.strip())
-    if request_id is not None:
-        statement = statement.where(AuditLog.request_id == request_id.strip())
-    if from_at is not None:
-        statement = statement.where(AuditLog.created_at >= from_at)
-    if to_at is not None:
-        statement = statement.where(AuditLog.created_at <= to_at)
+    statement = _audit_log_statement(
+        actor_user_id=actor_user_id,
+        action=action,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        school_id=school_id,
+        class_id=class_id,
+        event_result=event_result,
+        failure_reason=failure_reason,
+        request_id=request_id,
+        from_at=from_at,
+        to_at=to_at,
+    )
     total = _statement_count(db, statement)
     items = list(db.scalars(statement.offset(offset).limit(limit)).all())
     return AuditLogPage(items=items, total=total, limit=limit, offset=offset, next_offset=_next_offset(total, offset, len(items)))
+
+
+@router.get("/audit-logs/export", response_model=AuditLogExport)
+def export_audit_logs(
+    actor_user_id: int | None = Query(default=None),
+    action: str | None = Query(default=None),
+    resource_type: str | None = Query(default=None),
+    resource_id: str | None = Query(default=None),
+    school_id: int | None = Query(default=None),
+    class_id: int | None = Query(default=None),
+    event_result: str | None = Query(default=None),
+    failure_reason: str | None = Query(default=None),
+    request_id: str | None = Query(default=None),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    include_snapshot: bool = Query(default=False),
+    limit: int = Query(default=1000, ge=1, le=5000),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AuditLogExport:
+    _require_admin(current_user)
+    statement = _audit_log_statement(
+        actor_user_id=actor_user_id,
+        action=action,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        school_id=school_id,
+        class_id=class_id,
+        event_result=event_result,
+        failure_reason=failure_reason,
+        request_id=request_id,
+        from_at=from_at,
+        to_at=to_at,
+    )
+    total = _statement_count(db, statement)
+    logs = list(db.scalars(statement.limit(limit)).all())
+    return AuditLogExport(
+        items=[_audit_log_export_item(log, include_snapshot=include_snapshot) for log in logs],
+        total=total,
+        limit=limit,
+        truncated=total > len(logs),
+        include_snapshot=include_snapshot,
+        exported_at=datetime.now(UTC),
+    )
 
 
 @router.get("/submissions/pending", response_model=AdminPendingSubmissionQueue)
@@ -1539,6 +1573,55 @@ def _count(db: Session, model, *criteria: Any) -> int:
 def _statement_count(db: Session, statement: Any) -> int:
     count_statement = select(func.count()).select_from(statement.order_by(None).subquery())
     return int(db.scalar(count_statement) or 0)
+
+
+def _audit_log_statement(
+    *,
+    actor_user_id: int | None,
+    action: str | None,
+    resource_type: str | None,
+    resource_id: str | None,
+    school_id: int | None,
+    class_id: int | None,
+    event_result: str | None,
+    failure_reason: str | None,
+    request_id: str | None,
+    from_at: datetime | None,
+    to_at: datetime | None,
+) -> Any:
+    if from_at is not None and to_at is not None and from_at > to_at:
+        raise HTTPException(status_code=422, detail="from must be earlier than to")
+    statement = select(AuditLog).order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+    if actor_user_id is not None:
+        statement = statement.where(AuditLog.actor_user_id == actor_user_id)
+    if action is not None:
+        statement = statement.where(AuditLog.action == action.strip())
+    if resource_type is not None:
+        statement = statement.where(AuditLog.resource_type == resource_type.strip())
+    if resource_id is not None:
+        statement = statement.where(AuditLog.resource_id == resource_id.strip())
+    if school_id is not None:
+        statement = statement.where(AuditLog.school_id == school_id)
+    if class_id is not None:
+        statement = statement.where(AuditLog.class_id == class_id)
+    if event_result is not None:
+        statement = statement.where(AuditLog.event_result == event_result.strip())
+    if failure_reason is not None:
+        statement = statement.where(AuditLog.failure_reason == failure_reason.strip())
+    if request_id is not None:
+        statement = statement.where(AuditLog.request_id == request_id.strip())
+    if from_at is not None:
+        statement = statement.where(AuditLog.created_at >= from_at)
+    if to_at is not None:
+        statement = statement.where(AuditLog.created_at <= to_at)
+    return statement
+
+
+def _audit_log_export_item(log: AuditLog, *, include_snapshot: bool) -> AuditLogExportItem:
+    data = AuditLogRead.model_validate(log).model_dump()
+    if not include_snapshot:
+        data["snapshot_json"] = None
+    return AuditLogExportItem(**data)
 
 
 def _next_offset(total: int, offset: int, item_count: int) -> int | None:

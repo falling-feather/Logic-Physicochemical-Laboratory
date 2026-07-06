@@ -280,6 +280,8 @@ def test_admin_views_user_management_stats_and_bug_records(client):
 
     audit_forbidden = client.get("/api/admin/audit-logs", headers=_auth_header(student_token))
     assert audit_forbidden.status_code == 403
+    audit_export_forbidden = client.get("/api/admin/audit-logs/export", headers=_auth_header(student_token))
+    assert audit_export_forbidden.status_code == 403
 
     audit_logs = client.get("/api/admin/audit-logs?limit=10", headers=_auth_header(admin_token))
     assert audit_logs.status_code == 200
@@ -295,6 +297,26 @@ def test_admin_views_user_management_stats_and_bug_records(client):
         "admin.bug.create",
         "admin.bug.update",
     }
+    limited_export = client.get("/api/admin/audit-logs/export?limit=2", headers=_auth_header(admin_token))
+    assert limited_export.status_code == 200
+    assert limited_export.json()["total"] == 10
+    assert limited_export.json()["limit"] == 2
+    assert limited_export.json()["truncated"] is True
+    assert len(limited_export.json()["items"]) == 2
+    assert limited_export.json()["include_snapshot"] is False
+    assert all(item["snapshot_json"] is None for item in limited_export.json()["items"])
+    assert [item["id"] for item in limited_export.json()["items"]] == [
+        item["id"] for item in audit_logs.json()["items"][:2]
+    ]
+
+    export_limit_too_large = client.get("/api/admin/audit-logs/export?limit=5001", headers=_auth_header(admin_token))
+    assert export_limit_too_large.status_code == 422
+
+    export_invalid_window = client.get(
+        "/api/admin/audit-logs/export?from=2026-07-06T10:00:00Z&to=2026-07-05T10:00:00Z",
+        headers=_auth_header(admin_token),
+    )
+    assert export_invalid_window.status_code == 422
 
     school_audit = client.get(
         f"/api/admin/audit-logs?action=school.create&resource_id={school_id}",
@@ -310,6 +332,24 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert school_audit_item["request_path"] == "/api/schools"
     assert school_audit_item["client_ip_hash"]
 
+    school_export = client.get(
+        f"/api/admin/audit-logs/export?action=school.create&resource_id={school_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert school_export.status_code == 200
+    assert school_export.json()["total"] == 1
+    assert school_export.json()["truncated"] is False
+    assert school_export.json()["items"][0]["action"] == "school.create"
+    assert school_export.json()["items"][0]["snapshot_json"] is None
+
+    school_export_with_snapshot = client.get(
+        f"/api/admin/audit-logs/export?action=school.create&resource_id={school_id}&include_snapshot=true",
+        headers=_auth_header(admin_token),
+    )
+    assert school_export_with_snapshot.status_code == 200
+    assert school_export_with_snapshot.json()["include_snapshot"] is True
+    assert school_export_with_snapshot.json()["items"][0]["snapshot_json"]["after"]["name"] == "Admin Visible School"
+
     request_filtered_audit = client.get(
         f"/api/admin/audit-logs?request_id={school_request_id}",
         headers=_auth_header(admin_token),
@@ -317,6 +357,13 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert request_filtered_audit.status_code == 200
     assert request_filtered_audit.json()["total"] == 1
     assert request_filtered_audit.json()["items"][0]["action"] == "school.create"
+    request_filtered_export = client.get(
+        f"/api/admin/audit-logs/export?request_id={school_request_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert request_filtered_export.status_code == 200
+    assert request_filtered_export.json()["total"] == 1
+    assert request_filtered_export.json()["items"][0]["request_id"] == school_request_id
 
     disabled_login_audit = client.get(
         "/api/admin/audit-logs?action=auth.login.failed&failure_reason=user_disabled&event_result=failure",
@@ -324,6 +371,13 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     )
     assert disabled_login_audit.status_code == 200
     assert disabled_login_audit.json()["total"] == 1
+    disabled_login_export = client.get(
+        "/api/admin/audit-logs/export?action=auth.login.failed&failure_reason=user_disabled&event_result=failure",
+        headers=_auth_header(admin_token),
+    )
+    assert disabled_login_export.status_code == 200
+    assert disabled_login_export.json()["total"] == 1
+    assert disabled_login_export.json()["items"][0]["event_result"] == "failure"
 
     class_audit = client.get(
         f"/api/admin/audit-logs?action=class.create&resource_id={class_group.json()['id']}",
