@@ -181,6 +181,7 @@ node server/dev-static-server.mjs --port 8766
 > 完整的细碎微版本详见 [doc/03-发布历史.md](doc/03-发布历史.md)。当前主线在 `main` 分支维护。
 
 ### v6.5 — 2026-07-05（houduan）
+- 2026-07-06 已在 `houduan` 明确班级加入双路径口径：`/join` 保留为 legacy/direct join 兼容入口，`/join-requests` 承担教师/admin 审批流。
 - 2026-07-06 已在 `houduan` 落地 closed/archived 作业学生侧只读复盘入口：学生可继续查看题目、本人提交、成绩和反馈，但不可再次提交；教师/admin 提交列表与批改视角保持不变。
 - 2026-07-06 已在 `houduan` 落地 active 草稿数据库级抗并发：新增 `active_key` 与唯一约束，同作者同目标页只能有一个 active 草稿，撤回/发布后可重新创建。
 - 2026-07-06 已读取 `review` 分支代码审查报告并回流规划：本次只同步文档和后续任务，不合并 review 分支代码；后续开发继续在 `houduan` 上推进。

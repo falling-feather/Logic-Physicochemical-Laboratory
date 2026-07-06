@@ -1,3 +1,10 @@
+from sqlalchemy import select
+
+from app.core.config import get_settings
+from app.db.session import get_session_factory
+from app.models import ClassJoinRequest, ClassMembership, SchoolMembership
+
+
 def _auth_header(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
@@ -88,6 +95,35 @@ def test_teacher_creates_school_class_and_student_joins(client):
     )
     assert join.status_code == 201
     assert join.json()["role"] == "student"
+    student_me = client.get("/api/users/me", headers=_auth_header(student_token))
+    assert student_me.status_code == 200
+    student_id = student_me.json()["id"]
+
+    with get_session_factory(get_settings().database_url)() as db:
+        school_membership = db.scalar(
+            select(SchoolMembership).where(
+                SchoolMembership.school_id == school_id,
+                SchoolMembership.user_id == student_id,
+                SchoolMembership.role == "student",
+            )
+        )
+        assert school_membership is not None
+        class_membership = db.scalar(
+            select(ClassMembership).where(
+                ClassMembership.class_id == class_id,
+                ClassMembership.user_id == student_id,
+                ClassMembership.role == "student",
+            )
+        )
+        assert class_membership is not None
+        join_request = db.scalar(
+            select(ClassJoinRequest).where(
+                ClassJoinRequest.class_id == class_id,
+                ClassJoinRequest.user_id == student_id,
+                ClassJoinRequest.role == "student",
+            )
+        )
+        assert join_request is None
 
     student_classes = client.get(f"/api/classes?school_id={school_id}", headers=_auth_header(student_token))
     assert student_classes.status_code == 200
@@ -182,6 +218,22 @@ def test_class_join_request_requires_teacher_approval(client):
     assert approval_body["reviewed_by_user_id"] is not None
     assert approval_body["reviewed_at"] is not None
 
+    repeat_approval = client.patch(
+        f"/api/classes/{class_id}/join-requests/{join_request_body['id']}",
+        headers=_auth_header(teacher_token),
+        json={"status": "approved", "note": "Already approved"},
+    )
+    assert repeat_approval.status_code == 200
+    assert repeat_approval.json()["id"] == join_request_body["id"]
+    assert repeat_approval.json()["status"] == "approved"
+
+    reverse_rejection = client.patch(
+        f"/api/classes/{class_id}/join-requests/{join_request_body['id']}",
+        headers=_auth_header(teacher_token),
+        json={"status": "rejected", "note": "Too late"},
+    )
+    assert reverse_rejection.status_code == 409
+
     student_classes = client.get(f"/api/classes?school_id={school_id}", headers=_auth_header(student_token))
     assert student_classes.status_code == 200
     assert student_classes.json()[0]["id"] == class_id
@@ -264,6 +316,7 @@ def test_rejected_class_join_request_can_be_reopened(client):
 
 
 def test_legacy_join_approves_existing_pending_join_request(client):
+    admin_token = _bootstrap_admin(client, "admin_legacy_direct_join")
     teacher_token = _register_and_login(client, "teacher_legacy_join", "teacher")
     student_token = _register_and_login(client, "student_legacy_join", "student")
     _, class_id = _create_school_and_class(
@@ -281,6 +334,10 @@ def test_legacy_join_approves_existing_pending_join_request(client):
     assert join_request.status_code == 201
     join_request_id = join_request.json()["id"]
 
+    pending_stats = client.get("/api/admin/stats", headers=_auth_header(admin_token))
+    assert pending_stats.status_code == 200
+    assert pending_stats.json()["pending_class_join_requests"] == 1
+
     legacy_join = client.post(
         f"/api/classes/{class_id}/join",
         headers=_auth_header(student_token),
@@ -297,3 +354,20 @@ def test_legacy_join_approves_existing_pending_join_request(client):
     assert len(approved_requests.json()) == 1
     assert approved_requests.json()[0]["id"] == join_request_id
     assert approved_requests.json()[0]["status"] == "approved"
+    assert approved_requests.json()[0]["reviewed_by_user_id"] is not None
+    assert approved_requests.json()[0]["reviewed_at"] is not None
+    assert approved_requests.json()[0]["review_note"] == "approved by legacy direct join"
+
+    pending_stats_after_join = client.get("/api/admin/stats", headers=_auth_header(admin_token))
+    assert pending_stats_after_join.status_code == 200
+    assert pending_stats_after_join.json()["pending_class_join_requests"] == 0
+
+    approval_audit = client.get(
+        f"/api/admin/audit-logs?action=class.join.request.approve&resource_id={join_request_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert approval_audit.status_code == 200
+    assert approval_audit.json()["total"] == 1
+    approval_snapshot = approval_audit.json()["items"][0]["snapshot_json"]
+    assert approval_snapshot["after"]["approval_source"] == "legacy_direct_join"
+    assert approval_snapshot["after"]["membership_created"] is True

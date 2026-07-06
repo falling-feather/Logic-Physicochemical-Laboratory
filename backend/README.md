@@ -56,8 +56,8 @@ python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-revi
 | GET/POST | `/api/schools` | 当前用户可见学校 / 创建学校 |
 | GET | `/api/schools/{id}/classes` | 学校内班级 |
 | GET/POST | `/api/classes` | 当前用户可见班级 / 创建班级 |
-| POST | `/api/classes/{id}/join` | 以学生或教师角色加入班级 |
-| POST | `/api/classes/{id}/join-requests` | 创建班级加入申请；不立即生成成员关系 |
+| POST | `/api/classes/{id}/join` | legacy/direct join 兼容入口：以学生或教师角色直接生成学校/班级成员关系；若同角色已有 pending 申请，会同步转为 approved |
+| POST | `/api/classes/{id}/join-requests` | 审批流入口：创建班级加入申请；不立即生成成员关系 |
 | GET | `/api/classes/{id}/join-requests` | 班级教师或管理员查看加入申请，可按 `status` 过滤 |
 | PATCH | `/api/classes/{id}/join-requests/{request_id}` | 班级教师或管理员审批加入申请，支持 `approved` / `rejected` |
 | GET/POST | `/api/courses` | 当前用户可见课程 / 教师创建课程 |
@@ -145,6 +145,7 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 
 - `app.services.access_control` 负责学校、班级和课程范围判断，普通业务端点不再各自复制 `_require_*` helper；后续权限矩阵扩展应优先在这里收口。
 - `app.services.class_join_requests` 负责加入申请审批状态流转和成员关系补齐。
+- `POST /api/classes/{id}/join` 与 `POST /api/classes/{id}/join-requests` 长期并存：前者是保留给受控场景、导入/邀请码或旧 UI 的 direct join，后者是需要教师/admin 审批的申请流；前端不得把审批流表现为唯一加入路径。
 - `app.services.audit` 负责写入审计日志及 request_id、IP 哈希、user-agent 等请求元数据。
 - `app.services.content_catalog` 负责内容页 seed、正式内容初始化、已发布 schema 读取和内容页摘要；`/api/content/pages*` 与 `/api/render/*` 查询只读 published 当前记录，不在 GET 路径隐式写库，公开响应会剥离原始脚本引用并保留不可执行 `scriptManifest`；正式初始化会显式创建/修复内置内容页版本，默认不覆盖已有差异版本。
 - `app.services.content_script_policy` 负责内容草稿脚本静态分析与后端 sandbox 契约；当前识别脚本引用、外链脚本、事件处理器、阻断协议、路径穿越、内联 `<script>` 和不安全 sandbox 能力，并输出 `script_risk_level`、`script_analysis.sandbox` 与 findings。当前不承担浏览器 iframe/worker 运行时执行。
