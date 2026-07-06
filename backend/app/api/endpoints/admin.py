@@ -469,7 +469,22 @@ def list_admin_content_pages(
     db: Session = Depends(get_db),
 ) -> AdminContentPagePage:
     _require_admin(current_user)
-    records = db.scalars(select(ContentPageRecord).order_by(ContentPageRecord.slug)).all()
+    statement = select(ContentPageRecord).order_by(ContentPageRecord.slug)
+    if status_filter is not None:
+        statement = statement.where(ContentPageRecord.status == status_filter.strip().lower())
+    if q is not None and q.strip():
+        pattern = _contains_pattern(q)
+        searchable_fields = [
+            ContentPageRecord.slug,
+            _content_page_schema_text("title"),
+            _content_page_schema_text("galaxy"),
+            _content_page_schema_text("subject"),
+            _content_page_schema_text("layout"),
+        ]
+        statement = statement.where(or_(*(field.ilike(pattern, escape="~") for field in searchable_fields)))
+
+    total = _statement_count(db, statement)
+    records = list(db.scalars(statement.offset(offset).limit(limit)).all())
     items = [
         AdminContentPageRead(
             id=record.id,
@@ -488,28 +503,12 @@ def list_admin_content_pages(
         )
         for record in records
     ]
-    if status_filter is not None:
-        normalized_status = status_filter.strip().lower()
-        items = [item for item in items if item.status == normalized_status]
-    if q is not None and q.strip():
-        normalized_query = q.strip().lower()
-        items = [
-            item
-            for item in items
-            if normalized_query in item.slug.lower()
-            or normalized_query in item.title.lower()
-            or normalized_query in item.galaxy.lower()
-            or normalized_query in item.subject.lower()
-            or normalized_query in item.layout.lower()
-        ]
-    total = len(items)
-    page_items = items[offset : offset + limit]
     return AdminContentPagePage(
-        items=page_items,
+        items=items,
         total=total,
         limit=limit,
         offset=offset,
-        next_offset=_next_offset(total, offset, len(page_items)),
+        next_offset=_next_offset(total, offset, len(items)),
     )
 
 
@@ -1536,6 +1535,15 @@ def _strip_optional(value: str | None) -> str | None:
 
 def _strip_required(value: str) -> str:
     return value.strip()
+
+
+def _contains_pattern(value: str) -> str:
+    escaped = value.strip().replace("~", "~~").replace("%", "~%").replace("_", "~_")
+    return f"%{escaped}%"
+
+
+def _content_page_schema_text(field: str) -> Any:
+    return func.coalesce(ContentPageRecord.schema_json[field].as_string(), "")
 
 
 def _user_snapshot(user: User) -> dict[str, str]:

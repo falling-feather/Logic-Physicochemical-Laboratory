@@ -1,3 +1,8 @@
+from app.core.config import get_settings
+from app.db.session import get_session_factory
+from app.models import ContentPageRecord
+
+
 def _auth_header(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
@@ -266,6 +271,82 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert student_forbidden.status_code == 403
 
 
+def test_admin_content_pages_filter_count_and_paginate_in_database(client):
+    admin_token = _bootstrap_admin(client)
+    _insert_content_page("physics/db-page-alpha", "DBPage Alpha", status="published")
+    _insert_content_page("physics/db-page-beta", "DBPage Beta", status="published")
+    _insert_content_page("physics/db-page-draft", "DBPage Draft", status="draft")
+    _insert_content_page("physics/db-page-percent", "100% Energy", status="published")
+    _insert_content_page("physics/db-page-percent-decoy", "100X Energy", status="published")
+    _insert_content_page("physics/db-page_under", "Underscore Search", status="published")
+    _insert_content_page("physics/db-page-galaxy", "Galaxy Field", status="published", galaxy="db-galaxy-token")
+    _insert_content_page("physics/db-page-subject", "Subject Field", status="published", subject="db-subject-token")
+    _insert_content_page("physics/db-page-layout", "Layout Field", status="published", layout="db-layout-token")
+
+    first_page = client.get(
+        "/api/admin/content/pages?q=DBPage&limit=2",
+        headers=_auth_header(admin_token),
+    )
+    assert first_page.status_code == 200
+    first_body = first_page.json()
+    assert first_body["total"] == 3
+    assert first_body["next_offset"] == 2
+    assert [item["slug"] for item in first_body["items"]] == [
+        "physics/db-page-alpha",
+        "physics/db-page-beta",
+    ]
+
+    second_page = client.get(
+        "/api/admin/content/pages?q=DBPage&limit=2&offset=2",
+        headers=_auth_header(admin_token),
+    )
+    assert second_page.status_code == 200
+    second_body = second_page.json()
+    assert second_body["total"] == 3
+    assert second_body["next_offset"] is None
+    assert [item["slug"] for item in second_body["items"]] == ["physics/db-page-draft"]
+
+    draft_only = client.get(
+        "/api/admin/content/pages?q=DBPage&status=draft",
+        headers=_auth_header(admin_token),
+    )
+    assert draft_only.status_code == 200
+    assert draft_only.json()["total"] == 1
+    assert draft_only.json()["items"][0]["slug"] == "physics/db-page-draft"
+
+    literal_percent = client.get(
+        "/api/admin/content/pages",
+        params={"q": "100%"},
+        headers=_auth_header(admin_token),
+    )
+    assert literal_percent.status_code == 200
+    assert literal_percent.json()["total"] == 1
+    assert literal_percent.json()["items"][0]["slug"] == "physics/db-page-percent"
+
+    literal_underscore = client.get(
+        "/api/admin/content/pages",
+        params={"q": "_"},
+        headers=_auth_header(admin_token),
+    )
+    assert literal_underscore.status_code == 200
+    assert literal_underscore.json()["total"] == 1
+    assert literal_underscore.json()["items"][0]["slug"] == "physics/db-page_under"
+
+    for query, slug in [
+        ("db-galaxy-token", "physics/db-page-galaxy"),
+        ("db-subject-token", "physics/db-page-subject"),
+        ("db-layout-token", "physics/db-page-layout"),
+    ]:
+        field_search = client.get(
+            "/api/admin/content/pages",
+            params={"q": query},
+            headers=_auth_header(admin_token),
+        )
+        assert field_search.status_code == 200
+        assert field_search.json()["total"] == 1
+        assert field_search.json()["items"][0]["slug"] == slug
+
+
 def test_admin_class_join_request_queue_and_review(client):
     admin_token = _bootstrap_admin(client)
     teacher_token = _register_and_login(client, "teacher_join_queue", "teacher")
@@ -388,3 +469,36 @@ def test_admin_class_join_request_queue_and_review(client):
     assert join_audit.status_code == 200
     assert join_audit.json()["total"] == 1
     assert join_audit.json()["items"][0]["snapshot_json"]["after"]["source_join_request_id"] == first_request_id
+
+
+def _insert_content_page(
+    slug: str,
+    title: str,
+    *,
+    status: str,
+    galaxy: str = "englab",
+    subject: str = "physics",
+    layout: str = "experiment-page",
+) -> None:
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        db.add(
+            ContentPageRecord(
+                slug=slug,
+                status=status,
+                version="test",
+                schema_json={
+                    "slug": slug,
+                    "galaxy": galaxy,
+                    "subject": subject,
+                    "title": title,
+                    "layout": layout,
+                    "status": status,
+                    "version": "test",
+                    "sections": [],
+                    "sources": [],
+                },
+                schema_hash=None,
+            )
+        )
+        db.commit()
