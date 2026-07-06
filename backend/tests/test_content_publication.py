@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -196,6 +198,49 @@ def test_admin_publishes_draft_to_public_page_and_version_history(client):
     assert "schema_json" not in audit_item["snapshot_json"]["version"]
     assert _table_count(ContentPageRecord) >= 2
     assert _table_count(ContentPageVersion) == 1
+
+
+def test_content_publication_round_trips_unicode_slug(client):
+    admin_token = _bootstrap_admin(client, username="admin_unicode_slug")
+    _, teacher_token = _register_and_login(client, "teacher_unicode_slug", "teacher")
+    slug = "物理/量子摆渡测试"
+    encoded_slug = quote(slug, safe="/")
+
+    publication = _create_submit_publish(client, admin_token, teacher_token, slug, "量子摆渡测试")
+
+    assert publication["slug"] == slug
+    assert publication["title"] == "量子摆渡测试"
+    assert publication["version"] == "v1"
+
+    render = client.get(f"/api/render/page/{encoded_slug}")
+    assert render.status_code == 200
+    assert render.json()["slug"] == slug
+    assert render.json()["title"] == "量子摆渡测试"
+
+    public_page = client.get(f"/api/content/pages/{encoded_slug}")
+    assert public_page.status_code == 200
+    assert public_page.json()["slug"] == slug
+    assert public_page.json()["version"] == "v1"
+
+    pages = client.get(
+        "/api/admin/content/pages",
+        params={"q": "量子摆渡"},
+        headers=_auth_header(admin_token),
+    )
+    assert pages.status_code == 200
+    assert pages.json()["total"] == 1
+    assert pages.json()["items"][0]["slug"] == slug
+    assert pages.json()["items"][0]["schema_hash"] == publication["schema_hash"]
+
+    versions = client.get(
+        "/api/admin/content/page-versions",
+        params={"slug": slug},
+        headers=_auth_header(admin_token),
+    )
+    assert versions.status_code == 200
+    assert versions.json()["total"] == 1
+    assert versions.json()["items"][0]["slug"] == slug
+    assert versions.json()["items"][0]["schema_hash"] == publication["schema_hash"]
 
 
 def test_stale_parallel_draft_cannot_overwrite_newer_published_version(client):

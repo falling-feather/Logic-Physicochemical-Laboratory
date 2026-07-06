@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与 semantic 富语义摘要、登录、密码策略、登录失败锁定、用户名大小写规范化、必填文本修剪后校验、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、跨班级提交唯一性、学生资源状态可见性、学生侧作业历史/复盘只读入口、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、待批改队列、审计元数据和认证事件审计等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与 semantic 富语义摘要、登录、密码策略、登录失败锁定、用户名大小写规范化、必填文本修剪后校验、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、跨班级提交唯一性、学生资源状态可见性、学生侧作业历史/复盘只读入口、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、中文路径/中文 slug 回归、待批改队列、审计元数据和认证事件审计等能力。
 
 ## 本地启动
 
@@ -29,6 +29,8 @@ python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-revi
 ```
 
 脚本默认先运行部署预检，再创建或修复 `content_pages` 与 `content_page_versions`。若已有同 slug 当前版本与内置 schema 不同，默认报告冲突；确认要追加新版本时再使用 `--upgrade-existing`。存在活跃草稿时升级会被阻断，只有明确接受草稿过期风险时才使用 `--allow-stale-drafts`。`--skip-preflight` 仅用于受控测试或恢复场景。
+
+当前回归已覆盖中文目录和中文 SQLite 文件名下的 Alembic 迁移、正式初始化 CLI、JSON 报告和内容页 current version 写入；内容发布链路也覆盖中文 slug 经百分号编码后的公开读取、后台搜索与版本过滤。
 
 本地账号与学校班级 API：
 
@@ -177,7 +179,7 @@ $env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
 python -m alembic upgrade head
 ```
 
-当前 Alembic head：`20260706_0020`（作业提交唯一性按班级 scope 收口）。
+当前 Alembic head：`20260706_0021`（内容发布/回滚冲突与 `source_draft_id` 唯一约束收口）。
 
 知识快照周期重算：
 
@@ -218,3 +220,5 @@ python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-revi
 ```
 
 脚本输出 JSON 报告；非 dry-run 写入前必须确认内置脚本引用已审核。若不传 `--publisher-user-id`，脚本会选择第一个 active admin 作为发布归因；生产环境建议显式传入。
+
+相关回归入口：`python -m pytest backend/tests/test_content_initialization.py backend/tests/test_content_publication.py -q`，其中初始化用例覆盖中文数据库路径，发布用例覆盖中文 URL slug 的创建、发布、公开读取、后台查询和版本历史过滤。

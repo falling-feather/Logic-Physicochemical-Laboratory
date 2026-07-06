@@ -286,10 +286,52 @@ def test_init_content_pages_cli_outputs_json_report(monkeypatch, capsys):
         _dispose_and_remove(database_url, database_path)
 
 
-def _migrated_sqlite_database(monkeypatch, backend_root: Path) -> Path:
-    runtime_dir = backend_root / "pytest-cache-files-content-init"
+def test_init_content_pages_cli_handles_unicode_database_path(monkeypatch, capsys):
+    backend_root = Path(__file__).resolve().parents[1]
+    database_path = _migrated_sqlite_database(
+        monkeypatch,
+        backend_root,
+        runtime_dir_name="pytest-cache-files-content-init-中文路径",
+        database_name=f"内容初始化-{uuid4().hex}.db",
+    )
+    database_url = f"sqlite+pysqlite:///{database_path.as_posix()}"
+    try:
+        admin_id = _create_user(database_url, "admin")
+
+        exit_code = init_content_pages_main(
+            [
+                "--database-url",
+                database_url,
+                "--publisher-user-id",
+                str(admin_id),
+                "--allow-reviewed-scripts",
+            ]
+        )
+
+        captured = capsys.readouterr()
+        payload = json.loads(captured.out)
+        assert exit_code == 0
+        assert payload["ok"] is True
+        assert payload["content"]["publisher_user_id"] == admin_id
+        assert payload["content"]["items"][0]["slug"] == "physics/energy-conservation"
+        assert database_path.exists()
+        page, version = _content_page_and_version(database_url)
+        assert page.current_version_id == version.id
+        assert page.schema_hash == version.schema_hash
+    finally:
+        _dispose_and_remove(database_url, database_path)
+
+
+def _migrated_sqlite_database(
+    monkeypatch,
+    backend_root: Path,
+    *,
+    runtime_dir_name: str = "pytest-cache-files-content-init",
+    database_name: str | None = None,
+) -> Path:
+    runtime_dir = backend_root / runtime_dir_name
     runtime_dir.mkdir(exist_ok=True)
-    database_path = runtime_dir / f"content-init-{uuid4().hex}.db"
+    database_path = runtime_dir / (database_name or f"content-init-{uuid4().hex}.db")
     database_url = f"sqlite+pysqlite:///{database_path.as_posix()}"
     monkeypatch.setenv("ASTRA_DATABASE_URL", database_url)
     monkeypatch.setenv("ASTRA_AUTO_CREATE_TABLES", "false")
