@@ -30,12 +30,21 @@ class ContentPageRecord(TimestampMixin, Base):
 
 class ContentDraft(TimestampMixin, Base):
     __tablename__ = "content_drafts"
+    __table_args__ = (
+        UniqueConstraint(
+            "author_user_id",
+            "target_slug",
+            "active_key",
+            name="uq_content_drafts_active_author_target",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     author_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
     target_slug: Mapped[str] = mapped_column(String(180), index=True, nullable=False)
     title: Mapped[str] = mapped_column(String(240), nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True, nullable=False)
+    active_key: Mapped[str | None] = mapped_column(String(16), index=True, nullable=True)
     schema_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     schema_hash: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
     base_version_id: Mapped[int | None] = mapped_column(

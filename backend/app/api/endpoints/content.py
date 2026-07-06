@@ -4,6 +4,7 @@ import json
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
@@ -43,6 +44,7 @@ CONTENT_DRAFT_ACTIVE_STATUSES = {
     CONTENT_DRAFT_STATUS_SUBMITTED,
     CONTENT_DRAFT_STATUS_CHANGES_REQUESTED,
 }
+CONTENT_DRAFT_ACTIVE_KEY = "active"
 CONTENT_PAGE_STATUS_PUBLISHED = "published"
 SCRIPT_REVIEW_NOT_REQUIRED = "not_required"
 SCRIPT_REVIEW_PENDING = "pending"
@@ -86,6 +88,7 @@ def create_content_draft(
         target_slug=target_slug,
         title=page_schema.title.strip(),
         status=CONTENT_DRAFT_STATUS_DRAFT,
+        active_key=CONTENT_DRAFT_ACTIVE_KEY,
         schema_json=draft_payload,
         schema_hash=draft_schema_hash,
         base_version_id=base_version.id if base_version is not None else None,
@@ -96,7 +99,11 @@ def create_content_draft(
         script_review_status=SCRIPT_REVIEW_PENDING if script_policy.requires_review else SCRIPT_REVIEW_NOT_REQUIRED,
     )
     db.add(draft)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Active content draft already exists for this target") from exc
     record_audit_log(
         db,
         actor=current_user,
@@ -228,6 +235,7 @@ def withdraw_content_draft(
 
     before = _content_draft_snapshot(draft)
     draft.status = CONTENT_DRAFT_STATUS_WITHDRAWN
+    draft.active_key = None
     draft.withdrawn_at = utc_now()
     after = _content_draft_snapshot(draft)
     record_audit_log(
@@ -341,6 +349,7 @@ def publish_content_draft(
     page.published_at = version_record.published_at
     draft_before = _content_draft_snapshot(draft)
     draft.status = CONTENT_DRAFT_STATUS_PUBLISHED
+    draft.active_key = None
     draft.published_page_id = page.id
     draft.published_version_id = version_record.id
     draft.published_by_user_id = current_user.id
@@ -582,6 +591,7 @@ def _content_draft_snapshot(draft: ContentDraft) -> dict:
         "target_slug": draft.target_slug,
         "title": draft.title,
         "status": draft.status,
+        "active_key": draft.active_key,
         "allow_script": draft.allow_script,
         "schema_hash": draft.schema_hash,
         "base_version_id": draft.base_version_id,

@@ -365,6 +365,7 @@ def _create_active_draft(database_url: str, teacher_id: int) -> int:
             target_slug=schema.slug,
             title=schema.title,
             status="draft",
+            active_key="active",
             schema_json=payload,
             schema_hash=_schema_hash(payload),
             allow_script=False,

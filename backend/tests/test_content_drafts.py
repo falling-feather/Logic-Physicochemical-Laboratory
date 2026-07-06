@@ -1,8 +1,10 @@
+import pytest
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import ContentPageRecord
+from app.models import ContentDraft, ContentPageRecord
 
 
 def _auth_header(token: str) -> dict:
@@ -285,6 +287,74 @@ def test_content_draft_submit_request_changes_resubmit_and_withdraw(client):
     assert audit_item["snapshot_json"]["note"] == "Add clearer evidence prompts"
     assert "schema" not in audit_item["snapshot_json"]["before"]
     assert "schema" not in audit_item["snapshot_json"]["after"]
+
+
+def test_active_content_draft_uniqueness_is_enforced_by_database(client):
+    _, teacher_token = _register_and_login(client, "teacher_active_key", "teacher")
+    _, other_teacher_token = _register_and_login(client, "teacher_active_key_other", "teacher")
+    slug = "physics/active-key-draft"
+
+    create = client.post(
+        "/api/content/drafts",
+        headers=_auth_header(teacher_token),
+        json=_draft_payload(slug),
+    )
+    assert create.status_code == 201
+    draft = create.json()
+    draft_id = draft["id"]
+
+    other_author_create = client.post(
+        "/api/content/drafts",
+        headers=_auth_header(other_teacher_token),
+        json=_draft_payload(slug),
+    )
+    assert other_author_create.status_code == 201
+    assert other_author_create.json()["author_user_id"] != draft["author_user_id"]
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        stored = db.get(ContentDraft, draft_id)
+        assert stored is not None
+        assert stored.active_key == "active"
+
+        db.add(
+            ContentDraft(
+                author_user_id=draft["author_user_id"],
+                target_slug=slug,
+                title="Concurrent duplicate draft",
+                status="draft",
+                active_key="active",
+                schema_json=_draft_payload(slug)["schema"],
+                schema_hash=draft["schema_hash"],
+                allow_script=False,
+                script_risk_level="none",
+                script_review_status="not_required",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+
+    withdraw = client.post(
+        f"/api/content/drafts/{draft_id}/withdraw",
+        headers=_auth_header(teacher_token),
+        json={"note": "Close before creating a replacement"},
+    )
+    assert withdraw.status_code == 200
+    assert withdraw.json()["status"] == "withdrawn"
+
+    with session_factory() as db:
+        stored = db.get(ContentDraft, draft_id)
+        assert stored is not None
+        assert stored.active_key is None
+
+    replacement = client.post(
+        "/api/content/drafts",
+        headers=_auth_header(teacher_token),
+        json=_draft_payload(slug),
+    )
+    assert replacement.status_code == 201
+    assert replacement.json()["status"] == "draft"
 
 
 def test_content_draft_update_resets_script_review_and_records_audit(client):
