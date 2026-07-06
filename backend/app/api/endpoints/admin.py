@@ -724,6 +724,7 @@ def list_audit_logs(
 
 @router.get("/audit-logs/export", response_model=AuditLogExport)
 def export_audit_logs(
+    request: Request,
     actor_user_id: int | None = Query(default=None),
     action: str | None = Query(default=None),
     resource_type: str | None = Query(default=None),
@@ -756,13 +757,44 @@ def export_audit_logs(
     )
     total = _statement_count(db, statement)
     logs = list(db.scalars(statement.limit(limit)).all())
+    items = [_audit_log_export_item(log, include_snapshot=include_snapshot) for log in logs]
+    truncated = total > len(logs)
+    exported_at = datetime.now(UTC)
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.audit.export",
+        resource_type="audit_log",
+        event_result="success",
+        request=request,
+        snapshot=_audit_log_export_snapshot(
+            actor_user_id=actor_user_id,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            school_id=school_id,
+            class_id=class_id,
+            event_result=event_result,
+            failure_reason=failure_reason,
+            request_id=request_id,
+            from_at=from_at,
+            to_at=to_at,
+            include_snapshot=include_snapshot,
+            limit=limit,
+            total=total,
+            exported_count=len(logs),
+            truncated=truncated,
+            exported_at=exported_at,
+        ),
+    )
+    db.commit()
     return AuditLogExport(
-        items=[_audit_log_export_item(log, include_snapshot=include_snapshot) for log in logs],
+        items=items,
         total=total,
         limit=limit,
-        truncated=total > len(logs),
+        truncated=truncated,
         include_snapshot=include_snapshot,
-        exported_at=datetime.now(UTC),
+        exported_at=exported_at,
     )
 
 
@@ -1622,6 +1654,55 @@ def _audit_log_export_item(log: AuditLog, *, include_snapshot: bool) -> AuditLog
     if not include_snapshot:
         data["snapshot_json"] = None
     return AuditLogExportItem(**data)
+
+
+def _audit_log_export_snapshot(
+    *,
+    actor_user_id: int | None,
+    action: str | None,
+    resource_type: str | None,
+    resource_id: str | None,
+    school_id: int | None,
+    class_id: int | None,
+    event_result: str | None,
+    failure_reason: str | None,
+    request_id: str | None,
+    from_at: datetime | None,
+    to_at: datetime | None,
+    include_snapshot: bool,
+    limit: int,
+    total: int,
+    exported_count: int,
+    truncated: bool,
+    exported_at: datetime,
+) -> dict[str, Any]:
+    filters: dict[str, Any] = {}
+    for key, value in {
+        "actor_user_id": actor_user_id,
+        "action": action,
+        "resource_type": resource_type,
+        "resource_id": resource_id,
+        "school_id": school_id,
+        "class_id": class_id,
+        "event_result": event_result,
+        "failure_reason": failure_reason,
+        "request_id": request_id,
+    }.items():
+        if value is not None:
+            filters[key] = value.strip() if isinstance(value, str) else value
+    if from_at is not None:
+        filters["from"] = from_at.isoformat()
+    if to_at is not None:
+        filters["to"] = to_at.isoformat()
+    return {
+        "filters": filters,
+        "include_snapshot": include_snapshot,
+        "limit": limit,
+        "total": total,
+        "exported_count": exported_count,
+        "truncated": truncated,
+        "exported_at": exported_at.isoformat(),
+    }
 
 
 def _next_offset(total: int, offset: int, item_count: int) -> int | None:

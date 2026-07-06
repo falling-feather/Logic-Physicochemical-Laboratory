@@ -8,9 +8,9 @@
 
 星序总览页负责承载一级星系入口；进入某个星系后，才显示该星系自己的二级学科或知识目录。内置 C++ httplib 后端服务器，支持静态文件托管。
 
-> **当前状态**: v6.5（2026-07-03 起）— `houduan` 分支已接入 Python 后端骨架、健康检查、部署预检、部署 smoke 门禁、API no-store 缓存边界、工科试验室内容协议持久化样例、内容 seed 启动初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、草稿提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与富语义摘要、本地账号认证安全基线、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校/班级最小闭环与加入申请审批、课程/作业/学习事件/提交批改/作业只读复盘/跨班级提交唯一性/学生资源状态可见性/积分统计、知识状态/班级规则统计、个人/班级知识快照、知识快照周期重算脚本、运行记录与进程内调度器、管理端 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、待批改队列、审计元数据与认证事件审计、审计日志 JSON 导出、学校/班级/课程访问控制服务层、跨范围权限矩阵测试，以及前端 opt-in schema 渲染试点
+> **当前状态**: v6.5（2026-07-03 起）— `houduan` 分支已接入 Python 后端骨架、健康检查、部署预检、部署 smoke 门禁、API no-store 缓存边界、工科试验室内容协议持久化样例、内容 seed 启动初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、草稿提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与富语义摘要、本地账号认证安全基线、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校/班级最小闭环与加入申请审批、课程/作业/学习事件/提交批改/作业只读复盘/跨班级提交唯一性/学生资源状态可见性/积分统计、知识状态/班级规则统计、个人/班级知识快照、知识快照周期重算脚本、运行记录与进程内调度器、管理端 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、待批改队列、审计元数据与认证事件审计、审计日志 JSON 导出与导出审计留痕、学校/班级/课程访问控制服务层、跨范围权限矩阵测试，以及前端 opt-in schema 渲染试点
 > **Review 回流状态**: 2026-07-06，`review` 分支已交付代码审查报告（审查基线 `V6.5.23 Review 前基线快照`，范围 `re1` 至 `re17`）。本 `houduan` 分支未合并 review 代码修复；后续仅按 `02` / `07` 中记录的优先级在 `houduan` 上选择性吸收。
-> **最新回归**: 2026-07-06，`houduan` 已补齐 BE-12 审计日志 JSON 导出：`GET /api/admin/audit-logs/export` 复用审计筛选与排序，默认不输出 `snapshot_json`，可显式 `include_snapshot=true`，并通过 `limit/truncated` 标记导出截断；R-21 用户名数据库级规范化约束已在上一轮收口。
+> **最新回归**: 2026-07-06，`houduan` 已补齐 BE-12 审计日志导出留痕：`GET /api/admin/audit-logs/export` 会在导出后写入 `admin.audit.export`，记录筛选条件、total、exported_count、limit、truncated 和 include_snapshot，但不记录导出条目内容；R-21 用户名数据库级规范化约束已在上一轮收口。
 > **下一阶段规划**: Python + MySQL 后端化、内容协议、登录用户体系与管理员 / 教师 / 学生三端平台设计，详见 [`doc/07-后端优化与设计.md`](doc/07-后端优化与设计.md)
 > **当前分支**: `houduan` — 后端化设计与重构开发分支；`main` 保持主线维护
 > **v6.4 主线**：未来星系产品内容保留，比赛提交/评审/截图临时层清理 + `20260630mainV64` 资产版本同步
@@ -175,13 +175,14 @@ node server/dev-static-server.mjs --port 8766
 - **Canvas 2D API** — 可视化渲染（ResizeObserver + DPR 适配）
 - **cpp-httplib 0.18.3** — C++ HTTP 服务器
 - **CMake 3.14+** — C++ 构建系统
-- **Python 3 / FastAPI / SQLAlchemy** — v6.5 业务后端骨架、API、MySQL 连接、部署预检、部署 smoke、API no-store 缓存边界、内容协议、内容 seed 初始化与只读查询边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、active 草稿数据库唯一约束、内容发布/版本记录/追加式回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、管理端版本 JSON path diff 与富语义摘要、本地认证安全基线、用户名大小写规范化与 normalized key 数据库唯一约束、必填文本修剪后校验、学校/班级加入申请审批、学校/班级/课程访问控制服务层、作业提交/批改/学生侧只读复盘、跨班级提交唯一性、学生资源状态可见性、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端学校/班级统计、加入申请治理、列表分页搜索、内容页数据库侧分页、待批改队列、审计元数据和审计日志 JSON 导出
+- **Python 3 / FastAPI / SQLAlchemy** — v6.5 业务后端骨架、API、MySQL 连接、部署预检、部署 smoke、API no-store 缓存边界、内容协议、内容 seed 初始化与只读查询边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、active 草稿数据库唯一约束、内容发布/版本记录/追加式回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、管理端版本 JSON path diff 与富语义摘要、本地认证安全基线、用户名大小写规范化与 normalized key 数据库唯一约束、必填文本修剪后校验、学校/班级加入申请审批、学校/班级/课程访问控制服务层、作业提交/批改/学生侧只读复盘、跨班级提交唯一性、学生资源状态可见性、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端学校/班级统计、加入申请治理、列表分页搜索、内容页数据库侧分页、待批改队列、审计元数据、审计日志 JSON 导出和导出行为审计留痕
 
 ## 📝 更新日志
 
 > 完整的细碎微版本详见 [doc/03-发布历史.md](doc/03-发布历史.md)。当前主线在 `main` 分支维护。
 
 ### v6.5 — 2026-07-05（houduan）
+- 2026-07-06 已在 `houduan` 落地 BE-12 审计日志导出留痕：成功调用 `/api/admin/audit-logs/export` 后写入 `admin.audit.export`，只记录筛选条件和导出摘要，不记录导出结果明细。
 - 2026-07-06 已在 `houduan` 落地 BE-12 审计日志 JSON 导出：`GET /api/admin/audit-logs/export` 复用列表筛选、排序与管理员权限，默认剥离 `snapshot_json`，通过 `include_snapshot=true` 显式包含快照，并用 `limit/truncated` 标记导出截断。
 - 2026-07-06 已在 `houduan` 落地 R-21 用户名数据库级规范化约束：`users.normalized_username` 与 `login_attempts.normalized_username` 由 Alembic `20260706_0022` 回填并建立唯一约束，注册/admin bootstrap 并发唯一冲突返回 `409`，迁移测试覆盖历史重复用户阻断与重复登录失败桶清理。
 - 2026-07-06 已在 `houduan` 落地 REV-04 第七批后端修复：正式内容初始化迁移测试显式覆盖中文目录和中文 SQLite 文件名，内容发布测试覆盖中文 slug 经百分号编码后的公开读取、后台搜索与版本过滤；REV-04 后端候选修复已转入生产 MySQL/部署联调风险跟进。

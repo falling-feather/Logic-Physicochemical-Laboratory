@@ -297,7 +297,8 @@ def test_admin_views_user_management_stats_and_bug_records(client):
         "admin.bug.create",
         "admin.bug.update",
     }
-    limited_export = client.get("/api/admin/audit-logs/export?limit=2", headers=_auth_header(admin_token))
+    export_request_headers = {**_auth_header(admin_token), "X-Request-ID": "audit-export-request"}
+    limited_export = client.get("/api/admin/audit-logs/export?limit=2", headers=export_request_headers)
     assert limited_export.status_code == 200
     assert limited_export.json()["total"] == 10
     assert limited_export.json()["limit"] == 2
@@ -308,6 +309,25 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert [item["id"] for item in limited_export.json()["items"]] == [
         item["id"] for item in audit_logs.json()["items"][:2]
     ]
+    first_export_audit = client.get(
+        "/api/admin/audit-logs?action=admin.audit.export&resource_type=audit_log&request_id=audit-export-request",
+        headers=_auth_header(admin_token),
+    )
+    assert first_export_audit.status_code == 200
+    assert first_export_audit.json()["total"] == 1
+    first_export_item = first_export_audit.json()["items"][0]
+    assert first_export_item["actor_role"] == "admin"
+    assert first_export_item["resource_type"] == "audit_log"
+    assert first_export_item["resource_id"] is None
+    assert first_export_item["request_id"] == "audit-export-request"
+    first_export_snapshot = first_export_item["snapshot_json"]
+    assert first_export_snapshot["filters"] == {}
+    assert first_export_snapshot["include_snapshot"] is False
+    assert first_export_snapshot["limit"] == limited_export.json()["limit"]
+    assert first_export_snapshot["total"] == limited_export.json()["total"]
+    assert first_export_snapshot["exported_count"] == len(limited_export.json()["items"])
+    assert first_export_snapshot["truncated"] == limited_export.json()["truncated"]
+    assert "items" not in first_export_snapshot
 
     export_limit_too_large = client.get("/api/admin/audit-logs/export?limit=5001", headers=_auth_header(admin_token))
     assert export_limit_too_large.status_code == 422
@@ -378,6 +398,30 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert disabled_login_export.status_code == 200
     assert disabled_login_export.json()["total"] == 1
     assert disabled_login_export.json()["items"][0]["event_result"] == "failure"
+
+    export_audit = client.get(
+        "/api/admin/audit-logs?action=admin.audit.export&limit=10",
+        headers=_auth_header(admin_token),
+    )
+    assert export_audit.status_code == 200
+    assert export_audit.json()["total"] == 5
+    latest_export = export_audit.json()["items"][0]
+    assert latest_export["resource_type"] == "audit_log"
+    assert latest_export["event_result"] == "success"
+    assert latest_export["request_method"] == "GET"
+    assert latest_export["request_path"] == "/api/admin/audit-logs/export"
+    export_snapshot = latest_export["snapshot_json"]
+    assert export_snapshot["filters"] == {
+        "action": "auth.login.failed",
+        "event_result": "failure",
+        "failure_reason": "user_disabled",
+    }
+    assert export_snapshot["include_snapshot"] is False
+    assert export_snapshot["limit"] == 1000
+    assert export_snapshot["total"] == 1
+    assert export_snapshot["exported_count"] == 1
+    assert export_snapshot["truncated"] is False
+    assert "items" not in export_snapshot
 
     class_audit = client.get(
         f"/api/admin/audit-logs?action=class.create&resource_id={class_group.json()['id']}",
