@@ -1,0 +1,19 @@
+import pytest
+from fastapi.testclient import TestClient
+
+from app.core.config import get_settings
+from app.db.session import reset_database_state
+from app.main import create_app
+
+
+@pytest.fixture()
+def client(monkeypatch):
+    monkeypatch.setenv("ASTRA_DATABASE_URL", "sqlite+pysqlite:///:memory:")
+    monkeypatch.setenv("ASTRA_AUTO_CREATE_TABLES", "true")
+    get_settings.cache_clear()
+    reset_database_state()
+    with TestClient(create_app()) as test_client:
+        yield test_client
+    get_settings.cache_clear()
+    reset_database_state()
+

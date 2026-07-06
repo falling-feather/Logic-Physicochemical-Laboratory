@@ -34,6 +34,7 @@
     <link rel="stylesheet" href="shared/css/page-layout.css?v=20260606v62e">
     <link rel="stylesheet" href="shared/css/cards.css?v=20260630mainV64">
     <link rel="stylesheet" href="shared/css/module-selector.css?v=20260630mainV64">
+    <link rel="stylesheet" href="shared/css/backend-content.css?v=20260703v65BackendSchemaP4">
     <link rel="stylesheet" href="shared/css/experiment-guide.css?v=20260630mainV64">
     <link rel="stylesheet" href="shared/css/experiment-export.css?v=20260424v44a">
     <link rel="stylesheet" href="shared/css/experiment-quiz.css?v=20260422z">
@@ -43,8 +44,8 @@
     <link rel="stylesheet" href="shared/css/back-to-top.css?v=20260424oo">
     <link rel="stylesheet" href="shared/css/fab-trigger.css?v=20260630mainV64">
     <!-- CSS: Pages -->
-    <link rel="stylesheet" href="pages/home/home.css?v=20260630mainV64">
-    <link rel="stylesheet" href="pages/planets/planets.css?v=20260630mainV64">
+    <link rel="stylesheet" href="pages/home/home.css?v=20260704qianduanV70">
+    <link rel="stylesheet" href="pages/planets/planets.css?v=20260704qianduanV72">
     <link rel="stylesheet" href="pages/cosmos/cosmos.css?v=20260630mainV64">
     <link rel="stylesheet" href="pages/datascience/datascience.css?v=20260630mainV64">
     <link rel="stylesheet" href="pages/infotech/infotech.css?v=20260630mainV64">
@@ -62,7 +63,7 @@
     <link rel="stylesheet" href="shared/css/related-experiments.css?v=20260424v45c">
     <link rel="stylesheet" href="shared/css/experiment-polish.css?v=20260526v61c">
     <!-- CSS: Responsive (must be last) -->
-    <link rel="stylesheet" href="shared/css/responsive.css?v=20260630mainV64">
+    <link rel="stylesheet" href="shared/css/responsive.css?v=20260704qianduanV70">
 
     <!-- Loading Screen (inline — zero dependency, shows immediately) -->
     <style id="loading-screen-styles">
@@ -281,61 +282,111 @@
     <!-- ═══════════════ Main Content ═══════════════ -->
     <main class="main-content" id="main-content">
 
-        <!-- ────────── HOME ────────── -->
+        <!-- ────────── HOME (v7.0) ────────── -->
         <section id="page-home" class="page home-page" aria-label="首页">
+            <!-- 极光幕布 -->
+            <div class="home-aurora" aria-hidden="true"></div>
+
             <!-- Particle Network Canvas -->
             <canvas id="particle-network" class="particle-network" role="img" aria-label="粒子网络动画背景"></canvas>
-
-            <!-- HUD Frame Overlay -->
-            <div class="hud-frame">
-                <div class="hud-corner hud-corner--tl"></div>
-                <div class="hud-corner hud-corner--tr"></div>
-                <div class="hud-corner hud-corner--bl"></div>
-                <div class="hud-corner hud-corner--br"></div>
-                <div class="hud-scanline"></div>
-                <div class="hud-data hud-data--left" id="hud-data-left"></div>
-                <div class="hud-data hud-data--right" id="hud-data-right"></div>
-            </div>
 
             <div class="stars-background" id="stars-bg">
                 <div class="star-layer star-layer-far" id="star-layer-1"></div>
                 <div class="star-layer star-layer-mid" id="star-layer-2"></div>
                 <div class="star-layer star-layer-near" id="star-layer-3"></div>
             </div>
-            <div class="nebula-container">
-                <div class="nebula nebula-1"></div>
-                <div class="nebula nebula-2"></div>
-                <div class="nebula nebula-3"></div>
-            </div>
             <div class="shooting-stars" id="shooting-stars"></div>
 
-            <!-- Hex Grid Overlay -->
-            <div class="hex-grid-overlay"></div>
-
             <div class="home-container">
-                <div class="main-star" id="main-star">
-                    <div class="star-atmosphere"></div>
-                    <div class="star-body">
-                        <div class="planet-surface"></div>
-                        <div class="planet-highlight"></div>
-                        <h1 class="star-title" data-text="工科实验室">工科实验室</h1>
-                        <span class="star-subtitle">Engineering Lab</span>
-                    </div>
-                    <div class="star-eyes-container" aria-hidden="true">
-                        <div class="star-eyes">
-                            <div class="eye" id="eye-left">
-                                <div class="pupil" id="pupil-left"><div class="pupil-shine"></div></div>
-                            </div>
-                            <div class="eye" id="eye-right">
-                                <div class="pupil" id="pupil-right"><div class="pupil-shine"></div></div>
-                            </div>
-                        </div>
+                <!-- 大标题（不参与 3D 倾斜，保证可读性） -->
+                <div class="home-heading">
+                    <span class="home-heading__eyebrow">Engineering Lab · 88 Experiments</span>
+                    <h1 class="home-heading__title" id="home-title" data-text="工科实验室">工科实验室</h1>
+                    <div class="home-tagline" id="home-tagline">
+                        <p id="tagline-text">探索科学的星辰大海</p>
+                        <div class="tagline-cursor"></div>
                     </div>
                 </div>
 
-                <div class="home-tagline" id="home-tagline">
-                    <p id="tagline-text">探索科学的星辰大海</p>
-                    <div class="tagline-cursor"></div>
+                <!-- 3D 倾斜场景：星球 + 轨道 + 卫星 -->
+                <div class="home-scene" id="home-scene">
+                    <div class="main-star" id="main-star">
+                        <div class="star-halo" aria-hidden="true"></div>
+                        <div class="star-ring star-ring--a" aria-hidden="true"></div>
+                        <div class="star-ring star-ring--b" aria-hidden="true"></div>
+                        <div class="star-body">
+                            <div class="star-eyes-container" aria-hidden="true">
+                                <div class="star-eyes">
+                                    <div class="eye" id="eye-left">
+                                        <div class="pupil" id="pupil-left"><div class="pupil-shine"></div></div>
+                                    </div>
+                                    <div class="eye" id="eye-right">
+                                        <div class="pupil" id="pupil-right"><div class="pupil-shine"></div></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="orbit-path orbit-path-1"></div>
+                    <div class="orbit-path orbit-path-2"></div>
+                    <div class="orbit-path orbit-path-3"></div>
+                    <div class="orbit-path orbit-path-4"></div>
+                    <div class="orbit-path orbit-path-5"></div>
+
+                    <div class="satellites-orbit" id="satellites-orbit">
+                        <div class="satellite satellite-1" data-target="mathematics" onclick="selectModule('mathematics')">
+                            <div class="satellite-glow"></div>
+                            <div class="satellite-icon">
+                                <i data-lucide="calculator"></i>
+                            </div>
+                            <div class="satellite-label-container">
+                                <span class="satellite-label">数学</span>
+                                <span class="satellite-desc">可视化探索数学之美</span>
+                            </div>
+                        </div>
+                        <div class="satellite satellite-2" data-target="physics" onclick="selectModule('physics')">
+                            <div class="satellite-glow"></div>
+                            <div class="satellite-icon">
+                                <i data-lucide="atom"></i>
+                            </div>
+                            <div class="satellite-ring"></div>
+                            <div class="satellite-label-container">
+                                <span class="satellite-label">物理</span>
+                                <span class="satellite-desc">感受力与运动的世界</span>
+                            </div>
+                        </div>
+                        <div class="satellite satellite-3" data-target="chemistry" onclick="selectModule('chemistry')">
+                            <div class="satellite-glow"></div>
+                            <div class="satellite-icon">
+                                <i data-lucide="flask-conical"></i>
+                            </div>
+                            <div class="satellite-label-container">
+                                <span class="satellite-label">化学</span>
+                                <span class="satellite-desc">探索微观粒子的奥秘</span>
+                            </div>
+                        </div>
+                        <div class="satellite satellite-4" data-target="algorithms" onclick="selectModule('algorithms')">
+                            <div class="satellite-glow"></div>
+                            <div class="satellite-icon">
+                                <i data-lucide="code"></i>
+                            </div>
+                            <div class="satellite-label-container">
+                                <span class="satellite-label">算法</span>
+                                <span class="satellite-desc">用代码解构复杂问题</span>
+                            </div>
+                        </div>
+                        <div class="satellite satellite-5" data-target="biology" onclick="selectModule('biology')">
+                            <div class="satellite-glow"></div>
+                            <div class="satellite-icon">
+                                <i data-lucide="leaf"></i>
+                            </div>
+                            <div class="satellite-label-container">
+                                <span class="satellite-label">生物</span>
+                                <span class="satellite-desc">探索生命科学的奥秘</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <a href="#planets" class="home-galaxy-cta" data-page="planets" aria-label="进入星系目录大屏">
@@ -346,84 +397,15 @@
                         <span class="home-galaxy-cta__title">进入星系目录</span>
                         <span class="home-galaxy-cta__sub">SUBJECT · GALAXY · MAP</span>
                     </span>
-                    <span class="home-galaxy-cta__arrow" aria-hidden="true">?</span>
+                    <span class="home-galaxy-cta__arrow" aria-hidden="true">→</span>
                 </a>
-
-                <div class="orbit-path orbit-path-1"></div>
-                <div class="orbit-path orbit-path-2"></div>
-                <div class="orbit-path orbit-path-3"></div>
-                <div class="orbit-path orbit-path-4"></div>
-                <div class="orbit-path orbit-path-5"></div>
-
-                <div class="satellites-orbit" id="satellites-orbit">
-                    <div class="satellite satellite-1" data-target="mathematics" onclick="selectModule('mathematics')">
-                        <div class="satellite-glow"></div>
-                        <div class="satellite-icon">
-                            <div class="planet-surface"></div>
-                            <div class="planet-highlight"></div>
-                            <i data-lucide="calculator"></i>
-                        </div>
-                        <div class="satellite-label-container">
-                            <span class="satellite-label">数学</span>
-                            <span class="satellite-desc">可视化探索数学之美</span>
-                        </div>
-                    </div>
-                    <div class="satellite satellite-2" data-target="physics" onclick="selectModule('physics')">
-                        <div class="satellite-glow"></div>
-                        <div class="satellite-icon">
-                            <div class="planet-surface"></div>
-                            <div class="planet-highlight"></div>
-                            <i data-lucide="atom"></i>
-                        </div>
-                        <div class="satellite-ring"></div>
-                        <div class="satellite-label-container">
-                            <span class="satellite-label">物理</span>
-                            <span class="satellite-desc">感受力与运动的世界</span>
-                        </div>
-                    </div>
-                    <div class="satellite satellite-3" data-target="chemistry" onclick="selectModule('chemistry')">
-                        <div class="satellite-glow"></div>
-                        <div class="satellite-icon">
-                            <div class="planet-surface"></div>
-                            <div class="planet-highlight"></div>
-                            <i data-lucide="flask-conical"></i>
-                        </div>
-                        <div class="satellite-label-container">
-                            <span class="satellite-label">化学</span>
-                            <span class="satellite-desc">探索微观粒子的奥秘</span>
-                        </div>
-                    </div>
-                    <div class="satellite satellite-4" data-target="algorithms" onclick="selectModule('algorithms')">
-                        <div class="satellite-glow"></div>
-                        <div class="satellite-icon">
-                            <div class="planet-surface"></div>
-                            <div class="planet-highlight"></div>
-                            <i data-lucide="code"></i>
-                        </div>
-                        <div class="satellite-label-container">
-                            <span class="satellite-label">算法</span>
-                            <span class="satellite-desc">用代码解构复杂问题</span>
-                        </div>
-                    </div>
-                    <div class="satellite satellite-5" data-target="biology" onclick="selectModule('biology')">
-                        <div class="satellite-glow"></div>
-                        <div class="satellite-icon">
-                            <div class="planet-surface"></div>
-                            <div class="planet-highlight"></div>
-                            <i data-lucide="leaf"></i>
-                        </div>
-                        <div class="satellite-label-container">
-                            <span class="satellite-label">生物</span>
-                            <span class="satellite-desc">探索生命科学的奥秘</span>
-                        </div>
-                    </div>
-                </div>
             </div>
         </section>
 
-        <!-- ────────── PLANETS · 星序顶层星系入口 ────────── -->
+        <!-- ────────── PLANETS · 星序顶层星系入口 (v7.0) ────────── -->
         <section id="page-planets" class="page active" aria-label="星序星系入口">
             <canvas id="planets-starfield" class="planets-starfield" aria-hidden="true"></canvas>
+            <div class="planets-cursor-halo" aria-hidden="true"></div>
 
             <div class="planets-atlas">
                 <header class="planets-topbar">
@@ -434,16 +416,58 @@
                             <span>Astra</span>
                         </span>
                     </a>
+                    <span class="planets-topbar__meta" aria-hidden="true">Star Atlas · Online</span>
                 </header>
 
                 <main class="planets-hero">
+                    <section class="planets-stage" aria-label="星序星系拨盘（拖动旋转选择星系）">
+                        <button class="planets-galaxy planets-galaxy--eng" type="button" data-galaxy="englab" aria-label="选择工科试验室星系">
+                            <span class="planets-galaxy-disc">
+                                <span class="planets-galaxy-core"></span>
+                                <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
+                            </span>
+                            <span class="planets-galaxy-no" aria-hidden="true">02</span>
+                            <span class="planets-galaxy-label">
+                                <strong>工科试验室</strong>
+                                <span>Engineering Lab</span>
+                            </span>
+                        </button>
+
+                        <button class="planets-galaxy planets-galaxy--code" type="button" data-galaxy="codespace" aria-label="选择代码空间星系">
+                            <span class="planets-galaxy-disc planets-galaxy-disc--code">
+                                <span class="planets-galaxy-core"></span>
+                                <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
+                            </span>
+                            <span class="planets-galaxy-no" aria-hidden="true">01</span>
+                            <span class="planets-galaxy-label">
+                                <strong>代码空间</strong>
+                                <span>Code Space</span>
+                            </span>
+                        </button>
+
+                        <button class="planets-galaxy planets-galaxy--roadmap" type="button" data-galaxy="frontier" aria-label="选择未来星系">
+                            <span class="planets-galaxy-disc planets-galaxy-disc--roadmap">
+                                <span class="planets-galaxy-core"></span>
+                                <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
+                            </span>
+                            <span class="planets-galaxy-no" aria-hidden="true">03</span>
+                            <span class="planets-galaxy-label">
+                                <strong>未来星系</strong>
+                                <span>Frontier</span>
+                            </span>
+                        </button>
+                    </section>
+
                     <section class="planets-intro" aria-labelledby="planets-main-title">
+                        <span class="planets-intro__eyebrow">Galaxy Directory</span>
                         <h1 id="planets-main-title">星序</h1>
-                        <p>面向未来学习者的星系化学科探索平台。先选择一座知识星系，再沿二级目录进入实验、判读和可信回查。</p>
+                        <p class="planets-intro__sub">A·S·T·R·A</p>
+                        <p class="planets-intro__copy">面向未来学习者的星系化学科探索平台。拨动右侧星盘，将星系对准准星即可展开二级目录。</p>
+                        <p class="planets-intro__hint">Drag to rotate · Scroll to shift</p>
                         <div class="planets-recommendation" aria-label="推荐学习主线">
                             <span>推荐路径</span>
                             <strong>从未来星系进入材料样板路线</strong>
-                            <p>星序总览 -> 未来星系 -> 材料微观 -> 晶体/晶粒实验台 -> 状态回查</p>
+                            <p>星序总览 → 未来星系 → 材料微观 → 实验台 → 状态回查</p>
                             <div class="planets-recommendation__actions">
                                 <a href="#frontier-frontier-route">学习主线</a>
                                 <a href="#frontier-materials-route">材料样板</a>
@@ -452,70 +476,13 @@
                         </div>
                     </section>
 
-                    <section class="planets-stage" aria-label="星序星系图">
-                        <div class="planets-stage-halo planets-stage-halo--outer"></div>
-                        <div class="planets-stage-halo planets-stage-halo--inner"></div>
-                        <div class="planets-stage-crosshair"></div>
-
-                        <svg class="planets-lines" viewBox="0 0 1000 700" preserveAspectRatio="none" aria-hidden="true">
-                            <ellipse class="planets-line planets-line--orbit" cx="500" cy="350" rx="325" ry="156" />
-                            <ellipse class="planets-line planets-line--orbit planets-line--tilt" cx="500" cy="350" rx="390" ry="198" />
-                            <path class="planets-line planets-line--axis" d="M500 66 L500 634" />
-                            <path class="planets-line planets-line--axis" d="M122 350 L878 350" />
-                        </svg>
-
-                        <div class="planets-beacon" aria-hidden="true">
-                            <span></span>
-                            <strong>ASTRA</strong>
-                        </div>
-
-                        <button class="planets-galaxy planets-galaxy--eng" type="button" data-galaxy="englab" aria-label="进入工科试验室星系二级菜单">
-                            <span class="planets-galaxy-glow"></span>
-                            <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
-                            <span class="planets-galaxy-orbit planets-galaxy-orbit--two"></span>
-                            <span class="planets-galaxy-disc" data-particles="englab">
-                                <span class="planets-galaxy-core"></span>
-                            </span>
-                            <span class="planets-galaxy-label">
-                                <strong>工科试验室</strong>
-                                <span>Engineering Lab</span>
-                            </span>
-                        </button>
-
-                        <button class="planets-galaxy planets-galaxy--code" type="button" data-galaxy="codespace" aria-label="进入代码空间星系二级菜单">
-                            <span class="planets-galaxy-glow planets-galaxy-glow--green"></span>
-                            <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
-                            <span class="planets-galaxy-orbit planets-galaxy-orbit--two"></span>
-                            <span class="planets-galaxy-disc planets-galaxy-disc--code" data-particles="codespace">
-                                <span class="planets-galaxy-core"></span>
-                            </span>
-                            <span class="planets-galaxy-label">
-                                <strong>代码空间</strong>
-                                <span>Code Space</span>
-                            </span>
-                        </button>
-
-                        <button class="planets-galaxy planets-galaxy--roadmap" type="button" data-galaxy="frontier" aria-label="查看未来星系学习方向">
-                            <span class="planets-galaxy-glow planets-galaxy-glow--amber"></span>
-                            <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
-                            <span class="planets-galaxy-orbit planets-galaxy-orbit--two"></span>
-                            <span class="planets-galaxy-disc planets-galaxy-disc--roadmap" data-particles="frontier">
-                                <span class="planets-galaxy-core"></span>
-                            </span>
-                            <span class="planets-galaxy-label">
-                                <strong>未来星系</strong>
-                                <span>Roadmap</span>
-                            </span>
-                        </button>
-
-                        <aside class="planets-menu" id="planets-menu" aria-live="polite" aria-label="星系二级菜单">
-                            <button class="planets-menu__close" type="button" data-close-menu aria-label="关闭二级菜单">×</button>
-                            <span class="planets-menu__state" id="planets-menu-state">进入星系</span>
-                            <h2 id="planets-menu-title">工科试验室</h2>
-                            <p id="planets-menu-copy">选择学科后进入该星系自己的二级内容。</p>
-                            <nav class="planets-module-menu" id="planets-module-menu" aria-label="二级模块"></nav>
-                        </aside>
-                    </section>
+                    <aside class="planets-menu" id="planets-menu" aria-live="polite" aria-label="星系二级菜单">
+                        <button class="planets-menu__close" type="button" data-close-menu aria-label="关闭二级菜单">×</button>
+                        <span class="planets-menu__state" id="planets-menu-state">进入星系</span>
+                        <h2 id="planets-menu-title">工科试验室</h2>
+                        <p id="planets-menu-copy">选择学科后进入该星系自己的二级内容。</p>
+                        <nav class="planets-module-menu" id="planets-module-menu" aria-label="二级模块"></nav>
+                    </aside>
                 </main>
             </div>
         </section>
@@ -5133,9 +5100,10 @@
     </div>
 
     <!-- Application Scripts: minimal boot path -->
-    <script src="shared/js/config.js?v=20260630mainV64"></script>
-    <script src="shared/js/router.js?v=20260630mainV64"></script>
-    <script src="shared/js/main.js?v=20260630mainV64"></script>
+    <script src="shared/js/config.js?v=20260703v65BackendSchemaP4"></script>
+    <script src="shared/js/backend-content.js?v=20260703v65BackendSchemaP4"></script>
+    <script src="shared/js/router.js?v=20260704qianduanV70"></script>
+    <script src="shared/js/main.js?v=20260704qianduanV70"></script>
     <script>
         (function () {
             try {

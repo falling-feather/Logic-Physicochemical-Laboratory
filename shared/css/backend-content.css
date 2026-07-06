@@ -1,0 +1,48 @@
+.backend-learning-card {
+    margin: 0 0 1rem;
+    padding: 1px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(58, 169, 255, 0.35), rgba(34, 255, 136, 0.22));
+}
+
+.backend-learning-card__body {
+    border-radius: 7px;
+    padding: 1rem 1.1rem;
+    background: rgba(12, 16, 28, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.backend-learning-card__eyebrow {
+    margin-bottom: 0.35rem;
+    color: var(--text-tertiary, #8a91a6);
+    font-size: var(--text-xs, 0.78rem);
+}
+
+.backend-learning-card__title {
+    margin: 0 0 0.4rem;
+    color: var(--text-primary, #eef3ff);
+    font-size: 1rem;
+    line-height: 1.35;
+}
+
+.backend-learning-card__summary {
+    margin: 0;
+    color: var(--text-secondary, #b6c0d8);
+    font-size: 0.9rem;
+    line-height: 1.7;
+}
+
+.backend-learning-card__concepts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.8rem;
+}
+
+.backend-learning-card__concepts span {
+    padding: 0.22rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary, #b6c0d8);
+    font-size: 0.78rem;
+}

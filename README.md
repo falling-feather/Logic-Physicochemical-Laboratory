@@ -8,9 +8,9 @@
 
 星序总览页负责承载一级星系入口；进入某个星系后，才显示该星系自己的二级学科或知识目录。内置 C++ httplib 后端服务器，支持静态文件托管。
 
-> **当前状态**: v6.4.0（2026-06-30）— 已结束赛事提交材料清理、future 分支主线合并、底栏显示恢复与缓存版本同步
-> **下一阶段规划**: v6.5（2026-07-03 起）— Python + MySQL 后端化、内容协议、登录用户体系与管理员 / 教师 / 学生三端平台设计，详见 [`doc/07-后端优化与设计.md`](doc/07-后端优化与设计.md)
-> **当前分支**: `main` — 主线维护
+> **当前状态**: v6.5（2026-07-03 起）— `houduan` 分支已接入 Python 后端骨架、健康检查、部署预检、API no-store 缓存边界、工科试验室内容协议持久化样例、本地账号认证安全基线、学校/班级最小闭环与加入申请审批、课程/作业/学习事件/提交批改/积分统计、知识状态/班级规则统计、个人/班级知识快照、知识快照周期重算脚本、运行记录与进程内调度器、管理端 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、待批改队列、审计元数据与认证事件审计，以及前端 opt-in schema 渲染试点
+> **下一阶段规划**: Python + MySQL 后端化、内容协议、登录用户体系与管理员 / 教师 / 学生三端平台设计，详见 [`doc/07-后端优化与设计.md`](doc/07-后端优化与设计.md)
+> **当前分支**: `houduan` — 后端化设计与重构开发分支；`main` 保持主线维护
 > **v6.4 主线**：未来星系产品内容保留，比赛提交/评审/截图临时层清理 + `20260630mainV64` 资产版本同步
 > **v6.0 主线**：多星系架构正式确立 + muban UI 模板扩充 + 开发者手册 §0/§6.6/§17 新增星系开发指南
 > **v5.1 主线**：Codevis 独立为子站 + Runtime 抽象层 + JS-Interpreter / Skulpt / JSCPP 三后端沙箱
@@ -43,6 +43,9 @@
 ├── index.html              # 主站 SPA 入口（含所有页面结构）
 ├── sw.js                   # Service Worker（离线缓存 + stale-while-revalidate）
 ├── deploy.ps1              # Windows 一键部署脚本
+├── backend/                 # Python FastAPI 业务后端（v6.5 首切片）
+│   ├── app/                 # API、配置、数据库探针、内容协议与服务层
+│   └── tests/               # pytest 后端回归测试
 ├── doc/                    # 项目文档（v5.1.4 中文化重组）
 │   ├── 01-开发者手册.md            # 完整开发者文档
 │   ├── 02-更新规划.md              # 后续更新计划
@@ -51,6 +54,7 @@
 │   ├── 05-UI规范模板.md            # UI 基准模板
 │   ├── 06-实验体验与信度审查报告-20260606.md  # 实验体验与事实口径审查
 │   ├── 07-后端优化与设计.md        # Python 后端化与三端平台设计
+│   ├── 08-前端页面实现索引.md      # 页面/路由/模块到实现文件的定位索引
 │   └── 99-历史审视报告归档.md      # v4.x 一次性审视报告归档
 ├── codevis/                # 代码可视化独立子站（v5.1 升级：独立 SPA + 多语言沙箱）
 │   ├── index.html          # 子站入口
@@ -103,6 +107,20 @@ cmake --build build --config Release
 # 详见 doc/04-部署指南.md
 ```
 
+### 方式四：Python 业务后端（v6.5 开发中）
+
+```bash
+cd backend
+python -m uvicorn app.main:app --reload --port 8000
+# 访问 http://127.0.0.1:8000/api/health
+# 内容协议样例：http://127.0.0.1:8000/api/render/page/physics/energy-conservation
+
+# 前端 schema smoke（另开终端启动静态服务）
+node server/dev-static-server.mjs --port 8766
+# 访问：
+# http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#physics/energy-conservation
+```
+
 ## ✨ 功能特性
 
 ### 星序总览与多星系入口
@@ -148,6 +166,7 @@ cmake --build build --config Release
 - **Canvas 2D API** — 可视化渲染（ResizeObserver + DPR 适配）
 - **cpp-httplib 0.18.3** — C++ HTTP 服务器
 - **CMake 3.14+** — C++ 构建系统
+- **Python 3 / FastAPI / SQLAlchemy** — v6.5 业务后端骨架、API、MySQL 连接、部署预检、API no-store 缓存边界、内容协议、本地认证安全基线、学校/班级加入申请审批、作业提交/批改、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端学校/班级统计、加入申请治理、列表分页搜索、待批改队列和审计元数据
 
 ## 📝 更新日志
 

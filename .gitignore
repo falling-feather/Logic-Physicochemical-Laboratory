@@ -1,6 +1,12 @@
 # Build outputs
 server/build/
 node_modules/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+pytest-cache-files-*/
+.venv/
+venv/
 
 # IDE
 .vscode/

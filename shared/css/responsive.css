@@ -189,23 +189,18 @@
         padding: var(--space-6) var(--space-4);
     }
 
-    /* Home orbit system – shrink for mobile viewport */
+    /* Home orbit system – shrink for mobile viewport (v7.0) */
     .orbit-path-1 { width: 330px; height: 200px; }
     .orbit-path-2 { width: 400px; height: 238px; }
     .orbit-path-3 { width: 480px; height: 286px; }
     .orbit-path-4 { width: 430px; height: 258px; }
     .orbit-path-5 { width: 370px; height: 222px; }
-    .main-star { width: 170px; height: 170px; }
-    .star-body { width: 100%; height: 100%; }
-    .star-title { font-size: 1.5rem; transform: translateY(-12px); }
-    .star-subtitle { font-size: 0.52rem; letter-spacing: 0.16em; transform: translateY(-9px); }
+    .main-star { width: 150px; height: 150px; }
     .satellite { width: 52px; height: 52px; }
     .satellite-label-container { bottom: -48px; width: 122px; }
     .satellite-label { font-size: 0.75rem; }
     .satellite-desc { display: none; }
     .home-tagline p { font-size: 0.78rem; letter-spacing: 0.08em; }
-    .hud-data { display: none; }
-    .nebula { display: none; }
     /* Sort controls */
     .sort-toolbar {
         flex-direction: column;
@@ -250,16 +245,12 @@
     .orbit-path-3 { width: 380px; height: 228px; }
     .orbit-path-4 { width: 340px; height: 204px; }
     .orbit-path-5 { width: 290px; height: 176px; }
-    .main-star { width: 142px; height: 142px; }
-    .star-body { width: 100%; height: 100%; }
-    .star-title { font-size: 1.3rem; transform: translateY(-11px); }
-    .star-subtitle { font-size: 0.46rem; letter-spacing: 0.12em; transform: translateY(-8px); }
+    .main-star { width: 126px; height: 126px; }
     .satellite { width: 42px; height: 42px; }
     .satellite-icon i { width: 1.15rem; height: 1.15rem; }
     .satellite-label-container { bottom: -42px; width: 96px; }
     .satellite-label { font-size: 0.68rem; letter-spacing: 0.04em; }
     .satellite-progress { font-size: 0.56rem; }
-    .home-tagline { bottom: 9%; }
     .home-tagline p { font-size: 0.68rem; }
     .page-hero {
         padding: var(--space-6) var(--space-4) var(--space-5);

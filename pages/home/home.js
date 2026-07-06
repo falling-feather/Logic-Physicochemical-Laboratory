@@ -1,7 +1,11 @@
-// ===== 首页逻辑 =====
+// ═══════════════════════════════════════════════════════════════
+// 工科实验室 · 首页逻辑  v7.0 (qianduan 重构)
+// 契约: window.initHome / window.selectModule /
+//       window.SatelliteSystem / window.ParticleNetwork
+// ═══════════════════════════════════════════════════════════════
 const _isReturningVisitor = !!(window.__englabCache && window.__englabCache.returnVisitor);
 
-// ===== 粒子网络系统 =====
+// ===== 粒子网络系统（OffscreenCanvas Worker 优先） =====
 const ParticleNetwork = {
     canvas: null, ctx: null,
     particles: [],
@@ -16,7 +20,7 @@ const ParticleNetwork = {
     _fpsFrames: 0,
     _fpsTime: 0,
     _fps: 60,
-    _targetCount: 0,   // 期望粒子数
+    _targetCount: 0,
     _maxParticles: 80,
 
     // ── 空间网格 ──
@@ -222,7 +226,7 @@ const ParticleNetwork = {
         this._fpsFrames++;
         const now = performance.now();
         const elapsed = now - this._fpsTime;
-        if (elapsed < 1000) return; // 每秒检查一次
+        if (elapsed < 1000) return;
 
         this._fps = Math.round(this._fpsFrames * 1000 / elapsed);
         this._fpsFrames = 0;
@@ -230,12 +234,10 @@ const ParticleNetwork = {
 
         const particles = this.particles;
         if (this._fps < 25 && particles.length > 20) {
-            // 帧率过低 → 减少 20% 粒子
             const remove = Math.max(2, Math.floor(particles.length * 0.2));
             particles.splice(particles.length - remove, remove);
             this._targetCount = particles.length;
         } else if (this._fps > 50 && particles.length < this._targetCount) {
-            // 帧率充裕且低于目标 → 补充粒子
             const add = Math.min(4, this._targetCount - particles.length);
             for (let i = 0; i < add; i++) {
                 particles.push({
@@ -249,7 +251,7 @@ const ParticleNetwork = {
         }
     },
 
-    /** 构建空间网格，将粒子分配到 cellSize×cellSize 的格子中 */
+    /** 构建空间网格 */
     _buildGrid() {
         const cols = this._gridCols, rows = this._gridRows;
         const cs = this._cellSize;
@@ -267,8 +269,6 @@ const ParticleNetwork = {
     loop() {
         if (!this.running) return;
         requestAnimationFrame(() => this.loop());
-
-        // 标签页隐藏时跳过渲染
         if (this._hidden) return;
 
         this._adaptParticleCount();
@@ -279,8 +279,7 @@ const ParticleNetwork = {
         const mouseDist2 = mouseDist * mouseDist;
         ctx.clearRect(0, 0, W, H);
 
-        // Update & draw particles
-        ctx.fillStyle = 'rgba(91,141,206,0.4)';
+        ctx.fillStyle = 'rgba(120,184,255,0.4)';
         ctx.beginPath();
         for (const p of particles) {
             p.x += p.vx;
@@ -288,10 +287,9 @@ const ParticleNetwork = {
             if (p.x < 0 || p.x > W) p.vx *= -1;
             if (p.y < 0 || p.y > H) p.vy *= -1;
 
-            // Mouse attraction (use squared distance)
             const dx = mouse.x - p.x, dy = mouse.y - p.y;
             const dist2 = dx * dx + dy * dy;
-            if (dist2 < 40000) { // 200^2
+            if (dist2 < 40000) {
                 p.vx += dx * 0.00005;
                 p.vy += dy * 0.00005;
             }
@@ -301,21 +299,19 @@ const ParticleNetwork = {
         }
         ctx.fill();
 
-        // ── 基于空间网格的连线（替代 O(n²) 暴力搜索）──
         this._buildGrid();
         const grid = this._grid;
         const cols = this._gridCols, rows = this._gridRows;
         const cs = this._cellSize;
 
         ctx.lineWidth = 0.5;
-        const bins = [[], [], [], []]; // 4 opacity bins
+        const bins = [[], [], [], []];
 
         for (let i = 0; i < particles.length; i++) {
             const pi = particles[i];
             const gc = Math.min(cols - 1, (pi.x / cs) | 0);
             const gr = Math.min(rows - 1, (pi.y / cs) | 0);
 
-            // 检查自身及相邻 3x3 格子
             for (let dr = -1; dr <= 1; dr++) {
                 const nr = gr + dr;
                 if (nr < 0 || nr >= rows) continue;
@@ -325,7 +321,7 @@ const ParticleNetwork = {
                     const cell = grid[nr * cols + nc];
                     for (let k = 0; k < cell.length; k++) {
                         const j = cell[k];
-                        if (j <= i) continue; // 避免重复
+                        if (j <= i) continue;
                         const pj = particles[j];
                         const dx = pi.x - pj.x;
                         const dy = pi.y - pj.y;
@@ -338,7 +334,6 @@ const ParticleNetwork = {
                     }
                 }
             }
-            // Mouse connections
             const mdx = mouse.x - pi.x;
             const mdy = mouse.y - pi.y;
             const md2 = mdx * mdx + mdy * mdy;
@@ -349,12 +344,11 @@ const ParticleNetwork = {
             }
         }
 
-        // Draw each opacity bin as a single batched path
         const alphas = [0.03, 0.06, 0.09, 0.12];
         for (let b = 0; b < 4; b++) {
             const arr = bins[b];
             if (!arr.length) continue;
-            ctx.strokeStyle = `rgba(91,141,206,${alphas[b]})`;
+            ctx.strokeStyle = `rgba(120,184,255,${alphas[b]})`;
             ctx.beginPath();
             for (let k = 0; k < arr.length; k += 2) {
                 const pi = arr[k], pj = arr[k + 1];
@@ -369,6 +363,17 @@ const ParticleNetwork = {
         }
     }
 };
+
+// ===== 大标题逐字入场 =====
+function initHeadingChars() {
+    const title = document.getElementById('home-title');
+    if (!title) return;
+    const text = title.dataset.text || title.textContent.trim();
+    title.dataset.text = text;
+    title.innerHTML = Array.from(text).map((ch, i) =>
+        `<span class="home-heading__char" style="--ci:${i}">${ch}</span>`
+    ).join('');
+}
 
 // ===== 打字机标语 =====
 const TaglineTyper = {
@@ -419,31 +424,32 @@ const TaglineTyper = {
     }
 };
 
-// ===== HUD 数据流 =====
-const HUDData = {
-    _interval: null,
+// ===== 3D 场景倾斜（鼠标跟随 · lerp 平滑） =====
+const SceneTilt = {
+    tx: 0, ty: 0,   // 目标角度
+    cx: 0, cy: 0,   // 当前角度
+    el: null,
+    enabled: true,
+
     init() {
-        const left = document.getElementById('hud-data-left');
-        const right = document.getElementById('hud-data-right');
-        if (!left || !right) return;
+        this.el = document.getElementById('home-scene');
+        this.enabled = !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+            && !(typeof _isLowEnd !== 'undefined' && _isLowEnd);
+        if (window.__homeTiltBound) return;
+        window.__homeTiltBound = true;
+        document.addEventListener('mousemove', e => {
+            SceneTilt.tx = (e.clientX / window.innerWidth - 0.5) * 2;   // -1 ~ 1
+            SceneTilt.ty = (e.clientY / window.innerHeight - 0.5) * 2;
+        });
+    },
 
-        const dataL = ['ASTRA.ONLINE', 'GALAXIES: 2', 'ENG.LAB: 71', 'CODE.SPACE: 1', 'ROUTE: HASH', 'CANVAS: DPR', 'CACHE: READY'];
-        const dataR = ['v' + new Date().getFullYear() + '.06', 'MATH: 19', 'PHYSICS: 17', 'CHEM: 14', 'ALGO: 8', 'BIO: 13', 'FOCUS: LEARN'];
-
-        left.innerHTML = dataL.map(d => `<span>${d}</span>`).join('<br>');
-        right.innerHTML = dataR.map(d => `<span>${d}</span>`).join('<br>');
-
-        // Periodically flash random data items
-        if (this._interval) clearInterval(this._interval);
-        this._interval = setInterval(() => {
-            const targets = [left, right];
-            const target = targets[Math.floor(Math.random() * 2)];
-            const spans = target.querySelectorAll('span');
-            if (spans.length === 0) return;
-            const span = spans[Math.floor(Math.random() * spans.length)];
-            span.style.color = 'rgba(91,141,206,0.7)';
-            setTimeout(() => { span.style.color = ''; }, 400);
-        }, 1500);
+    /** 由 SatelliteSystem 的 rAF 循环驱动 */
+    apply() {
+        if (!this.el || !this.enabled) return;
+        this.cx += (this.tx - this.cx) * 0.045;
+        this.cy += (this.ty - this.cy) * 0.045;
+        this.el.style.transform =
+            `rotateX(${(-this.cy * 3.2).toFixed(3)}deg) rotateY(${(this.cx * 4.2).toFixed(3)}deg)`;
     }
 };
 
@@ -455,7 +461,7 @@ const SatelliteSystem = {
     orbit: null,
     rafId: null,
 
-    // 每颗行星保留独立轨道；phase 让首屏分散，避免一加载就挤在同侧。
+    // 每颗行星独立轨道；phase 让首屏分散，避免一加载就挤在同侧。
     orbits: [
         { radiusX: 300, radiusY: 170, tiltX: 65, tiltZ: 25,  period: 26000, dir:  1, phase:  55 },
         { radiusX: 365, radiusY: 212, tiltX: 60, tiltZ: -15, period: 33000, dir: -1, phase: 250 },
@@ -468,9 +474,9 @@ const SatelliteSystem = {
     getScaledOrbits: function() {
         const w = window.innerWidth;
         if (w <= 480) {
-            return this.orbits.map(o => ({ ...o, radiusX: o.radiusX * 0.54, radiusY: o.radiusY * 0.54 }));
+            return this.orbits.map(o => ({ ...o, radiusX: o.radiusX * 0.52, radiusY: o.radiusY * 0.52 }));
         } else if (w <= 768) {
-            return this.orbits.map(o => ({ ...o, radiusX: o.radiusX * 0.74, radiusY: o.radiusY * 0.74 }));
+            return this.orbits.map(o => ({ ...o, radiusX: o.radiusX * 0.72, radiusY: o.radiusY * 0.72 }));
         }
         return this.orbits;
     },
@@ -495,15 +501,19 @@ const SatelliteSystem = {
         if (!this.isRunning) return;
         this.rafId = requestAnimationFrame(this.loop.bind(this));
 
-        // 低端设备帧率限制：约 30fps（~33ms 间隔）
+        // 低端设备帧率限制：约 30fps
         const perfNow = performance.now();
         const minInterval = (typeof _isLowEnd !== 'undefined' && _isLowEnd) ? 33 : 0;
         if (minInterval > 0 && perfNow - this._lastFrameTime < minInterval) return;
         this._lastFrameTime = perfNow;
 
+        SceneTilt.apply();
+
         const now = Date.now();
         const toRad = Math.PI / 180;
         const scaledOrbits = this.getScaledOrbits();
+        // 轨道中心与星球中心对齐（星球 translateY(6vh)）
+        const yOff = window.innerHeight * 0.06;
 
         this.satellites.forEach((sat, index) => {
             if (sat.classList.contains('focusing')) return;
@@ -525,7 +535,7 @@ const SatelliteSystem = {
             const zRotX = yOrbit * sinTiltX;
 
             const xFinal = xOrbit * cosTiltZ - yRotX * sinTiltZ;
-            const yFinal = xOrbit * sinTiltZ + yRotX * cosTiltZ;
+            const yFinal = xOrbit * sinTiltZ + yRotX * cosTiltZ + yOff;
             const zFinal = zRotX;
 
             const scale = this.perspective / (this.perspective - zFinal);
@@ -575,17 +585,19 @@ function selectModule(target) {
         });
 
         mainStar.classList.add('fading-out');
+        // starPop 的 forwards 填充会盖过内联 transform，必须先取消动画
+        mainStar.style.animation = 'none';
         mainStar.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out';
         mainStar.style.opacity = '0';
-        mainStar.style.transform = 'scale(0.5)';
+        mainStar.style.transform = 'translateY(6vh) scale(0.5)';
 
         document.querySelectorAll('.orbit-path').forEach(o => {
             o.style.transition = 'opacity 0.4s ease-out';
             o.style.opacity = '0';
         });
 
-        const tagline = document.getElementById('home-tagline');
-        if (tagline) { tagline.style.transition = 'opacity 0.3s'; tagline.style.opacity = '0'; }
+        const heading = document.querySelector('.home-heading');
+        if (heading) { heading.style.transition = 'opacity 0.3s'; heading.style.opacity = '0'; }
 
         setTimeout(() => {
             satellite.style.transition = 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
@@ -606,18 +618,18 @@ function selectModule(target) {
                 biology: 'rgba(58,158,143,0.25)'
             };
             homePage.style.transition = 'background 0.8s ease-out';
-            homePage.style.background = `radial-gradient(ellipse at center, ${colors[target] || 'rgba(91,141,206,0.25)'} 0%, #08090e 100%)`;
+            homePage.style.background = `radial-gradient(ellipse at center, ${colors[target] || 'rgba(91,141,206,0.25)'} 0%, #04070f 100%)`;
 
             setTimeout(() => {
                 // Skip router animation — selectModule already provides visual departure
                 Router.navigateTo(target, false);
-                setTimeout(() => resetHomeState(allSatellites, mainStar, homePage, satellite, tagline, icon, labelContainer), 300);
+                setTimeout(() => resetHomeState(allSatellites, mainStar, homePage, satellite, icon, labelContainer), 300);
             }, 800);
         }, 400);
     }, 250);
 }
 
-function resetHomeState(allSatellites, mainStar, homePage, satellite, tagline, icon, labelContainer) {
+function resetHomeState(allSatellites, mainStar, homePage, satellite, icon, labelContainer) {
     SatelliteSystem.startTime = Date.now();
     SatelliteSystem.isRunning = true;
 
@@ -627,12 +639,14 @@ function resetHomeState(allSatellites, mainStar, homePage, satellite, tagline, i
     });
 
     mainStar.classList.remove('fading-out');
-    mainStar.style.transition = ''; mainStar.style.opacity = ''; mainStar.style.transform = ''; mainStar.style.zIndex = '10';
+    mainStar.style.animation = '';
+    mainStar.style.transition = ''; mainStar.style.opacity = ''; mainStar.style.transform = ''; mainStar.style.zIndex = '';
 
     document.querySelectorAll('.orbit-path').forEach(o => { o.style.transition = ''; o.style.opacity = ''; });
     homePage.style.transition = ''; homePage.style.background = '';
 
-    if (tagline) { tagline.style.transition = ''; tagline.style.opacity = ''; }
+    const heading = document.querySelector('.home-heading');
+    if (heading) { heading.style.transition = ''; heading.style.opacity = ''; }
     if (icon) icon.style.transform = '';
     if (labelContainer) { labelContainer.style.transition = ''; labelContainer.style.opacity = ''; }
 }
@@ -691,7 +705,7 @@ function initParallax() {
     if (window.__homeParallaxBound) return;
     window.__homeParallaxBound = true;
 
-    const depths = [0.015, 0.04, 0.09]; // 三层视差深度
+    const depths = [0.015, 0.04, 0.09];
     const layerEls = [
         document.getElementById('star-layer-1'),
         document.getElementById('star-layer-2'),
@@ -735,8 +749,8 @@ function initEyeTracking() {
         const dx = clientX - cx, dy = clientY - cy;
         const dist = Math.sqrt(dx * dx + dy * dy);
         const ang  = Math.atan2(dy, dx);
-        const maxMove = 5;
-        const ratio = Math.min(dist / 250, 1);
+        const maxMove = 6;
+        const ratio = Math.min(dist / 260, 1);
         const mx = Math.cos(ang) * ratio * maxMove;
         const my = Math.sin(ang) * ratio * maxMove;
         if (pl) pl.style.transform = `translate(calc(-50% + ${mx}px), calc(-50% + ${my}px))`;
@@ -780,6 +794,13 @@ function initShootingStars() {
     if (!container) return;
 
     function spawnStar() {
+        // 离开首页后停止链式生成，重进首页时由 initHome 重新拉起
+        const page = document.getElementById('page-home');
+        if (!page || !page.classList.contains('active')) {
+            window.__homeShootingStarsBound = false;
+            return;
+        }
+
         const star = document.createElement('div');
         star.className = 'shooting-star';
 
@@ -800,7 +821,6 @@ function initShootingStars() {
         container.appendChild(star);
         setTimeout(() => star.remove(), duration * 1000 + 150);
 
-        // 下一颗
         setTimeout(spawnStar, 3500 + Math.random() * 7000);
     }
 
@@ -814,6 +834,8 @@ const _isLowEnd = (navigator.hardwareConcurrency || 8) <= 4 ||
 
 function initHome() {
     // ── Phase 1 (同步): 先确保首页可见可交互 ──
+    initHeadingChars();
+    SceneTilt.init();
     SatelliteSystem.init();
     TaglineTyper.init();
     if (window.__loadProgress) window.__loadProgress(85);
@@ -841,7 +863,6 @@ function initHome() {
                     initShootingStars();
                 }, 350);
             }
-            HUDData.init();
             initEyeTracking();
         });
     });
@@ -851,4 +872,3 @@ function initHome() {
 window.selectModule = selectModule;
 window.SatelliteSystem = SatelliteSystem;
 window.ParticleNetwork = ParticleNetwork;
-
