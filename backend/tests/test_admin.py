@@ -71,6 +71,26 @@ def test_admin_bootstrap_rejects_blank_display_name_after_trimming(client):
     assert response.json()["detail"] == "Display name is required"
 
 
+def test_admin_bootstrap_normalizes_username(client):
+    response = client.post(
+        "/api/admin/bootstrap",
+        json={
+            "username": "AdminRootCase",
+            "password": "secret123",
+            "display_name": "Root Admin",
+        },
+    )
+    assert response.status_code == 201
+    assert response.json()["username"] == "adminrootcase"
+
+    login = client.post(
+        "/api/auth/login",
+        json={"username": "ADMINROOTCASE", "password": "secret123"},
+    )
+    assert login.status_code == 200
+    assert login.json()["user"]["username"] == "adminrootcase"
+
+
 def test_admin_bootstrap_is_single_use(client):
     admin_token = _bootstrap_admin(client)
 

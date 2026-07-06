@@ -70,6 +70,7 @@ from app.services.class_join_requests import (
     normalize_join_request_status,
 )
 from app.services.text import require_trimmed_text
+from app.services.users import find_user_by_normalized_username, require_normalized_username
 
 
 router = APIRouter()
@@ -93,12 +94,10 @@ def bootstrap_admin(payload: AdminBootstrapRequest, request: Request, db: Sessio
     elif settings.environment.lower() in {"production", "prod"}:
         raise HTTPException(status_code=403, detail="Admin bootstrap token is required in production")
 
-    username = payload.username.strip()
+    username = require_normalized_username(payload.username, min_length=3)
     display_name = require_trimmed_text(payload.display_name, "Display name is required")
-    if not username:
-        raise HTTPException(status_code=422, detail="Username is required")
     _enforce_password_strength(payload.password, username)
-    existing = db.scalar(select(User).where(User.username == username))
+    existing = find_user_by_normalized_username(db, username)
     if existing is not None:
         raise HTTPException(status_code=409, detail="Username already exists")
 

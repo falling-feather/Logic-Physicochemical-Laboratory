@@ -3,8 +3,9 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 
 from app.core.config import get_settings
+from app.core.security import hash_password
 from app.db.session import get_session_factory
-from app.models import AuditLog, AuthSession, LoginAttempt
+from app.models import AuditLog, AuthSession, LoginAttempt, User
 
 
 def _auth_header(token: str) -> dict:
@@ -140,6 +141,21 @@ def test_register_rejects_blank_username_after_trimming(client):
     assert response.json()["detail"] == "Username is required"
 
 
+def test_register_rejects_short_username_after_normalization(client):
+    response = client.post(
+        "/api/auth/register",
+        json={
+            "username": " A ",
+            "password": "secret123",
+            "display_name": "Short Username",
+            "role": "teacher",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Username must be at least 3 characters"
+
+
 def test_register_rejects_blank_display_name_after_trimming(client):
     response = client.post(
         "/api/auth/register",
@@ -153,6 +169,72 @@ def test_register_rejects_blank_display_name_after_trimming(client):
 
     assert response.status_code == 422
     assert response.json()["detail"] == "Display name is required"
+
+
+def test_register_normalizes_username_and_rejects_case_variant(client):
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "MixedTeacher",
+            "password": "secret123",
+            "display_name": "Mixed Teacher",
+            "role": "teacher",
+        },
+    )
+    assert register.status_code == 201
+    assert register.json()["username"] == "mixedteacher"
+
+    uppercase_login = client.post(
+        "/api/auth/login",
+        json={"username": "MIXEDTEACHER", "password": "secret123"},
+    )
+    assert uppercase_login.status_code == 200
+    assert uppercase_login.json()["user"]["username"] == "mixedteacher"
+
+    duplicate = client.post(
+        "/api/auth/register",
+        json={
+            "username": "mixedteacher",
+            "password": "secret123",
+            "display_name": "Duplicate Teacher",
+            "role": "teacher",
+        },
+    )
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"] == "Username already exists"
+
+
+def test_login_finds_legacy_mixed_case_user_by_normalized_username(client):
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        db.add(
+            User(
+                username="LegacyTeacher",
+                password_hash=hash_password("secret123"),
+                display_name="Legacy Teacher",
+                role="teacher",
+            )
+        )
+        db.commit()
+
+    login = client.post(
+        "/api/auth/login",
+        json={"username": "legacyteacher", "password": "secret123"},
+    )
+    assert login.status_code == 200
+    assert login.json()["user"]["username"] == "LegacyTeacher"
+
+    duplicate = client.post(
+        "/api/auth/register",
+        json={
+            "username": "LEGACYTEACHER",
+            "password": "secret123",
+            "display_name": "Duplicate Legacy",
+            "role": "teacher",
+        },
+    )
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"] == "Username already exists"
 
 
 def test_login_rate_limit_locks_and_recovers_after_window(client):
@@ -207,6 +289,35 @@ def test_login_rate_limit_locks_and_recovers_after_window(client):
         assert len(locked_audits) == 2
         assert all(audit.event_result == "blocked" for audit in locked_audits)
         assert all(audit.failure_reason == "account_locked" for audit in locked_audits)
+
+
+def test_login_rate_limit_uses_normalized_username(client):
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "CaseLockTeacher",
+            "password": "secret123",
+            "display_name": "Case Lock Teacher",
+            "role": "teacher",
+        },
+    )
+    assert register.status_code == 201
+
+    max_attempts = get_settings().login_max_attempts
+    variants = ["CASELOCKTEACHER", "caselockteacher", "CaseLockTeacher"]
+    for index in range(max_attempts):
+        response = client.post(
+            "/api/auth/login",
+            json={"username": variants[index % len(variants)], "password": "wrong-secret"},
+        )
+        assert response.status_code == (429 if index == max_attempts - 1 else 401)
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        attempts = db.scalars(select(LoginAttempt).order_by(LoginAttempt.id)).all()
+        assert [attempt.username for attempt in attempts] == ["caselockteacher"]
+        assert attempts[0].failure_count == max_attempts
+        assert attempts[0].locked_until is not None
 
 
 def test_login_revokes_expired_sessions(client):

@@ -13,6 +13,7 @@ from app.models import AuthSession, LoginAttempt, User
 from app.schemas.auth import LoginRequest, LoginResponse, RegisterRequest, UserPublic
 from app.services.audit import record_audit_log
 from app.services.text import require_trimmed_text
+from app.services.users import find_user_by_normalized_username, require_normalized_username
 
 
 router = APIRouter()
@@ -21,15 +22,13 @@ REGISTER_ROLES = {"teacher", "student"}
 
 @router.post("/register", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> User:
-    username = payload.username.strip()
+    username = require_normalized_username(payload.username, min_length=3)
     display_name = require_trimmed_text(payload.display_name, "Display name is required")
     role = payload.role.strip().lower()
-    if not username:
-        raise HTTPException(status_code=422, detail="Username is required")
     if role not in REGISTER_ROLES:
         raise HTTPException(status_code=422, detail="Unsupported registration role")
     _enforce_password_strength(payload.password, username)
-    existing = db.scalar(select(User).where(User.username == username))
+    existing = find_user_by_normalized_username(db, username)
     if existing is not None:
         raise HTTPException(status_code=409, detail="Username already exists")
 
@@ -52,9 +51,7 @@ def login(
     response: Response,
     db: Session = Depends(get_db),
 ) -> LoginResponse:
-    username = payload.username.strip()
-    if not username:
-        raise HTTPException(status_code=422, detail="Username is required")
+    username = require_normalized_username(payload.username)
 
     settings = get_settings()
     now = datetime.now(UTC)
@@ -66,7 +63,7 @@ def login(
         db.commit()
         _raise_login_locked(retry_after)
 
-    user = db.scalar(select(User).where(User.username == username))
+    user = find_user_by_normalized_username(db, username)
     if user is None or not verify_password(payload.password, user.password_hash):
         locked = _record_failed_login(db, attempt, now, settings.login_max_attempts, settings.login_lockout_seconds)
         retry_after = _retry_after_seconds(attempt, now) if locked else None
