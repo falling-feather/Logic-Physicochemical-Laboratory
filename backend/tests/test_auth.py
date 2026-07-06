@@ -53,6 +53,93 @@ def test_session_management_requires_authentication(client):
     assert revoke.status_code == 401
 
 
+def test_login_records_session_device_metadata_and_last_seen(client):
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "device_session_owner",
+            "password": "secret123",
+            "display_name": "Device Session Owner",
+            "role": "teacher",
+        },
+    )
+    assert register.status_code == 201
+    login = client.post(
+        "/api/auth/login",
+        headers={
+            "X-Device-Name": "Teacher Lab Laptop",
+            "User-Agent": "pytest-login-agent",
+            "X-Forwarded-For": "203.0.113.20, 10.0.0.1",
+        },
+        json={"username": "device_session_owner", "password": "secret123"},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+
+    sessions_response = client.get(
+        "/api/auth/sessions",
+        headers={**_auth_header(token), "User-Agent": "pytest-followup-agent"},
+    )
+    assert sessions_response.status_code == 200
+    sessions = sessions_response.json()
+    assert len(sessions) == 1
+    assert sessions[0]["device_label"] == "Teacher Lab Laptop"
+    assert sessions[0]["user_agent"] == "pytest-login-agent"
+    assert sessions[0]["last_seen_at"] is not None
+    assert sessions[0]["is_current"] is True
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        auth_session = db.scalar(select(AuthSession))
+        assert auth_session is not None
+        assert auth_session.device_label == "Teacher Lab Laptop"
+        assert auth_session.user_agent == "pytest-login-agent"
+        assert auth_session.last_seen_at is not None
+        assert auth_session.last_seen_ip_hash is not None
+        assert len(auth_session.last_seen_ip_hash) == 64
+        assert "203.0.113.20" not in auth_session.last_seen_ip_hash
+
+
+def test_authenticated_request_refreshes_session_last_seen(client):
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "last_seen_owner",
+            "password": "secret123",
+            "display_name": "Last Seen Owner",
+            "role": "student",
+        },
+    )
+    assert register.status_code == 201
+    login = client.post("/api/auth/login", json={"username": "last_seen_owner", "password": "secret123"})
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+
+    old_seen = datetime(2000, 1, 1, tzinfo=UTC)
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        auth_session = db.scalar(select(AuthSession))
+        assert auth_session is not None
+        auth_session.last_seen_at = old_seen
+        auth_session.last_seen_ip_hash = "old"
+        db.commit()
+
+    me = client.get(
+        "/api/users/me",
+        headers={**_auth_header(token), "X-Forwarded-For": "198.51.100.10", "User-Agent": "pytest-me-agent"},
+    )
+    assert me.status_code == 200
+
+    with session_factory() as db:
+        refreshed_session = db.scalar(select(AuthSession))
+        assert refreshed_session is not None
+        assert refreshed_session.last_seen_at is not None
+        assert refreshed_session.last_seen_at.year >= 2026
+        assert refreshed_session.last_seen_ip_hash is not None
+        assert refreshed_session.last_seen_ip_hash != "old"
+        assert "198.51.100.10" not in refreshed_session.last_seen_ip_hash
+
+
 def test_user_can_list_and_revoke_individual_sessions(client):
     register = client.post(
         "/api/auth/register",

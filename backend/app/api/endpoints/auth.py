@@ -20,6 +20,7 @@ from app.schemas.auth import (
     UserPublic,
 )
 from app.services.audit import record_audit_log
+from app.services.request_metadata import request_client_ip_hash, request_device_label, request_user_agent
 from app.services.text import require_trimmed_text
 from app.services.users import find_user_by_normalized_username, require_normalized_username
 
@@ -109,7 +110,11 @@ def login(
     auth_session = AuthSession(
         user_id=user.id,
         token_hash=hash_token(token),
+        device_label=request_device_label(request),
+        user_agent=request_user_agent(request),
         expires_at=now + timedelta(days=settings.session_days),
+        last_seen_at=now,
+        last_seen_ip_hash=request_client_ip_hash(request),
     )
     db.add(auth_session)
     record_audit_log(
@@ -120,7 +125,7 @@ def login(
         resource_id=user.id,
         event_result="success",
         request=request,
-        snapshot={"username": user.username, "role": user.role},
+        snapshot={"username": user.username, "role": user.role, "device_label": auth_session.device_label},
     )
     db.commit()
     response.set_cookie(
@@ -337,8 +342,11 @@ def _revoke_expired_sessions(db: Session, now: datetime) -> None:
 def _session_public(auth_session: AuthSession, current_session_id: int) -> AuthSessionPublic:
     return AuthSessionPublic(
         id=auth_session.id,
+        device_label=auth_session.device_label,
+        user_agent=auth_session.user_agent,
         created_at=auth_session.created_at,
         expires_at=auth_session.expires_at,
+        last_seen_at=auth_session.last_seen_at,
         revoked_at=auth_session.revoked_at,
         is_current=auth_session.id == current_session_id,
     )

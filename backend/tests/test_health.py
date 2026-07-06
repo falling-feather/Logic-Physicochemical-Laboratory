@@ -17,9 +17,12 @@ def test_cors_allows_local_preview_origin(client):
         "/api/render/page/physics/energy-conservation",
         headers={
             "Origin": "http://localhost:8766",
-            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Method": "DELETE",
+            "Access-Control-Request-Headers": "X-Device-Name, Authorization",
         },
     )
 
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://localhost:8766"
+    assert "DELETE" in response.headers["access-control-allow-methods"]
+    assert "X-Device-Name" in response.headers["access-control-allow-headers"]

@@ -33,8 +33,11 @@ class LoginResponse(BaseModel):
 
 class AuthSessionPublic(BaseModel):
     id: int
+    device_label: str | None = None
+    user_agent: str | None = None
     created_at: datetime
     expires_at: datetime
+    last_seen_at: datetime | None = None
     revoked_at: datetime | None = None
     is_current: bool
 

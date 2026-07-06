@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与 semantic 富语义摘要、登录、密码策略、登录失败锁定、活动会话列表与单会话撤销、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、跨班级提交唯一性、学生资源状态可见性、学生侧作业历史/复盘只读入口、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、中文路径/中文 slug 回归、待批改队列、审计元数据、认证事件审计、审计日志 JSON 导出和导出行为审计留痕等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与 semantic 富语义摘要、登录、密码策略、登录失败锁定、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、跨班级提交唯一性、学生资源状态可见性、学生侧作业历史/复盘只读入口、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、中文路径/中文 slug 回归、待批改队列、审计元数据、认证事件审计、审计日志 JSON 导出和导出行为审计留痕等能力。
 
 ## 本地启动
 
@@ -37,9 +37,9 @@ python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-revi
 | 方法 | 路径 | 说明 |
 | ---- | ---- | ---- |
 | POST | `/api/auth/register` | 本地账号注册；用户名会修剪并小写落库，重复校验大小写不敏感；拒绝短密码、纯数字/纯字母、常见弱口令和包含用户名的密码 |
-| POST | `/api/auth/login` | 登录并返回 Bearer token，同时写入 HttpOnly cookie；用户名按规范化值大小写不敏感匹配，连续失败达到阈值返回 `429` 与 `Retry-After`；成功、失败和锁定事件写入审计 |
+| POST | `/api/auth/login` | 登录并返回 Bearer token，同时写入 HttpOnly cookie；用户名按规范化值大小写不敏感匹配，连续失败达到阈值返回 `429` 与 `Retry-After`；成功登录会记录 best-effort 设备标识、登录 user-agent、`last_seen_at` 和 IP 哈希；成功、失败和锁定事件写入审计 |
 | POST | `/api/auth/logout` | 注销当前用户所有活动会话，并写入审计 |
-| GET | `/api/auth/sessions` | 当前用户活动会话列表；只返回未撤销、未过期会话，并标记 `is_current` |
+| GET | `/api/auth/sessions` | 当前用户活动会话列表；只返回未撤销、未过期会话，并标记 `is_current`；返回 `device_label`、登录时 `user_agent`、`last_seen_at` 等会话摘要，不返回 token 或 IP 明文 |
 | DELETE | `/api/auth/sessions/{id}` | 撤销当前用户自己的单个活动会话；撤销当前会话会清理 cookie，并写入 `auth.session.revoke` 审计 |
 | GET | `/api/users/me` | 当前用户；已撤销、过期或非 active 用户会话返回 `401` |
 | POST | `/api/admin/bootstrap` | 首个管理员受控初始化；用户名会修剪并小写落库，复用密码策略，公开注册仍拒绝 admin |
@@ -152,6 +152,8 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 - `app.services.class_join_requests` 负责加入申请审批状态流转和成员关系补齐。
 - `POST /api/classes/{id}/join` 与 `POST /api/classes/{id}/join-requests` 长期并存：前者是保留给受控场景、导入/邀请码或旧 UI 的 direct join，后者是需要教师/admin 审批的申请流；前端不得把审批流表现为唯一加入路径。
 - `app.services.audit` 负责写入审计日志及 request_id、IP 哈希、user-agent 等请求元数据；管理端导出接口默认剥离 `snapshot_json`，需要审查内容快照时必须显式传入 `include_snapshot=true`，且导出完成后会以 `admin.audit.export` 记录筛选条件、导出数量和截断状态，不记录导出条目明细。
+- `app.services.request_metadata` 统一解析请求元数据；审计与会话治理共享 request_id、user-agent 和 IP 哈希口径。`AuthSession.device_label` 优先来自 `X-Device-Label` / `X-Device-Name`，缺省回退到登录 user-agent，因此只是 best-effort 设备摘要，不等同强设备绑定。
+- `app.api.deps.auth.get_current_auth_context()` 会在有效鉴权后刷新当前 `AuthSession.last_seen_at` 和 `last_seen_ip_hash`；当前实现为每次有效请求写入，后续高频节流、长期会话策略和真实 MySQL 并发语义仍需继续治理。
 - `app.services.content_catalog` 负责内容页 seed、正式内容初始化、已发布 schema 读取和内容页摘要；`/api/content/pages*` 与 `/api/render/*` 查询只读 published 当前记录，不在 GET 路径隐式写库，公开响应会剥离原始脚本引用并保留不可执行 `scriptManifest`；正式初始化会显式创建/修复内置内容页版本，默认不覆盖已有差异版本。
 - `app.services.content_script_policy` 负责内容草稿脚本静态分析与后端 sandbox 契约；当前识别脚本引用、外链脚本、事件处理器、阻断协议、路径穿越、内联 `<script>` 和不安全 sandbox 能力，并输出 `script_risk_level`、`script_analysis.sandbox` 与 findings。当前不承担浏览器 iframe/worker 运行时执行。
 - `/api/admin/content/page-versions/{id}/diff` 负责版本对比：旧 `changes` 继续返回 JSON path 级差异，新 `semantic` 汇总 metadata、courseUnit、sections 与 sources 的增删改移，便于后续管理端 UI 展示。
@@ -182,7 +184,7 @@ $env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
 python -m alembic upgrade head
 ```
 
-当前 Alembic head：`20260706_0022`（用户名 normalized key 与登录失败桶数据库唯一约束收口）。
+当前 Alembic head：`20260707_0023`（`AuthSession` 设备摘要与 last_seen 字段）。
 
 知识快照周期重算：
 

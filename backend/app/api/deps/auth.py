@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.core.security import hash_token
 from app.db.session import get_db
 from app.models import AuthSession, User
+from app.services.request_metadata import request_client_ip_hash
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,8 @@ def get_current_auth_context(request: Request, db: Session = Depends(get_db)) ->
     user = db.get(User, auth_session.user_id)
     if user is None or user.status != "active":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user")
+    _touch_auth_session(db, auth_session, request, now)
+    db.refresh(user)
     return AuthContext(user=user, session=auth_session)
 
 
@@ -49,3 +52,10 @@ def _read_token(request: Request) -> str | None:
     if authorization.lower().startswith("bearer "):
         return authorization.split(" ", 1)[1].strip()
     return request.cookies.get(get_settings().session_cookie_name)
+
+
+def _touch_auth_session(db: Session, auth_session: AuthSession, request: Request, now: datetime) -> None:
+    auth_session.last_seen_at = now
+    auth_session.last_seen_ip_hash = request_client_ip_hash(request)
+    db.commit()
+    db.refresh(auth_session)
