@@ -1,6 +1,8 @@
+from sqlalchemy import select
+
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import ContentPageRecord
+from app.models import ContentPageRecord, User
 
 
 def _auth_header(token: str) -> dict:
@@ -82,6 +84,11 @@ def test_admin_bootstrap_normalizes_username(client):
     )
     assert response.status_code == 201
     assert response.json()["username"] == "adminrootcase"
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        stored = db.scalar(select(User).where(User.username == "adminrootcase"))
+        assert stored is not None
+        assert stored.normalized_username == "adminrootcase"
 
     login = client.post(
         "/api/auth/login",

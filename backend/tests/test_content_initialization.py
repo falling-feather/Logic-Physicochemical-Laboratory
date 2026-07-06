@@ -347,8 +347,10 @@ def _migrated_sqlite_database(
 def _create_user(database_url: str, role: str, *, status: str = "active") -> int:
     session_factory = get_session_factory(database_url)
     with session_factory() as db:
+        username = f"{role}_{uuid4().hex[:10]}"
         user = User(
-            username=f"{role}_{uuid4().hex[:10]}",
+            username=username,
+            normalized_username=username,
             display_name=role.title(),
             password_hash="not-used-in-test",
             role=role,

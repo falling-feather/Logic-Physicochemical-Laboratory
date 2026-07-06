@@ -3,6 +3,7 @@ from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
@@ -34,12 +35,17 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> User:
 
     user = User(
         username=username,
+        normalized_username=username,
         display_name=display_name,
         role=role,
         password_hash=hash_password(payload.password),
     )
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Username already exists")
     db.refresh(user)
     return user
 
@@ -160,9 +166,9 @@ def _enforce_password_strength(password: str, username: str) -> None:
 
 
 def _get_login_attempt(db: Session, username: str) -> LoginAttempt:
-    attempt = db.scalar(select(LoginAttempt).where(LoginAttempt.username == username))
+    attempt = db.scalar(select(LoginAttempt).where(LoginAttempt.normalized_username == username))
     if attempt is None:
-        attempt = LoginAttempt(username=username, failure_count=0)
+        attempt = LoginAttempt(username=username, normalized_username=username, failure_count=0)
         db.add(attempt)
     return attempt
 

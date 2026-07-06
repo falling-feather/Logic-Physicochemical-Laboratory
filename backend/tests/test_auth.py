@@ -1,6 +1,8 @@
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.core.config import get_settings
 from app.core.security import hash_password
@@ -183,6 +185,11 @@ def test_register_normalizes_username_and_rejects_case_variant(client):
     )
     assert register.status_code == 201
     assert register.json()["username"] == "mixedteacher"
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        stored = db.scalar(select(User).where(User.username == "mixedteacher"))
+        assert stored is not None
+        assert stored.normalized_username == "mixedteacher"
 
     uppercase_login = client.post(
         "/api/auth/login",
@@ -204,12 +211,40 @@ def test_register_normalizes_username_and_rejects_case_variant(client):
     assert duplicate.json()["detail"] == "Username already exists"
 
 
+def test_user_normalized_username_unique_constraint_blocks_case_variants(client):
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        db.add(
+            User(
+                username="DbCaseTeacher",
+                normalized_username="dbcaseteacher",
+                password_hash=hash_password("secret123"),
+                display_name="DB Case Teacher",
+                role="teacher",
+            )
+        )
+        db.commit()
+
+        db.add(
+            User(
+                username="dbcaseteacher_shadow",
+                normalized_username="dbcaseteacher",
+                password_hash=hash_password("secret123"),
+                display_name="DB Duplicate Teacher",
+                role="teacher",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            db.commit()
+
+
 def test_login_finds_legacy_mixed_case_user_by_normalized_username(client):
     session_factory = get_session_factory(get_settings().database_url)
     with session_factory() as db:
         db.add(
             User(
                 username="LegacyTeacher",
+                normalized_username="legacyteacher",
                 password_hash=hash_password("secret123"),
                 display_name="Legacy Teacher",
                 role="teacher",
@@ -316,8 +351,20 @@ def test_login_rate_limit_uses_normalized_username(client):
     with session_factory() as db:
         attempts = db.scalars(select(LoginAttempt).order_by(LoginAttempt.id)).all()
         assert [attempt.username for attempt in attempts] == ["caselockteacher"]
+        assert [attempt.normalized_username for attempt in attempts] == ["caselockteacher"]
         assert attempts[0].failure_count == max_attempts
         assert attempts[0].locked_until is not None
+
+
+def test_login_attempt_normalized_username_unique_constraint_blocks_case_variants(client):
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        db.add(LoginAttempt(username="CaseLockBucket", normalized_username="caselockbucket", failure_count=1))
+        db.commit()
+
+        db.add(LoginAttempt(username="caselockbucket_shadow", normalized_username="caselockbucket", failure_count=1))
+        with pytest.raises(IntegrityError):
+            db.commit()
 
 
 def test_login_revokes_expired_sessions(client):

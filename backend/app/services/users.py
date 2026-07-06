@@ -1,5 +1,5 @@
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import User
@@ -21,7 +21,7 @@ def require_normalized_username(username: str, *, min_length: int = 1) -> str:
 def find_user_by_normalized_username(db: Session, username: str) -> User | None:
     return db.scalar(
         select(User)
-        .where(func.lower(User.username) == normalize_username(username))
+        .where(User.normalized_username == normalize_username(username))
         .order_by(User.id)
         .limit(1)
     )

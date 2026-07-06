@@ -8,9 +8,11 @@ from app.models.base import Base, TimestampMixin
 
 class User(TimestampMixin, Base):
     __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("normalized_username", name="uq_users_normalized_username"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    normalized_username: Mapped[str] = mapped_column(String(64), nullable=False)
     display_name: Mapped[str] = mapped_column(String(120), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(32), default="student", nullable=False)
@@ -30,9 +32,11 @@ class AuthSession(TimestampMixin, Base):
 
 class LoginAttempt(TimestampMixin, Base):
     __tablename__ = "login_attempts"
+    __table_args__ = (UniqueConstraint("normalized_username", name="uq_login_attempts_normalized_username"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    normalized_username: Mapped[str] = mapped_column(String(64), nullable=False)
     failure_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -3,6 +3,7 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
@@ -103,13 +104,18 @@ def bootstrap_admin(payload: AdminBootstrapRequest, request: Request, db: Sessio
 
     user = User(
         username=username,
+        normalized_username=username,
         display_name=display_name,
         role="admin",
         status="active",
         password_hash=hash_password(payload.password),
     )
     db.add(user)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Username already exists")
     record_audit_log(
         db,
         actor=user,
@@ -120,7 +126,11 @@ def bootstrap_admin(payload: AdminBootstrapRequest, request: Request, db: Sessio
         request=request,
         snapshot={"after": {"username": user.username, "role": user.role, "status": user.status}},
     )
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Username already exists")
     db.refresh(user)
     return user
 

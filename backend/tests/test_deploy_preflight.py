@@ -1,8 +1,11 @@
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
 from alembic import command
 from alembic.config import Config
+from sqlalchemy import text
 
 from app.core.config import get_settings
 from app.db.session import make_engine, reset_database_state
@@ -36,3 +39,114 @@ def test_deploy_preflight_reports_migrated_database(monkeypatch):
         reset_database_state()
         if database_path.exists():
             database_path.unlink()
+
+
+def test_user_normalized_username_migration_rejects_duplicates(monkeypatch):
+    backend_root = Path(__file__).resolve().parents[1]
+    database_path, database_url = _empty_sqlite_database(monkeypatch, backend_root)
+    config = _alembic_config(backend_root)
+    try:
+        command.upgrade(config, "20260706_0021")
+        _insert_user(database_url, "LegacyTeacher")
+        _insert_user(database_url, "legacyteacher")
+
+        with pytest.raises(RuntimeError, match="Duplicate normalized usernames"):
+            command.upgrade(config, "head")
+    finally:
+        _dispose_and_remove(database_url, database_path)
+
+
+def test_login_attempt_normalized_username_migration_clears_duplicate_buckets(monkeypatch):
+    backend_root = Path(__file__).resolve().parents[1]
+    database_path, database_url = _empty_sqlite_database(monkeypatch, backend_root)
+    config = _alembic_config(backend_root)
+    try:
+        command.upgrade(config, "20260706_0021")
+        _insert_login_attempt(database_url, "CaseLockTeacher")
+        _insert_login_attempt(database_url, "caselockteacher")
+
+        command.upgrade(config, "head")
+
+        engine = make_engine(database_url)
+        with engine.connect() as connection:
+            count = connection.execute(text("SELECT COUNT(*) FROM login_attempts")).scalar_one()
+            assert int(count) == 0
+    finally:
+        _dispose_and_remove(database_url, database_path)
+
+
+def _empty_sqlite_database(monkeypatch, backend_root: Path) -> tuple[Path, str]:
+    runtime_dir = backend_root / "pytest-cache-files-preflight"
+    runtime_dir.mkdir(exist_ok=True)
+    database_path = runtime_dir / f"preflight-{uuid4().hex}.db"
+    database_url = f"sqlite+pysqlite:///{database_path.as_posix()}"
+    monkeypatch.setenv("ASTRA_DATABASE_URL", database_url)
+    get_settings.cache_clear()
+    reset_database_state()
+    return database_path, database_url
+
+
+def _alembic_config(backend_root: Path) -> Config:
+    config = Config(str(backend_root / "alembic.ini"))
+    config.set_main_option("script_location", str(backend_root / "alembic"))
+    return config
+
+
+def _insert_user(database_url: str, username: str) -> None:
+    now = datetime.now(UTC)
+    engine = make_engine(database_url)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO users (
+                    username, display_name, password_hash, role, status, created_at, updated_at
+                )
+                VALUES (
+                    :username, :display_name, :password_hash, :role, :status, :created_at, :updated_at
+                )
+                """
+            ),
+            {
+                "username": username,
+                "display_name": username,
+                "password_hash": "not-used-in-test",
+                "role": "teacher",
+                "status": "active",
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
+
+
+def _insert_login_attempt(database_url: str, username: str) -> None:
+    now = datetime.now(UTC)
+    engine = make_engine(database_url)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO login_attempts (
+                    username, failure_count, locked_until, last_failed_at, created_at, updated_at
+                )
+                VALUES (
+                    :username, :failure_count, NULL, :last_failed_at, :created_at, :updated_at
+                )
+                """
+            ),
+            {
+                "username": username,
+                "failure_count": 1,
+                "last_failed_at": now,
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
+
+
+def _dispose_and_remove(database_url: str, database_path: Path) -> None:
+    make_engine(database_url).dispose()
+    get_settings.cache_clear()
+    reset_database_state()
+    if database_path.exists():
+        database_path.unlink()
