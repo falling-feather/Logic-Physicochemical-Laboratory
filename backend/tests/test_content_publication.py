@@ -616,8 +616,16 @@ def test_allowlisted_external_script_asset_requires_review_before_publish(client
             json={"status": "approved", "note": "External script host, SRI and crossorigin reviewed"},
         )
         assert approve.status_code == 200
-        approve_codes = {finding["code"] for finding in approve.json()["script_analysis"]["findings"]}
+        approve_findings = approve.json()["script_analysis"]["findings"]
+        approve_codes = {finding["code"] for finding in approve_findings}
         assert "script_integrity_verified" in approve_codes
+        verified_finding = next(finding for finding in approve_findings if finding["code"] == "script_integrity_verified")
+        assert verified_finding["metadata"] == {
+            "asset_sha256": hashlib.sha256(asset_bytes).hexdigest(),
+            "asset_size_bytes": len(asset_bytes),
+            "integrity_token_count": 1,
+            "matched_algorithm": "sha384",
+        }
 
         publish_after_review = client.post(
             f"/api/content/drafts/{draft_id}/publish",
@@ -676,8 +684,13 @@ def test_external_script_asset_publish_rechecks_current_sri_bytes(client, monkey
             json={"status": "approved", "note": "External script bytes verified"},
         )
         assert approve.status_code == 200
-        approve_codes = {finding["code"] for finding in approve.json()["script_analysis"]["findings"]}
+        approve_findings = approve.json()["script_analysis"]["findings"]
+        approve_codes = {finding["code"] for finding in approve_findings}
         assert "script_integrity_verified" in approve_codes
+        verified_finding = next(finding for finding in approve_findings if finding["code"] == "script_integrity_verified")
+        assert verified_finding["metadata"]["asset_sha256"] == hashlib.sha256(asset_bytes).hexdigest()
+        assert verified_finding["metadata"]["asset_size_bytes"] == len(asset_bytes)
+        assert verified_finding["metadata"]["matched_algorithm"] == "sha384"
 
         monkeypatch.setattr(
             content_script_policy,

@@ -14,7 +14,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 from app.schemas.content import ContentPage
 
 
-SCRIPT_POLICY_VERSION = "2026-07-07.3"
+SCRIPT_POLICY_VERSION = "2026-07-07.4"
 MAX_FINDINGS = 50
 MAX_EXTERNAL_SCRIPT_BYTES = 1_000_000
 EXTERNAL_SCRIPT_FETCH_TIMEOUT_SECONDS = 10
@@ -57,6 +57,7 @@ class ScriptPolicyFinding:
     value_type: str | None = None
     value_preview: str | None = None
     value_sha256: str | None = None
+    metadata: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -70,6 +71,7 @@ class ScriptPolicyFinding:
                 "value_type": self.value_type,
                 "value_preview": self.value_preview,
                 "value_sha256": self.value_sha256,
+                "metadata": self.metadata,
             }.items()
             if value is not None
         }
@@ -170,6 +172,7 @@ def script_policy_result_from_json(payload: dict[str, Any] | None) -> ScriptPoli
             value_type=item.get("value_type"),
             value_preview=item.get("value_preview"),
             value_sha256=item.get("value_sha256"),
+            metadata=item.get("metadata") if isinstance(item.get("metadata"), dict) else None,
         )
         for item in payload.get("findings", [])
         if isinstance(item, dict)
@@ -472,7 +475,8 @@ def _verify_external_script_asset(
             )
         )
         return
-    if not _sri_matches_asset(integrity, asset_bytes):
+    verification_metadata = _external_script_asset_verification_metadata(integrity, asset_bytes)
+    if "matched_algorithm" not in verification_metadata:
         findings.append(
             _finding(
                 code="script_integrity_mismatch",
@@ -481,6 +485,7 @@ def _verify_external_script_asset(
                 key=key,
                 value=url,
                 message="External script asset bytes do not match the declared SRI hash.",
+                metadata=verification_metadata,
             )
         )
         return
@@ -492,6 +497,7 @@ def _verify_external_script_asset(
             key=key,
             value=url,
             message="External script asset was downloaded and matched the declared SRI hash.",
+            metadata=verification_metadata,
         )
     )
 
@@ -732,6 +738,7 @@ def _finding(
     key: str | None = None,
     value: Any = None,
     omit_preview: bool = False,
+    metadata: dict[str, Any] | None = None,
 ) -> ScriptPolicyFinding:
     value_type = type(value).__name__ if value is not None else None
     value_text = value if isinstance(value, str) else None
@@ -744,6 +751,7 @@ def _finding(
         value_type=value_type,
         value_preview=None if omit_preview else _preview(value_text),
         value_sha256=_sha256(value_text) if value_text is not None else None,
+        metadata=metadata,
     )
 
 
@@ -803,11 +811,19 @@ def _valid_sri(value: str) -> bool:
     return bool(tokens) and all(SRI_PATTERN.match(token) for token in tokens)
 
 
-def _sri_matches_asset(integrity: str, asset_bytes: bytes) -> bool:
-    for token in [item.strip() for item in integrity.split() if item.strip()]:
+def _external_script_asset_verification_metadata(integrity: str, asset_bytes: bytes) -> dict[str, Any]:
+    tokens = [item.strip() for item in integrity.split() if item.strip()]
+    metadata: dict[str, Any] = {
+        "asset_sha256": hashlib.sha256(asset_bytes).hexdigest(),
+        "asset_size_bytes": len(asset_bytes),
+        "integrity_token_count": len(tokens),
+    }
+    for token in tokens:
+        algorithm, _ = token.split("-", 1)
         if _sri_token_matches_asset(token, asset_bytes):
-            return True
-    return False
+            metadata["matched_algorithm"] = algorithm
+            break
+    return metadata
 
 
 def _sri_token_matches_asset(token: str, asset_bytes: bytes) -> bool:

@@ -2,7 +2,11 @@ import base64
 import hashlib
 
 from app.services import content_script_policy
-from app.services.content_script_policy import analyze_content_script_policy, public_content_page_schema
+from app.services.content_script_policy import (
+    analyze_content_script_policy,
+    public_content_page_schema,
+    script_policy_result_from_json,
+)
 
 
 def test_script_policy_accepts_clean_schema():
@@ -131,6 +135,18 @@ def test_script_policy_verifies_external_script_asset_sri_with_fetcher():
     assert "script_integrity_verified" in codes
     assert "script_integrity_mismatch" not in codes
     assert "external_script_asset_unavailable" not in codes
+    verified_finding = next(finding for finding in result.findings if finding.code == "script_integrity_verified")
+    assert verified_finding.metadata == {
+        "asset_sha256": hashlib.sha256(asset_bytes).hexdigest(),
+        "asset_size_bytes": len(asset_bytes),
+        "integrity_token_count": 1,
+        "matched_algorithm": "sha384",
+    }
+
+    restored = script_policy_result_from_json(result.to_json(schema_hash="schema-hash"))
+    assert restored is not None
+    restored_verified = next(finding for finding in restored.findings if finding.code == "script_integrity_verified")
+    assert restored_verified.metadata == verified_finding.metadata
 
 
 def test_script_policy_blocks_external_script_asset_sri_mismatch():
@@ -157,6 +173,12 @@ def test_script_policy_blocks_external_script_asset_sri_mismatch():
     assert result.has_blocking_findings is True
     assert "script_integrity_mismatch" in codes
     assert "script_integrity_verified" not in codes
+    mismatch_finding = next(finding for finding in result.findings if finding.code == "script_integrity_mismatch")
+    assert mismatch_finding.metadata == {
+        "asset_sha256": hashlib.sha256(b"console.log('changed asset');\n").hexdigest(),
+        "asset_size_bytes": len(b"console.log('changed asset');\n"),
+        "integrity_token_count": 1,
+    }
 
 
 def test_script_policy_blocks_external_script_asset_download_failure():

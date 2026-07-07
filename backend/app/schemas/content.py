@@ -123,6 +123,7 @@ class ScriptAnalysisFindingRead(BaseModel):
     value_type: str | None = None
     value_preview: str | None = None
     value_sha256: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class ScriptAnalysisRead(BaseModel):
