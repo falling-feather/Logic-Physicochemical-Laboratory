@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -439,6 +439,65 @@ class AdminKnowledgeSnapshotRunHealthReport(BaseModel):
     oldest_running_started_at: datetime | None = None
     next_lease_expires_at: datetime | None = None
     newest_finished_at: datetime | None = None
+
+
+class AdminKnowledgeSnapshotRunQueueItem(BaseModel):
+    source: Literal[
+        "due",
+        "pending",
+        "retryable_failed",
+        "exhausted_failed",
+        "cancelled",
+        "stale_running",
+        "active_running",
+        "legacy_running",
+    ]
+    reason: str
+    ready: bool
+    claimable: bool
+    run_id: int | None = None
+    run_key: str
+    granularity: str
+    reference_date: date
+    period_start: datetime
+    period_end: datetime
+    status: str
+    trigger_source: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    scheduler_lease_owner: str | None = None
+    scheduler_lease_expires_at: datetime | None = None
+    scheduler_heartbeat_at: datetime | None = None
+    attempt_count: int | None = None
+
+
+class AdminKnowledgeSnapshotRunQueueReport(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    queue_status: Literal["empty", "ready", "backlog"]
+    backlog_count: int
+    ready_count: int
+    dispatchable_now_count: int
+    claimable_by_lease_rule_count: int
+    due_count: int
+    pending_count: int
+    manual_requeue_count: int
+    blocked_count: int
+    retryable_failed_count: int
+    exhausted_failed_count: int
+    cancelled_count: int
+    stale_running_count: int
+    active_running_count: int
+    legacy_running_without_lease_count: int
+    by_granularity: dict[str, int]
+    ready_jobs: list[AdminKnowledgeSnapshotRunQueueItem]
+    manual_requeue_runs: list[AdminKnowledgeSnapshotRunQueueItem]
+    blocked_runs: list[AdminKnowledgeSnapshotRunQueueItem]
+    next_due_jobs: list[AdminKnowledgeSnapshotRunQueueItem]
+    oldest_ready_at: datetime | None = None
+    oldest_manual_requeue_at: datetime | None = None
+    next_lease_expires_at: datetime | None = None
 
 
 class AuditLogRead(BaseModel):

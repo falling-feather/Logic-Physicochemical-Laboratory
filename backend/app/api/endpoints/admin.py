@@ -1,7 +1,7 @@
 import csv
 import io
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -56,6 +56,8 @@ from app.schemas.admin import (
     AdminKnowledgeSnapshotRunHealthReport,
     AdminKnowledgeSnapshotRunHealthItem,
     AdminKnowledgeSnapshotRunPage,
+    AdminKnowledgeSnapshotRunQueueItem,
+    AdminKnowledgeSnapshotRunQueueReport,
     AdminKnowledgeSnapshotRunRead,
     AdminKnowledgeSnapshotRunRequeueRequest,
     AdminKnowledgeSnapshotRunStatusBucket,
@@ -98,7 +100,18 @@ from app.services.class_join_requests import (
 )
 from app.services.text import require_trimmed_text
 from app.services.users import find_user_by_normalized_username, require_normalized_username
-from app.services.knowledge_snapshot_runs import cancel_knowledge_snapshot_run, requeue_knowledge_snapshot_run
+from app.services.knowledge_snapshot_runs import (
+    cancel_knowledge_snapshot_run,
+    requeue_knowledge_snapshot_run,
+    snapshot_run_key,
+    snapshot_window,
+)
+from app.services.knowledge_snapshot_scheduler import (
+    SnapshotScheduleConfig,
+    SnapshotScheduleJob,
+    due_snapshot_jobs,
+    should_run_snapshot_job,
+)
 
 
 router = APIRouter()
@@ -863,6 +876,59 @@ def read_knowledge_snapshot_run_health(
         event_result="success",
         request=request,
         snapshot=_knowledge_snapshot_run_health_snapshot(report),
+    )
+    db.commit()
+    return report
+
+
+@router.get("/knowledge-snapshot-runs/queue", response_model=AdminKnowledgeSnapshotRunQueueReport)
+def read_knowledge_snapshot_run_queue(
+    request: Request,
+    granularity: str | None = Query(default=None),
+    trigger_source: str | None = Query(default=None),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    now_at: datetime | None = Query(default=None, alias="now"),
+    item_limit: int = Query(default=20, ge=0, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminKnowledgeSnapshotRunQueueReport:
+    _require_admin(current_user)
+    if from_at is not None and to_at is not None and from_at > to_at:
+        raise HTTPException(status_code=422, detail="from must be earlier than to")
+    settings = get_settings()
+    generated_at = now_at or datetime.now(UTC)
+    statement = _knowledge_snapshot_run_statement(
+        granularity=granularity,
+        trigger_source=trigger_source,
+        from_at=from_at,
+        to_at=to_at,
+    )
+    filters = _knowledge_snapshot_run_filters(
+        granularity=granularity,
+        trigger_source=trigger_source,
+        from_at=from_at,
+        to_at=to_at,
+    )
+    filters["now"] = now_at.isoformat() if now_at is not None else None
+    report = _knowledge_snapshot_run_queue_report(
+        db,
+        statement=statement,
+        filters=filters,
+        schedule_config=_knowledge_snapshot_schedule_config(settings),
+        retry_attempts=settings.knowledge_snapshot_retry_attempts,
+        lease_seconds=settings.knowledge_snapshot_scheduler_lease_seconds,
+        item_limit=item_limit,
+        generated_at=generated_at,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.knowledge_snapshot_run.queue_report",
+        resource_type="knowledge_snapshot_run",
+        event_result="success",
+        request=request,
+        snapshot=_knowledge_snapshot_run_queue_snapshot(report),
     )
     db.commit()
     return report
@@ -1978,6 +2044,375 @@ def _knowledge_snapshot_run_health_snapshot(report: AdminKnowledgeSnapshotRunHea
         "needs_attention_count": report.needs_attention_count,
         "problem_count": report.problem_count,
     }
+
+
+def _knowledge_snapshot_run_queue_report(
+    db: Session,
+    *,
+    statement: Any,
+    filters: dict[str, Any],
+    schedule_config: SnapshotScheduleConfig,
+    retry_attempts: int,
+    lease_seconds: int,
+    item_limit: int,
+    generated_at: datetime,
+) -> AdminKnowledgeSnapshotRunQueueReport:
+    runs = list(db.scalars(statement).all())
+    generated_at_naive = _naive_utc(generated_at)
+    due_jobs = due_snapshot_jobs(generated_at_naive, schedule_config)
+    if filters["granularity"] is not None:
+        due_jobs = [job for job in due_jobs if job.granularity == filters["granularity"]]
+
+    ready_jobs: list[AdminKnowledgeSnapshotRunQueueItem] = []
+    manual_requeue_runs: list[AdminKnowledgeSnapshotRunQueueItem] = []
+    blocked_runs: list[AdminKnowledgeSnapshotRunQueueItem] = []
+    next_due_jobs: list[AdminKnowledgeSnapshotRunQueueItem] = []
+    ready_keys: set[tuple[str, date]] = set()
+    next_lease_expires_at: datetime | None = None
+
+    for job in due_jobs:
+        item = _knowledge_snapshot_due_queue_item(db, job, retry_attempts, lease_seconds, generated_at_naive)
+        if item is None:
+            continue
+        if _knowledge_snapshot_queue_item_matches_filters(item, filters):
+            next_due_jobs.append(item)
+            if item.ready:
+                ready_jobs.append(item)
+                ready_keys.add((item.granularity, item.reference_date))
+
+    retryable_failed_count = 0
+    exhausted_failed_count = 0
+    cancelled_count = 0
+    stale_running_count = 0
+    active_running_count = 0
+    legacy_running_without_lease_count = 0
+    pending_count = 0
+    claimable_by_lease_rule_count = 0
+
+    for run in runs:
+        key = (run.granularity, run.period_start.date())
+        if run.status == "pending":
+            pending_count += 1
+            claimable_by_lease_rule_count += 1
+            if key not in ready_keys:
+                item = _knowledge_snapshot_run_queue_item(
+                    run,
+                    source="pending",
+                    reason="pending_run_waiting_for_scheduler",
+                    ready=True,
+                    claimable=True,
+                )
+                ready_jobs.append(item)
+                ready_keys.add(key)
+        elif run.status == "failed":
+            retryable = run.attempt_count < retry_attempts
+            if retryable:
+                retryable_failed_count += 1
+                claimable_by_lease_rule_count += 1
+                source = "retryable_failed"
+                reason = "manual_requeue_available_retryable_failed"
+            else:
+                exhausted_failed_count += 1
+                source = "exhausted_failed"
+                reason = "manual_requeue_available_exhausted_failed"
+            manual_requeue_runs.append(
+                _knowledge_snapshot_run_queue_item(
+                    run,
+                    source=source,
+                    reason=reason,
+                    ready=False,
+                    claimable=retryable,
+                )
+            )
+        elif run.status == "cancelled":
+            cancelled_count += 1
+            manual_requeue_runs.append(
+                _knowledge_snapshot_run_queue_item(
+                    run,
+                    source="cancelled",
+                    reason="manual_requeue_available_cancelled",
+                    ready=False,
+                    claimable=False,
+                )
+            )
+        elif run.status == "running":
+            lease_expired = _knowledge_snapshot_run_lease_expired(run, generated_at_naive, lease_seconds)
+            if run.scheduler_lease_token is None:
+                legacy_running_without_lease_count += 1
+            lease_expires_at = _naive_utc(run.scheduler_lease_expires_at) if run.scheduler_lease_expires_at else None
+            if lease_expires_at is not None and lease_expires_at > generated_at_naive:
+                if next_lease_expires_at is None or lease_expires_at < _naive_utc(next_lease_expires_at):
+                    next_lease_expires_at = run.scheduler_lease_expires_at
+            if lease_expired and run.scheduler_lease_token is not None:
+                stale_running_count += 1
+                claimable_by_lease_rule_count += 1
+                if key not in ready_keys:
+                    manual_requeue_runs.append(
+                        _knowledge_snapshot_run_queue_item(
+                            run,
+                            source="stale_running",
+                            reason="manual_requeue_available_stale_running",
+                            ready=False,
+                            claimable=True,
+                        )
+                    )
+            elif lease_expired:
+                stale_running_count += 1
+                claimable_by_lease_rule_count += 1
+                blocked_runs.append(
+                    _knowledge_snapshot_run_queue_item(
+                        run,
+                        source="legacy_running",
+                        reason="legacy_running_without_scheduler_lease",
+                        ready=False,
+                        claimable=False,
+                    )
+                )
+            else:
+                active_running_count += 1
+                blocked_runs.append(
+                    _knowledge_snapshot_run_queue_item(
+                        run,
+                        source="active_running" if run.scheduler_lease_token is not None else "legacy_running",
+                        reason="active_running_lease_not_expired"
+                        if run.scheduler_lease_token is not None
+                        else "legacy_running_without_scheduler_lease",
+                        ready=False,
+                        claimable=False,
+                    )
+                )
+
+    ready_jobs = _sort_knowledge_snapshot_queue_items(ready_jobs)
+    manual_requeue_runs = _sort_knowledge_snapshot_queue_items(manual_requeue_runs)
+    blocked_runs = _sort_knowledge_snapshot_queue_items(blocked_runs)
+    next_due_jobs = _sort_knowledge_snapshot_queue_items(next_due_jobs)
+    ready_count = len(ready_jobs)
+    manual_requeue_count = len(manual_requeue_runs)
+    blocked_count = len(blocked_runs)
+    backlog_count = ready_count + manual_requeue_count + blocked_count
+    if ready_count > 0:
+        queue_status: Literal["empty", "ready", "backlog"] = "ready"
+    elif backlog_count > 0:
+        queue_status = "backlog"
+    else:
+        queue_status = "empty"
+
+    by_granularity: dict[str, int] = {}
+    for item in ready_jobs + manual_requeue_runs + blocked_runs:
+        by_granularity[item.granularity] = by_granularity.get(item.granularity, 0) + 1
+
+    return AdminKnowledgeSnapshotRunQueueReport(
+        generated_at=generated_at,
+        filters=filters,
+        policy={
+            "retry_attempts": retry_attempts,
+            "lease_seconds": lease_seconds,
+            "item_limit": item_limit,
+            "daily_enabled": schedule_config.daily_enabled,
+            "daily_hour": schedule_config.daily_hour,
+            "weekly_enabled": schedule_config.weekly_enabled,
+            "weekly_weekday": schedule_config.weekly_weekday,
+            "weekly_hour": schedule_config.weekly_hour,
+        },
+        queue_status=queue_status,
+        backlog_count=backlog_count,
+        ready_count=ready_count,
+        dispatchable_now_count=ready_count,
+        claimable_by_lease_rule_count=claimable_by_lease_rule_count,
+        due_count=sum(1 for item in ready_jobs if item.source == "due"),
+        pending_count=pending_count,
+        manual_requeue_count=manual_requeue_count,
+        blocked_count=blocked_count,
+        retryable_failed_count=retryable_failed_count,
+        exhausted_failed_count=exhausted_failed_count,
+        cancelled_count=cancelled_count,
+        stale_running_count=stale_running_count,
+        active_running_count=active_running_count,
+        legacy_running_without_lease_count=legacy_running_without_lease_count,
+        by_granularity=by_granularity,
+        ready_jobs=ready_jobs[:item_limit],
+        manual_requeue_runs=manual_requeue_runs[:item_limit],
+        blocked_runs=blocked_runs[:item_limit],
+        next_due_jobs=next_due_jobs[:item_limit],
+        oldest_ready_at=_oldest_queue_item_started_at(ready_jobs),
+        oldest_manual_requeue_at=_oldest_queue_item_started_at(manual_requeue_runs),
+        next_lease_expires_at=next_lease_expires_at,
+    )
+
+
+def _knowledge_snapshot_due_queue_item(
+    db: Session,
+    job: SnapshotScheduleJob,
+    retry_attempts: int,
+    lease_seconds: int,
+    now: datetime,
+) -> AdminKnowledgeSnapshotRunQueueItem | None:
+    period_start, period_end = snapshot_window(job.granularity, job.reference_date)
+    run_key = snapshot_run_key(job.granularity, period_start, period_end)
+    should_run = should_run_snapshot_job(
+        db,
+        job,
+        retry_attempts=retry_attempts,
+        lease_seconds=lease_seconds,
+        now=now,
+    )
+    run = db.scalar(select(KnowledgeSnapshotRun).where(KnowledgeSnapshotRun.run_key == run_key))
+    if not should_run and run is None:
+        return None
+    if run is None:
+        return AdminKnowledgeSnapshotRunQueueItem(
+            source="due",
+            reason="due_window_missing_run",
+            ready=True,
+            claimable=True,
+            run_key=run_key,
+            granularity=job.granularity,
+            reference_date=job.reference_date,
+            period_start=period_start,
+            period_end=period_end,
+            status="missing",
+        )
+    if not should_run:
+        return _knowledge_snapshot_run_queue_item(
+            run,
+            source="due",
+            reason=f"due_window_{run.status}_not_ready",
+            ready=False,
+            claimable=False,
+        )
+    if run.status == "pending":
+        reason = "due_window_pending"
+    elif run.status == "failed":
+        reason = "due_window_retryable_failed" if run.attempt_count < retry_attempts else "due_window_failed"
+    elif run.status == "running":
+        reason = "due_window_stale_running"
+    else:
+        reason = "due_window_ready"
+    return _knowledge_snapshot_run_queue_item(
+        run,
+        source="due",
+        reason=reason,
+        ready=True,
+        claimable=True,
+    )
+
+
+def _knowledge_snapshot_run_queue_item(
+    run: KnowledgeSnapshotRun,
+    *,
+    source: Literal[
+        "due",
+        "pending",
+        "retryable_failed",
+        "exhausted_failed",
+        "cancelled",
+        "stale_running",
+        "active_running",
+        "legacy_running",
+    ],
+    reason: str,
+    ready: bool,
+    claimable: bool,
+) -> AdminKnowledgeSnapshotRunQueueItem:
+    return AdminKnowledgeSnapshotRunQueueItem(
+        source=source,
+        reason=reason,
+        ready=ready,
+        claimable=claimable,
+        run_id=run.id,
+        run_key=run.run_key,
+        granularity=run.granularity,
+        reference_date=run.period_start.date(),
+        period_start=run.period_start,
+        period_end=run.period_end,
+        status=run.status,
+        trigger_source=run.trigger_source,
+        started_at=run.started_at,
+        finished_at=run.finished_at,
+        scheduler_lease_owner=run.scheduler_lease_owner,
+        scheduler_lease_expires_at=run.scheduler_lease_expires_at,
+        scheduler_heartbeat_at=run.scheduler_heartbeat_at,
+        attempt_count=run.attempt_count,
+    )
+
+
+def _knowledge_snapshot_queue_item_matches_filters(
+    item: AdminKnowledgeSnapshotRunQueueItem,
+    filters: dict[str, Any],
+) -> bool:
+    if filters["granularity"] is not None and item.granularity != filters["granularity"]:
+        return False
+    if filters["trigger_source"] is not None and item.trigger_source != filters["trigger_source"]:
+        return False
+    if filters["from"] is not None:
+        if item.started_at is None or _naive_utc(item.started_at) < _naive_utc(datetime.fromisoformat(filters["from"])):
+            return False
+    if filters["to"] is not None:
+        if item.started_at is None or _naive_utc(item.started_at) > _naive_utc(datetime.fromisoformat(filters["to"])):
+            return False
+    return True
+
+
+def _sort_knowledge_snapshot_queue_items(
+    items: list[AdminKnowledgeSnapshotRunQueueItem],
+) -> list[AdminKnowledgeSnapshotRunQueueItem]:
+    source_order = {
+        "due": 0,
+        "pending": 1,
+        "stale_running": 2,
+        "retryable_failed": 3,
+        "exhausted_failed": 4,
+        "cancelled": 5,
+        "active_running": 6,
+        "legacy_running": 7,
+    }
+
+    def sort_key(item: AdminKnowledgeSnapshotRunQueueItem) -> tuple[int, datetime, str, int]:
+        base_time = item.started_at or item.period_start
+        return (source_order.get(item.source, 99), _naive_utc(base_time), item.run_key, item.run_id or 0)
+
+    return sorted(items, key=sort_key)
+
+
+def _oldest_queue_item_started_at(items: list[AdminKnowledgeSnapshotRunQueueItem]) -> datetime | None:
+    started_values = [item.started_at for item in items if item.started_at is not None]
+    if not started_values:
+        return None
+    return min(started_values, key=_naive_utc)
+
+
+def _knowledge_snapshot_run_queue_snapshot(report: AdminKnowledgeSnapshotRunQueueReport) -> dict[str, Any]:
+    return {
+        "format": "queue",
+        "filters": report.filters,
+        "policy": report.policy,
+        "queue_status": report.queue_status,
+        "backlog_count": report.backlog_count,
+        "ready_count": report.ready_count,
+        "dispatchable_now_count": report.dispatchable_now_count,
+        "claimable_by_lease_rule_count": report.claimable_by_lease_rule_count,
+        "due_count": report.due_count,
+        "pending_count": report.pending_count,
+        "manual_requeue_count": report.manual_requeue_count,
+        "blocked_count": report.blocked_count,
+        "retryable_failed_count": report.retryable_failed_count,
+        "exhausted_failed_count": report.exhausted_failed_count,
+        "cancelled_count": report.cancelled_count,
+        "stale_running_count": report.stale_running_count,
+        "active_running_count": report.active_running_count,
+        "legacy_running_without_lease_count": report.legacy_running_without_lease_count,
+        "by_granularity": report.by_granularity,
+    }
+
+
+def _knowledge_snapshot_schedule_config(settings: Any) -> SnapshotScheduleConfig:
+    return SnapshotScheduleConfig(
+        daily_enabled=settings.knowledge_snapshot_daily_enabled,
+        daily_hour=settings.knowledge_snapshot_daily_hour,
+        weekly_enabled=settings.knowledge_snapshot_weekly_enabled,
+        weekly_weekday=settings.knowledge_snapshot_weekly_weekday,
+        weekly_hour=settings.knowledge_snapshot_weekly_hour,
+    )
 
 
 def _sort_knowledge_snapshot_problem_runs(
