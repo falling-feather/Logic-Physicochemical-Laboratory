@@ -380,6 +380,63 @@ class AdminKnowledgeSnapshotRunPage(BaseModel):
     next_offset: int | None = None
 
 
+class AdminKnowledgeSnapshotRunStatusBucket(BaseModel):
+    status: str | None = None
+    total: int
+
+
+class AdminKnowledgeSnapshotRunHealthItem(BaseModel):
+    id: int
+    run_key: str
+    granularity: str
+    period_start: datetime
+    period_end: datetime
+    trigger_source: str
+    status: str
+    started_at: datetime
+    finished_at: datetime | None = None
+    scheduler_lease_owner: str | None = None
+    scheduler_lease_expires_at: datetime | None = None
+    scheduler_heartbeat_at: datetime | None = None
+    attempt_count: int
+    user_snapshot_count: int
+    class_snapshot_count: int
+    error_message: str | None = None
+    health_flags: list[str]
+    retryable: bool
+    claimable: bool
+    cancellable: bool
+    lease_seconds_remaining: int | None = None
+
+
+class AdminKnowledgeSnapshotRunHealthReport(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    health_status: Literal["ok", "warning", "attention"]
+    total: int
+    by_status: list[AdminKnowledgeSnapshotRunStatusBucket]
+    running_count: int
+    active_running_count: int
+    stale_running_count: int
+    lease_expiring_count: int
+    legacy_running_without_lease_count: int
+    claimable_count: int
+    pending_count: int
+    success_count: int
+    failed_count: int
+    retryable_failed_count: int
+    exhausted_failed_count: int
+    cancelled_count: int
+    needs_attention_count: int
+    problem_count: int
+    problem_runs: list[AdminKnowledgeSnapshotRunHealthItem]
+    latest_success_by_granularity: dict[str, datetime | None]
+    oldest_running_started_at: datetime | None = None
+    next_lease_expires_at: datetime | None = None
+    newest_finished_at: datetime | None = None
+
+
 class AuditLogRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

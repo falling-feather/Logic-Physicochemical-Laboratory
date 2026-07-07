@@ -1279,6 +1279,199 @@ def test_admin_can_list_and_cancel_knowledge_snapshot_runs(client):
         assert stored.metadata_json["previous_status"] == "running"
 
 
+def test_admin_can_read_knowledge_snapshot_run_health(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "snapshot_health_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    settings = get_settings()
+    now = datetime.now(UTC).replace(microsecond=0)
+    retryable_attempts = max(settings.knowledge_snapshot_retry_attempts - 1, 0)
+    with session_factory() as db:
+        runs = [
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:active",
+                granularity="day",
+                period_start=now - timedelta(days=8),
+                period_end=now - timedelta(days=8) + timedelta(hours=23, minutes=59),
+                trigger_source="scheduler",
+                status="running",
+                started_at=now - timedelta(minutes=10),
+                scheduler_lease_owner="worker-active",
+                scheduler_lease_token="secret-active-token",
+                scheduler_lease_expires_at=now + timedelta(hours=1),
+                scheduler_heartbeat_at=now - timedelta(minutes=1),
+                attempt_count=1,
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:expiring",
+                granularity="day",
+                period_start=now - timedelta(days=7),
+                period_end=now - timedelta(days=7) + timedelta(hours=23, minutes=59),
+                trigger_source="scheduler",
+                status="running",
+                started_at=now - timedelta(minutes=20),
+                scheduler_lease_owner="worker-expiring",
+                scheduler_lease_token="secret-expiring-token",
+                scheduler_lease_expires_at=now + timedelta(minutes=5),
+                scheduler_heartbeat_at=now - timedelta(minutes=1),
+                attempt_count=1,
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:stale",
+                granularity="day",
+                period_start=now - timedelta(days=6),
+                period_end=now - timedelta(days=6) + timedelta(hours=23, minutes=59),
+                trigger_source="scheduler",
+                status="running",
+                started_at=now - timedelta(hours=2),
+                scheduler_lease_owner="worker-stale",
+                scheduler_lease_token="secret-stale-token",
+                scheduler_lease_expires_at=now - timedelta(minutes=1),
+                scheduler_heartbeat_at=now - timedelta(hours=1),
+                attempt_count=1,
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:legacy",
+                granularity="day",
+                period_start=now - timedelta(days=5),
+                period_end=now - timedelta(days=5) + timedelta(hours=23, minutes=59),
+                trigger_source="script",
+                status="running",
+                started_at=now - timedelta(seconds=settings.knowledge_snapshot_scheduler_lease_seconds + 60),
+                attempt_count=1,
+                metadata_json={"trigger_source": "script"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:retryable",
+                granularity="day",
+                period_start=now - timedelta(days=4),
+                period_end=now - timedelta(days=4) + timedelta(hours=23, minutes=59),
+                trigger_source="scheduler",
+                status="failed",
+                started_at=now - timedelta(hours=4),
+                finished_at=now - timedelta(hours=3, minutes=59),
+                attempt_count=retryable_attempts,
+                error_message="SnapshotRunLeaseLost",
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:exhausted",
+                granularity="day",
+                period_start=now - timedelta(days=3),
+                period_end=now - timedelta(days=3) + timedelta(hours=23, minutes=59),
+                trigger_source="scheduler",
+                status="failed",
+                started_at=now - timedelta(hours=3),
+                finished_at=now - timedelta(hours=2, minutes=59),
+                attempt_count=settings.knowledge_snapshot_retry_attempts,
+                error_message="RuntimeError",
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:pending",
+                granularity="week",
+                period_start=now - timedelta(days=14),
+                period_end=now - timedelta(days=8),
+                trigger_source="queue",
+                status="pending",
+                started_at=now - timedelta(hours=2),
+                attempt_count=0,
+                metadata_json={"trigger_source": "queue"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:success",
+                granularity="day",
+                period_start=now - timedelta(days=2),
+                period_end=now - timedelta(days=2) + timedelta(hours=23, minutes=59),
+                trigger_source="scheduler",
+                status="success",
+                started_at=now - timedelta(hours=2),
+                finished_at=now - timedelta(hours=1),
+                attempt_count=1,
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:cancelled",
+                granularity="day",
+                period_start=now - timedelta(days=1),
+                period_end=now - timedelta(days=1) + timedelta(hours=23, minutes=59),
+                trigger_source="scheduler",
+                status="cancelled",
+                started_at=now - timedelta(hours=1),
+                finished_at=now - timedelta(minutes=30),
+                attempt_count=1,
+                error_message="cancelled_by_admin",
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+        ]
+        db.add_all(runs)
+        db.commit()
+
+    forbidden = client.get("/api/admin/knowledge-snapshot-runs/health", headers=_auth_header(teacher_token))
+    assert forbidden.status_code == 403
+
+    response = client.get(
+        "/api/admin/knowledge-snapshot-runs/health?lease_expiring_seconds=600&problem_limit=3",
+        headers={**_auth_header(admin_token), "X-Request-ID": "snapshot-health-request"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["health_status"] == "attention"
+    assert body["total"] == 9
+    by_status = {item["status"]: item["total"] for item in body["by_status"]}
+    assert by_status == {
+        "cancelled": 1,
+        "failed": 2,
+        "pending": 1,
+        "running": 4,
+        "success": 1,
+    }
+    assert body["running_count"] == 4
+    assert body["active_running_count"] == 2
+    assert body["stale_running_count"] == 2
+    assert body["lease_expiring_count"] == 1
+    assert body["legacy_running_without_lease_count"] == 1
+    assert body["failed_count"] == 2
+    assert body["retryable_failed_count"] == 1
+    assert body["exhausted_failed_count"] == 1
+    assert body["claimable_count"] == 3
+    assert body["pending_count"] == 1
+    assert body["cancelled_count"] == 1
+    assert body["needs_attention_count"] == 5
+    assert body["problem_count"] == 6
+    assert len(body["problem_runs"]) == 3
+    assert body["latest_success_by_granularity"]["day"] is not None
+    problem_flags = {flag for item in body["problem_runs"] for flag in item["health_flags"]}
+    assert "stale_running" in problem_flags
+    serialized = json.dumps(body, ensure_ascii=False)
+    assert "scheduler_lease_token" not in serialized
+    assert "secret-active-token" not in serialized
+    assert "secret-expiring-token" not in serialized
+    assert "secret-stale-token" not in serialized
+
+    invalid_window = client.get(
+        "/api/admin/knowledge-snapshot-runs/health?from=2026-07-06T10:00:00Z&to=2026-07-05T10:00:00Z",
+        headers=_auth_header(admin_token),
+    )
+    assert invalid_window.status_code == 422
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.knowledge_snapshot_run.health_report"
+        "&resource_type=knowledge_snapshot_run&request_id=snapshot-health-request",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    audit_item = audit.json()["items"][0]
+    assert audit_item["snapshot_json"]["health_status"] == "attention"
+    assert audit_item["snapshot_json"]["problem_count"] == 6
+    assert audit_item["snapshot_json"]["claimable_count"] == 3
+    assert "secret-" not in json.dumps(audit_item["snapshot_json"], ensure_ascii=False)
+    assert "problem_runs" not in audit_item["snapshot_json"]
+
+
 def test_admin_content_pages_filter_count_and_paginate_in_database(client):
     admin_token = _bootstrap_admin(client)
     _insert_content_page("physics/db-page-alpha", "DBPage Alpha", status="published")

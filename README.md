@@ -8,10 +8,10 @@
 
 星序总览页负责承载一级星系入口；进入某个星系后，才显示该星系自己的二级学科或知识目录。内置 C++ httplib 后端服务器，支持静态文件托管。
 
-> **当前状态**: v6.5（2026-07-03 起）— `houduan` 分支已接入 Python 后端骨架、健康检查、部署预检、部署 smoke 门禁、API no-store 缓存边界、工科试验室内容协议持久化样例、内容 seed 启动初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、草稿提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与富语义摘要、本地账号认证安全基线、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、用户自助密码重置令牌、密码重置 token 留存清理脚本、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校/班级最小闭环与加入申请审批、课程/作业/学习事件/提交批改/作业只读复盘/跨班级提交唯一性/学生资源状态可见性/积分统计、知识状态/班级规则统计、个人/班级知识快照、知识快照周期重算脚本、运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端知识快照运行列表与协作式取消、管理端 API、缺陷记录外部 issue 链接、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、待批改队列、审计元数据与认证事件审计、审计日志链式哈希、审计链完整性校验、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要、审计留存预检、本地审计归档包导出/Manifest 校验与导出/摘要行为审计留痕、学校/班级/课程访问控制服务层、跨范围权限矩阵测试，以及前端 opt-in schema 渲染试点
+> **当前状态**: v6.5（2026-07-03 起）— `houduan` 分支已接入 Python 后端骨架、健康检查、部署预检、部署 smoke 门禁、API no-store 缓存边界、工科试验室内容协议持久化样例、内容 seed 启动初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、草稿提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与富语义摘要、本地账号认证安全基线、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、用户自助密码重置令牌、密码重置 token 留存清理脚本、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校/班级最小闭环与加入申请审批、课程/作业/学习事件/提交批改/作业只读复盘/跨班级提交唯一性/学生资源状态可见性/积分统计、知识状态/班级规则统计、个人/班级知识快照、知识快照周期重算脚本、运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端知识快照运行列表/健康摘要与协作式取消、管理端 API、缺陷记录外部 issue 链接、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、待批改队列、审计元数据与认证事件审计、审计日志链式哈希、审计链完整性校验、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要、审计留存预检、本地审计归档包导出/Manifest 校验与导出/摘要行为审计留痕、学校/班级/课程访问控制服务层、跨范围权限矩阵测试，以及前端 opt-in schema 渲染试点
 > **Review 回流状态**: 2026-07-06，`review` 分支已交付代码审查报告（审查基线 `V6.5.23 Review 前基线快照`，范围 `re1` 至 `re17`）。本 `houduan` 分支未合并 review 代码修复；后续仅按 `02` / `07` 中记录的优先级在 `houduan` 上选择性吸收。
-> **最新治理**: 2026-07-07，`houduan` 已补齐 BE-08 知识快照运行列表与协作式取消：`GET /api/admin/knowledge-snapshot-runs` 可分页过滤 run，`POST /api/admin/knowledge-snapshot-runs/{id}/cancel` 可将 `pending` 或带 scheduler lease 的 `running` run 标为 `cancelled`、清空租约并写入脱敏审计，响应不暴露 `scheduler_lease_token`。
-> **最新回归**: 2026-07-07，知识快照运行取消已覆盖 cancelled run 不被 scheduler 重试/抢占、旧 lease heartbeat 失败、admin 列表/取消权限、success/failed/cancelled 与无租约 legacy running 取消 409、审计摘要不含 lease token；外部任务队列、告警和真实 MySQL 长任务取消演练仍属后续治理。
+> **最新治理**: 2026-07-07，`houduan` 已补齐 BE-08 知识快照运行健康摘要：`GET /api/admin/knowledge-snapshot-runs/health` 可汇总 status、stale running、lease expiring、claimable、retryable/exhausted failed 和 problem runs；响应与审计均不暴露 `scheduler_lease_token`。
+> **最新回归**: 2026-07-07，知识快照运行健康摘要已覆盖 admin 权限、active/expiring/stale/legacy running、retryable/exhausted failed、pending/cancelled/success 计数、problem_runs 脱敏、非法时间窗 422 和审计摘要脱敏；外部任务队列、正式告警、requeue 和真实 MySQL 长任务演练仍属后续治理。
 > **下一阶段规划**: Python + MySQL 后端化、内容协议、登录用户体系与管理员 / 教师 / 学生三端平台设计，详见 [`doc/07-后端优化与设计.md`](doc/07-后端优化与设计.md)
 > **当前分支**: `houduan` — 后端化设计与重构开发分支；`main` 保持主线维护
 > **v6.4 主线**：未来星系产品内容保留，比赛提交/评审/截图临时层清理 + `20260630mainV64` 资产版本同步
@@ -184,13 +184,14 @@ node server/dev-static-server.mjs --port 8766
 - **Canvas 2D API** — 可视化渲染（ResizeObserver + DPR 适配）
 - **cpp-httplib 0.18.3** — C++ HTTP 服务器
 - **CMake 3.14+** — C++ 构建系统
-- **Python 3 / FastAPI / SQLAlchemy** — v6.5 业务后端骨架、API、MySQL 连接、部署预检、部署 smoke、API no-store 缓存边界、内容协议、内容 seed 初始化与只读查询边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、active 草稿数据库唯一约束、内容发布/版本记录/追加式回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、管理端版本 JSON path diff 与富语义摘要、本地认证安全基线、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、用户自助密码重置令牌、禁用用户会话撤销、用户名大小写规范化与 normalized key 数据库唯一约束、必填文本修剪后校验、学校/班级加入申请审批、学校/班级/课程访问控制服务层、作业提交/批改/学生侧只读复盘、跨班级提交唯一性、学生资源状态可见性、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端知识快照运行列表与协作式取消、管理端学校/班级统计、加入申请治理、列表分页搜索、内容页数据库侧分页、待批改队列、缺陷记录外部 issue 链接、审计元数据、审计日志链式哈希、审计链完整性校验、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要、审计留存预检、本地审计归档包导出/Manifest 校验和导出/摘要行为审计留痕
+- **Python 3 / FastAPI / SQLAlchemy** — v6.5 业务后端骨架、API、MySQL 连接、部署预检、部署 smoke、API no-store 缓存边界、内容协议、内容 seed 初始化与只读查询边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、active 草稿数据库唯一约束、内容发布/版本记录/追加式回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、管理端版本 JSON path diff 与富语义摘要、本地认证安全基线、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、用户自助密码重置令牌、禁用用户会话撤销、用户名大小写规范化与 normalized key 数据库唯一约束、必填文本修剪后校验、学校/班级加入申请审批、学校/班级/课程访问控制服务层、作业提交/批改/学生侧只读复盘、跨班级提交唯一性、学生资源状态可见性、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端知识快照运行列表/健康摘要与协作式取消、管理端学校/班级统计、加入申请治理、列表分页搜索、内容页数据库侧分页、待批改队列、缺陷记录外部 issue 链接、审计元数据、审计日志链式哈希、审计链完整性校验、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要、审计留存预检、本地审计归档包导出/Manifest 校验和导出/摘要行为审计留痕
 
 ## 📝 更新日志
 
 > 完整的细碎微版本详见 [doc/03-发布历史.md](doc/03-发布历史.md)。当前主线在 `main` 分支维护。
 
 ### v6.5 — 2026-07-05（houduan）
+- 2026-07-07 已在 `houduan` 落地 BE-08 知识快照运行健康摘要：管理员可通过 `/api/admin/knowledge-snapshot-runs/health` 查看 stale running、lease expiring、claimable、retryable/exhausted failed、pending 与 problem runs 摘要；响应和 `admin.knowledge_snapshot_run.health_report` 审计均不暴露 lease token。
 - 2026-07-07 已在 `houduan` 落地 BE-08 知识快照运行取消：管理员可分页过滤 `knowledge_snapshot_runs`，并对 `pending` 或带 scheduler lease 的 `running` run 执行协作式取消；取消会标记 `cancelled`、清空 scheduler lease、写入 `admin.knowledge_snapshot_run.cancel` 审计且不返回 lease token。
 - 2026-07-07 已在 `houduan` 落地 BE-03 密码重置 token 留存清理脚本：默认 dry-run，显式 `--apply` 才删除；按已用时间或过期时间命中 cutoff，摘要只返回计数、截断、策略和首尾 id，不暴露用户名、IP 哈希、user-agent 或 token hash。
 - 2026-07-07 已在 `houduan` 落地 BE-03 用户自助密码重置令牌：请求接口泛化响应并按账号哈希/IP 哈希冷却，生产环境不回传 token；确认接口行锁消费一次性 token，重置密码后撤销会话、清理登录失败桶并写入脱敏审计。真实投递通道、MFA 和 MySQL 并发压测仍待后续。
