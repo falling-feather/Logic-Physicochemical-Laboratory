@@ -13,6 +13,9 @@ class BugRecord(TimestampMixin, Base):
     severity: Mapped[str] = mapped_column(String(32), default="P2", nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="open", nullable=False)
     source: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    external_issue_provider: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    external_issue_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    external_issue_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 

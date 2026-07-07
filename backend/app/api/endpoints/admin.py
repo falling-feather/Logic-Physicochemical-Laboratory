@@ -1177,14 +1177,17 @@ def list_bug_records(
     if status_filter is not None:
         statement = statement.where(BugRecord.status == status_filter.strip().lower())
     if q is not None and q.strip():
-        pattern = f"%{q.strip()}%"
+        pattern = _contains_pattern(q)
         statement = statement.where(
             or_(
-                BugRecord.title.ilike(pattern),
-                BugRecord.category.ilike(pattern),
-                BugRecord.source.ilike(pattern),
-                BugRecord.evidence.ilike(pattern),
-                BugRecord.notes.ilike(pattern),
+                BugRecord.title.ilike(pattern, escape="~"),
+                BugRecord.category.ilike(pattern, escape="~"),
+                BugRecord.source.ilike(pattern, escape="~"),
+                BugRecord.external_issue_provider.ilike(pattern, escape="~"),
+                BugRecord.external_issue_id.ilike(pattern, escape="~"),
+                BugRecord.external_issue_url.ilike(pattern, escape="~"),
+                BugRecord.evidence.ilike(pattern, escape="~"),
+                BugRecord.notes.ilike(pattern, escape="~"),
             )
         )
     total = _statement_count(db, statement)
@@ -1208,6 +1211,9 @@ def create_bug_record(
         severity=payload.severity,
         status=payload.status,
         source=_strip_optional(payload.source),
+        external_issue_provider=_normalize_issue_provider(payload.external_issue_provider),
+        external_issue_id=_strip_optional(payload.external_issue_id),
+        external_issue_url=_strip_optional(payload.external_issue_url),
         evidence=_strip_optional(payload.evidence),
         notes=_strip_optional(payload.notes),
     )
@@ -1242,13 +1248,24 @@ def update_bug_record(
         raise HTTPException(status_code=404, detail="Bug record not found")
 
     before = _bug_snapshot(bug)
-    for field in ("title", "category", "source", "evidence", "notes"):
+    for field in (
+        "title",
+        "category",
+        "source",
+        "external_issue_provider",
+        "external_issue_id",
+        "external_issue_url",
+        "evidence",
+        "notes",
+    ):
         value = getattr(payload, field)
         if value is not None:
             if field == "title":
                 value = require_trimmed_text(value, "Bug title is required")
             elif field == "category":
                 value = require_trimmed_text(value, "Bug category is required")
+            elif field == "external_issue_provider":
+                value = _normalize_issue_provider(value)
             else:
                 value = _strip_optional(value)
             setattr(bug, field, value)
@@ -2212,6 +2229,13 @@ def _strip_optional(value: str | None) -> str | None:
     return value.strip() or None
 
 
+def _normalize_issue_provider(value: str | None) -> str | None:
+    normalized = _strip_optional(value)
+    if normalized is None:
+        return None
+    return normalized.lower()
+
+
 def _contains_pattern(value: str) -> str:
     escaped = value.strip().replace("~", "~~").replace("%", "~%").replace("_", "~_")
     return f"%{escaped}%"
@@ -2237,6 +2261,9 @@ def _bug_snapshot(bug: BugRecord) -> dict[str, str | None]:
         "severity": bug.severity,
         "status": bug.status,
         "source": bug.source,
+        "external_issue_provider": bug.external_issue_provider,
+        "external_issue_id": bug.external_issue_id,
+        "external_issue_url": bug.external_issue_url,
         "evidence": bug.evidence,
         "notes": bug.notes,
     }

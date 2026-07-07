@@ -231,10 +231,16 @@ def test_admin_views_user_management_stats_and_bug_records(client):
             "category": "BE",
             "severity": "P1",
             "source": "test_admin.py",
+            "external_issue_provider": " Manual ",
+            "external_issue_id": " DOC-001 ",
+            "external_issue_url": " https://tracker.local/issues/DOC-001 ",
         },
     )
     assert bug.status_code == 201
     bug_id = bug.json()["id"]
+    assert bug.json()["external_issue_provider"] == "manual"
+    assert bug.json()["external_issue_id"] == "DOC-001"
+    assert bug.json()["external_issue_url"] == "https://tracker.local/issues/DOC-001"
 
     blank_bug_title = client.post(
         "/api/admin/bugs",
@@ -271,10 +277,19 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     close_bug = client.patch(
         f"/api/admin/bugs/{bug_id}",
         headers=_auth_header(admin_token),
-        json={"status": "closed", "notes": "covered by regression"},
+        json={
+            "status": "closed",
+            "notes": "covered by regression",
+            "external_issue_provider": " GitHub ",
+            "external_issue_id": " ASTRA-42 ",
+            "external_issue_url": " https://github.com/example/astra/issues/42 ",
+        },
     )
     assert close_bug.status_code == 200
     assert close_bug.json()["status"] == "closed"
+    assert close_bug.json()["external_issue_provider"] == "github"
+    assert close_bug.json()["external_issue_id"] == "ASTRA-42"
+    assert close_bug.json()["external_issue_url"] == "https://github.com/example/astra/issues/42"
 
     stats = client.get("/api/admin/stats", headers=_auth_header(admin_token))
     assert stats.status_code == 200
@@ -579,6 +594,21 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert bug_page.json()["total"] == 1
     assert bug_page.json()["items"][0]["id"] == bug_id
     assert bug_page.json()["next_offset"] is None
+
+    bug_issue_page = client.get("/api/admin/bugs?q=ASTRA-42&limit=1", headers=_auth_header(admin_token))
+    assert bug_issue_page.status_code == 200
+    assert bug_issue_page.json()["total"] == 1
+    assert bug_issue_page.json()["items"][0]["external_issue_provider"] == "github"
+
+    bug_update_audit = client.get(
+        f"/api/admin/audit-logs?action=admin.bug.update&resource_id={bug_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert bug_update_audit.status_code == 200
+    assert bug_update_audit.json()["total"] == 1
+    bug_update_snapshot = bug_update_audit.json()["items"][0]["snapshot_json"]
+    assert bug_update_snapshot["changes"]["external_issue_provider"] == {"from": "manual", "to": "github"}
+    assert bug_update_snapshot["changes"]["external_issue_id"] == {"from": "DOC-001", "to": "ASTRA-42"}
 
     student_forbidden = client.get("/api/admin/stats", headers=_auth_header(student_token))
     assert student_forbidden.status_code == 403

@@ -443,6 +443,9 @@ class BugRecordCreate(BaseModel):
     severity: BugSeverity = "P2"
     status: BugStatus = "open"
     source: str | None = Field(default=None, max_length=240)
+    external_issue_provider: str | None = Field(default=None, max_length=80)
+    external_issue_id: str | None = Field(default=None, max_length=120)
+    external_issue_url: str | None = Field(default=None, max_length=500)
     evidence: str | None = Field(default=None, max_length=4000)
     notes: str | None = Field(default=None, max_length=4000)
 
@@ -453,6 +456,9 @@ class BugRecordUpdate(BaseModel):
     severity: BugSeverity | None = None
     status: BugStatus | None = None
     source: str | None = Field(default=None, max_length=240)
+    external_issue_provider: str | None = Field(default=None, max_length=80)
+    external_issue_id: str | None = Field(default=None, max_length=120)
+    external_issue_url: str | None = Field(default=None, max_length=500)
     evidence: str | None = Field(default=None, max_length=4000)
     notes: str | None = Field(default=None, max_length=4000)
 
@@ -466,6 +472,9 @@ class BugRecordRead(BaseModel):
     severity: str
     status: str
     source: str | None = None
+    external_issue_provider: str | None = None
+    external_issue_id: str | None = None
+    external_issue_url: str | None = None
     evidence: str | None = None
     notes: str | None = None
     created_at: datetime
