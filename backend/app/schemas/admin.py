@@ -350,6 +350,36 @@ class AdminPendingSubmissionQueue(BaseModel):
     next_offset: int | None = None
 
 
+class AdminKnowledgeSnapshotRunRead(BaseModel):
+    id: int
+    run_key: str
+    granularity: str
+    period_start: datetime
+    period_end: datetime
+    trigger_source: str
+    status: str
+    started_at: datetime
+    finished_at: datetime | None = None
+    scheduler_lease_owner: str | None = None
+    scheduler_lease_expires_at: datetime | None = None
+    scheduler_heartbeat_at: datetime | None = None
+    attempt_count: int
+    user_snapshot_count: int
+    class_snapshot_count: int
+    error_message: str | None = None
+    metadata_json: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminKnowledgeSnapshotRunPage(BaseModel):
+    items: list[AdminKnowledgeSnapshotRunRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
 class AuditLogRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

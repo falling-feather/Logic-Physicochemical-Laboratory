@@ -12,6 +12,7 @@ from app.models import KnowledgeSnapshotRun
 from app.models.base import utc_now
 from app.services.knowledge_snapshot_runs import (
     SnapshotRunLeaseLost,
+    cancel_knowledge_snapshot_run,
     rebuild_periodic_knowledge_snapshots,
     snapshot_run_key,
     snapshot_window,
@@ -86,6 +87,81 @@ def test_snapshot_scheduler_skips_success_and_retries_failed_runs(client):
         db.commit()
         assert should_run_snapshot_job(db, job, retry_attempts=3) is False
         assert should_run_snapshot_job(db, job, retry_attempts=3, lease_seconds=3600) is True
+
+
+def test_snapshot_scheduler_does_not_retry_cancelled_runs(client):
+    job = SnapshotScheduleJob(granularity="day", reference_date=date(2026, 7, 8))
+    period_start, period_end = snapshot_window(job.granularity, job.reference_date)
+    run_key = snapshot_run_key(job.granularity, period_start, period_end)
+
+    with get_session_factory(get_settings().database_url)() as db:
+        lease = acquire_snapshot_job_lease(
+            db,
+            job,
+            retry_attempts=3,
+            lease_owner="worker-cancelled",
+            lease_seconds=3600,
+            now=datetime(2026, 7, 9, 2, 0),
+        )
+        assert lease is not None
+        run = db.scalar(select(KnowledgeSnapshotRun).where(KnowledgeSnapshotRun.run_key == run_key))
+        assert run is not None
+        cancel_knowledge_snapshot_run(run, cancelled_by_user_id=1, clock=lambda: datetime(2026, 7, 9, 2, 45))
+        db.commit()
+
+        assert run.status == "cancelled"
+        assert run.scheduler_lease_owner is None
+        assert run.scheduler_lease_token is None
+        assert run.scheduler_lease_expires_at is None
+        assert run.scheduler_heartbeat_at is None
+        assert (
+            heartbeat_snapshot_job_lease(
+                db,
+                lease,
+                lease_seconds=3600,
+                now=datetime(2026, 7, 9, 2, 50),
+            )
+            is False
+        )
+        assert should_run_snapshot_job(db, job, retry_attempts=3, lease_seconds=3600) is False
+        assert (
+            acquire_snapshot_job_lease(
+                db,
+                job,
+                retry_attempts=3,
+                lease_owner="worker-after-cancel",
+                lease_seconds=3600,
+                now=datetime(2026, 7, 9, 4, 0),
+            )
+            is None
+        )
+
+
+def test_running_snapshot_run_without_lease_cannot_be_cancelled(client):
+    job = SnapshotScheduleJob(granularity="day", reference_date=date(2026, 7, 10))
+    period_start, period_end = snapshot_window(job.granularity, job.reference_date)
+    run_key = snapshot_run_key(job.granularity, period_start, period_end)
+
+    with get_session_factory(get_settings().database_url)() as db:
+        run = KnowledgeSnapshotRun(
+            run_key=run_key,
+            granularity=job.granularity,
+            period_start=period_start,
+            period_end=period_end,
+            trigger_source="script",
+            status="running",
+            started_at=datetime(2026, 7, 11, 3, 0),
+            attempt_count=1,
+            metadata_json={"trigger_source": "script"},
+        )
+        db.add(run)
+        db.commit()
+
+        with pytest.raises(ValueError, match="scheduler lease"):
+            cancel_knowledge_snapshot_run(run, cancelled_by_user_id=1)
+
+        assert run.status == "running"
+        assert run.finished_at is None
 
 
 def test_snapshot_scheduler_lease_blocks_parallel_workers_until_expiry(client):

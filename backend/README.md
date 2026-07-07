@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与 semantic 富语义摘要、登录、密码策略、登录失败锁定、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、用户自助密码重置令牌、密码重置 token 留存清理脚本、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、跨班级提交唯一性、学生资源状态可见性、学生侧作业历史/复盘只读入口、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、中文路径/中文 slug 回归、待批改队列、缺陷记录外部 issue 链接、审计元数据、认证事件审计、审计日志链式哈希、审计链完整性校验、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要、审计留存预检、本地审计归档包导出/Manifest 校验和导出/摘要行为审计留痕等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与 semantic 富语义摘要、登录、密码策略、登录失败锁定、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、用户自助密码重置令牌、密码重置 token 留存清理脚本、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、跨班级提交唯一性、学生资源状态可见性、学生侧作业历史/复盘只读入口、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端知识快照运行列表与协作式取消、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、中文路径/中文 slug 回归、待批改队列、缺陷记录外部 issue 链接、审计元数据、认证事件审计、审计日志链式哈希、审计链完整性校验、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要、审计留存预检、本地审计归档包导出/Manifest 校验和导出/摘要行为审计留痕等能力。
 
 ## 本地启动
 
@@ -57,6 +57,8 @@ python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-revi
 | GET | `/api/admin/content/page-versions` | 管理端内容版本历史；支持 slug/source_draft/restored_from/q 分页过滤，返回 `previous_version_id` |
 | GET | `/api/admin/content/page-versions/{id}/diff` | 管理端内容版本 schema diff；默认沿显式 `previous_version_id` 链对比，`base_version_id` 可指定基线，跨 slug 返回 `422`；响应保留兼容 `changes` 并新增 `semantic` 摘要 |
 | GET | `/api/admin/stats` | 管理端全站统计摘要 |
+| GET | `/api/admin/knowledge-snapshot-runs` | 管理端知识快照运行记录；支持 status/granularity/trigger_source/时间窗分页过滤，不返回 `scheduler_lease_token` |
+| POST | `/api/admin/knowledge-snapshot-runs/{id}/cancel` | 管理端协作式取消 pending 或带 scheduler lease 的 running 知识快照 run；标记 `cancelled`、清空租约并写入 `admin.knowledge_snapshot_run.cancel` 审计 |
 | GET | `/api/admin/audit-logs` | 管理端审计日志查询，分页返回，可按 actor/action/resource/request_id/event_result/failure_reason/时间窗过滤；响应包含 `prev_hash/current_hash` 应用层链式哈希 |
 | GET | `/api/admin/audit-logs/export` | 管理端审计日志 JSON 导出；复用审计筛选与倒序排序，不使用 offset，默认 `limit=1000`、最大 `5000`，默认不返回 `snapshot_json`，但保留 `prev_hash/current_hash`；成功导出后写入 `admin.audit.export`，只记录筛选条件和导出摘要 |
 | GET | `/api/admin/audit-logs/export.csv` | 管理端审计日志 CSV 导出；复用 JSON 导出的筛选、排序、`limit/truncated` 和 `include_snapshot` 边界，响应为下载附件并返回 `X-Audit-Export-*` 元数据头；默认快照列为空，显式包含快照时写入紧凑 JSON 字符串，CSV 表头包含 `prev_hash/current_hash`，文本单元格会中和表格公式前缀；成功导出后同样写入 `admin.audit.export` 摘要 |
@@ -180,7 +182,7 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 - `PATCH /api/content/drafts/{id}` 负责草稿编辑闭环：仅允许作者或管理员编辑 `draft` / `changes_requested` 草稿，禁止 retarget 到其他 slug，保存时重算 `schema_hash/script_analysis/script_risk_level`，并清空旧脚本审核元数据；`base_version_id/base_schema_hash` 保持创建时基线，发布前仍由 stale guard 拦截过期草稿。
 - `/api/content/drafts/{id}/submit`、`/request-changes`、`/withdraw` 与 `/publish` 负责草稿状态流转；创建草稿时绑定当前 published base 版本和 hash，写入 `active_key='active'`，并由 `(author_user_id, target_slug, active_key)` 唯一约束防止同一作者同一目标页并发创建多个 active 草稿；撤回或发布会清空 active key。发布前校验 base 未过期并复核脚本 policy，脚本引用必须带 `scriptSandbox.mode=isolated-iframe` 且不能声明危险能力；发布阶段由 `(slug, version)` 和 `source_draft_id` 唯一约束兜底，冲突统一返回 `409`，发布后回填 page/version/publisher 元数据，审计只记录状态和版本元数据，不记录完整 schema。
 - `/api/content/page-versions/{id}/rollback` 负责内容版本追加式回滚：更新 `content_pages.current_version_id/schema_hash/published_*` 当前态、追加带 `previous_version_id` 的 `content_page_versions`，并在审计中只记录版本元数据与 schema hash，不记录完整 schema。
-- `app.services.knowledge_snapshot_runs` 与 `app.services.knowledge_snapshot_scheduler` 负责知识快照窗口重算、运行记录、进程内调度、数据库租约防重入和长重算自动心跳；同一 `run_key` 通过 scheduler lease owner/token/expires/heartbeat 元数据抢占，调度器与 CLI 会把 token-guard heartbeat callback 注入重算循环，完成或失败释放使用 token guard，失去租约的旧 worker 会中止而不覆盖新状态。
+- `app.services.knowledge_snapshot_runs` 与 `app.services.knowledge_snapshot_scheduler` 负责知识快照窗口重算、运行记录、进程内调度、数据库租约防重入、长重算自动心跳和协作式取消；同一 `run_key` 通过 scheduler lease owner/token/expires/heartbeat 元数据抢占，调度器与 CLI 会把 token-guard heartbeat callback 注入重算循环，完成或失败释放使用 token guard，失去租约或被 admin 取消的旧 worker 会中止而不覆盖新状态；管理端响应不返回 `scheduler_lease_token`。
 - `POST /api/assignments/{id}/submissions` 的提交唯一性按 `assignment_id + student_id + class_id` 收口；同一课程作业挂到多个班级时，学生可在不同班级各提交一次，同班级重复提交仍返回 `409`；学生提交只允许 published 课程、published 单元下的 active 作业。
 - `GET /api/assignments/{id}/review` 是学生侧只读复盘入口：只允许 student 访问自己的提交历史，可用 `class_id` 定位班级提交；published 课程/单元内 closed / archived 作业不允许再次提交但仍返回题目、成绩和反馈；教师和管理员继续使用 submissions 列表与批改接口。
 
@@ -216,7 +218,7 @@ python -m scripts.rebuild_knowledge_snapshots --granularity week --date 2026-07-
 
 脚本按日或自然周对齐窗口，先抢占 `knowledge_snapshot_runs` 数据库租约，再重算活跃班级已挂接课程的个人/班级快照；学生 user snapshot 跳过 unpublished 课程并按学生可见性过滤单元/作业，class snapshot 保持教师/管理聚合口径；重算长循环会按 `ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_HEARTBEAT_SECONDS` 自动续租，租约不可用时输出 `status=skipped`，失去租约或失败时输出 JSON 并返回非零退出码。
 
-知识快照进程内调度器默认关闭。生产启用时应先完成 Alembic 迁移和部署预检，再设置 `ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_ENABLED=true`；调度器与周期重算 CLI 已通过数据库租约和自动心跳降低多 worker/多副本重复执行风险，过期 running 窗口可被抢占，成功/失败释放使用 token guard，心跳失败会让旧 worker 中止。当前仍不是完整任务队列，外部告警、任务取消、队列堆积可观测性和真实 MySQL 并发压测仍是后续部署增强项。
+知识快照进程内调度器默认关闭。生产启用时应先完成 Alembic 迁移和部署预检，再设置 `ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_ENABLED=true`；调度器与周期重算 CLI 已通过数据库租约和自动心跳降低多 worker/多副本重复执行风险，过期 running 窗口可被抢占，成功/失败释放使用 token guard，心跳失败会让旧 worker 中止。管理员可通过 `/api/admin/knowledge-snapshot-runs` 查看 run，并通过 `/cancel` 对 `pending` 或带 scheduler lease 的 `running` run 做协作式取消；取消不是强杀线程，而是清空租约并让旧 worker 在下一次 heartbeat/finish guard 处停止写回。当前仍不是完整任务队列，外部告警、队列堆积可观测性和真实 MySQL 并发取消演练仍是后续部署增强项。
 
 审计归档候选导出：
 

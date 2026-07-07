@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import AuditLog, AuthSession, ContentPageRecord, LoginAttempt, User
+from app.models import AuditLog, AuthSession, ContentPageRecord, KnowledgeSnapshotRun, LoginAttempt, User
 from app.services.audit import audit_log_chain_hash, record_audit_log
 
 
@@ -1133,6 +1133,150 @@ def test_admin_can_reset_user_password_and_revoke_sessions(client):
         assert "password" not in audit.snapshot_json
         assert "ResetPass123" not in str(audit.snapshot_json)
         assert "secret123" not in str(audit.snapshot_json)
+
+
+def test_admin_can_list_and_cancel_knowledge_snapshot_runs(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "snapshot_run_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        run = KnowledgeSnapshotRun(
+            run_key="knowledge:day:2026-07-01",
+            granularity="day",
+            period_start=datetime(2026, 7, 1, tzinfo=UTC),
+            period_end=datetime(2026, 7, 1, 23, 59, 59, tzinfo=UTC),
+            trigger_source="scheduler",
+            status="running",
+            started_at=datetime(2026, 7, 2, 3, 0, tzinfo=UTC),
+            scheduler_lease_owner="worker-admin-cancel",
+            scheduler_lease_token="secret-lease-token",
+            scheduler_lease_expires_at=datetime(2026, 7, 2, 4, 0, tzinfo=UTC),
+            scheduler_heartbeat_at=datetime(2026, 7, 2, 3, 30, tzinfo=UTC),
+            attempt_count=1,
+            user_snapshot_count=0,
+            class_snapshot_count=0,
+            metadata_json={"trigger_source": "scheduler"},
+        )
+        success_run = KnowledgeSnapshotRun(
+            run_key="knowledge:day:2026-07-02",
+            granularity="day",
+            period_start=datetime(2026, 7, 2, tzinfo=UTC),
+            period_end=datetime(2026, 7, 2, 23, 59, 59, tzinfo=UTC),
+            trigger_source="script",
+            status="success",
+            started_at=datetime(2026, 7, 3, 3, 0, tzinfo=UTC),
+            finished_at=datetime(2026, 7, 3, 3, 1, tzinfo=UTC),
+            attempt_count=1,
+            user_snapshot_count=0,
+            class_snapshot_count=0,
+            metadata_json={"trigger_source": "script"},
+        )
+        failed_run = KnowledgeSnapshotRun(
+            run_key="knowledge:day:2026-07-03",
+            granularity="day",
+            period_start=datetime(2026, 7, 3, tzinfo=UTC),
+            period_end=datetime(2026, 7, 3, 23, 59, 59, tzinfo=UTC),
+            trigger_source="scheduler",
+            status="failed",
+            started_at=datetime(2026, 7, 4, 3, 0, tzinfo=UTC),
+            finished_at=datetime(2026, 7, 4, 3, 1, tzinfo=UTC),
+            attempt_count=1,
+            user_snapshot_count=0,
+            class_snapshot_count=0,
+            error_message="RuntimeError",
+            metadata_json={"trigger_source": "scheduler"},
+        )
+        legacy_running_run = KnowledgeSnapshotRun(
+            run_key="knowledge:day:2026-07-04",
+            granularity="day",
+            period_start=datetime(2026, 7, 4, tzinfo=UTC),
+            period_end=datetime(2026, 7, 4, 23, 59, 59, tzinfo=UTC),
+            trigger_source="script",
+            status="running",
+            started_at=datetime(2026, 7, 5, 3, 0, tzinfo=UTC),
+            attempt_count=1,
+            user_snapshot_count=0,
+            class_snapshot_count=0,
+            metadata_json={"trigger_source": "script"},
+        )
+        db.add_all([run, success_run, failed_run, legacy_running_run])
+        db.commit()
+        run_id = run.id
+        success_run_id = success_run.id
+        failed_run_id = failed_run.id
+        legacy_running_run_id = legacy_running_run.id
+
+    forbidden = client.get("/api/admin/knowledge-snapshot-runs", headers=_auth_header(teacher_token))
+    assert forbidden.status_code == 403
+
+    page = client.get(
+        "/api/admin/knowledge-snapshot-runs?status=running&trigger_source=scheduler",
+        headers=_auth_header(admin_token),
+    )
+    assert page.status_code == 200
+    body = page.json()
+    assert body["total"] == 1
+    assert body["items"][0]["id"] == run_id
+    assert body["items"][0]["scheduler_lease_owner"] == "worker-admin-cancel"
+    assert "scheduler_lease_token" not in body["items"][0]
+    assert "secret-lease-token" not in json.dumps(body, ensure_ascii=False)
+
+    cancelled = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{run_id}/cancel",
+        headers=_auth_header(admin_token),
+    )
+    assert cancelled.status_code == 200
+    cancelled_body = cancelled.json()
+    assert cancelled_body["status"] == "cancelled"
+    assert cancelled_body["finished_at"] is not None
+    assert cancelled_body["error_message"] == "cancelled_by_admin"
+    assert cancelled_body["scheduler_lease_owner"] is None
+    assert cancelled_body["scheduler_lease_expires_at"] is None
+    assert cancelled_body["scheduler_heartbeat_at"] is None
+    assert cancelled_body["metadata_json"]["previous_status"] == "running"
+    assert "scheduler_lease_token" not in cancelled_body
+
+    second_cancel = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{run_id}/cancel",
+        headers=_auth_header(admin_token),
+    )
+    assert second_cancel.status_code == 409
+
+    success_cancel = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{success_run_id}/cancel",
+        headers=_auth_header(admin_token),
+    )
+    assert success_cancel.status_code == 409
+
+    failed_cancel = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{failed_run_id}/cancel",
+        headers=_auth_header(admin_token),
+    )
+    assert failed_cancel.status_code == 409
+
+    legacy_cancel = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{legacy_running_run_id}/cancel",
+        headers=_auth_header(admin_token),
+    )
+    assert legacy_cancel.status_code == 409
+
+    audit = client.get(
+        f"/api/admin/audit-logs?action=admin.knowledge_snapshot_run.cancel&resource_id={run_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    audit_item = audit.json()["items"][0]
+    assert audit_item["snapshot_json"]["previous_status"] == "running"
+    assert audit_item["snapshot_json"]["status"] == "cancelled"
+    assert audit_item["snapshot_json"]["cleared_lease"] is True
+    assert "secret-lease-token" not in json.dumps(audit_item["snapshot_json"], ensure_ascii=False)
+
+    with session_factory() as db:
+        stored = db.get(KnowledgeSnapshotRun, run_id)
+        assert stored is not None
+        assert stored.status == "cancelled"
+        assert stored.scheduler_lease_token is None
+        assert stored.metadata_json["previous_status"] == "running"
 
 
 def test_admin_content_pages_filter_count_and_paginate_in_database(client):

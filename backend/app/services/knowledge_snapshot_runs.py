@@ -12,10 +12,38 @@ from app.models.base import utc_now
 
 
 SnapshotGranularity = Literal["day", "week"]
+CANCELLABLE_SNAPSHOT_RUN_STATUSES = {"running", "pending"}
 
 
 class SnapshotRunLeaseLost(RuntimeError):
     pass
+
+
+def cancel_knowledge_snapshot_run(
+    run: KnowledgeSnapshotRun,
+    *,
+    cancelled_by_user_id: int,
+    clock: Callable[[], datetime] = utc_now,
+) -> KnowledgeSnapshotRun:
+    if run.status not in CANCELLABLE_SNAPSHOT_RUN_STATUSES:
+        raise ValueError("knowledge snapshot run cannot be cancelled")
+    if run.status == "running" and not run.scheduler_lease_token:
+        raise ValueError("running knowledge snapshot run cannot be cancelled without a scheduler lease")
+    cancelled_at = clock()
+    previous_status = run.status
+    metadata = dict(run.metadata_json or {})
+    metadata["cancelled_by_user_id"] = cancelled_by_user_id
+    metadata["cancelled_at"] = cancelled_at.isoformat()
+    metadata["previous_status"] = previous_status
+    run.status = "cancelled"
+    run.finished_at = cancelled_at
+    run.error_message = "cancelled_by_admin"
+    run.scheduler_lease_owner = None
+    run.scheduler_lease_token = None
+    run.scheduler_lease_expires_at = None
+    run.scheduler_heartbeat_at = None
+    run.metadata_json = metadata
+    return run
 
 
 def snapshot_window(

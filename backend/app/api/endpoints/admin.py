@@ -29,6 +29,7 @@ from app.models import (
     CourseUnit,
     LearningEvent,
     LoginAttempt,
+    KnowledgeSnapshotRun,
     PointLedger,
     School,
     SchoolMembership,
@@ -52,6 +53,8 @@ from app.schemas.admin import (
     AdminContentPageVersionSemanticSourceChange,
     AdminContentPageVersionPage,
     AdminContentPageVersionRead,
+    AdminKnowledgeSnapshotRunPage,
+    AdminKnowledgeSnapshotRunRead,
     AdminContentDraftPage,
     AdminContentDraftRead,
     AdminPendingSubmissionQueue,
@@ -91,6 +94,7 @@ from app.services.class_join_requests import (
 )
 from app.services.text import require_trimmed_text
 from app.services.users import find_user_by_normalized_username, require_normalized_username
+from app.services.knowledge_snapshot_runs import cancel_knowledge_snapshot_run
 
 
 router = APIRouter()
@@ -766,6 +770,85 @@ def read_admin_stats(
         open_bug_records=_count(db, BugRecord, BugRecord.status != "closed"),
         total_audit_logs=_count(db, AuditLog),
     )
+
+
+@router.get("/knowledge-snapshot-runs", response_model=AdminKnowledgeSnapshotRunPage)
+def list_knowledge_snapshot_runs(
+    granularity: str | None = Query(default=None),
+    status_filter: str | None = Query(default=None, alias="status"),
+    trigger_source: str | None = Query(default=None),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminKnowledgeSnapshotRunPage:
+    _require_admin(current_user)
+    if from_at is not None and to_at is not None and from_at > to_at:
+        raise HTTPException(status_code=422, detail="from must be earlier than to")
+    statement = select(KnowledgeSnapshotRun).order_by(
+        KnowledgeSnapshotRun.started_at.desc(),
+        KnowledgeSnapshotRun.id.desc(),
+    )
+    if granularity is not None:
+        statement = statement.where(KnowledgeSnapshotRun.granularity == granularity.strip().lower())
+    if status_filter is not None:
+        statement = statement.where(KnowledgeSnapshotRun.status == status_filter.strip().lower())
+    if trigger_source is not None:
+        statement = statement.where(KnowledgeSnapshotRun.trigger_source == trigger_source.strip().lower())
+    if from_at is not None:
+        statement = statement.where(KnowledgeSnapshotRun.started_at >= from_at)
+    if to_at is not None:
+        statement = statement.where(KnowledgeSnapshotRun.started_at <= to_at)
+    total = _statement_count(db, statement)
+    runs = list(db.scalars(statement.offset(offset).limit(limit)).all())
+    return AdminKnowledgeSnapshotRunPage(
+        items=[_admin_knowledge_snapshot_run_read(run) for run in runs],
+        total=total,
+        limit=limit,
+        offset=offset,
+        next_offset=_next_offset(total, offset, len(runs)),
+    )
+
+
+@router.post("/knowledge-snapshot-runs/{run_id}/cancel", response_model=AdminKnowledgeSnapshotRunRead)
+def cancel_admin_knowledge_snapshot_run(
+    run_id: int,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminKnowledgeSnapshotRunRead:
+    _require_admin(current_user)
+    run = db.get(KnowledgeSnapshotRun, run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Knowledge snapshot run not found")
+    previous_status = run.status
+    try:
+        cancel_knowledge_snapshot_run(run, cancelled_by_user_id=current_user.id)
+    except ValueError:
+        raise HTTPException(status_code=409, detail="Knowledge snapshot run cannot be cancelled")
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.knowledge_snapshot_run.cancel",
+        resource_type="knowledge_snapshot_run",
+        resource_id=run.id,
+        event_result="success",
+        request=request,
+        snapshot={
+            "run_id": run.id,
+            "run_key": run.run_key,
+            "granularity": run.granularity,
+            "trigger_source": run.trigger_source,
+            "previous_status": previous_status,
+            "status": run.status,
+            "cleared_lease": True,
+        },
+    )
+    db.commit()
+    db.refresh(run)
+    return _admin_knowledge_snapshot_run_read(run)
 
 
 @router.get("/audit-logs", response_model=AuditLogPage)
@@ -1565,6 +1648,30 @@ def _admin_class_join_request_read(
         review_note=join_request.review_note,
         created_at=join_request.created_at,
         updated_at=join_request.updated_at,
+    )
+
+
+def _admin_knowledge_snapshot_run_read(run: KnowledgeSnapshotRun) -> AdminKnowledgeSnapshotRunRead:
+    return AdminKnowledgeSnapshotRunRead(
+        id=run.id,
+        run_key=run.run_key,
+        granularity=run.granularity,
+        period_start=run.period_start,
+        period_end=run.period_end,
+        trigger_source=run.trigger_source,
+        status=run.status,
+        started_at=run.started_at,
+        finished_at=run.finished_at,
+        scheduler_lease_owner=run.scheduler_lease_owner,
+        scheduler_lease_expires_at=run.scheduler_lease_expires_at,
+        scheduler_heartbeat_at=run.scheduler_heartbeat_at,
+        attempt_count=run.attempt_count,
+        user_snapshot_count=run.user_snapshot_count,
+        class_snapshot_count=run.class_snapshot_count,
+        error_message=run.error_message,
+        metadata_json=run.metadata_json,
+        created_at=run.created_at,
+        updated_at=run.updated_at,
     )
 
 
