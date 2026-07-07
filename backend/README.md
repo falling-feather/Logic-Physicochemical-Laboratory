@@ -81,9 +81,9 @@ python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-revi
 | PATCH | `/api/classes/{id}/join-requests/{request_id}` | 班级教师或管理员审批加入申请，支持 `approved` / `rejected` |
 | GET/POST | `/api/courses` | 当前用户可见课程 / 教师创建课程；学生仅返回本人 active 班级内 published 课程 |
 | POST | `/api/courses/{id}/classes` | 将课程挂接到班级 |
-| GET/POST | `/api/courses/{id}/units` | 课程单元列表 / 教师创建单元；学生仅可读取 published 课程下的 published 单元 |
+| GET/POST | `/api/courses/{id}/units` | 课程单元列表 / 课程作者或管理员创建单元；学生仅可读取 published 课程下的 published 单元 |
 | GET | `/api/courses/{id}/assignments` | 课程作业列表；学生仅可读取 published 单元下的 active 作业 |
-| POST | `/api/courses/{id}/units/{unit_id}/assignments` | 教师创建作业 |
+| POST | `/api/courses/{id}/units/{unit_id}/assignments` | 课程作者或管理员创建作业 |
 | GET/POST | `/api/learning-events` | 学习事件查询 / 记录访问、提交、完成等事件；学生读写仅计入 published 课程、published 单元和 active 作业；教师查询按本班 teacher scope 收束 |
 | POST | `/api/assignments/{id}/submissions` | 学生按 `class_id` 提交作业；同一 `assignment/student/class` 只能提交一次，同一作业挂到多个班级时可分别提交；提交目标必须位于 published 课程和 published 单元下且作业 active |
 | GET | `/api/assignments/{id}/review` | 学生侧作业复盘入口；可用 `class_id` 定位班级提交，published 课程/单元内 active 未提交返回可提交，已提交、closed 或 archived 返回只读和 `submit_block_reason` |
@@ -171,7 +171,7 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 
 ## 服务层边界
 
-- `app.services.access_control` 负责学校、班级和课程范围判断，普通业务端点不再各自复制 `_require_*` helper；学生课程访问会额外要求课程 `published`，单元读取/事件/提交/复盘会继续要求单元 `published`，事件与提交写入要求作业 `active`；教师端涉及班级挂课、学习事件查询、积分流水、学生进度、查看提交和批改时必须具备对应班级的 active teacher membership，全局 admin 保留跨范围治理能力；后续权限矩阵扩展应优先在这里收口。
+- `app.services.access_control` 负责学校、班级和课程范围判断，普通业务端点不再各自复制 `_require_*` helper；学生课程访问会额外要求课程 `published`，单元读取/事件/提交/复盘会继续要求单元 `published`，事件与提交写入要求作业 `active`；教师端涉及班级挂课、学习事件查询、积分流水、学生进度、查看提交和批改时必须具备对应班级的 active teacher membership；课程结构写入（单元/作业创建）要求课程作者或全局 admin；全局 admin 保留跨范围治理能力；后续权限矩阵扩展应优先在这里收口。
 - `app.services.class_join_requests` 负责加入申请审批状态流转和成员关系补齐。
 - `POST /api/classes/{id}/join` 与 `POST /api/classes/{id}/join-requests` 长期并存：前者是保留给受控场景、导入/邀请码或旧 UI 的 direct join，后者是需要教师/admin 审批的申请流；前端不得把审批流表现为唯一加入路径。
 - `app.services.audit` 负责写入审计日志及 request_id、IP 哈希、user-agent 等请求元数据；新审计记录会以 `prev_hash/current_hash` 保存应用层 SHA-256 链式哈希，用于追踪篡改迹象，但不能替代备份、binlog、外部归档、WORM 或第三方时间戳；管理端 JSON/CSV 明细导出接口默认剥离 `snapshot_json`，需要审查内容快照时必须显式传入 `include_snapshot=true`，且导出完成后会以 `admin.audit.export` 记录筛选条件、导出格式、导出数量和截断状态，不记录导出条目明细；审计报表摘要以 `admin.audit.report` 留痕，只记录格式、筛选和 bucket 数量；审计留存预检以 `admin.audit.retention_plan` 留痕，只记录策略、候选数量、临期数量、bucket 数量和链边界，不记录候选明细或原始快照；`scripts.archive_audit_logs` 是离线只读归档包导出工具，会生成 JSONL/CSV 数据文件与 Manifest，并支持 SHA-256 和记录数复验，默认不删除源数据、不写新的审计日志、不提供 WORM 或外部锚定；高频候选摘要以 `admin.audit.high_frequency` 留痕，只记录筛选、时间窗、阈值、总量和维度命中数，不记录候选明细、原始日志 id 或完整 IP 哈希清单。

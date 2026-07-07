@@ -30,6 +30,21 @@ def _register_and_login(client, username: str, role: str) -> dict:
     return {"token": login.json()["access_token"], "id": me.json()["id"]}
 
 
+def _bootstrap_admin(client, username: str) -> str:
+    response = client.post(
+        "/api/admin/bootstrap",
+        json={
+            "username": username,
+            "password": "secret123",
+            "display_name": username.replace("_", " ").title(),
+        },
+    )
+    assert response.status_code == 201
+    login = client.post("/api/auth/login", json={"username": username, "password": "secret123"})
+    assert login.status_code == 200
+    return login.json()["access_token"]
+
+
 def _create_learning_scope(client) -> dict:
     teacher = _register_and_login(client, "scope_teacher", "teacher")
     student = _register_and_login(client, "scope_student", "student")
@@ -290,6 +305,69 @@ def test_school_teacher_without_class_scope_cannot_manage_class_assignments(clie
     )
     assert owner_progress.status_code == 200
     assert owner_progress.json()["total_points"] == 12
+
+
+def test_school_teacher_without_course_author_scope_cannot_edit_course_structure(client):
+    scope = _create_learning_scope(client)
+    peer_teacher = _register_and_login(client, "scope_peer_course_editor", "teacher")
+    _grant_school_teacher_membership(peer_teacher["id"], scope["school_id"])
+    admin_token = _bootstrap_admin(client, "admin_course_author_scope")
+
+    teacher_headers = _auth_header(scope["teacher"]["token"])
+    peer_headers = _auth_header(peer_teacher["token"])
+    admin_headers = _auth_header(admin_token)
+
+    peer_units = client.get(f"/api/courses/{scope['course_id']}/units", headers=peer_headers)
+    assert peer_units.status_code == 200
+    assert [item["id"] for item in peer_units.json()] == [scope["unit_id"]]
+
+    peer_assignments = client.get(f"/api/courses/{scope['course_id']}/assignments", headers=peer_headers)
+    assert peer_assignments.status_code == 200
+    assert [item["id"] for item in peer_assignments.json()] == [scope["assignment_id"]]
+
+    peer_unit_create = client.post(
+        f"/api/courses/{scope['course_id']}/units",
+        headers=peer_headers,
+        json={"title": "Peer Edited Unit", "position": 2, "status": "published"},
+    )
+    assert peer_unit_create.status_code == 403
+    assert peer_unit_create.json()["detail"] == "Course unit creation requires course author role"
+
+    peer_assignment_create = client.post(
+        f"/api/courses/{scope['course_id']}/units/{scope['unit_id']}/assignments",
+        headers=peer_headers,
+        json={"title": "Peer Edited Assignment", "max_score": 20},
+    )
+    assert peer_assignment_create.status_code == 403
+    assert peer_assignment_create.json()["detail"] == "Assignment creation requires course author role"
+
+    owner_unit = client.post(
+        f"/api/courses/{scope['course_id']}/units",
+        headers=teacher_headers,
+        json={"title": "Owner Edited Unit", "position": 2, "status": "published"},
+    )
+    assert owner_unit.status_code == 201
+
+    owner_assignment = client.post(
+        f"/api/courses/{scope['course_id']}/units/{owner_unit.json()['id']}/assignments",
+        headers=teacher_headers,
+        json={"title": "Owner Edited Assignment", "max_score": 20},
+    )
+    assert owner_assignment.status_code == 201
+
+    admin_unit = client.post(
+        f"/api/courses/{scope['course_id']}/units",
+        headers=admin_headers,
+        json={"title": "Admin Edited Unit", "position": 3, "status": "published"},
+    )
+    assert admin_unit.status_code == 201
+
+    admin_assignment = client.post(
+        f"/api/courses/{scope['course_id']}/units/{admin_unit.json()['id']}/assignments",
+        headers=admin_headers,
+        json={"title": "Admin Edited Assignment", "max_score": 20},
+    )
+    assert admin_assignment.status_code == 201
 
 
 def test_class_members_can_access_their_scoped_course_resources(client):

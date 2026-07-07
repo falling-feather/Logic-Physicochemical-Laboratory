@@ -149,6 +149,17 @@ def require_class_teacher_or_admin(
         raise HTTPException(status_code=403, detail=detail)
 
 
+def require_course_author_or_admin(
+    user: User,
+    course: Course,
+    *,
+    detail: str = "Course author role is required",
+) -> None:
+    if user.role == "admin" or course.creator_user_id == user.id:
+        return
+    raise HTTPException(status_code=403, detail=detail)
+
+
 def require_course_visible(db: Session, user: User, course_id: int) -> Course:
     course = get_course(db, course_id)
     if user.role == "admin":

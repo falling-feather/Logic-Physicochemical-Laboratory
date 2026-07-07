@@ -27,6 +27,7 @@ from app.services.access_control import (
     get_course,
     require_class_member,
     require_class_teacher_or_admin,
+    require_course_author_or_admin,
     require_course_visible,
     require_school_member,
     require_school_role,
@@ -206,6 +207,11 @@ def create_course_unit(
 ) -> CourseUnit:
     course = get_course(db, course_id)
     require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    require_course_author_or_admin(
+        current_user,
+        course,
+        detail="Course unit creation requires course author role",
+    )
     content_slug = (payload.content_slug or "").strip() or None
     title = require_trimmed_text(payload.title, "Course unit title is required")
     existing_position = db.scalar(
@@ -286,6 +292,11 @@ def create_assignment(
 ) -> Assignment:
     course = get_course(db, course_id)
     require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    require_course_author_or_admin(
+        current_user,
+        course,
+        detail="Assignment creation requires course author role",
+    )
     unit = db.get(CourseUnit, unit_id)
     if unit is None or unit.course_id != course_id:
         raise HTTPException(status_code=404, detail="Course unit not found")
