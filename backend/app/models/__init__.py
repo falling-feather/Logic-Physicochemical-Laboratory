@@ -5,6 +5,7 @@ from app.models.content import (
     ContentPageRecord,
     ContentPageVersion,
     ContentScriptAsset,
+    ContentScriptAssetScanRun,
     ContentScriptHostPolicy,
 )
 from app.models.course import (
@@ -37,6 +38,7 @@ __all__ = [
     "ContentPageRecord",
     "ContentPageVersion",
     "ContentScriptAsset",
+    "ContentScriptAssetScanRun",
     "ContentScriptHostPolicy",
     "Course",
     "CourseClass",

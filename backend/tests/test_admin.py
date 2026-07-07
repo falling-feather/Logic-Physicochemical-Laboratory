@@ -15,6 +15,7 @@ from app.models import (
     ContentPageRecord,
     ContentPageVersion,
     ContentScriptAsset,
+    ContentScriptAssetScanRun,
     KnowledgeSnapshotRun,
     LoginAttempt,
     SchoolMembership,
@@ -2978,6 +2979,7 @@ def test_admin_scans_content_script_asset_remote_drift_with_redaction(client, mo
     )
     assert second_page.status_code == 200
     second_page_body = second_page.json()
+    assert second_page_body["scan_run_id"] is not None
     assert second_page_body["total_scanned_references"] == 1
     assert second_page_body["total_remote_fetches"] == 1
     assert second_page_body["total_issues"] == 1
@@ -2996,6 +2998,8 @@ def test_admin_scans_content_script_asset_remote_drift_with_redaction(client, mo
     )
     assert filtered.status_code == 200
     body = filtered.json()
+    assert body["scan_run_id"] is not None
+    assert body["scan_run_key"].startswith("content-script-remote-drift:")
     assert body["total_issues"] == 1
     assert body["items"][0]["code"] == "remote_sri_mismatch"
     assert body["items"][0]["source_host"] == "cdn-remote.example.test"
@@ -3008,6 +3012,98 @@ def test_admin_scans_content_script_asset_remote_drift_with_redaction(client, mo
     assert "remote drift now changed" not in response_text
     assert "remote drift mirrored" not in response_text
     assert "remote secret unavailable" not in response_text
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        run = db.get(ContentScriptAssetScanRun, body["scan_run_id"])
+        assert run is not None
+        assert run.run_key == body["scan_run_key"]
+        assert run.scan_type == "remote_drift"
+        assert run.trigger_source == "manual"
+        assert run.status == "success"
+        assert run.created_by_user_id == admin_user_id
+        assert run.filters_json == {
+            "source_host": "cdn-remote.example.test",
+            "issue_code": "remote_sri_mismatch",
+            "limit": 2,
+            "offset": 0,
+            "confirm_external_network": True,
+        }
+        assert run.totals_json["total_issues"] == 1
+        assert run.totals_json["issue_summary_truncated"] is False
+        assert run.issue_counts_json == {
+            "by_code": {"remote_sri_mismatch": 1},
+            "by_severity": {"critical": 1},
+        }
+        assert run.alert_status == "critical"
+        assert run.issue_summary_json[0]["code"] == "remote_sri_mismatch"
+        stored_run_text = json.dumps(
+            {
+                "filters": run.filters_json,
+                "totals": run.totals_json,
+                "issue_counts": run.issue_counts_json,
+                "issue_summary": run.issue_summary_json,
+            },
+            ensure_ascii=False,
+        )
+        assert '"source_url"' not in stored_run_text
+        assert "integrity" not in stored_run_text
+        assert "content_bytes" not in stored_run_text
+        assert "secret-drift-token" not in stored_run_text
+        assert "remote drift now changed" not in stored_run_text
+        assert "remote secret unavailable" not in stored_run_text
+
+    forbidden_runs = client.get(
+        "/api/admin/content/script-assets/remote-drift-scan-runs",
+        headers=_auth_header(teacher_token),
+    )
+    assert forbidden_runs.status_code == 403
+
+    runs = client.get(
+        "/api/admin/content/script-assets/remote-drift-scan-runs?alert_status=critical&limit=2",
+        headers={**_auth_header(admin_token), "X-Request-ID": "remote-drift-runs"},
+    )
+    assert runs.status_code == 200
+    runs_body = runs.json()
+    assert runs_body["total"] == 3
+    assert runs_body["next_offset"] == 2
+    assert runs_body["items"][0]["scan_type"] == "remote_drift"
+    assert runs_body["items"][0]["trigger_source"] == "manual"
+    assert runs_body["items"][0]["alert_status"] == "critical"
+    runs_text = json.dumps(runs_body, ensure_ascii=False)
+    assert '"source_url"' not in runs_text
+    assert "integrity" not in runs_text
+    assert "content_bytes" not in runs_text
+    assert "secret-drift-token" not in runs_text
+
+    forbidden_alerts = client.get(
+        "/api/admin/content/script-assets/remote-drift-alerts",
+        headers=_auth_header(teacher_token),
+    )
+    assert forbidden_alerts.status_code == 403
+
+    alerts = client.get(
+        "/api/admin/content/script-assets/remote-drift-alerts?recent_run_limit=10&candidate_limit=10",
+        headers={**_auth_header(admin_token), "X-Request-ID": "remote-drift-alerts"},
+    )
+    assert alerts.status_code == 200
+    alerts_body = alerts.json()
+    assert alerts_body["alert_status"] == "critical"
+    assert alerts_body["recent_run_count"] == 3
+    assert alerts_body["issue_run_count"] == 3
+    assert alerts_body["candidate_count"] == 5
+    assert alerts_body["critical_count"] == 5
+    assert {item["code"] for item in alerts_body["candidates"]} >= {
+        "remote_sri_mismatch",
+        "remote_asset_unavailable",
+    }
+    assert {item["action_hint"] for item in alerts_body["candidates"]} >= {"review_host", "investigate"}
+    alerts_text = json.dumps(alerts_body, ensure_ascii=False)
+    assert '"source_url"' not in alerts_text
+    assert "integrity" not in alerts_text
+    assert "content_bytes" not in alerts_text
+    assert "secret-drift-token" not in alerts_text
+    assert "remote drift now changed" not in alerts_text
 
     audit = client.get(
         "/api/admin/audit-logs?action=admin.content_script_asset.remote_drift_scan"
@@ -3032,12 +3128,49 @@ def test_admin_scans_content_script_asset_remote_drift_with_redaction(client, mo
         "repair": False,
         "mutation": False,
     }
+    assert snapshot["scan_run"]["id"] == body["scan_run_id"]
+    assert snapshot["scan_run"]["run_key"] == body["scan_run_key"]
+    assert snapshot["scan_run"]["issue_summary_count"] == 1
     audit_text = json.dumps(snapshot, ensure_ascii=False)
     assert "source_url" not in audit_text
     assert "integrity" not in audit_text
     assert "content_bytes" not in audit_text
     assert "secret-drift-token" not in audit_text
     assert "remote drift now changed" not in audit_text
+
+    run_list_audit = client.get(
+        "/api/admin/audit-logs?action=admin.content_script_asset.remote_drift_scan_run.list"
+        "&resource_type=content_script_asset_scan_run&request_id=remote-drift-runs",
+        headers=_auth_header(admin_token),
+    )
+    assert run_list_audit.status_code == 200
+    assert run_list_audit.json()["total"] == 1
+    run_list_snapshot = run_list_audit.json()["items"][0]["snapshot_json"]
+    assert run_list_snapshot["filters"] == {"scan_type": "remote_drift", "alert_status": "critical"}
+    assert run_list_snapshot["capabilities"] == {
+        "mutation": False,
+        "external_network": False,
+        "external_alerts": False,
+        "automatic_actions": False,
+    }
+
+    alert_audit = client.get(
+        "/api/admin/audit-logs?action=admin.content_script_asset.remote_drift_alert_report"
+        "&resource_type=content_script_asset_scan_run&request_id=remote-drift-alerts",
+        headers=_auth_header(admin_token),
+    )
+    assert alert_audit.status_code == 200
+    assert alert_audit.json()["total"] == 1
+    alert_snapshot = alert_audit.json()["items"][0]["snapshot_json"]
+    assert alert_snapshot["alert_status"] == "critical"
+    assert alert_snapshot["candidate_count"] == 5
+    assert alert_snapshot["policy"]["external_alerts"] is False
+    assert alert_snapshot["policy"]["automatic_actions"] is False
+    alert_audit_text = json.dumps(alert_snapshot, ensure_ascii=False)
+    assert "source_url" not in alert_audit_text
+    assert "integrity" not in alert_audit_text
+    assert "content_bytes" not in alert_audit_text
+    assert "secret-drift-token" not in alert_audit_text
 
     def fake_large_fetch(url: str) -> bytes:
         assert url == "https://cdn-remote.example.test/ok.js"

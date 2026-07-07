@@ -267,6 +267,8 @@ class AdminContentScriptAssetRemoteDriftIssueRead(BaseModel):
 
 
 class AdminContentScriptAssetRemoteDriftReport(BaseModel):
+    scan_run_id: int | None = None
+    scan_run_key: str | None = None
     generated_at: datetime
     total_pages_scanned: int
     total_external_references: int
@@ -280,6 +282,74 @@ class AdminContentScriptAssetRemoteDriftReport(BaseModel):
     limit: int
     offset: int
     next_offset: int | None = None
+
+
+class AdminContentScriptAssetScanRunRead(BaseModel):
+    id: int
+    run_key: str
+    scan_type: str
+    trigger_source: str
+    status: str
+    started_at: datetime
+    finished_at: datetime
+    created_by_user_id: int
+    filters_json: dict[str, Any]
+    totals_json: dict[str, Any]
+    issue_counts_json: dict[str, Any]
+    alert_status: str
+    error_message: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminContentScriptAssetScanRunPage(BaseModel):
+    items: list[AdminContentScriptAssetScanRunRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class AdminContentScriptAssetScanAlertCandidate(BaseModel):
+    severity: str
+    code: str
+    source: str
+    action_hint: str
+    run_id: int
+    run_key: str
+    scan_type: str
+    trigger_source: str
+    status: str
+    alert_status: str
+    started_at: datetime
+    finished_at: datetime
+    slug: str | None = None
+    page_id: int | None = None
+    page_version_id: int | None = None
+    sandbox_id: str | None = None
+    reference_key: str | None = None
+    reference_value_sha256: str | None = None
+    source_host: str | None = None
+    source_url_sha256: str | None = None
+    asset_id: int | None = None
+    asset_sha256: str | None = None
+    remote_asset_sha256: str | None = None
+    remote_asset_size_bytes: int | None = None
+    published_at: datetime | None = None
+
+
+class AdminContentScriptAssetScanAlertReport(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    alert_status: str
+    candidate_count: int
+    critical_count: int
+    warning_count: int
+    info_count: int
+    recent_run_count: int
+    issue_run_count: int
+    candidates: list[AdminContentScriptAssetScanAlertCandidate]
 
 
 class AdminContentPageVersionDiffItem(BaseModel):

@@ -27,6 +27,7 @@ from app.models import (
     ContentPageRecord,
     ContentPageVersion,
     ContentScriptAsset,
+    ContentScriptAssetScanRun,
     Course,
     CourseClass,
     CourseUnit,
@@ -52,6 +53,10 @@ from app.schemas.admin import (
     AdminContentScriptAssetAuditReport,
     AdminContentScriptAssetPage,
     AdminContentScriptAssetRead,
+    AdminContentScriptAssetScanAlertCandidate,
+    AdminContentScriptAssetScanAlertReport,
+    AdminContentScriptAssetScanRunPage,
+    AdminContentScriptAssetScanRunRead,
     AdminContentScriptAssetRemoteDriftIssueRead,
     AdminContentScriptAssetRemoteDriftReport,
     AdminContentScriptAssetRemoteDriftScanRequest,
@@ -139,6 +144,15 @@ from app.services.content_script_assets import (
     ContentScriptAssetRemoteDriftReport,
     audit_current_content_script_asset_mirrors,
     scan_current_content_script_asset_remote_drift,
+)
+from app.services.content_script_asset_scan_runs import (
+    ContentScriptAssetScanAlertCandidate as ContentScriptAssetScanAlertCandidateRow,
+    ContentScriptAssetScanAlertReport as ContentScriptAssetScanAlertReportRow,
+    build_content_script_asset_scan_alert_report,
+    content_script_asset_scan_alert_snapshot,
+    content_script_asset_scan_run_snapshot,
+    create_content_script_asset_remote_drift_scan_run,
+    list_content_script_asset_scan_runs,
 )
 from app.services.content_script_host_policies import (
     ContentScriptHostPolicyRow,
@@ -1022,6 +1036,103 @@ def read_admin_content_script_asset_audit(
     )
 
 
+@router.get("/content/script-assets/remote-drift-scan-runs", response_model=AdminContentScriptAssetScanRunPage)
+def list_admin_content_script_asset_remote_drift_scan_runs(
+    request: Request,
+    status_filter: str | None = Query(default=None, alias="status", max_length=32),
+    trigger_source: str | None = Query(default=None, max_length=32),
+    alert_status: Literal["ok", "warning", "critical"] | None = Query(default=None),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminContentScriptAssetScanRunPage:
+    _require_admin(current_user)
+    if from_at is not None and to_at is not None and from_at > to_at:
+        raise HTTPException(status_code=422, detail="from must be earlier than to")
+    page = list_content_script_asset_scan_runs(
+        db,
+        status=status_filter,
+        trigger_source=trigger_source,
+        alert_status=alert_status,
+        from_at=from_at,
+        to_at=to_at,
+        limit=limit,
+        offset=offset,
+    )
+    items = [_admin_content_script_asset_scan_run_read(run) for run in page.items]
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.content_script_asset.remote_drift_scan_run.list",
+        resource_type="content_script_asset_scan_run",
+        event_result="success",
+        request=request,
+        snapshot={
+            "filters": _content_script_asset_scan_run_filters(
+                status_filter=status_filter,
+                trigger_source=trigger_source,
+                alert_status=alert_status,
+                from_at=from_at,
+                to_at=to_at,
+            ),
+            "total": page.total,
+            "limit": limit,
+            "offset": offset,
+            "item_count": len(items),
+            "capabilities": {
+                "mutation": False,
+                "external_network": False,
+                "external_alerts": False,
+                "automatic_actions": False,
+            },
+        },
+    )
+    db.commit()
+    return AdminContentScriptAssetScanRunPage(
+        items=items,
+        total=page.total,
+        limit=limit,
+        offset=offset,
+        next_offset=_next_offset(page.total, offset, len(items)),
+    )
+
+
+@router.get("/content/script-assets/remote-drift-alerts", response_model=AdminContentScriptAssetScanAlertReport)
+def read_admin_content_script_asset_remote_drift_alerts(
+    request: Request,
+    trigger_source: str | None = Query(default=None, max_length=32),
+    alert_status: Literal["ok", "warning", "critical"] | None = Query(default=None),
+    recent_run_limit: int = Query(default=20, ge=1, le=100),
+    candidate_limit: int = Query(default=20, ge=0, le=100),
+    now_at: datetime | None = Query(default=None, alias="now"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminContentScriptAssetScanAlertReport:
+    _require_admin(current_user)
+    report = build_content_script_asset_scan_alert_report(
+        db,
+        recent_run_limit=recent_run_limit,
+        candidate_limit=candidate_limit,
+        generated_at=now_at,
+        trigger_source=trigger_source,
+        alert_status=alert_status,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.content_script_asset.remote_drift_alert_report",
+        resource_type="content_script_asset_scan_run",
+        event_result="success",
+        request=request,
+        snapshot=content_script_asset_scan_alert_snapshot(report),
+    )
+    db.commit()
+    return _admin_content_script_asset_scan_alert_report(report)
+
+
 @router.post("/content/script-assets/remote-drift-scan", response_model=AdminContentScriptAssetRemoteDriftReport)
 def scan_admin_content_script_asset_remote_drift(
     request_body: AdminContentScriptAssetRemoteDriftScanRequest,
@@ -1041,6 +1152,19 @@ def scan_admin_content_script_asset_remote_drift(
         scan_limit=request_body.limit,
         scan_offset=request_body.offset,
     )
+    scan_run = create_content_script_asset_remote_drift_scan_run(
+        db,
+        report=report,
+        request_filters=_content_script_asset_remote_drift_scan_request_filters(request_body),
+        creator=current_user,
+    )
+    db.flush()
+    audit_snapshot = _content_script_asset_remote_drift_scan_snapshot(
+        report,
+        request_body=request_body,
+        item_count=len(report.issues),
+    )
+    audit_snapshot["scan_run"] = content_script_asset_scan_run_snapshot(scan_run)
     record_audit_log(
         db,
         actor=current_user,
@@ -1048,14 +1172,12 @@ def scan_admin_content_script_asset_remote_drift(
         resource_type="content_script_asset",
         event_result="success",
         request=request,
-        snapshot=_content_script_asset_remote_drift_scan_snapshot(
-            report,
-            request_body=request_body,
-            item_count=len(report.issues),
-        ),
+        snapshot=audit_snapshot,
     )
     db.commit()
     return AdminContentScriptAssetRemoteDriftReport(
+        scan_run_id=scan_run.id,
+        scan_run_key=scan_run.run_key,
         generated_at=report.generated_at,
         total_pages_scanned=report.total_pages_scanned,
         total_external_references=report.total_external_references,
@@ -3249,6 +3371,76 @@ def _admin_content_script_asset_remote_drift_issue_read(
     )
 
 
+def _admin_content_script_asset_scan_run_read(run: ContentScriptAssetScanRun) -> AdminContentScriptAssetScanRunRead:
+    return AdminContentScriptAssetScanRunRead(
+        id=run.id,
+        run_key=run.run_key,
+        scan_type=run.scan_type,
+        trigger_source=run.trigger_source,
+        status=run.status,
+        started_at=run.started_at,
+        finished_at=run.finished_at,
+        created_by_user_id=run.created_by_user_id,
+        filters_json=run.filters_json,
+        totals_json=run.totals_json,
+        issue_counts_json=run.issue_counts_json,
+        alert_status=run.alert_status,
+        error_message=run.error_message,
+        created_at=run.created_at,
+        updated_at=run.updated_at,
+    )
+
+
+def _admin_content_script_asset_scan_alert_report(
+    report: ContentScriptAssetScanAlertReportRow,
+) -> AdminContentScriptAssetScanAlertReport:
+    return AdminContentScriptAssetScanAlertReport(
+        generated_at=report.generated_at,
+        filters=report.filters,
+        policy=report.policy,
+        alert_status=report.alert_status,
+        candidate_count=report.candidate_count,
+        critical_count=report.critical_count,
+        warning_count=report.warning_count,
+        info_count=report.info_count,
+        recent_run_count=report.recent_run_count,
+        issue_run_count=report.issue_run_count,
+        candidates=[_admin_content_script_asset_scan_alert_candidate(item) for item in report.candidates],
+    )
+
+
+def _admin_content_script_asset_scan_alert_candidate(
+    item: ContentScriptAssetScanAlertCandidateRow,
+) -> AdminContentScriptAssetScanAlertCandidate:
+    return AdminContentScriptAssetScanAlertCandidate(
+        severity=item.severity,
+        code=item.code,
+        source=item.source,
+        action_hint=item.action_hint,
+        run_id=item.run_id,
+        run_key=item.run_key,
+        scan_type=item.scan_type,
+        trigger_source=item.trigger_source,
+        status=item.status,
+        alert_status=item.alert_status,
+        started_at=item.started_at,
+        finished_at=item.finished_at,
+        slug=item.slug,
+        page_id=item.page_id,
+        page_version_id=item.page_version_id,
+        sandbox_id=item.sandbox_id,
+        reference_key=item.reference_key,
+        reference_value_sha256=item.reference_value_sha256,
+        source_host=item.source_host,
+        source_url_sha256=item.source_url_sha256,
+        asset_id=item.asset_id,
+        asset_sha256=item.asset_sha256,
+        remote_asset_sha256=item.remote_asset_sha256,
+        remote_asset_size_bytes=item.remote_asset_size_bytes,
+        published_at=item.published_at,
+    )
+
+
 def _content_script_asset_filters(
     *,
     slug: str | None,
@@ -3300,6 +3492,50 @@ def _content_script_host_policy_filters(
     return {key: value for key, value in filters.items() if value is not None}
 
 
+def _content_script_asset_scan_run_filters(
+    *,
+    status_filter: str | None,
+    trigger_source: str | None,
+    alert_status: str | None,
+    from_at: datetime | None,
+    to_at: datetime | None,
+) -> dict[str, Any]:
+    filters = {
+        "scan_type": "remote_drift",
+        "status": status_filter.strip().lower() if status_filter is not None and status_filter.strip() else None,
+        "trigger_source": trigger_source.strip().lower()
+        if trigger_source is not None and trigger_source.strip()
+        else None,
+        "alert_status": alert_status.strip().lower() if alert_status is not None and alert_status.strip() else None,
+        "from": from_at.isoformat() if from_at is not None else None,
+        "to": to_at.isoformat() if to_at is not None else None,
+    }
+    return {key: value for key, value in filters.items() if value is not None}
+
+
+def _content_script_asset_remote_drift_scan_request_filters(
+    request_body: AdminContentScriptAssetRemoteDriftScanRequest,
+) -> dict[str, Any]:
+    filters = {
+        "slug": request_body.slug.strip("/") if request_body.slug is not None and request_body.slug.strip("/") else None,
+        "source_host": (
+            request_body.source_host.strip().lower()
+            if request_body.source_host is not None and request_body.source_host.strip()
+            else None
+        ),
+        "issue_code": (
+            request_body.issue_code.strip().lower()
+            if request_body.issue_code is not None and request_body.issue_code.strip()
+            else None
+        ),
+        "severity": request_body.severity,
+        "limit": request_body.limit,
+        "offset": request_body.offset,
+        "confirm_external_network": bool(request_body.confirm_external_network),
+    }
+    return {key: value for key, value in filters.items() if value is not None}
+
+
 def _content_script_asset_mirror_audit_snapshot(
     report: ContentScriptAssetMirrorAuditReport,
     *,
@@ -3343,22 +3579,12 @@ def _content_script_asset_remote_drift_scan_snapshot(
     request_body: AdminContentScriptAssetRemoteDriftScanRequest,
     item_count: int,
 ) -> dict[str, Any]:
-    filters = {
-        "slug": request_body.slug.strip("/") if request_body.slug is not None and request_body.slug.strip("/") else None,
-        "source_host": (
-            request_body.source_host.strip().lower()
-            if request_body.source_host is not None and request_body.source_host.strip()
-            else None
-        ),
-        "issue_code": (
-            request_body.issue_code.strip().lower()
-            if request_body.issue_code is not None and request_body.issue_code.strip()
-            else None
-        ),
-        "severity": request_body.severity,
-    }
+    filters = _content_script_asset_remote_drift_scan_request_filters(request_body)
+    filters.pop("limit", None)
+    filters.pop("offset", None)
+    filters.pop("confirm_external_network", None)
     return {
-        "filters": {key: value for key, value in filters.items() if value is not None},
+        "filters": filters,
         "generated_at": report.generated_at.isoformat(),
         "total_pages_scanned": report.total_pages_scanned,
         "total_external_references": report.total_external_references,

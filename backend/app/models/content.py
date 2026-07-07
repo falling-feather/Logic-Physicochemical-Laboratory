@@ -154,3 +154,21 @@ class ContentScriptHostPolicy(TimestampMixin, Base):
     reviewed_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
     reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
 
+
+class ContentScriptAssetScanRun(TimestampMixin, Base):
+    __tablename__ = "content_script_asset_scan_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    run_key: Mapped[str] = mapped_column(String(160), index=True, nullable=False)
+    scan_type: Mapped[str] = mapped_column(String(32), default="remote_drift", index=True, nullable=False)
+    trigger_source: Mapped[str] = mapped_column(String(32), default="manual", index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="success", index=True, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    finished_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    filters_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    totals_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    issue_counts_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    issue_summary_json: Mapped[list] = mapped_column(JSON, nullable=False)
+    alert_status: Mapped[str] = mapped_column(String(32), default="ok", index=True, nullable=False)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
