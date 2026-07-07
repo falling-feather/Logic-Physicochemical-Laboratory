@@ -206,6 +206,51 @@ class AdminContentScriptAssetAuditReport(BaseModel):
     next_offset: int | None = None
 
 
+class AdminContentScriptAssetRemoteDriftScanRequest(BaseModel):
+    slug: str | None = Field(default=None, max_length=180)
+    source_host: str | None = Field(default=None, max_length=255)
+    issue_code: str | None = Field(default=None, max_length=80)
+    severity: Literal["critical", "warning", "info"] | None = None
+    limit: int = Field(default=25, ge=1, le=50)
+    offset: int = Field(default=0, ge=0)
+    confirm_external_network: bool = False
+
+
+class AdminContentScriptAssetRemoteDriftIssueRead(BaseModel):
+    code: str
+    severity: str
+    message: str
+    page_id: int | None = None
+    page_version_id: int | None = None
+    slug: str
+    sandbox_id: str | None = None
+    reference_key: str | None = None
+    reference_value_sha256: str | None = None
+    source_host: str | None = None
+    source_url_sha256: str | None = None
+    asset_id: int | None = None
+    asset_sha256: str | None = None
+    remote_asset_sha256: str | None = None
+    remote_asset_size_bytes: int | None = None
+    published_at: datetime | None = None
+
+
+class AdminContentScriptAssetRemoteDriftReport(BaseModel):
+    generated_at: datetime
+    total_pages_scanned: int
+    total_external_references: int
+    total_scanned_references: int
+    total_remote_fetches: int
+    total_skipped_references: int
+    total_issues: int
+    issue_counts_by_code: dict[str, int]
+    issue_counts_by_severity: dict[str, int]
+    items: list[AdminContentScriptAssetRemoteDriftIssueRead]
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
 class AdminContentPageVersionDiffItem(BaseModel):
     path: str
     before: Any = None

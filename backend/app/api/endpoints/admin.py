@@ -52,6 +52,9 @@ from app.schemas.admin import (
     AdminContentScriptAssetAuditReport,
     AdminContentScriptAssetPage,
     AdminContentScriptAssetRead,
+    AdminContentScriptAssetRemoteDriftIssueRead,
+    AdminContentScriptAssetRemoteDriftReport,
+    AdminContentScriptAssetRemoteDriftScanRequest,
     AdminContentPageVersionDiff,
     AdminContentPageVersionDiffItem,
     AdminContentPageVersionSemanticDiff,
@@ -129,7 +132,10 @@ from app.services.knowledge_snapshot_scheduler import (
 from app.services.content_script_assets import (
     ContentScriptAssetMirrorAuditIssue,
     ContentScriptAssetMirrorAuditReport,
+    ContentScriptAssetRemoteDriftIssue,
+    ContentScriptAssetRemoteDriftReport,
     audit_current_content_script_asset_mirrors,
+    scan_current_content_script_asset_remote_drift,
 )
 
 
@@ -879,6 +885,60 @@ def read_admin_content_script_asset_audit(
         limit=limit,
         offset=offset,
         next_offset=_next_offset(report.total_issues, offset, len(issues)),
+    )
+
+
+@router.post("/content/script-assets/remote-drift-scan", response_model=AdminContentScriptAssetRemoteDriftReport)
+def scan_admin_content_script_asset_remote_drift(
+    request_body: AdminContentScriptAssetRemoteDriftScanRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminContentScriptAssetRemoteDriftReport:
+    _require_admin(current_user)
+    if not request_body.confirm_external_network:
+        raise HTTPException(status_code=422, detail="confirm_external_network must be true")
+    report = scan_current_content_script_asset_remote_drift(
+        db,
+        slug=request_body.slug,
+        source_host=request_body.source_host,
+        issue_code=request_body.issue_code,
+        severity=request_body.severity,
+        scan_limit=request_body.limit,
+        scan_offset=request_body.offset,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.content_script_asset.remote_drift_scan",
+        resource_type="content_script_asset",
+        event_result="success",
+        request=request,
+        snapshot=_content_script_asset_remote_drift_scan_snapshot(
+            report,
+            request_body=request_body,
+            item_count=len(report.issues),
+        ),
+    )
+    db.commit()
+    return AdminContentScriptAssetRemoteDriftReport(
+        generated_at=report.generated_at,
+        total_pages_scanned=report.total_pages_scanned,
+        total_external_references=report.total_external_references,
+        total_scanned_references=report.total_scanned_references,
+        total_remote_fetches=report.total_remote_fetches,
+        total_skipped_references=report.total_skipped_references,
+        total_issues=report.total_issues,
+        issue_counts_by_code=report.issue_counts_by_code,
+        issue_counts_by_severity=report.issue_counts_by_severity,
+        items=[_admin_content_script_asset_remote_drift_issue_read(issue) for issue in report.issues],
+        limit=request_body.limit,
+        offset=request_body.offset,
+        next_offset=_next_offset(
+            report.total_external_references,
+            request_body.offset,
+            report.total_scanned_references,
+        ),
     )
 
 
@@ -3015,6 +3075,29 @@ def _admin_content_script_asset_audit_issue_read(
     )
 
 
+def _admin_content_script_asset_remote_drift_issue_read(
+    issue: ContentScriptAssetRemoteDriftIssue,
+) -> AdminContentScriptAssetRemoteDriftIssueRead:
+    return AdminContentScriptAssetRemoteDriftIssueRead(
+        code=issue.code,
+        severity=issue.severity,
+        message=issue.message,
+        page_id=issue.page_id,
+        page_version_id=issue.page_version_id,
+        slug=issue.slug,
+        sandbox_id=issue.sandbox_id,
+        reference_key=issue.reference_key,
+        reference_value_sha256=issue.reference_value_sha256,
+        source_host=issue.source_host,
+        source_url_sha256=issue.source_url_sha256,
+        asset_id=issue.asset_id,
+        asset_sha256=issue.asset_sha256,
+        remote_asset_sha256=issue.remote_asset_sha256,
+        remote_asset_size_bytes=issue.remote_asset_size_bytes,
+        published_at=issue.published_at,
+    )
+
+
 def _content_script_asset_filters(
     *,
     slug: str | None,
@@ -3085,6 +3168,50 @@ def _content_script_asset_mirror_audit_snapshot(
             "cdn_scan": False,
             "external_alerts": False,
             "repair": False,
+        },
+    }
+
+
+def _content_script_asset_remote_drift_scan_snapshot(
+    report: ContentScriptAssetRemoteDriftReport,
+    *,
+    request_body: AdminContentScriptAssetRemoteDriftScanRequest,
+    item_count: int,
+) -> dict[str, Any]:
+    filters = {
+        "slug": request_body.slug.strip("/") if request_body.slug is not None and request_body.slug.strip("/") else None,
+        "source_host": (
+            request_body.source_host.strip().lower()
+            if request_body.source_host is not None and request_body.source_host.strip()
+            else None
+        ),
+        "issue_code": (
+            request_body.issue_code.strip().lower()
+            if request_body.issue_code is not None and request_body.issue_code.strip()
+            else None
+        ),
+        "severity": request_body.severity,
+    }
+    return {
+        "filters": {key: value for key, value in filters.items() if value is not None},
+        "generated_at": report.generated_at.isoformat(),
+        "total_pages_scanned": report.total_pages_scanned,
+        "total_external_references": report.total_external_references,
+        "total_scanned_references": report.total_scanned_references,
+        "total_remote_fetches": report.total_remote_fetches,
+        "total_skipped_references": report.total_skipped_references,
+        "total_issues": report.total_issues,
+        "issue_counts_by_code": report.issue_counts_by_code,
+        "issue_counts_by_severity": report.issue_counts_by_severity,
+        "limit": request_body.limit,
+        "offset": request_body.offset,
+        "item_count": item_count,
+        "capabilities": {
+            "external_network": True,
+            "cdn_scan": True,
+            "external_alerts": False,
+            "repair": False,
+            "mutation": False,
         },
     }
 

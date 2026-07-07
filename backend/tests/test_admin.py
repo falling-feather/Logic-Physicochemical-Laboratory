@@ -20,6 +20,7 @@ from app.models import (
     SchoolMembership,
     User,
 )
+from app.services import content_script_assets
 from app.services.content_script_assets import external_script_references
 from app.services.audit import audit_log_chain_hash, record_audit_log
 
@@ -2681,6 +2682,228 @@ def test_admin_reads_content_script_asset_mirror_audit_with_redaction(client):
     assert "integrity" not in audit_text
     assert "content_bytes" not in audit_text
     assert "secret-stale-token" not in audit_text
+
+
+def test_admin_scans_content_script_asset_remote_drift_with_redaction(client, monkeypatch):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "teacher_remote_drift", "teacher")
+    admin_user_id = _current_user_id(client, admin_token)
+    published_at = datetime(2026, 7, 8, 12, 15, tzinfo=UTC)
+    ok_bytes = b"console.log('remote drift ok');\n"
+    mirrored_bytes = b"console.log('remote drift mirrored');\n"
+    drifted_bytes = b"console.log('remote drift now changed and longer');\n"
+    unavailable_bytes = b"console.log('remote drift unavailable');\n"
+
+    ok_schema = _script_asset_schema(
+        "physics/remote-drift-ok",
+        "https://cdn-remote.example.test/ok.js",
+        _sri_sha384(ok_bytes),
+    )
+    drift_schema = _script_asset_schema(
+        "physics/remote-drift-changed",
+        "https://cdn-remote.example.test/secret-drift-token.js",
+        _sri_sha384(mirrored_bytes),
+    )
+    unavailable_schema = _script_asset_schema(
+        "physics/remote-drift-unavailable",
+        "https://cdn-remote.example.test/unavailable.js",
+        _sri_sha384(unavailable_bytes),
+    )
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        ok_page, ok_version = _insert_published_script_page(
+            db,
+            schema=ok_schema,
+            publisher_user_id=admin_user_id,
+            published_at=published_at,
+        )
+        drift_page, drift_version = _insert_published_script_page(
+            db,
+            schema=drift_schema,
+            publisher_user_id=admin_user_id,
+            published_at=published_at + timedelta(minutes=1),
+        )
+        unavailable_page, unavailable_version = _insert_published_script_page(
+            db,
+            schema=unavailable_schema,
+            publisher_user_id=admin_user_id,
+            published_at=published_at + timedelta(minutes=2),
+        )
+        for page, version, schema, payload in (
+            (ok_page, ok_version, ok_schema, ok_bytes),
+            (drift_page, drift_version, drift_schema, mirrored_bytes),
+            (unavailable_page, unavailable_version, unavailable_schema, unavailable_bytes),
+        ):
+            reference = external_script_references(schema)[0]
+            db.add(
+                ContentScriptAsset(
+                    page_id=page.id,
+                    page_version_id=version.id,
+                    slug=page.slug,
+                    sandbox_id=reference.sandbox_id,
+                    reference_key=reference.reference_key,
+                    reference_value_sha256=reference.reference_value_sha256,
+                    source_url=reference.source_url,
+                    source_host=reference.source_host,
+                    integrity=reference.integrity,
+                    matched_algorithm="sha384",
+                    asset_sha256=hashlib.sha256(payload).hexdigest(),
+                    asset_size_bytes=len(payload),
+                    content_bytes=payload,
+                    policy_version="v6.6.24",
+                    policy_context_hash="c" * 64,
+                    published_by_user_id=admin_user_id,
+                    published_at=version.published_at,
+                )
+            )
+        db.commit()
+
+    def fake_fetch(url: str) -> bytes:
+        if url == "https://cdn-remote.example.test/ok.js":
+            return ok_bytes
+        if url == "https://cdn-remote.example.test/secret-drift-token.js":
+            return drifted_bytes
+        if url == "https://cdn-remote.example.test/unavailable.js":
+            raise RuntimeError("remote secret unavailable")
+        raise AssertionError(f"unexpected URL: {url}")
+
+    monkeypatch.setattr(content_script_assets, "_fetch_external_script_asset", fake_fetch)
+
+    forbidden = client.post(
+        "/api/admin/content/script-assets/remote-drift-scan",
+        headers=_auth_header(teacher_token),
+        json={"source_host": "cdn-remote.example.test"},
+    )
+    assert forbidden.status_code == 403
+
+    rejected = client.post(
+        "/api/admin/content/script-assets/remote-drift-scan",
+        headers=_auth_header(admin_token),
+        json={"source_host": "cdn-remote.example.test", "confirm_external_network": False},
+    )
+    assert rejected.status_code == 422
+
+    omitted_confirmation = client.post(
+        "/api/admin/content/script-assets/remote-drift-scan",
+        headers=_auth_header(admin_token),
+        json={"source_host": "cdn-remote.example.test"},
+    )
+    assert omitted_confirmation.status_code == 422
+
+    first_page = client.post(
+        "/api/admin/content/script-assets/remote-drift-scan",
+        headers=_auth_header(admin_token),
+        json={"source_host": "cdn-remote.example.test", "limit": 2, "confirm_external_network": True},
+    )
+    assert first_page.status_code == 200
+    first_page_body = first_page.json()
+    assert first_page_body["total_pages_scanned"] >= 3
+    assert first_page_body["total_external_references"] == 3
+    assert first_page_body["total_scanned_references"] == 2
+    assert first_page_body["total_remote_fetches"] == 2
+    assert first_page_body["total_issues"] == 3
+    assert first_page_body["next_offset"] == 2
+    assert first_page_body["issue_counts_by_code"] == {
+        "remote_hash_mismatch": 1,
+        "remote_size_mismatch": 1,
+        "remote_sri_mismatch": 1,
+    }
+    assert first_page_body["issue_counts_by_severity"] == {"critical": 3}
+
+    second_page = client.post(
+        "/api/admin/content/script-assets/remote-drift-scan",
+        headers=_auth_header(admin_token),
+        json={
+            "source_host": "cdn-remote.example.test",
+            "limit": 2,
+            "offset": 2,
+            "confirm_external_network": True,
+        },
+    )
+    assert second_page.status_code == 200
+    second_page_body = second_page.json()
+    assert second_page_body["total_scanned_references"] == 1
+    assert second_page_body["total_remote_fetches"] == 1
+    assert second_page_body["total_issues"] == 1
+    assert second_page_body["issue_counts_by_code"] == {"remote_asset_unavailable": 1}
+    assert second_page_body["next_offset"] is None
+
+    filtered = client.post(
+        "/api/admin/content/script-assets/remote-drift-scan",
+        headers={**_auth_header(admin_token), "X-Request-ID": "remote-drift-scan"},
+        json={
+            "source_host": "cdn-remote.example.test",
+            "issue_code": "remote_sri_mismatch",
+            "limit": 2,
+            "confirm_external_network": True,
+        },
+    )
+    assert filtered.status_code == 200
+    body = filtered.json()
+    assert body["total_issues"] == 1
+    assert body["items"][0]["code"] == "remote_sri_mismatch"
+    assert body["items"][0]["source_host"] == "cdn-remote.example.test"
+    assert body["items"][0]["remote_asset_sha256"] == hashlib.sha256(drifted_bytes).hexdigest()
+    response_text = json.dumps(body, ensure_ascii=False)
+    assert "source_url" not in body["items"][0]
+    assert "integrity" not in body["items"][0]
+    assert "content_bytes" not in body["items"][0]
+    assert "secret-drift-token" not in response_text
+    assert "remote drift now changed" not in response_text
+    assert "remote drift mirrored" not in response_text
+    assert "remote secret unavailable" not in response_text
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.content_script_asset.remote_drift_scan"
+        "&resource_type=content_script_asset&request_id=remote-drift-scan",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert snapshot["filters"] == {
+        "source_host": "cdn-remote.example.test",
+        "issue_code": "remote_sri_mismatch",
+    }
+    assert snapshot["total_external_references"] == 3
+    assert snapshot["total_scanned_references"] == 2
+    assert snapshot["total_remote_fetches"] == 2
+    assert snapshot["total_issues"] == 1
+    assert snapshot["capabilities"] == {
+        "external_network": True,
+        "cdn_scan": True,
+        "external_alerts": False,
+        "repair": False,
+        "mutation": False,
+    }
+    audit_text = json.dumps(snapshot, ensure_ascii=False)
+    assert "source_url" not in audit_text
+    assert "integrity" not in audit_text
+    assert "content_bytes" not in audit_text
+    assert "secret-drift-token" not in audit_text
+    assert "remote drift now changed" not in audit_text
+
+    def fake_large_fetch(url: str) -> bytes:
+        assert url == "https://cdn-remote.example.test/ok.js"
+        return b"x" * (content_script_assets.content_script_policy.MAX_EXTERNAL_SCRIPT_BYTES + 1)
+
+    monkeypatch.setattr(content_script_assets, "_fetch_external_script_asset", fake_large_fetch)
+    too_large = client.post(
+        "/api/admin/content/script-assets/remote-drift-scan",
+        headers=_auth_header(admin_token),
+        json={
+            "slug": "physics/remote-drift-ok",
+            "issue_code": "remote_asset_too_large",
+            "limit": 1,
+            "confirm_external_network": True,
+        },
+    )
+    assert too_large.status_code == 200
+    too_large_body = too_large.json()
+    assert too_large_body["total_issues"] == 1
+    assert too_large_body["items"][0]["code"] == "remote_asset_too_large"
+    assert "x" * 32 not in json.dumps(too_large_body, ensure_ascii=False)
 
 
 def _script_asset_schema(slug: str, source_url: str, integrity: str) -> dict:
