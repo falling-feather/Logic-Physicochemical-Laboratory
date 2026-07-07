@@ -147,6 +147,35 @@ class AdminContentPageVersionPage(BaseModel):
     next_offset: int | None = None
 
 
+class AdminContentScriptAssetRead(BaseModel):
+    id: int
+    page_id: int
+    page_version_id: int
+    slug: str
+    sandbox_id: str
+    reference_key: str
+    reference_value_sha256: str
+    source_host: str
+    source_url_sha256: str
+    matched_algorithm: str
+    asset_sha256: str
+    asset_size_bytes: int
+    policy_version: str
+    policy_context_hash: str
+    published_by_user_id: int
+    published_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminContentScriptAssetPage(BaseModel):
+    items: list[AdminContentScriptAssetRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
 class AdminContentPageVersionDiffItem(BaseModel):
     path: str
     before: Any = None

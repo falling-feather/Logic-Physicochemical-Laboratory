@@ -7,7 +7,17 @@ from sqlalchemy import func, select
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import AuditLog, AuthSession, ContentPageRecord, KnowledgeSnapshotRun, LoginAttempt, SchoolMembership, User
+from app.models import (
+    AuditLog,
+    AuthSession,
+    ContentPageRecord,
+    ContentPageVersion,
+    ContentScriptAsset,
+    KnowledgeSnapshotRun,
+    LoginAttempt,
+    SchoolMembership,
+    User,
+)
 from app.services.audit import audit_log_chain_hash, record_audit_log
 
 
@@ -2353,3 +2363,161 @@ def _insert_content_page(
             )
         )
         db.commit()
+
+
+def test_admin_lists_content_script_asset_inventory_with_redaction_and_audit(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "teacher_script_assets", "teacher")
+    admin_user_id = _current_user_id(client, admin_token)
+    published_at = datetime(2026, 7, 8, 9, 30, tzinfo=UTC)
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        schema = {
+            "slug": "physics/script-asset-inventory",
+            "galaxy": "englab",
+            "subject": "physics",
+            "title": "Energy Conservation",
+            "layout": "experiment-page",
+            "status": "published",
+            "version": "v-test",
+            "sections": [],
+            "sources": [],
+        }
+        page = ContentPageRecord(
+            slug="physics/script-asset-inventory",
+            status="published",
+            version="v-test",
+            schema_json=schema,
+            schema_hash="d" * 64,
+            published_by_user_id=admin_user_id,
+            published_at=published_at,
+        )
+        db.add(page)
+        db.flush()
+        version = ContentPageVersion(
+            page_id=page.id,
+            slug=page.slug,
+            status="published",
+            version="v-test",
+            schema_hash="d" * 64,
+            schema_json=schema,
+            published_by_user_id=admin_user_id,
+            published_at=published_at,
+            note="content script asset inventory fixture",
+        )
+        db.add(version)
+        db.flush()
+        page.current_version_id = version.id
+        db.add_all(
+            [
+                ContentScriptAsset(
+                    page_id=page.id,
+                    page_version_id=version.id,
+                    slug=page.slug,
+                    sandbox_id="sb_energy",
+                    reference_key="scriptUrl",
+                    reference_value_sha256="a" * 64,
+                    source_url="https://cdn.example.test/assets/secret-token-tool.js",
+                    source_host="cdn.example.test",
+                    integrity="sha384-secret-integrity-token",
+                    matched_algorithm="sha384",
+                    asset_sha256="b" * 64,
+                    asset_size_bytes=18,
+                    content_bytes=b"secret-asset-bytes",
+                    policy_version="v6.6.20",
+                    policy_context_hash="c" * 64,
+                    published_by_user_id=admin_user_id,
+                    published_at=published_at + timedelta(minutes=1),
+                ),
+                ContentScriptAsset(
+                    page_id=page.id,
+                    page_version_id=version.id,
+                    slug=page.slug,
+                    sandbox_id="sb_energy",
+                    reference_key="workerUrl",
+                    reference_value_sha256="e" * 64,
+                    source_url="https://static.other.test/assets/worker.js",
+                    source_host="static.other.test",
+                    integrity="sha384-other-integrity-token",
+                    matched_algorithm="sha384",
+                    asset_sha256="f" * 64,
+                    asset_size_bytes=12,
+                    content_bytes=b"other-asset-bytes",
+                    policy_version="v6.6.20",
+                    policy_context_hash="c" * 64,
+                    published_by_user_id=admin_user_id,
+                    published_at=published_at,
+                ),
+            ]
+        )
+        db.commit()
+        page_id = page.id
+        version_id = version.id
+
+    forbidden = client.get("/api/admin/content/script-assets", headers=_auth_header(teacher_token))
+    assert forbidden.status_code == 403
+
+    first_page = client.get("/api/admin/content/script-assets?limit=1", headers=_auth_header(admin_token))
+    assert first_page.status_code == 200
+    first_page_body = first_page.json()
+    assert first_page_body["total"] == 2
+    assert first_page_body["next_offset"] == 1
+    assert first_page_body["items"][0]["source_host"] == "cdn.example.test"
+
+    response = client.get(
+        "/api/admin/content/script-assets"
+        "?source_host=cdn.example.test"
+        "&q=energy"
+        "&limit=50",
+        headers={**_auth_header(admin_token), "X-Request-ID": "script-asset-inventory"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert body["next_offset"] is None
+    item = body["items"][0]
+    assert item["page_id"] == page_id
+    assert item["page_version_id"] == version_id
+    assert item["slug"] == "physics/script-asset-inventory"
+    assert item["sandbox_id"] == "sb_energy"
+    assert item["reference_key"] == "scriptUrl"
+    assert item["reference_value_sha256"] == "a" * 64
+    assert item["asset_sha256"] == "b" * 64
+    assert item["asset_size_bytes"] == 18
+    assert item["policy_context_hash"] == "c" * 64
+    assert item["source_url_sha256"]
+    response_text = json.dumps(body, ensure_ascii=False)
+    assert "source_url" not in item
+    assert "integrity" not in item
+    assert "content_bytes" not in item
+    assert "secret-token" not in response_text
+    assert "secret-integrity-token" not in response_text
+    assert "secret-asset-bytes" not in response_text
+
+    invalid_window = client.get(
+        "/api/admin/content/script-assets?from=2026-07-09T00:00:00Z&to=2026-07-08T00:00:00Z",
+        headers=_auth_header(admin_token),
+    )
+    assert invalid_window.status_code == 422
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.content_script_asset.inventory"
+        "&resource_type=content_script_asset&request_id=script-asset-inventory",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert snapshot["filters"]["source_host"] == "cdn.example.test"
+    assert snapshot["filters"]["has_q"] is True
+    assert snapshot["total"] == 1
+    assert snapshot["item_count"] == 1
+    assert snapshot["host_counts"] == {"cdn.example.test": 1}
+    audit_text = json.dumps(snapshot, ensure_ascii=False)
+    assert "source_url" not in audit_text
+    assert "integrity" not in audit_text
+    assert "content_bytes" not in audit_text
+    assert "secret-token" not in audit_text
+    assert "secret-integrity-token" not in audit_text
+    assert "secret-asset-bytes" not in audit_text

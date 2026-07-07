@@ -3,6 +3,7 @@ import io
 import json
 import re
 from datetime import UTC, date, datetime, timedelta
+from hashlib import sha256
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -25,6 +26,7 @@ from app.models import (
     ContentDraft,
     ContentPageRecord,
     ContentPageVersion,
+    ContentScriptAsset,
     Course,
     CourseClass,
     CourseUnit,
@@ -46,6 +48,8 @@ from app.schemas.admin import (
     AdminClassStats,
     AdminContentPagePage,
     AdminContentPageRead,
+    AdminContentScriptAssetPage,
+    AdminContentScriptAssetRead,
     AdminContentPageVersionDiff,
     AdminContentPageVersionDiffItem,
     AdminContentPageVersionSemanticDiff,
@@ -735,6 +739,80 @@ def list_admin_content_page_versions(
     versions = list(db.scalars(statement.offset(offset).limit(limit)).all())
     items = [_admin_content_page_version_read(version) for version in versions]
     return AdminContentPageVersionPage(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        next_offset=_next_offset(total, offset, len(items)),
+    )
+
+
+@router.get("/content/script-assets", response_model=AdminContentScriptAssetPage)
+def list_admin_content_script_assets(
+    request: Request,
+    slug: str | None = Query(default=None, max_length=180),
+    source_host: str | None = Query(default=None, max_length=255),
+    sandbox_id: str | None = Query(default=None, max_length=32),
+    page_id: int | None = Query(default=None, ge=1),
+    page_version_id: int | None = Query(default=None, ge=1),
+    published_by_user_id: int | None = Query(default=None, ge=1),
+    policy_version: str | None = Query(default=None, max_length=64),
+    policy_context_hash: str | None = Query(default=None, min_length=64, max_length=64),
+    asset_sha256: str | None = Query(default=None, min_length=64, max_length=64),
+    reference_value_sha256: str | None = Query(default=None, min_length=64, max_length=64),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    q: str | None = Query(default=None, max_length=160),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminContentScriptAssetPage:
+    _require_admin(current_user)
+    if from_at is not None and to_at is not None and from_at > to_at:
+        raise HTTPException(status_code=422, detail="from must be earlier than to")
+
+    filters = _content_script_asset_filters(
+        slug=slug,
+        source_host=source_host,
+        sandbox_id=sandbox_id,
+        page_id=page_id,
+        page_version_id=page_version_id,
+        published_by_user_id=published_by_user_id,
+        policy_version=policy_version,
+        policy_context_hash=policy_context_hash,
+        asset_sha256=asset_sha256,
+        reference_value_sha256=reference_value_sha256,
+        from_at=from_at,
+        to_at=to_at,
+        q=q,
+    )
+    statement = select(ContentScriptAsset).order_by(
+        ContentScriptAsset.published_at.desc(),
+        ContentScriptAsset.id.desc(),
+    )
+    statement = _apply_content_script_asset_filters(statement, filters)
+    total = _statement_count(db, statement)
+    assets = list(db.scalars(statement.offset(offset).limit(limit)).all())
+    items = [_admin_content_script_asset_read(asset) for asset in assets]
+
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.content_script_asset.inventory",
+        resource_type="content_script_asset",
+        event_result="success",
+        request=request,
+        snapshot=_content_script_asset_inventory_snapshot(
+            assets,
+            filters=filters,
+            total=total,
+            limit=limit,
+            offset=offset,
+        ),
+    )
+    db.commit()
+    return AdminContentScriptAssetPage(
         items=items,
         total=total,
         limit=limit,
@@ -2830,6 +2908,138 @@ def _admin_content_page_version_read(version: ContentPageVersion) -> AdminConten
         note=version.note,
         created_at=version.created_at,
     )
+
+
+def _admin_content_script_asset_read(asset: ContentScriptAsset) -> AdminContentScriptAssetRead:
+    return AdminContentScriptAssetRead(
+        id=asset.id,
+        page_id=asset.page_id,
+        page_version_id=asset.page_version_id,
+        slug=asset.slug,
+        sandbox_id=asset.sandbox_id,
+        reference_key=asset.reference_key,
+        reference_value_sha256=asset.reference_value_sha256,
+        source_host=asset.source_host,
+        source_url_sha256=sha256(asset.source_url.encode("utf-8")).hexdigest(),
+        matched_algorithm=asset.matched_algorithm,
+        asset_sha256=asset.asset_sha256,
+        asset_size_bytes=asset.asset_size_bytes,
+        policy_version=asset.policy_version,
+        policy_context_hash=asset.policy_context_hash,
+        published_by_user_id=asset.published_by_user_id,
+        published_at=asset.published_at,
+        created_at=asset.created_at,
+        updated_at=asset.updated_at,
+    )
+
+
+def _content_script_asset_filters(
+    *,
+    slug: str | None,
+    source_host: str | None,
+    sandbox_id: str | None,
+    page_id: int | None,
+    page_version_id: int | None,
+    published_by_user_id: int | None,
+    policy_version: str | None,
+    policy_context_hash: str | None,
+    asset_sha256: str | None,
+    reference_value_sha256: str | None,
+    from_at: datetime | None,
+    to_at: datetime | None,
+    q: str | None,
+) -> dict[str, Any]:
+    return {
+        "slug": slug.strip("/") if slug is not None and slug.strip("/") else None,
+        "source_host": source_host.strip().lower() if source_host is not None and source_host.strip() else None,
+        "sandbox_id": sandbox_id.strip() if sandbox_id is not None and sandbox_id.strip() else None,
+        "page_id": page_id,
+        "page_version_id": page_version_id,
+        "published_by_user_id": published_by_user_id,
+        "policy_version": policy_version.strip() if policy_version is not None and policy_version.strip() else None,
+        "policy_context_hash": policy_context_hash.strip().lower()
+        if policy_context_hash is not None and policy_context_hash.strip()
+        else None,
+        "asset_sha256": asset_sha256.strip().lower() if asset_sha256 is not None and asset_sha256.strip() else None,
+        "reference_value_sha256": reference_value_sha256.strip().lower()
+        if reference_value_sha256 is not None and reference_value_sha256.strip()
+        else None,
+        "from": from_at,
+        "to": to_at,
+        "q": q.strip() if q is not None and q.strip() else None,
+    }
+
+
+def _apply_content_script_asset_filters(statement: Any, filters: dict[str, Any]) -> Any:
+    if filters["slug"] is not None:
+        statement = statement.where(ContentScriptAsset.slug == filters["slug"])
+    if filters["source_host"] is not None:
+        statement = statement.where(ContentScriptAsset.source_host == filters["source_host"])
+    if filters["sandbox_id"] is not None:
+        statement = statement.where(ContentScriptAsset.sandbox_id == filters["sandbox_id"])
+    if filters["page_id"] is not None:
+        statement = statement.where(ContentScriptAsset.page_id == filters["page_id"])
+    if filters["page_version_id"] is not None:
+        statement = statement.where(ContentScriptAsset.page_version_id == filters["page_version_id"])
+    if filters["published_by_user_id"] is not None:
+        statement = statement.where(ContentScriptAsset.published_by_user_id == filters["published_by_user_id"])
+    if filters["policy_version"] is not None:
+        statement = statement.where(ContentScriptAsset.policy_version == filters["policy_version"])
+    if filters["policy_context_hash"] is not None:
+        statement = statement.where(ContentScriptAsset.policy_context_hash == filters["policy_context_hash"])
+    if filters["asset_sha256"] is not None:
+        statement = statement.where(ContentScriptAsset.asset_sha256 == filters["asset_sha256"])
+    if filters["reference_value_sha256"] is not None:
+        statement = statement.where(ContentScriptAsset.reference_value_sha256 == filters["reference_value_sha256"])
+    if filters["from"] is not None:
+        statement = statement.where(ContentScriptAsset.published_at >= filters["from"])
+    if filters["to"] is not None:
+        statement = statement.where(ContentScriptAsset.published_at <= filters["to"])
+    if filters["q"] is not None:
+        pattern = _contains_pattern(filters["q"])
+        statement = statement.where(
+            or_(
+                ContentScriptAsset.slug.ilike(pattern, escape="~"),
+                ContentScriptAsset.source_host.ilike(pattern, escape="~"),
+                ContentScriptAsset.sandbox_id.ilike(pattern, escape="~"),
+                ContentScriptAsset.reference_key.ilike(pattern, escape="~"),
+                ContentScriptAsset.reference_value_sha256.ilike(pattern, escape="~"),
+                ContentScriptAsset.asset_sha256.ilike(pattern, escape="~"),
+                ContentScriptAsset.policy_version.ilike(pattern, escape="~"),
+                ContentScriptAsset.policy_context_hash.ilike(pattern, escape="~"),
+            )
+        )
+    return statement
+
+
+def _content_script_asset_inventory_snapshot(
+    assets: list[ContentScriptAsset],
+    *,
+    filters: dict[str, Any],
+    total: int,
+    limit: int,
+    offset: int,
+) -> dict[str, Any]:
+    host_counts: dict[str, int] = {}
+    policy_version_counts: dict[str, int] = {}
+    for asset in assets:
+        host_counts[asset.source_host] = host_counts.get(asset.source_host, 0) + 1
+        policy_version_counts[asset.policy_version] = policy_version_counts.get(asset.policy_version, 0) + 1
+    audit_filters = {
+        key: (value.isoformat() if isinstance(value, datetime) else value)
+        for key, value in filters.items()
+        if value is not None and key != "q"
+    }
+    audit_filters["has_q"] = filters["q"] is not None
+    return {
+        "filters": audit_filters,
+        "total": total,
+        "item_count": len(assets),
+        "limit": limit,
+        "offset": offset,
+        "host_counts": host_counts,
+        "policy_version_counts": policy_version_counts,
+    }
 
 
 def _previous_content_page_version(db: Session, version: ContentPageVersion) -> ContentPageVersion | None:
