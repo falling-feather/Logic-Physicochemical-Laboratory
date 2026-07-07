@@ -5,9 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import get_settings
-from app.core.security import hash_password
+from app.core.security import hash_password, hash_token
 from app.db.session import get_session_factory
-from app.models import AuditLog, AuthSession, LoginAttempt, User
+from app.models import AuditLog, AuthSession, LoginAttempt, PasswordResetToken, User
 
 
 def _auth_header(token: str) -> dict:
@@ -875,3 +875,312 @@ def test_login_revokes_expired_sessions(client):
         assert len(sessions) == 2
         assert sessions[0].revoked_at is not None
         assert sessions[1].revoked_at is None
+
+
+def test_password_reset_request_and_confirm_revokes_sessions_without_exposing_secrets(client, monkeypatch):
+    monkeypatch.setenv("ASTRA_PASSWORD_RESET_RETURN_TOKEN_FOR_DEV", "true")
+    monkeypatch.setenv("ASTRA_PASSWORD_RESET_REQUEST_COOLDOWN_SECONDS", "0")
+    get_settings.cache_clear()
+
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "reset_owner",
+            "password": "secret123",
+            "display_name": "Reset Owner",
+            "role": "teacher",
+        },
+    )
+    assert register.status_code == 201
+    login = client.post("/api/auth/login", json={"username": "reset_owner", "password": "secret123"})
+    assert login.status_code == 200
+    old_token = login.json()["access_token"]
+
+    missing_request = client.post("/api/auth/password-reset/request", json={"username": "missing_reset_owner"})
+    assert missing_request.status_code == 200
+    assert missing_request.json()["status"] == "ok"
+    assert missing_request.json()["reset_token"] is None
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        attempt = db.scalar(select(LoginAttempt).where(LoginAttempt.normalized_username == "reset_owner"))
+        assert attempt is not None
+        attempt.failure_count = 3
+        db.commit()
+
+    first_request = client.post(
+        "/api/auth/password-reset/request",
+        headers={"X-Request-ID": "password-reset-request-1", "User-Agent": "pytest-reset-agent"},
+        json={"username": "RESET_OWNER"},
+    )
+    assert first_request.status_code == 200
+    first_token = first_request.json()["reset_token"]
+    assert first_token
+
+    second_request = client.post(
+        "/api/auth/password-reset/request",
+        headers={"X-Request-ID": "password-reset-request-2"},
+        json={"username": "reset_owner"},
+    )
+    assert second_request.status_code == 200
+    reset_token = second_request.json()["reset_token"]
+    assert reset_token and reset_token != first_token
+
+    first_confirm = client.post(
+        "/api/auth/password-reset/confirm",
+        json={"token": first_token, "password": "ResetPass123"},
+    )
+    assert first_confirm.status_code == 400
+
+    weak_confirm = client.post(
+        "/api/auth/password-reset/confirm",
+        json={"token": reset_token, "password": "12345678"},
+    )
+    assert weak_confirm.status_code == 422
+    assert "Password must include at least one letter" in weak_confirm.json()["detail"]["password"]
+
+    confirm = client.post(
+        "/api/auth/password-reset/confirm",
+        headers={"X-Request-ID": "password-reset-confirm"},
+        json={"token": reset_token, "password": "ResetPass123"},
+    )
+    assert confirm.status_code == 200
+    assert confirm.json() == {"status": "ok", "revoked_sessions": 1, "cleared_login_attempt": True}
+
+    old_session_rejected = client.get("/api/users/me", headers=_auth_header(old_token))
+    assert old_session_rejected.status_code == 401
+    old_password_login = client.post("/api/auth/login", json={"username": "reset_owner", "password": "secret123"})
+    assert old_password_login.status_code == 401
+    new_password_login = client.post("/api/auth/login", json={"username": "reset_owner", "password": "ResetPass123"})
+    assert new_password_login.status_code == 200
+
+    reused = client.post(
+        "/api/auth/password-reset/confirm",
+        json={"token": reset_token, "password": "AnotherPass123"},
+    )
+    assert reused.status_code == 400
+    invalid = client.post(
+        "/api/auth/password-reset/confirm",
+        json={"token": "x" * 32, "password": "AnotherPass123"},
+    )
+    assert invalid.status_code == 400
+
+    with session_factory() as db:
+        reset_tokens = db.scalars(select(PasswordResetToken).order_by(PasswordResetToken.id)).all()
+        assert len(reset_tokens) == 2
+        assert reset_tokens[0].used_at is not None
+        assert reset_tokens[1].used_at is not None
+        assert reset_tokens[1].token_hash == hash_token(reset_token)
+        assert reset_tokens[1].token_hash != reset_token
+        assert reset_tokens[1].requested_username == "reset_owner"
+        attempt = db.scalar(select(LoginAttempt).where(LoginAttempt.normalized_username == "reset_owner"))
+        assert attempt is not None
+        assert attempt.failure_count == 0
+        assert attempt.locked_until is None
+        revoked_session = db.scalar(select(AuthSession).where(AuthSession.token_hash == hash_token(old_token)))
+        assert revoked_session is not None
+        assert revoked_session.revoked_at is not None
+        request_audit = db.scalar(
+            select(AuditLog).where(
+                AuditLog.action == "auth.password_reset.request",
+                AuditLog.request_id == "password-reset-request-1",
+            )
+        )
+        assert request_audit is not None
+        assert request_audit.resource_id != "reset_owner"
+        assert "username" not in request_audit.snapshot_json
+        assert "accepted" not in request_audit.snapshot_json
+        assert request_audit.snapshot_json["cooldown_hit"] is False
+        weak_audit = db.scalar(
+            select(AuditLog).where(
+                AuditLog.action == "auth.password_reset.failed",
+                AuditLog.failure_reason == "weak_password",
+            )
+        )
+        assert weak_audit is not None
+        assert weak_audit.snapshot_json["reset_token_id"] == reset_tokens[1].id
+        success_audit = db.scalar(
+            select(AuditLog).where(
+                AuditLog.action == "auth.password_reset.success",
+                AuditLog.request_id == "password-reset-confirm",
+            )
+        )
+        assert success_audit is not None
+        assert success_audit.snapshot_json["revoked_sessions"] == 1
+        assert success_audit.snapshot_json["cleared_login_attempt"] is True
+        audit_payload = str(success_audit.snapshot_json)
+        assert reset_token not in audit_payload
+        assert "ResetPass123" not in audit_payload
+
+
+def test_password_reset_request_uses_cooldown_without_invalidating_existing_token(client, monkeypatch):
+    monkeypatch.setenv("ASTRA_PASSWORD_RESET_RETURN_TOKEN_FOR_DEV", "true")
+    monkeypatch.setenv("ASTRA_PASSWORD_RESET_REQUEST_COOLDOWN_SECONDS", "300")
+    get_settings.cache_clear()
+
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "cooldown_reset_owner",
+            "password": "secret123",
+            "display_name": "Cooldown Reset Owner",
+            "role": "teacher",
+        },
+    )
+    assert register.status_code == 201
+
+    first_request = client.post(
+        "/api/auth/password-reset/request",
+        headers={"X-Forwarded-For": "198.51.100.201"},
+        json={"username": "cooldown_reset_owner"},
+    )
+    assert first_request.status_code == 200
+    first_token = first_request.json()["reset_token"]
+    assert first_token
+
+    second_request = client.post(
+        "/api/auth/password-reset/request",
+        headers={"X-Forwarded-For": "198.51.100.202"},
+        json={"username": "cooldown_reset_owner"},
+    )
+    assert second_request.status_code == 200
+    assert second_request.json()["reset_token"] is None
+
+    confirm = client.post(
+        "/api/auth/password-reset/confirm",
+        json={"token": first_token, "password": "ResetPass123"},
+    )
+    assert confirm.status_code == 200
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        reset_tokens = db.scalars(select(PasswordResetToken)).all()
+        assert len(reset_tokens) == 1
+        assert reset_tokens[0].used_at is not None
+        blocked_audit = db.scalar(
+            select(AuditLog).where(
+                AuditLog.action == "auth.password_reset.request",
+                AuditLog.failure_reason == "request_cooldown",
+            )
+        )
+        assert blocked_audit is not None
+        assert blocked_audit.event_result == "blocked"
+        assert blocked_audit.snapshot_json["cooldown_hit"] is True
+
+
+def test_password_reset_request_in_production_does_not_return_token(client, monkeypatch):
+    monkeypatch.setenv("ASTRA_ENVIRONMENT", "production")
+    monkeypatch.setenv("ASTRA_PASSWORD_RESET_RETURN_TOKEN_FOR_DEV", "true")
+    get_settings.cache_clear()
+
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "production_reset_owner",
+            "password": "secret123",
+            "display_name": "Production Reset Owner",
+            "role": "teacher",
+        },
+    )
+    assert register.status_code == 201
+
+    reset_request = client.post(
+        "/api/auth/password-reset/request",
+        headers={"X-Forwarded-For": "198.51.100.210"},
+        json={"username": "production_reset_owner"},
+    )
+    assert reset_request.status_code == 200
+    assert reset_request.json()["reset_token"] is None
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        reset_token = db.scalar(select(PasswordResetToken))
+        assert reset_token is not None
+        assert reset_token.used_at is None
+
+
+def test_password_reset_disabled_user_request_is_generic_and_confirm_consumes_existing_token(client, monkeypatch):
+    monkeypatch.setenv("ASTRA_PASSWORD_RESET_RETURN_TOKEN_FOR_DEV", "true")
+    monkeypatch.setenv("ASTRA_PASSWORD_RESET_REQUEST_COOLDOWN_SECONDS", "0")
+    get_settings.cache_clear()
+
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "disabled_reset_owner",
+            "password": "secret123",
+            "display_name": "Disabled Reset Owner",
+            "role": "teacher",
+        },
+    )
+    assert register.status_code == 201
+
+    reset_request = client.post("/api/auth/password-reset/request", json={"username": "disabled_reset_owner"})
+    assert reset_request.status_code == 200
+    reset_token = reset_request.json()["reset_token"]
+    assert reset_token
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        user = db.scalar(select(User).where(User.normalized_username == "disabled_reset_owner"))
+        assert user is not None
+        user.status = "disabled"
+        db.commit()
+
+    disabled_request = client.post("/api/auth/password-reset/request", json={"username": "disabled_reset_owner"})
+    assert disabled_request.status_code == 200
+    assert disabled_request.json()["reset_token"] is None
+
+    confirm = client.post(
+        "/api/auth/password-reset/confirm",
+        json={"token": reset_token, "password": "ResetPass123"},
+    )
+    assert confirm.status_code == 400
+
+    with session_factory() as db:
+        reset_tokens = db.scalars(select(PasswordResetToken).order_by(PasswordResetToken.id)).all()
+        assert len(reset_tokens) == 1
+        assert reset_tokens[0].used_at is not None
+        failed_audit = db.scalar(
+            select(AuditLog).where(
+                AuditLog.action == "auth.password_reset.failed",
+                AuditLog.failure_reason == "user_unavailable",
+            )
+        )
+        assert failed_audit is not None
+
+
+def test_password_reset_confirm_rejects_expired_token(client, monkeypatch):
+    monkeypatch.setenv("ASTRA_PASSWORD_RESET_RETURN_TOKEN_FOR_DEV", "true")
+    monkeypatch.setenv("ASTRA_PASSWORD_RESET_REQUEST_COOLDOWN_SECONDS", "0")
+    get_settings.cache_clear()
+
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "expired_reset_owner",
+            "password": "secret123",
+            "display_name": "Expired Reset Owner",
+            "role": "teacher",
+        },
+    )
+    assert register.status_code == 201
+    reset_request = client.post(
+        "/api/auth/password-reset/request",
+        json={"username": "expired_reset_owner"},
+    )
+    assert reset_request.status_code == 200
+    reset_token = reset_request.json()["reset_token"]
+    assert reset_token
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        token_record = db.scalar(select(PasswordResetToken).where(PasswordResetToken.token_hash == hash_token(reset_token)))
+        assert token_record is not None
+        token_record.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        db.commit()
+
+    confirm = client.post(
+        "/api/auth/password-reset/confirm",
+        json={"token": reset_token, "password": "ResetPass123"},
+    )
+    assert confirm.status_code == 400

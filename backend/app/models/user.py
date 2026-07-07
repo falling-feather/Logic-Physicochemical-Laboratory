@@ -34,6 +34,20 @@ class AuthSession(TimestampMixin, Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class PasswordResetToken(TimestampMixin, Base):
+    __tablename__ = "password_reset_tokens"
+    __table_args__ = (UniqueConstraint("token_hash", name="uq_password_reset_tokens_token_hash"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    requested_username: Mapped[str] = mapped_column(String(64), nullable=False)
+    requested_ip_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
+
+
 class LoginAttempt(TimestampMixin, Base):
     __tablename__ = "login_attempts"
     __table_args__ = (UniqueConstraint("normalized_username", name="uq_login_attempts_normalized_username"),)

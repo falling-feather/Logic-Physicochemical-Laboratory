@@ -31,6 +31,27 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class PasswordResetRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=64)
+
+
+class PasswordResetRequestResponse(BaseModel):
+    status: str = "ok"
+    expires_in_seconds: int
+    reset_token: str | None = None
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=256)
+    password: str = Field(min_length=8, max_length=128)
+
+
+class PasswordResetConfirmResponse(BaseModel):
+    status: str = "ok"
+    revoked_sessions: int
+    cleared_login_attempt: bool
+
+
 class AuthSessionPublic(BaseModel):
     id: int
     device_label: str | None = None

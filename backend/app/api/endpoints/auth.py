@@ -10,12 +10,16 @@ from app.api.deps.auth import AuthContext, get_current_auth_context, get_current
 from app.core.config import get_settings
 from app.core.security import create_session_token, hash_password, hash_token, password_strength_errors, verify_password
 from app.db.session import get_db
-from app.models import AuthSession, LoginAttempt, User
+from app.models import AuditLog, AuthSession, LoginAttempt, PasswordResetToken, User
 from app.schemas.auth import (
     AuthSessionPublic,
     AuthSessionRevokeResponse,
     LoginRequest,
     LoginResponse,
+    PasswordResetConfirmRequest,
+    PasswordResetConfirmResponse,
+    PasswordResetRequest,
+    PasswordResetRequestResponse,
     RegisterRequest,
     UserPublic,
 )
@@ -137,6 +141,143 @@ def login(
         secure=settings.environment.lower() in {"production", "prod"},
     )
     return LoginResponse(user=UserPublic.model_validate(user), access_token=token)
+
+
+@router.post("/password-reset/request", response_model=PasswordResetRequestResponse)
+def request_password_reset(
+    payload: PasswordResetRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> PasswordResetRequestResponse:
+    username = require_normalized_username(payload.username)
+    settings = get_settings()
+    now = datetime.now(UTC)
+    expires_at = now + timedelta(seconds=settings.password_reset_token_ttl_seconds)
+    reset_token_value: str | None = None
+    subject_hash = _password_reset_subject_hash(username)
+    client_ip_hash = request_client_ip_hash(request)
+    cooldown_hit = _password_reset_request_is_in_cooldown(db, subject_hash, client_ip_hash, now)
+    user = find_user_by_normalized_username(db, username)
+    accepted = user is not None and user.status == "active"
+    if accepted and not cooldown_hit:
+        _expire_password_reset_tokens(db, user, now)
+        reset_token_value = create_session_token()
+        db.add(
+            PasswordResetToken(
+                user_id=user.id,
+                token_hash=hash_token(reset_token_value),
+                requested_username=username,
+                requested_ip_hash=client_ip_hash,
+                user_agent=request_user_agent(request),
+                expires_at=expires_at,
+            )
+        )
+    record_audit_log(
+        db,
+        actor=None,
+        action="auth.password_reset.request",
+        resource_type="auth_password_reset",
+        resource_id=subject_hash,
+        event_result="blocked" if cooldown_hit else "success",
+        failure_reason="request_cooldown" if cooldown_hit else None,
+        request=request,
+        snapshot={
+            "expires_in_seconds": settings.password_reset_token_ttl_seconds,
+            "cooldown_seconds": settings.password_reset_request_cooldown_seconds,
+            "cooldown_hit": cooldown_hit,
+        },
+    )
+    db.commit()
+    return PasswordResetRequestResponse(
+        expires_in_seconds=settings.password_reset_token_ttl_seconds,
+        reset_token=reset_token_value if _should_return_password_reset_token(settings) else None,
+    )
+
+
+@router.post("/password-reset/confirm", response_model=PasswordResetConfirmResponse)
+def confirm_password_reset(
+    payload: PasswordResetConfirmRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> PasswordResetConfirmResponse:
+    now = datetime.now(UTC)
+    reset_token_hash = hash_token(payload.token)
+    reset_token = db.scalar(
+        select(PasswordResetToken)
+        .where(PasswordResetToken.token_hash == reset_token_hash)
+        .with_for_update()
+    )
+    if reset_token is None or reset_token.used_at is not None or _as_utc(reset_token.expires_at) <= now:
+        record_audit_log(
+            db,
+            actor=None,
+            action="auth.password_reset.failed",
+            resource_type="auth_password_reset",
+            event_result="failure",
+            failure_reason="invalid_or_expired_token",
+            request=request,
+            snapshot={},
+        )
+        db.commit()
+        raise HTTPException(status_code=400, detail="Invalid or expired password reset token")
+
+    user = db.get(User, reset_token.user_id)
+    if user is None or user.status != "active":
+        reset_token.used_at = now
+        record_audit_log(
+            db,
+            actor=None,
+            action="auth.password_reset.failed",
+            resource_type="auth_password_reset",
+            resource_id=reset_token.id,
+            event_result="failure",
+            failure_reason="user_unavailable",
+            request=request,
+            snapshot={"reset_token_id": reset_token.id},
+        )
+        db.commit()
+        raise HTTPException(status_code=400, detail="Invalid or expired password reset token")
+
+    password_errors = password_strength_errors(payload.password, username=user.username)
+    if password_errors:
+        record_audit_log(
+            db,
+            actor=user,
+            action="auth.password_reset.failed",
+            resource_type="user",
+            resource_id=user.id,
+            event_result="failure",
+            failure_reason="weak_password",
+            request=request,
+            snapshot={"reset_token_id": reset_token.id},
+        )
+        db.commit()
+        raise HTTPException(status_code=422, detail={"password": password_errors})
+
+    reset_token.used_at = now
+    user.password_hash = hash_password(payload.password)
+    cleared_login_attempt = _clear_user_login_attempt(db, user)
+    revoked_sessions = _revoke_user_sessions(db, user, now)
+    record_audit_log(
+        db,
+        actor=user,
+        action="auth.password_reset.success",
+        resource_type="user",
+        resource_id=user.id,
+        event_result="success",
+        request=request,
+        snapshot={
+            "reset_token_id": reset_token.id,
+            "requested_username": reset_token.requested_username,
+            "revoked_sessions": revoked_sessions,
+            "cleared_login_attempt": cleared_login_attempt,
+        },
+    )
+    db.commit()
+    return PasswordResetConfirmResponse(
+        revoked_sessions=revoked_sessions,
+        cleared_login_attempt=cleared_login_attempt,
+    )
 
 
 @router.post("/logout")
@@ -337,6 +478,74 @@ def _revoke_expired_sessions(db: Session, now: datetime) -> None:
     ).all()
     for auth_session in expired_sessions:
         auth_session.revoked_at = now
+
+
+def _revoke_user_sessions(db: Session, user: User, now: datetime) -> int:
+    auth_sessions = db.scalars(
+        select(AuthSession).where(AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None))
+    ).all()
+    for auth_session in auth_sessions:
+        auth_session.revoked_at = now
+    return len(auth_sessions)
+
+
+def _clear_user_login_attempt(db: Session, user: User) -> bool:
+    attempt = db.scalar(select(LoginAttempt).where(LoginAttempt.normalized_username == user.normalized_username))
+    if attempt is None:
+        return False
+    _clear_login_attempt(attempt)
+    return True
+
+
+def _expire_password_reset_tokens(db: Session, user: User, now: datetime) -> None:
+    reset_tokens = db.scalars(
+        select(PasswordResetToken).where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.used_at.is_(None),
+            PasswordResetToken.expires_at > now,
+        )
+    ).all()
+    for reset_token in reset_tokens:
+        reset_token.used_at = now
+
+
+def _password_reset_subject_hash(username: str) -> str:
+    return hash_token(f"password-reset:{get_settings().audit_ip_hash_salt}:{username}")
+
+
+def _should_return_password_reset_token(settings) -> bool:
+    return settings.password_reset_return_token_for_dev and settings.environment.lower() not in {"production", "prod"}
+
+
+def _password_reset_request_is_in_cooldown(
+    db: Session,
+    subject_hash: str,
+    client_ip_hash: str | None,
+    now: datetime,
+) -> bool:
+    cooldown_seconds = get_settings().password_reset_request_cooldown_seconds
+    if cooldown_seconds <= 0:
+        return False
+    cutoff = now - timedelta(seconds=cooldown_seconds)
+    subject_recent = db.scalar(
+        select(AuditLog.id).where(
+            AuditLog.action == "auth.password_reset.request",
+            AuditLog.resource_id == subject_hash,
+            AuditLog.created_at >= cutoff,
+        )
+    )
+    if subject_recent is not None:
+        return True
+    if client_ip_hash is None:
+        return False
+    ip_recent = db.scalar(
+        select(AuditLog.id).where(
+            AuditLog.action == "auth.password_reset.request",
+            AuditLog.client_ip_hash == client_ip_hash,
+            AuditLog.created_at >= cutoff,
+        )
+    )
+    return ip_recent is not None
 
 
 def _session_public(auth_session: AuthSession, current_session_id: int) -> AuthSessionPublic:

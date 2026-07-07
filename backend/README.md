@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与 semantic 富语义摘要、登录、密码策略、登录失败锁定、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、跨班级提交唯一性、学生资源状态可见性、学生侧作业历史/复盘只读入口、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、中文路径/中文 slug 回归、待批改队列、缺陷记录外部 issue 链接、审计元数据、认证事件审计、审计日志链式哈希、审计链完整性校验、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要、审计留存预检、本地审计归档包导出/Manifest 校验和导出/摘要行为审计留痕等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与 semantic 富语义摘要、登录、密码策略、登录失败锁定、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、用户自助密码重置令牌、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、跨班级提交唯一性、学生资源状态可见性、学生侧作业历史/复盘只读入口、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、中文路径/中文 slug 回归、待批改队列、缺陷记录外部 issue 链接、审计元数据、认证事件审计、审计日志链式哈希、审计链完整性校验、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要、审计留存预检、本地审计归档包导出/Manifest 校验和导出/摘要行为审计留痕等能力。
 
 ## 本地启动
 
@@ -39,6 +39,8 @@ python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-revi
 | POST | `/api/auth/register` | 本地账号注册；用户名会修剪并小写落库，重复校验大小写不敏感；拒绝短密码、纯数字/纯字母、常见弱口令和包含用户名的密码 |
 | POST | `/api/auth/login` | 登录并返回 Bearer token，同时写入 HttpOnly cookie；用户名按规范化值大小写不敏感匹配，连续失败达到阈值返回 `429` 与 `Retry-After`；成功登录会记录 best-effort 设备标识、登录 user-agent、`last_seen_at` 和 IP 哈希；成功、失败和锁定事件写入审计 |
 | POST | `/api/auth/logout` | 注销当前用户所有活动会话，并写入审计 |
+| POST | `/api/auth/password-reset/request` | 用户自助密码重置请求；响应始终泛化为 `ok`，active 用户会生成哈希存储的一次性 token，并按账号哈希/IP 哈希冷却；生产环境不返回 token，本地调试也必须显式开启 `ASTRA_PASSWORD_RESET_RETURN_TOKEN_FOR_DEV=true` |
+| POST | `/api/auth/password-reset/confirm` | 使用一次性 token 重置密码；行锁消费 token，复用密码强度策略，成功后撤销用户未撤销会话、清理登录失败桶，并写入不含明文密码或 token 的 `auth.password_reset.*` 审计 |
 | GET | `/api/auth/sessions` | 当前用户活动会话列表；只返回未撤销、未过期会话，并标记 `is_current`；返回 `device_label`、登录时 `user_agent`、`last_seen_at` 等会话摘要，不返回 token 或 IP 明文 |
 | DELETE | `/api/auth/sessions/{id}` | 撤销当前用户自己的单个活动会话；撤销当前会话会清理 cookie，并写入 `auth.session.revoke` 审计 |
 | GET | `/api/users/me` | 当前用户；已撤销、过期或非 active 用户会话返回 `401` |
@@ -133,6 +135,9 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 | `ASTRA_SESSION_COOKIE_NAME` | `astra_session` | 登录会话 cookie 名称 |
 | `ASTRA_SESSION_DAYS` | `7` | 登录会话有效天数 |
 | `ASTRA_SESSION_LAST_SEEN_UPDATE_SECONDS` | `300` | 当前会话 last_seen 刷新节流窗口；同一 IP 哈希在窗口内不重复写库，设为 `0` 可关闭节流 |
+| `ASTRA_PASSWORD_RESET_TOKEN_TTL_SECONDS` | `1800` | 用户自助密码重置 token 有效期，最低 60 秒 |
+| `ASTRA_PASSWORD_RESET_REQUEST_COOLDOWN_SECONDS` | `300` | 密码重置请求冷却窗口；按账号哈希和客户端 IP 哈希检查最近请求，设为 `0` 可关闭冷却 |
+| `ASTRA_PASSWORD_RESET_RETURN_TOKEN_FOR_DEV` | `false` | 仅用于本地/测试调试的 token 回传开关；生产环境即便误设为 `true` 也不会回传 token |
 | `ASTRA_LOGIN_MAX_ATTEMPTS` | `5` | 登录失败锁定阈值 |
 | `ASTRA_LOGIN_LOCKOUT_SECONDS` | `900` | 达到失败阈值后的锁定秒数 |
 | `ASTRA_LOGIN_ATTEMPT_WINDOW_SECONDS` | `900` | 统计连续失败的时间窗口 |
@@ -167,6 +172,7 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 - `/api/admin/bugs` 负责缺陷与风险清单的最小维护；`external_issue_provider/external_issue_id/external_issue_url` 只是外部 issue 链接元数据，不代表已经实现外部平台自动创建或双向状态同步。
 - `app.services.request_metadata` 统一解析请求元数据；审计与会话治理共享 request_id、user-agent 和 IP 哈希口径。`AuthSession.device_label` 优先来自 `X-Device-Label` / `X-Device-Name`，缺省回退到登录 user-agent，因此只是 best-effort 设备摘要，不等同强设备绑定。
 - `app.api.deps.auth.get_current_auth_context()` 会在有效鉴权后按 `ASTRA_SESSION_LAST_SEEN_UPDATE_SECONDS` 刷新当前 `AuthSession.last_seen_at` 和 `last_seen_ip_hash`；默认 300 秒内同一 IP 哈希不重复写库，窗口过期、IP 哈希变化或配置为 `0` 时刷新。该机制只降低 last_seen 写放大，不等同强设备绑定或长期会话风控。
+- `/api/auth/password-reset/request` 与 `/api/auth/password-reset/confirm` 只提供本地账号自助重置 token 能力，不包含邮件/短信/MFA 投递。请求审计使用账号哈希作为 `resource_id`，不记录明文用户名或 token；确认阶段会对 token 行加锁并一次性消费。过期/已用 token 当前仍保留在数据库中，清理任务和安全数据留存策略后续按 BE-03/BE-12 推进。
 - `app.services.content_catalog` 负责内容页 seed、正式内容初始化、已发布 schema 读取和内容页摘要；`/api/content/pages*` 与 `/api/render/*` 查询只读 published 当前记录，不在 GET 路径隐式写库，公开响应会剥离原始脚本引用并保留不可执行 `scriptManifest`；正式初始化会显式创建/修复内置内容页版本，默认不覆盖已有差异版本。
 - `app.services.content_script_policy` 负责内容草稿脚本静态分析与后端 sandbox 契约；当前识别脚本引用、外链脚本、事件处理器、阻断协议、路径穿越、内联 `<script>` 和不安全 sandbox 能力，并输出 `script_risk_level`、`script_analysis.sandbox` 与 findings。当前不承担浏览器 iframe/worker 运行时执行。
 - `/api/admin/content/page-versions/{id}/diff` 负责版本对比：旧 `changes` 继续返回 JSON path 级差异，新 `semantic` 汇总 metadata、courseUnit、sections 与 sources 的增删改移，便于后续管理端 UI 展示。
@@ -197,7 +203,7 @@ $env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
 python -m alembic upgrade head
 ```
 
-当前 Alembic head：`20260707_0026`（知识快照调度租约字段）。
+当前 Alembic head：`20260707_0027`（用户自助密码重置 token 表）。
 
 知识快照周期重算：
 

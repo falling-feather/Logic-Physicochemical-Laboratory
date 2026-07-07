@@ -14,7 +14,7 @@ from app.models.course import (
     UserKnowledgeSnapshot,
 )
 from app.models.school import ClassGroup, ClassJoinRequest, ClassMembership, School, SchoolMembership
-from app.models.user import AuthSession, LoginAttempt, User
+from app.models.user import AuthSession, LoginAttempt, PasswordResetToken, User
 
 __all__ = [
     "Assignment",
@@ -35,6 +35,7 @@ __all__ = [
     "KnowledgeSnapshotRun",
     "LearningEvent",
     "LoginAttempt",
+    "PasswordResetToken",
     "PointLedger",
     "School",
     "SchoolMembership",
