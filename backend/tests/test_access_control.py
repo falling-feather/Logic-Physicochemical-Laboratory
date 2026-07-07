@@ -209,6 +209,13 @@ def test_school_teacher_without_class_scope_cannot_manage_class_assignments(clie
     assert submission.status_code == 201
     submission_id = submission.json()["id"]
 
+    event = client.post(
+        "/api/learning-events",
+        headers=student_headers,
+        json={"class_id": scope["class_id"], "assignment_id": scope["assignment_id"], "event_type": "complete"},
+    )
+    assert event.status_code == 201
+
     peer_unscoped_list = client.get(
         f"/api/assignments/{scope['assignment_id']}/submissions",
         headers=peer_headers,
@@ -231,6 +238,21 @@ def test_school_teacher_without_class_scope_cannot_manage_class_assignments(clie
     assert peer_grade.status_code == 403
     assert peer_grade.json()["detail"] == "Submission grading requires class teacher scope"
 
+    peer_unscoped_events = client.get("/api/learning-events", headers=peer_headers)
+    assert peer_unscoped_events.status_code == 200
+    assert peer_unscoped_events.json() == []
+
+    peer_class_events = client.get(f"/api/learning-events?class_id={scope['class_id']}", headers=peer_headers)
+    assert peer_class_events.status_code == 403
+    assert peer_class_events.json()["detail"] == "Learning events require class teacher scope"
+
+    peer_progress = client.get(
+        f"/api/progress/users/{scope['student']['id']}?class_id={scope['class_id']}",
+        headers=peer_headers,
+    )
+    assert peer_progress.status_code == 403
+    assert peer_progress.json()["detail"] == "Student progress requires class teacher scope"
+
     owner_class_list = client.get(
         f"/api/assignments/{scope['assignment_id']}/submissions?class_id={scope['class_id']}",
         headers=teacher_headers,
@@ -245,6 +267,29 @@ def test_school_teacher_without_class_scope_cannot_manage_class_assignments(clie
     )
     assert owner_grade.status_code == 200
     assert owner_grade.json()["score"] == 12
+
+    peer_unscoped_points = client.get("/api/points/ledger", headers=peer_headers)
+    assert peer_unscoped_points.status_code == 200
+    assert peer_unscoped_points.json() == []
+
+    peer_class_points = client.get(f"/api/points/ledger?class_id={scope['class_id']}", headers=peer_headers)
+    assert peer_class_points.status_code == 403
+    assert peer_class_points.json()["detail"] == "Point ledger requires class teacher scope"
+
+    owner_events = client.get(f"/api/learning-events?class_id={scope['class_id']}", headers=teacher_headers)
+    assert owner_events.status_code == 200
+    assert event.json()["id"] in {item["id"] for item in owner_events.json()}
+
+    owner_points = client.get(f"/api/points/ledger?class_id={scope['class_id']}", headers=teacher_headers)
+    assert owner_points.status_code == 200
+    assert [item["delta"] for item in owner_points.json()] == [12]
+
+    owner_progress = client.get(
+        f"/api/progress/users/{scope['student']['id']}?class_id={scope['class_id']}",
+        headers=teacher_headers,
+    )
+    assert owner_progress.status_code == 200
+    assert owner_progress.json()["total_points"] == 12
 
 
 def test_class_members_can_access_their_scoped_course_resources(client):

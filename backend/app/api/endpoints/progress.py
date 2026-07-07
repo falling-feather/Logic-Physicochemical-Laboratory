@@ -6,7 +6,7 @@ from app.api.deps.auth import get_current_user
 from app.db.session import get_db
 from app.models import Assignment, ClassMembership, Course, CourseUnit, LearningEvent, PointLedger, Submission, User
 from app.schemas.course import ProgressSummary
-from app.services.access_control import get_class, require_class_member, require_school_role
+from app.services.access_control import get_class, require_class_member, require_class_teacher_or_admin
 
 
 router = APIRouter()
@@ -36,7 +36,12 @@ def get_user_progress(
     db: Session = Depends(get_db),
 ) -> ProgressSummary:
     class_group = get_class(db, class_id)
-    require_school_role(db, current_user, class_group.school_id, {"admin", "teacher"})
+    require_class_teacher_or_admin(
+        db,
+        current_user,
+        class_group,
+        detail="Student progress requires class teacher scope",
+    )
     target_membership = db.scalar(
         select(ClassMembership).where(
             ClassMembership.class_id == class_id,

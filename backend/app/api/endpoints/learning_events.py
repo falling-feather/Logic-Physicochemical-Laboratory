@@ -18,11 +18,11 @@ from app.services.access_control import (
     course_attached_to_class,
     get_class,
     require_class_member,
+    require_class_teacher_or_admin,
     require_course_visible,
-    require_school_role,
     require_student_assignment_active,
     require_student_unit_published,
-    teacher_school_ids,
+    teacher_class_ids,
 )
 
 
@@ -98,16 +98,21 @@ def list_learning_events(
 
     if class_id is not None:
         class_group = get_class(db, class_id)
-        require_school_role(db, current_user, class_group.school_id, {"admin", "teacher"})
+        require_class_teacher_or_admin(
+            db,
+            current_user,
+            class_group,
+            detail="Learning events require class teacher scope",
+        )
         statement = statement.where(LearningEvent.class_id == class_id)
         if user_id is not None:
             statement = statement.where(LearningEvent.user_id == user_id)
         return list(db.scalars(statement).all())
 
-    school_ids = teacher_school_ids(db, current_user.id)
-    if not school_ids:
+    class_ids = teacher_class_ids(db, current_user.id)
+    if not class_ids:
         return []
-    statement = statement.where(LearningEvent.school_id.in_(school_ids))
+    statement = statement.where(LearningEvent.class_id.in_(class_ids))
     if user_id is not None:
         statement = statement.where(LearningEvent.user_id == user_id)
     return list(db.scalars(statement).all())

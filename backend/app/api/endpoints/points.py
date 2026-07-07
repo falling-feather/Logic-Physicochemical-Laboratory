@@ -6,7 +6,7 @@ from app.api.deps.auth import get_current_user
 from app.db.session import get_db
 from app.models import PointLedger, User
 from app.schemas.course import PointLedgerRead
-from app.services.access_control import get_class, require_school_role, teacher_school_ids
+from app.services.access_control import get_class, require_class_teacher_or_admin, teacher_class_ids
 
 
 router = APIRouter()
@@ -30,13 +30,18 @@ def list_point_ledger(
 
     if class_id is not None:
         class_group = get_class(db, class_id)
-        require_school_role(db, current_user, class_group.school_id, {"admin", "teacher"})
+        require_class_teacher_or_admin(
+            db,
+            current_user,
+            class_group,
+            detail="Point ledger requires class teacher scope",
+        )
         statement = statement.where(PointLedger.class_id == class_id)
     elif current_user.role != "admin":
-        school_ids = teacher_school_ids(db, current_user.id)
-        if not school_ids:
+        class_ids = teacher_class_ids(db, current_user.id)
+        if not class_ids:
             return []
-        statement = statement.where(PointLedger.school_id.in_(school_ids))
+        statement = statement.where(PointLedger.class_id.in_(class_ids))
 
     if user_id is not None:
         statement = statement.where(PointLedger.user_id == user_id)
