@@ -1,4 +1,6 @@
+import base64
 import csv
+import hashlib
 import io
 import json
 from datetime import UTC, datetime, timedelta
@@ -18,6 +20,7 @@ from app.models import (
     SchoolMembership,
     User,
 )
+from app.services.content_script_assets import external_script_references
 from app.services.audit import audit_log_chain_hash, record_audit_log
 
 
@@ -2521,3 +2524,229 @@ def test_admin_lists_content_script_asset_inventory_with_redaction_and_audit(cli
     assert "secret-token" not in audit_text
     assert "secret-integrity-token" not in audit_text
     assert "secret-asset-bytes" not in audit_text
+
+
+def test_admin_reads_content_script_asset_mirror_audit_with_redaction(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "teacher_script_asset_audit", "teacher")
+    admin_user_id = _current_user_id(client, admin_token)
+    published_at = datetime(2026, 7, 8, 10, 45, tzinfo=UTC)
+    ok_bytes = b"console.log('mirror audit ok');\n"
+    stale_bytes = b"console.log('mirror audit stale actual');\n"
+    expected_stale_bytes = b"console.log('mirror audit stale expected');\n"
+
+    ok_schema = _script_asset_schema(
+        "physics/script-asset-audit-ok",
+        "https://cdn-audit.example.test/ok.js",
+        _sri_sha384(ok_bytes),
+    )
+    missing_schema = _script_asset_schema(
+        "physics/script-asset-audit-missing",
+        "https://cdn-audit.example.test/missing.js",
+        _sri_sha384(b"console.log('missing mirror');\n"),
+    )
+    stale_schema = _script_asset_schema(
+        "physics/script-asset-audit-stale",
+        "https://cdn-audit.example.test/stale.js",
+        _sri_sha384(expected_stale_bytes),
+    )
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        ok_page, ok_version = _insert_published_script_page(
+            db,
+            schema=ok_schema,
+            publisher_user_id=admin_user_id,
+            published_at=published_at,
+        )
+        missing_page, missing_version = _insert_published_script_page(
+            db,
+            schema=missing_schema,
+            publisher_user_id=admin_user_id,
+            published_at=published_at + timedelta(minutes=1),
+        )
+        stale_page, stale_version = _insert_published_script_page(
+            db,
+            schema=stale_schema,
+            publisher_user_id=admin_user_id,
+            published_at=published_at + timedelta(minutes=2),
+        )
+
+        ok_ref = external_script_references(ok_schema)[0]
+        stale_ref = external_script_references(stale_schema)[0]
+        db.add(
+            ContentScriptAsset(
+                page_id=ok_page.id,
+                page_version_id=ok_version.id,
+                slug=ok_page.slug,
+                sandbox_id=ok_ref.sandbox_id,
+                reference_key=ok_ref.reference_key,
+                reference_value_sha256=ok_ref.reference_value_sha256,
+                source_url=ok_ref.source_url,
+                source_host=ok_ref.source_host,
+                integrity=ok_ref.integrity,
+                matched_algorithm="sha384",
+                asset_sha256=hashlib.sha256(ok_bytes).hexdigest(),
+                asset_size_bytes=len(ok_bytes),
+                content_bytes=ok_bytes,
+                policy_version="v6.6.23",
+                policy_context_hash="a" * 64,
+                published_by_user_id=admin_user_id,
+                published_at=ok_version.published_at,
+            )
+        )
+        db.add(
+            ContentScriptAsset(
+                page_id=stale_page.id,
+                page_version_id=stale_version.id,
+                slug=stale_page.slug,
+                sandbox_id=stale_ref.sandbox_id,
+                reference_key=stale_ref.reference_key,
+                reference_value_sha256=stale_ref.reference_value_sha256,
+                source_url="https://cdn-audit.example.test/secret-stale-token.js",
+                source_host=stale_ref.source_host,
+                integrity=stale_ref.integrity,
+                matched_algorithm="sha384",
+                asset_sha256="b" * 64,
+                asset_size_bytes=1,
+                content_bytes=stale_bytes,
+                policy_version="v6.6.23",
+                policy_context_hash="a" * 64,
+                published_by_user_id=admin_user_id,
+                published_at=stale_version.published_at,
+            )
+        )
+        db.commit()
+        missing_version_id = missing_version.id
+
+    forbidden = client.get("/api/admin/content/script-assets/mirror-audit", headers=_auth_header(teacher_token))
+    assert forbidden.status_code == 403
+
+    first_page = client.get(
+        "/api/admin/content/script-assets/mirror-audit?source_host=cdn-audit.example.test&limit=2",
+        headers=_auth_header(admin_token),
+    )
+    assert first_page.status_code == 200
+    first_page_body = first_page.json()
+    assert first_page_body["total_pages_scanned"] >= 3
+    assert first_page_body["total_external_references"] == 3
+    assert first_page_body["total_issues"] == 5
+    assert first_page_body["next_offset"] == 2
+    assert first_page_body["issue_counts_by_code"]["missing_mirror"] == 1
+    assert first_page_body["issue_counts_by_code"]["source_mismatch"] == 1
+    assert first_page_body["issue_counts_by_code"]["asset_hash_mismatch"] == 1
+    assert first_page_body["issue_counts_by_code"]["asset_size_mismatch"] == 1
+    assert first_page_body["issue_counts_by_code"]["sri_mismatch"] == 1
+    assert first_page_body["issue_counts_by_severity"] == {"critical": 5}
+
+    filtered = client.get(
+        "/api/admin/content/script-assets/mirror-audit"
+        "?source_host=cdn-audit.example.test"
+        "&issue_code=missing_mirror",
+        headers={**_auth_header(admin_token), "X-Request-ID": "script-mirror-audit"},
+    )
+    assert filtered.status_code == 200
+    body = filtered.json()
+    assert body["total_issues"] == 1
+    assert body["items"][0]["code"] == "missing_mirror"
+    assert body["items"][0]["page_version_id"] == missing_version_id
+    assert body["items"][0]["source_host"] == "cdn-audit.example.test"
+    response_text = json.dumps(body, ensure_ascii=False)
+    assert "source_url" not in body["items"][0]
+    assert "integrity" not in body["items"][0]
+    assert "content_bytes" not in body["items"][0]
+    assert "secret-stale-token" not in response_text
+    assert "mirror audit stale actual" not in response_text
+    assert "mirror audit stale expected" not in response_text
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.content_script_asset.mirror_audit"
+        "&resource_type=content_script_asset&request_id=script-mirror-audit",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert snapshot["filters"]["issue_code"] == "missing_mirror"
+    assert snapshot["total_issues"] == 1
+    assert snapshot["item_count"] == 1
+    assert snapshot["capabilities"] == {
+        "external_network": False,
+        "cdn_scan": False,
+        "external_alerts": False,
+        "repair": False,
+    }
+    audit_text = json.dumps(snapshot, ensure_ascii=False)
+    assert "source_url" not in audit_text
+    assert "integrity" not in audit_text
+    assert "content_bytes" not in audit_text
+    assert "secret-stale-token" not in audit_text
+
+
+def _script_asset_schema(slug: str, source_url: str, integrity: str) -> dict:
+    return {
+        "slug": slug,
+        "galaxy": "englab",
+        "subject": "physics",
+        "title": "Script Asset Audit",
+        "layout": "experiment-page",
+        "status": "published",
+        "version": "v-test",
+        "sections": [
+            {
+                "sectionId": f"{slug.rsplit('/', 1)[-1]}-section",
+                "type": "experiment",
+                "title": "Script Asset Audit",
+                "props": {
+                    "scriptUrl": source_url,
+                    "scriptIntegrity": integrity,
+                    "scriptCrossorigin": "anonymous",
+                    "scriptSandbox": {
+                        "mode": "isolated-iframe",
+                        "network": "same-origin",
+                    },
+                },
+            }
+        ],
+        "sources": [],
+    }
+
+
+def _insert_published_script_page(
+    db,
+    *,
+    schema: dict,
+    publisher_user_id: int,
+    published_at: datetime,
+) -> tuple[ContentPageRecord, ContentPageVersion]:
+    page = ContentPageRecord(
+        slug=schema["slug"],
+        status="published",
+        version="v-test",
+        schema_json=schema,
+        schema_hash=hashlib.sha256(json.dumps(schema, sort_keys=True).encode("utf-8")).hexdigest(),
+        published_by_user_id=publisher_user_id,
+        published_at=published_at,
+    )
+    db.add(page)
+    db.flush()
+    version = ContentPageVersion(
+        page_id=page.id,
+        slug=page.slug,
+        status="published",
+        version="v-test",
+        schema_hash=page.schema_hash,
+        schema_json=schema,
+        published_by_user_id=publisher_user_id,
+        published_at=published_at,
+        note="content script asset mirror audit fixture",
+    )
+    db.add(version)
+    db.flush()
+    page.current_version_id = version.id
+    return page, version
+
+
+def _sri_sha384(payload: bytes) -> str:
+    digest = hashlib.sha384(payload).digest()
+    return "sha384-" + base64.b64encode(digest).decode("ascii").rstrip("=")

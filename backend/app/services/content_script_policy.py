@@ -490,7 +490,7 @@ def _verify_external_script_asset(
             )
         )
         return
-    verification_metadata = _external_script_asset_verification_metadata(integrity, asset_bytes)
+    verification_metadata = external_script_asset_verification_metadata(integrity, asset_bytes)
     if "matched_algorithm" not in verification_metadata:
         findings.append(
             _finding(
@@ -940,6 +940,10 @@ def _container_value_by_normalized_key(container: dict[str, Any], normalized_key
 def _valid_sri(value: str) -> bool:
     tokens = [token.strip() for token in value.split() if token.strip()]
     return bool(tokens) and all(SRI_PATTERN.match(token) for token in tokens)
+
+
+def external_script_asset_verification_metadata(integrity: str, asset_bytes: bytes) -> dict[str, Any]:
+    return _external_script_asset_verification_metadata(integrity, asset_bytes)
 
 
 def _external_script_asset_verification_metadata(integrity: str, asset_bytes: bytes) -> dict[str, Any]:

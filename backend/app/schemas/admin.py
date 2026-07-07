@@ -176,6 +176,36 @@ class AdminContentScriptAssetPage(BaseModel):
     next_offset: int | None = None
 
 
+class AdminContentScriptAssetAuditIssueRead(BaseModel):
+    code: str
+    severity: str
+    message: str
+    page_id: int | None = None
+    page_version_id: int | None = None
+    slug: str
+    sandbox_id: str | None = None
+    reference_key: str | None = None
+    reference_value_sha256: str | None = None
+    source_host: str | None = None
+    source_url_sha256: str | None = None
+    asset_id: int | None = None
+    asset_sha256: str | None = None
+    published_at: datetime | None = None
+
+
+class AdminContentScriptAssetAuditReport(BaseModel):
+    generated_at: datetime
+    total_pages_scanned: int
+    total_external_references: int
+    total_issues: int
+    issue_counts_by_code: dict[str, int]
+    issue_counts_by_severity: dict[str, int]
+    items: list[AdminContentScriptAssetAuditIssueRead]
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
 class AdminContentPageVersionDiffItem(BaseModel):
     path: str
     before: Any = None

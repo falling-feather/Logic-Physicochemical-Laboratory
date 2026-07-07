@@ -48,6 +48,8 @@ from app.schemas.admin import (
     AdminClassStats,
     AdminContentPagePage,
     AdminContentPageRead,
+    AdminContentScriptAssetAuditIssueRead,
+    AdminContentScriptAssetAuditReport,
     AdminContentScriptAssetPage,
     AdminContentScriptAssetRead,
     AdminContentPageVersionDiff,
@@ -123,6 +125,11 @@ from app.services.knowledge_snapshot_scheduler import (
     SnapshotScheduleJob,
     due_snapshot_jobs,
     should_run_snapshot_job,
+)
+from app.services.content_script_assets import (
+    ContentScriptAssetMirrorAuditIssue,
+    ContentScriptAssetMirrorAuditReport,
+    audit_current_content_script_asset_mirrors,
 )
 
 
@@ -818,6 +825,60 @@ def list_admin_content_script_assets(
         limit=limit,
         offset=offset,
         next_offset=_next_offset(total, offset, len(items)),
+    )
+
+
+@router.get("/content/script-assets/mirror-audit", response_model=AdminContentScriptAssetAuditReport)
+def read_admin_content_script_asset_audit(
+    request: Request,
+    slug: str | None = Query(default=None, max_length=180),
+    source_host: str | None = Query(default=None, max_length=255),
+    issue_code: str | None = Query(default=None, max_length=80),
+    severity: Literal["critical", "warning", "info"] | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminContentScriptAssetAuditReport:
+    _require_admin(current_user)
+    report = audit_current_content_script_asset_mirrors(
+        db,
+        slug=slug,
+        source_host=source_host,
+        issue_code=issue_code,
+        severity=severity,
+    )
+    issues = report.issues[offset : offset + limit]
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.content_script_asset.mirror_audit",
+        resource_type="content_script_asset",
+        event_result="success",
+        request=request,
+        snapshot=_content_script_asset_mirror_audit_snapshot(
+            report,
+            slug=slug,
+            source_host=source_host,
+            issue_code=issue_code,
+            severity=severity,
+            limit=limit,
+            offset=offset,
+            item_count=len(issues),
+        ),
+    )
+    db.commit()
+    return AdminContentScriptAssetAuditReport(
+        generated_at=report.generated_at,
+        total_pages_scanned=report.total_pages_scanned,
+        total_external_references=report.total_external_references,
+        total_issues=report.total_issues,
+        issue_counts_by_code=report.issue_counts_by_code,
+        issue_counts_by_severity=report.issue_counts_by_severity,
+        items=[_admin_content_script_asset_audit_issue_read(issue) for issue in issues],
+        limit=limit,
+        offset=offset,
+        next_offset=_next_offset(report.total_issues, offset, len(issues)),
     )
 
 
@@ -2933,6 +2994,27 @@ def _admin_content_script_asset_read(asset: ContentScriptAsset) -> AdminContentS
     )
 
 
+def _admin_content_script_asset_audit_issue_read(
+    issue: ContentScriptAssetMirrorAuditIssue,
+) -> AdminContentScriptAssetAuditIssueRead:
+    return AdminContentScriptAssetAuditIssueRead(
+        code=issue.code,
+        severity=issue.severity,
+        message=issue.message,
+        page_id=issue.page_id,
+        page_version_id=issue.page_version_id,
+        slug=issue.slug,
+        sandbox_id=issue.sandbox_id,
+        reference_key=issue.reference_key,
+        reference_value_sha256=issue.reference_value_sha256,
+        source_host=issue.source_host,
+        source_url_sha256=issue.source_url_sha256,
+        asset_id=issue.asset_id,
+        asset_sha256=issue.asset_sha256,
+        published_at=issue.published_at,
+    )
+
+
 def _content_script_asset_filters(
     *,
     slug: str | None,
@@ -2967,6 +3049,43 @@ def _content_script_asset_filters(
         "from": from_at,
         "to": to_at,
         "q": q.strip() if q is not None and q.strip() else None,
+    }
+
+
+def _content_script_asset_mirror_audit_snapshot(
+    report: ContentScriptAssetMirrorAuditReport,
+    *,
+    slug: str | None,
+    source_host: str | None,
+    issue_code: str | None,
+    severity: str | None,
+    limit: int,
+    offset: int,
+    item_count: int,
+) -> dict[str, Any]:
+    filters = {
+        "slug": slug.strip("/") if slug is not None and slug.strip("/") else None,
+        "source_host": source_host.strip().lower() if source_host is not None and source_host.strip() else None,
+        "issue_code": issue_code.strip().lower() if issue_code is not None and issue_code.strip() else None,
+        "severity": severity,
+    }
+    return {
+        "filters": {key: value for key, value in filters.items() if value is not None},
+        "generated_at": report.generated_at.isoformat(),
+        "total_pages_scanned": report.total_pages_scanned,
+        "total_external_references": report.total_external_references,
+        "total_issues": report.total_issues,
+        "issue_counts_by_code": report.issue_counts_by_code,
+        "issue_counts_by_severity": report.issue_counts_by_severity,
+        "limit": limit,
+        "offset": offset,
+        "item_count": item_count,
+        "capabilities": {
+            "external_network": False,
+            "cdn_scan": False,
+            "external_alerts": False,
+            "repair": False,
+        },
     }
 
 
