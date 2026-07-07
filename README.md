@@ -8,10 +8,10 @@
 
 星序总览页负责承载一级星系入口；进入某个星系后，才显示该星系自己的二级学科或知识目录。内置 C++ httplib 后端服务器，支持静态文件托管。
 
-> **当前状态**: v6.5（2026-07-03 起）— `houduan` 分支已接入 Python 后端骨架、健康检查、部署预检、部署 smoke 门禁、API no-store 缓存边界、工科试验室内容协议持久化样例、内容 seed 启动初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、草稿提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与富语义摘要、本地账号认证安全基线、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、用户自助密码重置令牌、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校/班级最小闭环与加入申请审批、课程/作业/学习事件/提交批改/作业只读复盘/跨班级提交唯一性/学生资源状态可见性/积分统计、知识状态/班级规则统计、个人/班级知识快照、知识快照周期重算脚本、运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端 API、缺陷记录外部 issue 链接、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、待批改队列、审计元数据与认证事件审计、审计日志链式哈希、审计链完整性校验、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要、审计留存预检、本地审计归档包导出/Manifest 校验与导出/摘要行为审计留痕、学校/班级/课程访问控制服务层、跨范围权限矩阵测试，以及前端 opt-in schema 渲染试点
+> **当前状态**: v6.5（2026-07-03 起）— `houduan` 分支已接入 Python 后端骨架、健康检查、部署预检、部署 smoke 门禁、API no-store 缓存边界、工科试验室内容协议持久化样例、内容 seed 启动初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、草稿提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与富语义摘要、本地账号认证安全基线、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、用户自助密码重置令牌、密码重置 token 留存清理脚本、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校/班级最小闭环与加入申请审批、课程/作业/学习事件/提交批改/作业只读复盘/跨班级提交唯一性/学生资源状态可见性/积分统计、知识状态/班级规则统计、个人/班级知识快照、知识快照周期重算脚本、运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端 API、缺陷记录外部 issue 链接、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、待批改队列、审计元数据与认证事件审计、审计日志链式哈希、审计链完整性校验、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要、审计留存预检、本地审计归档包导出/Manifest 校验与导出/摘要行为审计留痕、学校/班级/课程访问控制服务层、跨范围权限矩阵测试，以及前端 opt-in schema 渲染试点
 > **Review 回流状态**: 2026-07-06，`review` 分支已交付代码审查报告（审查基线 `V6.5.23 Review 前基线快照`，范围 `re1` 至 `re17`）。本 `houduan` 分支未合并 review 代码修复；后续仅按 `02` / `07` 中记录的优先级在 `houduan` 上选择性吸收。
-> **最新治理**: 2026-07-07，`houduan` 已补齐 BE-03 用户自助密码重置令牌：`POST /api/auth/password-reset/request` 返回泛化成功响应，为 active 用户创建一次性哈希 token，并按账号哈希/IP 哈希冷却；生产环境绝不回传 token，本地调试也必须显式开启 `ASTRA_PASSWORD_RESET_RETURN_TOKEN_FOR_DEV=true`；`POST /api/auth/password-reset/confirm` 消费 token、校验密码强度、重置密码、撤销活动会话、清理登录失败桶并写入 `auth.password_reset.*` 审计。
-> **最新回归**: 2026-07-07，用户自助密码重置令牌已覆盖请求冷却、生产不回传 token、弱密码失败审计、disabled 用户边界、过期 token、旧 token 失效、会话撤销和审计脱敏；真实邮件/短信/MFA 投递、token 清理任务和真实 MySQL 并发压测仍属后续治理。
+> **最新治理**: 2026-07-07，`houduan` 已补齐 BE-03 密码重置 token 留存清理脚本：`scripts.cleanup_password_reset_tokens` 默认 dry-run，按 `ASTRA_PASSWORD_RESET_TOKEN_RETENTION_DAYS`、`--retention-days` 或 `--before` 选择已用或已过期 token，只有显式 `--apply` 才删除，并且输出摘要不包含用户名、IP 哈希、user-agent 或 token hash。
+> **最新回归**: 2026-07-07，密码重置 token 清理已覆盖 dry-run 不删除、已用/过期 token cutoff 条件、近期或仍有效 token 保留、limit 截断、CLI 参数校验和输出脱敏；真实邮件/短信/MFA 投递、强设备绑定、长期会话策略和真实 MySQL 并发压测仍属后续治理。
 > **下一阶段规划**: Python + MySQL 后端化、内容协议、登录用户体系与管理员 / 教师 / 学生三端平台设计，详见 [`doc/07-后端优化与设计.md`](doc/07-后端优化与设计.md)
 > **当前分支**: `houduan` — 后端化设计与重构开发分支；`main` 保持主线维护
 > **v6.4 主线**：未来星系产品内容保留，比赛提交/评审/截图临时层清理 + `20260630mainV64` 资产版本同步
@@ -129,6 +129,10 @@ python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-revi
 python -m scripts.archive_audit_logs --retention-days 365 --output-dir audit-archives
 python -m scripts.archive_audit_logs --verify audit-archives/audit-logs-archive-<stamp>.manifest.json
 
+# 密码重置 token 留存清理（默认 dry-run；显式 --apply 才删除）
+python -m scripts.cleanup_password_reset_tokens --retention-days 30
+python -m scripts.cleanup_password_reset_tokens --retention-days 30 --apply
+
 # 前端 schema smoke（另开终端启动静态服务）
 node server/dev-static-server.mjs --port 8766
 # 访问：
@@ -187,7 +191,8 @@ node server/dev-static-server.mjs --port 8766
 > 完整的细碎微版本详见 [doc/03-发布历史.md](doc/03-发布历史.md)。当前主线在 `main` 分支维护。
 
 ### v6.5 — 2026-07-05（houduan）
-- 2026-07-07 已在 `houduan` 落地 BE-03 用户自助密码重置令牌：请求接口泛化响应并按账号哈希/IP 哈希冷却，生产环境不回传 token；确认接口行锁消费一次性 token，重置密码后撤销会话、清理登录失败桶并写入脱敏审计。真实投递通道、MFA、token 清理任务和 MySQL 并发压测仍待后续。
+- 2026-07-07 已在 `houduan` 落地 BE-03 密码重置 token 留存清理脚本：默认 dry-run，显式 `--apply` 才删除；按已用时间或过期时间命中 cutoff，摘要只返回计数、截断、策略和首尾 id，不暴露用户名、IP 哈希、user-agent 或 token hash。
+- 2026-07-07 已在 `houduan` 落地 BE-03 用户自助密码重置令牌：请求接口泛化响应并按账号哈希/IP 哈希冷却，生产环境不回传 token；确认接口行锁消费一次性 token，重置密码后撤销会话、清理登录失败桶并写入脱敏审计。真实投递通道、MFA 和 MySQL 并发压测仍待后续。
 - 2026-07-07 已在 `houduan` 落地 BE-12 审计链完整性校验：`GET /api/admin/audit-logs/chain-integrity` 按时间窗与扫描上限重算应用层 hash chain，报告 `current_hash_mismatch`、`prev_hash_mismatch`、历史空 hash 与截断状态，并以 `admin.audit.chain_integrity` 记录摘要；接口只读，不修复、不删除、不提供 WORM 或外部锚定。
 - 2026-07-07 已在 `houduan` 落地 BE-12 本地审计归档包导出：`scripts.archive_audit_logs` 可按配置、`--retention-days` 或 `--before` 选择归档候选，输出 JSONL/CSV 数据文件和 Manifest，记录 SHA-256、导出数量、截断状态、链边界与 hash-chain 校验状态，并支持 `--verify`；脚本默认只读，不删除源表、不写管理端审计日志、不提供 WORM 或外部锚定。
 - 2026-07-07 已在 `houduan` 落地 BE-12 审计留存预检：`GET /api/admin/audit-logs/retention-plan` 复用审计筛选，按配置或查询参数计算 cutoff、归档候选、临期数量、聚合桶和哈希链边界，并以 `admin.audit.retention_plan` 记录不含候选明细的摘要；真实归档、删除、WORM、外部锚定和正式留存执行仍待后续。
