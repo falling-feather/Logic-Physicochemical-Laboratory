@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 import pytest
@@ -16,6 +17,7 @@ from app.services.knowledge_snapshot_runs import (
     snapshot_window,
 )
 from app.services.knowledge_snapshot_scheduler import (
+    KnowledgeSnapshotScheduler,
     SnapshotScheduleConfig,
     SnapshotScheduleJob,
     acquire_snapshot_job_lease,
@@ -216,6 +218,75 @@ def test_snapshot_rebuild_releases_scheduler_lease(client):
         assert stored_run.scheduler_heartbeat_at is None
 
 
+def test_snapshot_rebuild_runs_automatic_lease_heartbeat(client):
+    job = SnapshotScheduleJob(granularity="day", reference_date=date(2026, 7, 3))
+    session_factory = get_session_factory(get_settings().database_url)
+    heartbeat_calls: list[str] = []
+
+    with session_factory() as db:
+        lease = acquire_snapshot_job_lease(
+            db,
+            job,
+            retry_attempts=3,
+            lease_owner="worker-auto-heartbeat",
+            lease_seconds=3600,
+            now=datetime(2026, 7, 4, 3, 0),
+        )
+        assert lease is not None
+
+        run = rebuild_periodic_knowledge_snapshots(
+            db,
+            granularity=job.granularity,
+            reference_date=job.reference_date,
+            trigger_source="scheduler",
+            scheduler_lease_owner=lease.lease_owner,
+            scheduler_lease_token=lease.lease_token,
+            scheduler_lease_heartbeat=lambda: heartbeat_calls.append("beat") or True,
+            scheduler_heartbeat_seconds=0,
+        )
+
+        assert run.status == "success"
+        assert heartbeat_calls
+
+
+def test_snapshot_rebuild_stops_when_automatic_heartbeat_loses_lease(client):
+    job = SnapshotScheduleJob(granularity="day", reference_date=date(2026, 7, 3))
+    period_start, period_end = snapshot_window(job.granularity, job.reference_date)
+    run_key = snapshot_run_key(job.granularity, period_start, period_end)
+    session_factory = get_session_factory(get_settings().database_url)
+
+    with session_factory() as db:
+        lease = acquire_snapshot_job_lease(
+            db,
+            job,
+            retry_attempts=3,
+            lease_owner="worker-heartbeat-lost",
+            lease_seconds=3600,
+            now=datetime(2026, 7, 4, 3, 0),
+        )
+        assert lease is not None
+
+        with pytest.raises(SnapshotRunLeaseLost):
+            rebuild_periodic_knowledge_snapshots(
+                db,
+                granularity=job.granularity,
+                reference_date=job.reference_date,
+                trigger_source="scheduler",
+                scheduler_lease_owner=lease.lease_owner,
+                scheduler_lease_token=lease.lease_token,
+                scheduler_lease_heartbeat=lambda: False,
+                scheduler_heartbeat_seconds=0,
+            )
+
+    with session_factory() as db:
+        stored_run = db.scalar(select(KnowledgeSnapshotRun).where(KnowledgeSnapshotRun.run_key == run_key))
+        assert stored_run is not None
+        assert stored_run.status == "running"
+        assert stored_run.scheduler_lease_owner == "worker-heartbeat-lost"
+        assert stored_run.scheduler_lease_token == lease.lease_token
+        assert stored_run.error_message is None
+
+
 def test_snapshot_rebuild_with_stale_token_cannot_finish_run(client):
     job = SnapshotScheduleJob(granularity="day", reference_date=date(2026, 7, 3))
     period_start, period_end = snapshot_window(job.granularity, job.reference_date)
@@ -286,6 +357,71 @@ def test_snapshot_rebuild_script_skips_when_lease_is_unavailable(client):
         "granularity": "day",
         "reference_date": "2026-07-12",
     }
+
+
+def test_snapshot_scheduler_passes_automatic_heartbeat_to_rebuild(client, monkeypatch):
+    captured: dict[str, object] = {}
+
+    def fake_rebuild(db, **kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(status="success", id=123, attempt_count=1)
+
+    monkeypatch.setattr(
+        "app.services.knowledge_snapshot_scheduler.rebuild_periodic_knowledge_snapshots",
+        fake_rebuild,
+    )
+    scheduler = KnowledgeSnapshotScheduler(
+        database_url=get_settings().database_url,
+        schedule_config=SnapshotScheduleConfig(),
+        retry_attempts=3,
+        interval_seconds=300,
+        lease_seconds=3600,
+        heartbeat_seconds=45,
+        instance_id="scheduler-heartbeat-test",
+    )
+
+    result = scheduler._run_job_if_needed(SnapshotScheduleJob(granularity="day", reference_date=date(2026, 7, 20)))
+
+    assert result["status"] == "success"
+    assert callable(captured["scheduler_lease_heartbeat"])
+    assert captured["scheduler_heartbeat_seconds"] == 45
+    assert captured["scheduler_lease_owner"] == "scheduler-heartbeat-test"
+    assert isinstance(captured["scheduler_lease_token"], str)
+
+
+def test_snapshot_rebuild_script_passes_automatic_heartbeat_to_rebuild(client, monkeypatch):
+    captured: dict[str, object] = {}
+
+    def fake_rebuild(db, **kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            status="success",
+            id=456,
+            run_key="knowledge:day:fake",
+            granularity=kwargs["granularity"],
+            period_start=datetime(2026, 7, 20),
+            period_end=datetime(2026, 7, 20, 23, 59, 59),
+            trigger_source=kwargs["trigger_source"],
+            attempt_count=1,
+            user_snapshot_count=0,
+            class_snapshot_count=0,
+            error_message=None,
+            metadata_json={"trigger_source": kwargs["trigger_source"]},
+        )
+
+    monkeypatch.setattr("scripts.rebuild_knowledge_snapshots.rebuild_periodic_knowledge_snapshots", fake_rebuild)
+
+    report = run_rebuild(
+        granularity="day",
+        reference_date=date(2026, 7, 20),
+        database_url=get_settings().database_url,
+    )
+
+    assert report["ok"] is True
+    assert callable(captured["scheduler_lease_heartbeat"])
+    assert captured["scheduler_heartbeat_seconds"] == get_settings().knowledge_snapshot_scheduler_heartbeat_seconds
+    assert str(captured["scheduler_lease_owner"]).startswith("script:")
+    assert isinstance(captured["scheduler_lease_token"], str)
 
 
 def test_snapshot_scheduler_is_not_registered_by_default(client):

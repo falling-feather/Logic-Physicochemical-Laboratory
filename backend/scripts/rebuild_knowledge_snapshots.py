@@ -10,7 +10,11 @@ from app.core.config import get_settings
 from app.db.session import get_session_factory
 from app.models.base import utc_now
 from app.services.knowledge_snapshot_runs import rebuild_periodic_knowledge_snapshots, snapshot_run_report
-from app.services.knowledge_snapshot_scheduler import SnapshotScheduleJob, acquire_snapshot_job_lease
+from app.services.knowledge_snapshot_scheduler import (
+    SnapshotScheduleJob,
+    acquire_snapshot_job_lease,
+    heartbeat_snapshot_job_lease,
+)
 
 
 def run_rebuild(
@@ -43,6 +47,15 @@ def run_rebuild(
                 "granularity": granularity,
                 "reference_date": job.reference_date.isoformat(),
             }
+
+        def lease_heartbeat() -> bool:
+            with session_factory() as heartbeat_db:
+                return heartbeat_snapshot_job_lease(
+                    heartbeat_db,
+                    lease,
+                    lease_seconds=settings.knowledge_snapshot_scheduler_lease_seconds,
+                )
+
         run = rebuild_periodic_knowledge_snapshots(
             db,
             granularity=granularity,
@@ -50,6 +63,8 @@ def run_rebuild(
             trigger_source="script",
             scheduler_lease_owner=lease.lease_owner,
             scheduler_lease_token=lease.lease_token,
+            scheduler_lease_heartbeat=lease_heartbeat,
+            scheduler_heartbeat_seconds=settings.knowledge_snapshot_scheduler_heartbeat_seconds,
         )
         return snapshot_run_report(run)
 

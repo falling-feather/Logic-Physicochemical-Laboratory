@@ -125,6 +125,11 @@ class KnowledgeSnapshotScheduler:
                         "status": "skipped",
                         "reason": "lease_unavailable",
                     }
+                lease_heartbeat = _lease_heartbeat_callback(
+                    self.database_url,
+                    lease,
+                    lease_seconds=self.lease_seconds,
+                )
                 run = rebuild_periodic_knowledge_snapshots(
                     db,
                     granularity=job.granularity,
@@ -132,6 +137,8 @@ class KnowledgeSnapshotScheduler:
                     trigger_source="scheduler",
                     scheduler_lease_owner=lease.lease_owner,
                     scheduler_lease_token=lease.lease_token,
+                    scheduler_lease_heartbeat=lease_heartbeat,
+                    scheduler_heartbeat_seconds=self.heartbeat_seconds,
                 )
             except Exception as exc:
                 return {
@@ -373,3 +380,17 @@ def _as_naive_utc(value: datetime) -> datetime:
 
 def _default_scheduler_instance_id() -> str:
     return f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:12]}"
+
+
+def _lease_heartbeat_callback(
+    database_url: str,
+    lease: SnapshotJobLease,
+    *,
+    lease_seconds: int,
+) -> Callable[[], bool]:
+    def heartbeat() -> bool:
+        session_factory = get_session_factory(database_url)
+        with session_factory() as heartbeat_db:
+            return heartbeat_snapshot_job_lease(heartbeat_db, lease, lease_seconds=lease_seconds)
+
+    return heartbeat

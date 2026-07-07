@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
-from typing import Literal
+from typing import Callable, Literal
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
@@ -44,6 +44,9 @@ def rebuild_periodic_knowledge_snapshots(
     trigger_source: str = "script",
     scheduler_lease_owner: str | None = None,
     scheduler_lease_token: str | None = None,
+    scheduler_lease_heartbeat: Callable[[], bool] | None = None,
+    scheduler_heartbeat_seconds: int | None = None,
+    clock: Callable[[], datetime] = utc_now,
 ) -> KnowledgeSnapshotRun:
     period_start, period_end = snapshot_window(granularity, reference_date)
     run_key = _run_key(granularity, period_start, period_end)
@@ -58,9 +61,15 @@ def rebuild_periodic_knowledge_snapshots(
     run.user_snapshot_count = 0
     run.class_snapshot_count = 0
     run.metadata_json = {"trigger_source": trigger_source}
-    db.flush()
+    db.commit()
+    db.refresh(run)
     try:
-        counts = _rebuild_window(db, granularity, period_start, period_end)
+        heartbeat = _SnapshotRunHeartbeat(
+            heartbeat=scheduler_lease_heartbeat,
+            heartbeat_seconds=scheduler_heartbeat_seconds,
+            clock=clock,
+        )
+        counts = _rebuild_window(db, granularity, period_start, period_end, heartbeat=heartbeat)
         success_metadata = {
             "trigger_source": trigger_source,
             "class_course_pairs": counts["class_course_pairs"],
@@ -118,10 +127,14 @@ def _rebuild_window(
     granularity: SnapshotGranularity,
     period_start: datetime,
     period_end: datetime,
+    *,
+    heartbeat: "_SnapshotRunHeartbeat | None" = None,
 ) -> dict[str, int]:
     user_snapshot_count = 0
     class_snapshot_count = 0
     class_course_pairs = 0
+    if heartbeat is not None:
+        heartbeat.maybe()
     for class_group, course in _active_class_courses(db):
         class_course_pairs += 1
         created_by_user_id = _class_snapshot_actor_id(db, class_group, course)
@@ -142,6 +155,8 @@ def _rebuild_window(
             to_at=period_end,
         )
         class_snapshot_count += 1
+        if heartbeat is not None:
+            heartbeat.maybe()
         if course.status != "published":
             continue
         for student in _active_class_students(db, class_group.id):
@@ -166,6 +181,8 @@ def _rebuild_window(
                 to_at=period_end,
             )
             user_snapshot_count += 1
+            if heartbeat is not None:
+                heartbeat.maybe()
     return {
         "class_course_pairs": class_course_pairs,
         "class_snapshot_count": class_snapshot_count,
@@ -322,6 +339,31 @@ def _finish_run_failure(
     )
     if result.rowcount != 1:
         raise SnapshotRunLeaseLost("knowledge snapshot run lease was lost before failure")
+
+
+class _SnapshotRunHeartbeat:
+    def __init__(
+        self,
+        *,
+        heartbeat: Callable[[], bool] | None,
+        heartbeat_seconds: int | None,
+        clock: Callable[[], datetime],
+    ) -> None:
+        self.heartbeat = heartbeat
+        self.heartbeat_seconds = heartbeat_seconds
+        self.clock = clock
+        self.last_heartbeat_at = clock()
+
+    def maybe(self) -> None:
+        if self.heartbeat is None or self.heartbeat_seconds is None:
+            return
+        now = self.clock()
+        elapsed_seconds = (now - self.last_heartbeat_at).total_seconds()
+        if elapsed_seconds < self.heartbeat_seconds:
+            return
+        if not self.heartbeat():
+            raise SnapshotRunLeaseLost("knowledge snapshot run lease heartbeat failed")
+        self.last_heartbeat_at = now
 
 
 def _run_key(granularity: SnapshotGranularity, period_start: datetime, period_end: datetime) -> str:
