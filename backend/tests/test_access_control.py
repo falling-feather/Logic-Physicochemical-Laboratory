@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import Course, CourseUnit, SchoolMembership, UserKnowledgeSnapshot
+from app.models import Course, CourseUnit, SchoolMembership, User, UserKnowledgeSnapshot
 from app.services import knowledge_snapshot_runs
 
 
@@ -118,10 +118,24 @@ def _create_learning_scope(client) -> dict:
     }
 
 
-def _grant_school_teacher_membership(user_id: int, school_id: int, status: str = "active") -> None:
+def _grant_school_teacher_membership(
+    user_id: int,
+    school_id: int,
+    status: str = "active",
+    role: str = "teacher",
+) -> None:
     session_factory = get_session_factory(get_settings().database_url)
     with session_factory() as db:
-        db.add(SchoolMembership(school_id=school_id, user_id=user_id, role="teacher", status=status))
+        db.add(SchoolMembership(school_id=school_id, user_id=user_id, role=role, status=status))
+        db.commit()
+
+
+def _set_user_status(user_id: int, status: str) -> None:
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        user = db.get(User, user_id)
+        assert user is not None
+        user.status = status
         db.commit()
 
 
@@ -648,6 +662,191 @@ def test_course_editor_collaborator_scope_controls_course_structure(client):
     assert admin_created_collaborator.status_code == 201
     assert admin_created_collaborator.json()["role"] == "editor"
     assert admin_created_collaborator.json()["status"] == "active"
+
+
+def test_course_owner_transfer_rebinds_course_management_scope(client):
+    scope = _create_learning_scope(client)
+    successor = _register_and_login(client, "scope_owner_transfer_successor", "teacher")
+    _grant_school_teacher_membership(successor["id"], scope["school_id"])
+    peer_teacher = _register_and_login(client, "scope_owner_transfer_peer", "teacher")
+    _grant_school_teacher_membership(peer_teacher["id"], scope["school_id"])
+    outside_teacher = _register_and_login(client, "scope_owner_transfer_outside", "teacher")
+    inactive_teacher = _register_and_login(client, "scope_owner_transfer_inactive", "teacher")
+    _grant_school_teacher_membership(inactive_teacher["id"], scope["school_id"], status="inactive")
+    disabled_teacher = _register_and_login(client, "scope_owner_transfer_disabled", "teacher")
+    _grant_school_teacher_membership(disabled_teacher["id"], scope["school_id"])
+    _set_user_status(disabled_teacher["id"], "disabled")
+    school_admin_member = _register_and_login(client, "scope_owner_transfer_school_admin", "teacher")
+    _grant_school_teacher_membership(school_admin_member["id"], scope["school_id"], role="admin")
+    admin_token = _bootstrap_admin(client, "admin_course_owner_transfer")
+
+    owner_headers = _auth_header(scope["teacher"]["token"])
+    successor_headers = _auth_header(successor["token"])
+    peer_headers = _auth_header(peer_teacher["token"])
+    admin_headers = _auth_header(admin_token)
+
+    collaborator = client.post(
+        f"/api/courses/{scope['course_id']}/collaborators",
+        headers=owner_headers,
+        json={"user_id": successor["id"]},
+    )
+    assert collaborator.status_code == 201
+    collaborator_id = collaborator.json()["id"]
+    assert collaborator.json()["status"] == "active"
+
+    peer_transfer = client.patch(
+        f"/api/courses/{scope['course_id']}/owner",
+        headers=peer_headers,
+        json={"target_user_id": successor["id"]},
+    )
+    assert peer_transfer.status_code == 403
+    assert peer_transfer.json()["detail"] == "Course owner transfer requires course owner role"
+
+    student_transfer = client.patch(
+        f"/api/courses/{scope['course_id']}/owner",
+        headers=owner_headers,
+        json={"target_user_id": scope["student"]["id"]},
+    )
+    assert student_transfer.status_code == 422
+    assert student_transfer.json()["detail"] == "Course owner transfer target must be active school teacher/admin"
+
+    outside_transfer = client.patch(
+        f"/api/courses/{scope['course_id']}/owner",
+        headers=owner_headers,
+        json={"target_user_id": outside_teacher["id"]},
+    )
+    assert outside_transfer.status_code == 422
+    assert outside_transfer.json()["detail"] == "Course owner transfer target must be active school teacher/admin"
+
+    inactive_transfer = client.patch(
+        f"/api/courses/{scope['course_id']}/owner",
+        headers=owner_headers,
+        json={"target_user_id": inactive_teacher["id"]},
+    )
+    assert inactive_transfer.status_code == 422
+    assert inactive_transfer.json()["detail"] == "Course owner transfer target must be active school teacher/admin"
+
+    disabled_transfer = client.patch(
+        f"/api/courses/{scope['course_id']}/owner",
+        headers=owner_headers,
+        json={"target_user_id": disabled_teacher["id"]},
+    )
+    assert disabled_transfer.status_code == 422
+    assert disabled_transfer.json()["detail"] == "Course owner transfer target must be active school teacher/admin"
+
+    missing_transfer = client.patch(
+        f"/api/courses/{scope['course_id']}/owner",
+        headers=owner_headers,
+        json={"target_user_id": 999999},
+    )
+    assert missing_transfer.status_code == 404
+    assert missing_transfer.json()["detail"] == "Course owner transfer target not found"
+
+    same_owner_transfer = client.patch(
+        f"/api/courses/{scope['course_id']}/owner",
+        headers=owner_headers,
+        json={"target_user_id": scope["teacher"]["id"]},
+    )
+    assert same_owner_transfer.status_code == 409
+    assert same_owner_transfer.json()["detail"] == "Course owner is already target user"
+
+    transferred = client.patch(
+        f"/api/courses/{scope['course_id']}/owner",
+        headers=owner_headers,
+        json={"target_user_id": successor["id"]},
+    )
+    assert transferred.status_code == 200
+    assert transferred.json()["creator_user_id"] == successor["id"]
+
+    transfer_audit = client.get(
+        f"/api/admin/audit-logs?action=course.owner.transfer&resource_id={scope['course_id']}",
+        headers=admin_headers,
+    )
+    assert transfer_audit.status_code == 200
+    assert transfer_audit.json()["total"] == 1
+    audit_snapshot = transfer_audit.json()["items"][0]["snapshot_json"]
+    assert audit_snapshot["before"]["creator_user_id"] == scope["teacher"]["id"]
+    assert audit_snapshot["after"]["creator_user_id"] == successor["id"]
+    assert audit_snapshot["target_collaborator_before"]["id"] == collaborator_id
+    assert audit_snapshot["target_collaborator_before"]["status"] == "active"
+    assert audit_snapshot["target_collaborator_after"]["status"] == "inactive"
+
+    successor_collaborators = client.get(
+        f"/api/courses/{scope['course_id']}/collaborators",
+        headers=successor_headers,
+    )
+    assert successor_collaborators.status_code == 200
+    assert successor_collaborators.json() == []
+
+    old_owner_unit = client.post(
+        f"/api/courses/{scope['course_id']}/units",
+        headers=owner_headers,
+        json={"title": "Old Owner Unit", "position": 2, "status": "published"},
+    )
+    assert old_owner_unit.status_code == 403
+    assert old_owner_unit.json()["detail"] == "Course unit creation requires course editor role"
+
+    old_owner_collaborator_create = client.post(
+        f"/api/courses/{scope['course_id']}/collaborators",
+        headers=owner_headers,
+        json={"user_id": peer_teacher["id"]},
+    )
+    assert old_owner_collaborator_create.status_code == 403
+    assert old_owner_collaborator_create.json()["detail"] == "Course collaborator management requires course owner role"
+
+    old_owner_rule_update = client.patch(
+        f"/api/points/assignments/{scope['assignment_id']}/rule",
+        headers=owner_headers,
+        json={"enabled": True, "points_per_score": 2, "max_points": 20},
+    )
+    assert old_owner_rule_update.status_code == 403
+    assert old_owner_rule_update.json()["detail"] == "Assignment point rule requires course editor role"
+
+    successor_unit = client.post(
+        f"/api/courses/{scope['course_id']}/units",
+        headers=successor_headers,
+        json={"title": "Successor Owner Unit", "position": 2, "status": "published"},
+    )
+    assert successor_unit.status_code == 201
+
+    successor_collaborator_create = client.post(
+        f"/api/courses/{scope['course_id']}/collaborators",
+        headers=successor_headers,
+        json={"user_id": peer_teacher["id"]},
+    )
+    assert successor_collaborator_create.status_code == 201
+    assert successor_collaborator_create.json()["user_id"] == peer_teacher["id"]
+
+    old_owner_transfer_back = client.patch(
+        f"/api/courses/{scope['course_id']}/owner",
+        headers=owner_headers,
+        json={"target_user_id": scope["teacher"]["id"]},
+    )
+    assert old_owner_transfer_back.status_code == 403
+    assert old_owner_transfer_back.json()["detail"] == "Course owner transfer requires course owner role"
+
+    admin_transfer_back = client.patch(
+        f"/api/courses/{scope['course_id']}/owner",
+        headers=admin_headers,
+        json={"target_user_id": scope["teacher"]["id"]},
+    )
+    assert admin_transfer_back.status_code == 200
+    assert admin_transfer_back.json()["creator_user_id"] == scope["teacher"]["id"]
+
+    restored_owner_unit = client.post(
+        f"/api/courses/{scope['course_id']}/units",
+        headers=owner_headers,
+        json={"title": "Restored Owner Unit", "position": 3, "status": "published"},
+    )
+    assert restored_owner_unit.status_code == 201
+
+    school_admin_owner_transfer = client.patch(
+        f"/api/courses/{scope['course_id']}/owner",
+        headers=owner_headers,
+        json={"target_user_id": school_admin_member["id"]},
+    )
+    assert school_admin_owner_transfer.status_code == 200
+    assert school_admin_owner_transfer.json()["creator_user_id"] == school_admin_member["id"]
 
 
 def test_class_members_can_access_their_scoped_course_resources(client):

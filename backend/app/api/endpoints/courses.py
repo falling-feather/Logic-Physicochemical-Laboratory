@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
@@ -23,6 +23,7 @@ from app.schemas.course import (
     CourseCollaboratorRead,
     CourseCollaboratorUpdate,
     CourseCreate,
+    CourseOwnerTransfer,
     CourseRead,
     CourseUnitCreate,
     CourseUnitRead,
@@ -188,6 +189,75 @@ def attach_course_class(
     db.commit()
     db.refresh(course_class)
     return course_class
+
+
+@router.patch("/{course_id}/owner", response_model=CourseRead)
+def transfer_course_owner(
+    course_id: int,
+    payload: CourseOwnerTransfer,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Course:
+    course = get_course(db, course_id)
+    require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    require_course_author_or_admin(
+        current_user,
+        course,
+        detail="Course owner transfer requires course owner role",
+    )
+    _require_active_school_teacher(
+        db,
+        course.school_id,
+        payload.target_user_id,
+        target_not_found_detail="Course owner transfer target not found",
+        membership_detail="Course owner transfer target must be active school teacher/admin",
+    )
+    if payload.target_user_id == course.creator_user_id:
+        raise HTTPException(status_code=409, detail="Course owner is already target user")
+
+    before = _course_snapshot(course)
+    previous_owner_id = course.creator_user_id
+    target_collaborator = db.scalar(
+        select(CourseCollaborator).where(
+            CourseCollaborator.course_id == course.id,
+            CourseCollaborator.user_id == payload.target_user_id,
+        )
+    )
+    owner_update = db.execute(
+        update(Course)
+        .where(Course.id == course.id, Course.creator_user_id == previous_owner_id)
+        .values(creator_user_id=payload.target_user_id)
+    )
+    if owner_update.rowcount != 1:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Course owner changed; retry transfer")
+
+    course.creator_user_id = payload.target_user_id
+    collaborator_before = _course_collaborator_snapshot(target_collaborator) if target_collaborator is not None else None
+    if target_collaborator is not None and target_collaborator.status != "inactive":
+        target_collaborator.status = "inactive"
+    collaborator_after = _course_collaborator_snapshot(target_collaborator) if target_collaborator is not None else None
+
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="course.owner.transfer",
+        resource_type="course",
+        resource_id=course.id,
+        school_id=course.school_id,
+        event_result="success",
+        request=request,
+        snapshot={
+            "before": before,
+            "after": _course_snapshot(course),
+            "target_collaborator_before": collaborator_before,
+            "target_collaborator_after": collaborator_after,
+        },
+    )
+    db.commit()
+    db.refresh(course)
+    return course
 
 
 @router.get("/{course_id}/collaborators", response_model=list[CourseCollaboratorRead])
@@ -469,10 +539,19 @@ def create_assignment(
     return assignment
 
 
-def _require_active_school_teacher(db: Session, school_id: int, user_id: int) -> None:
+def _require_active_school_teacher(
+    db: Session,
+    school_id: int,
+    user_id: int,
+    *,
+    target_not_found_detail: str = "Course collaborator user not found",
+    membership_detail: str = "Course collaborator must be active school teacher/admin",
+) -> None:
     target = db.get(User, user_id)
     if target is None:
-        raise HTTPException(status_code=404, detail="Course collaborator user not found")
+        raise HTTPException(status_code=404, detail=target_not_found_detail)
+    if target.status != "active":
+        raise HTTPException(status_code=422, detail=membership_detail)
     membership = db.scalar(
         select(SchoolMembership).where(
             SchoolMembership.school_id == school_id,
@@ -482,7 +561,18 @@ def _require_active_school_teacher(db: Session, school_id: int, user_id: int) ->
         )
     )
     if membership is None:
-        raise HTTPException(status_code=422, detail="Course collaborator must be active school teacher/admin")
+        raise HTTPException(status_code=422, detail=membership_detail)
+
+
+def _course_snapshot(course: Course) -> dict:
+    return {
+        "id": course.id,
+        "school_id": course.school_id,
+        "creator_user_id": course.creator_user_id,
+        "title": course.title,
+        "summary": course.summary,
+        "status": course.status,
+    }
 
 
 def _course_collaborator_snapshot(collaborator: CourseCollaborator) -> dict:

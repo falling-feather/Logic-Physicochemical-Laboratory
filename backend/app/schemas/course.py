@@ -65,6 +65,10 @@ class CourseCollaboratorRead(BaseModel):
     status: str
 
 
+class CourseOwnerTransfer(BaseModel):
+    target_user_id: int
+
+
 class CourseUnitCreate(BaseModel):
     title: str = Field(min_length=1, max_length=180)
     position: int = Field(ge=1)
