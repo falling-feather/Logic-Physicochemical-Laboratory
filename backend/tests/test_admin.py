@@ -2,7 +2,7 @@ from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import AuthSession, ContentPageRecord, User
+from app.models import AuditLog, AuthSession, ContentPageRecord, LoginAttempt, User
 
 
 def _auth_header(token: str) -> dict:
@@ -456,6 +456,93 @@ def test_admin_views_user_management_stats_and_bug_records(client):
 
     student_forbidden = client.get("/api/admin/stats", headers=_auth_header(student_token))
     assert student_forbidden.status_code == 403
+
+
+def test_admin_can_reset_user_password_and_revoke_sessions(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "teacher_password_reset", "teacher")
+
+    users = client.get("/api/admin/users?q=teacher_password_reset", headers=_auth_header(admin_token))
+    assert users.status_code == 200
+    teacher = users.json()["items"][0]
+
+    weak_reset = client.post(
+        f"/api/admin/users/{teacher['id']}/password-reset",
+        headers=_auth_header(admin_token),
+        json={"password": "12345678"},
+    )
+    assert weak_reset.status_code == 422
+    assert "Password must include at least one letter" in weak_reset.json()["detail"]["password"]
+
+    forbidden_reset = client.post(
+        f"/api/admin/users/{teacher['id']}/password-reset",
+        headers=_auth_header(teacher_token),
+        json={"password": "ResetPass123"},
+    )
+    assert forbidden_reset.status_code == 403
+
+    missing_user_reset = client.post(
+        "/api/admin/users/9999/password-reset",
+        headers=_auth_header(admin_token),
+        json={"password": "ResetPass123"},
+    )
+    assert missing_user_reset.status_code == 404
+
+    failed_login = client.post(
+        "/api/auth/login",
+        json={"username": "teacher_password_reset", "password": "wrong-secret"},
+    )
+    assert failed_login.status_code == 401
+
+    reset = client.post(
+        f"/api/admin/users/{teacher['id']}/password-reset",
+        headers={**_auth_header(admin_token), "X-Request-ID": "admin-password-reset-request"},
+        json={"password": "ResetPass123"},
+    )
+    assert reset.status_code == 200
+    assert reset.json() == {
+        "status": "ok",
+        "user_id": teacher["id"],
+        "revoked_sessions": 1,
+        "cleared_login_attempt": True,
+    }
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        cleared_attempt = db.scalar(
+            select(LoginAttempt).where(LoginAttempt.normalized_username == "teacher_password_reset")
+        )
+        assert cleared_attempt is None
+
+    old_token_me = client.get("/api/users/me", headers=_auth_header(teacher_token))
+    assert old_token_me.status_code == 401
+    old_password_login = client.post(
+        "/api/auth/login",
+        json={"username": "teacher_password_reset", "password": "secret123"},
+    )
+    assert old_password_login.status_code == 401
+    new_password_login = client.post(
+        "/api/auth/login",
+        json={"username": "teacher_password_reset", "password": "ResetPass123"},
+    )
+    assert new_password_login.status_code == 200
+
+    with session_factory() as db:
+        revoked_session = db.scalar(
+            select(AuthSession).where(AuthSession.user_id == teacher["id"], AuthSession.revoked_at.is_not(None))
+        )
+        assert revoked_session is not None
+        audit = db.scalar(select(AuditLog).where(AuditLog.action == "admin.user.password_reset"))
+        assert audit is not None
+        assert audit.resource_type == "user"
+        assert audit.resource_id == str(teacher["id"])
+        assert audit.request_id == "admin-password-reset-request"
+        assert audit.snapshot_json["revoked_sessions"] == 1
+        assert audit.snapshot_json["cleared_login_attempt"] is True
+        assert audit.snapshot_json["user"]["username"] == "teacher_password_reset"
+        assert "password" not in audit.snapshot_json
+        assert "ResetPass123" not in str(audit.snapshot_json)
+        assert "secret123" not in str(audit.snapshot_json)
 
 
 def test_admin_content_pages_filter_count_and_paginate_in_database(client):

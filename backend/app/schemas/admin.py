@@ -46,6 +46,17 @@ class AdminUserUpdate(BaseModel):
     status: AdminUserStatus | None = None
 
 
+class AdminUserPasswordReset(BaseModel):
+    password: str = Field(min_length=8, max_length=128)
+
+
+class AdminUserPasswordResetResponse(BaseModel):
+    status: str = "ok"
+    user_id: int
+    revoked_sessions: int
+    cleared_login_attempt: bool
+
+
 class AdminContentPageRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -25,6 +25,7 @@ from app.models import (
     CourseClass,
     CourseUnit,
     LearningEvent,
+    LoginAttempt,
     PointLedger,
     School,
     SchoolMembership,
@@ -56,6 +57,8 @@ from app.schemas.admin import (
     AdminSchoolStats,
     AdminStats,
     AdminUserPage,
+    AdminUserPasswordReset,
+    AdminUserPasswordResetResponse,
     AdminUserRead,
     AdminUserUpdate,
     AuditLogExport,
@@ -207,6 +210,45 @@ def update_user(
     db.commit()
     db.refresh(user)
     return user
+
+
+@router.post("/users/{user_id}/password-reset", response_model=AdminUserPasswordResetResponse)
+def reset_user_password(
+    user_id: int,
+    payload: AdminUserPasswordReset,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminUserPasswordResetResponse:
+    _require_admin(current_user)
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    _enforce_password_strength(payload.password, user.username)
+    user.password_hash = hash_password(payload.password)
+    cleared_login_attempt = _clear_user_login_attempt(db, user)
+    revoked_sessions = _revoke_user_sessions(db, user)
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.user.password_reset",
+        resource_type="user",
+        resource_id=user.id,
+        event_result="success",
+        request=request,
+        snapshot={
+            "user": _user_snapshot(user),
+            "revoked_sessions": revoked_sessions,
+            "cleared_login_attempt": cleared_login_attempt,
+        },
+    )
+    db.commit()
+    return AdminUserPasswordResetResponse(
+        user_id=user.id,
+        revoked_sessions=revoked_sessions,
+        cleared_login_attempt=cleared_login_attempt,
+    )
 
 
 @router.get("/schools", response_model=AdminSchoolPage)
@@ -1768,3 +1810,11 @@ def _revoke_user_sessions(db: Session, user: User) -> int:
     for auth_session in sessions:
         auth_session.revoked_at = now
     return len(sessions)
+
+
+def _clear_user_login_attempt(db: Session, user: User) -> bool:
+    attempt = db.scalar(select(LoginAttempt).where(LoginAttempt.normalized_username == user.normalized_username))
+    if attempt is None:
+        return False
+    db.delete(attempt)
+    return True
