@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
@@ -278,12 +278,24 @@ def update_class_member_status(
         raise HTTPException(status_code=404, detail="Class member not found")
 
     membership, user = row
-    if membership.role != "student":
-        raise HTTPException(status_code=403, detail="Only student class membership can be updated here")
+    if membership.role != "student" and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can update teacher class membership")
 
     previous_status = membership.status
     note = trim_optional(payload.note)
     if previous_status != payload.status:
+        if membership.role == "teacher" and previous_status == "active" and payload.status == "inactive":
+            active_teacher_count = db.scalar(
+                select(func.count())
+                .select_from(ClassMembership)
+                .where(
+                    ClassMembership.class_id == class_group.id,
+                    ClassMembership.role == "teacher",
+                    ClassMembership.status == "active",
+                )
+            )
+            if active_teacher_count is not None and active_teacher_count <= 1:
+                raise HTTPException(status_code=409, detail="Cannot deactivate the last active class teacher")
         membership.status = payload.status
         record_audit_log(
             db,

@@ -66,6 +66,7 @@ def test_teacher_creates_school_class_and_student_joins(client):
     teacher_token = _register_and_login(client, "teacher02", "teacher")
     student_token = _register_and_login(client, "student01", "student")
     outsider_teacher_token = _register_and_login(client, "teacher_member_outsider", "teacher")
+    assistant_teacher_token = _register_and_login(client, "teacher_member_assistant", "teacher")
 
     school = client.post(
         "/api/schools",
@@ -102,6 +103,9 @@ def test_teacher_creates_school_class_and_student_joins(client):
     student_me = client.get("/api/users/me", headers=_auth_header(student_token))
     assert student_me.status_code == 200
     student_id = student_me.json()["id"]
+    assistant_teacher_me = client.get("/api/users/me", headers=_auth_header(assistant_teacher_token))
+    assert assistant_teacher_me.status_code == 200
+    assistant_teacher_id = assistant_teacher_me.json()["id"]
 
     with get_session_factory(get_settings().database_url)() as db:
         school_membership = db.scalar(
@@ -181,7 +185,7 @@ def test_teacher_creates_school_class_and_student_joins(client):
         json={"status": "inactive"},
     )
     assert teacher_member_update_forbidden.status_code == 403
-    assert teacher_member_update_forbidden.json()["detail"] == "Only student class membership can be updated here"
+    assert teacher_member_update_forbidden.json()["detail"] == "Only admins can update teacher class membership"
 
     unsupported_member_status = client.patch(
         f"/api/classes/{class_id}/members/{student_membership_id}",
@@ -284,6 +288,58 @@ def test_teacher_creates_school_class_and_student_joins(client):
     teacher_classes = client.get(f"/api/schools/{school_id}/classes", headers=_auth_header(teacher_token))
     assert teacher_classes.status_code == 200
     assert teacher_classes.json()[0]["name"] == "Physics Class A"
+
+    last_teacher_blocked = client.patch(
+        f"/api/classes/{class_id}/members/{teacher_membership_id}",
+        headers=_auth_header(admin_token),
+        json={"status": "inactive"},
+    )
+    assert last_teacher_blocked.status_code == 409
+    assert last_teacher_blocked.json()["detail"] == "Cannot deactivate the last active class teacher"
+
+    with get_session_factory(get_settings().database_url)() as db:
+        db.add(SchoolMembership(school_id=school_id, user_id=assistant_teacher_id, role="teacher"))
+        db.add(ClassMembership(class_id=class_id, user_id=assistant_teacher_id, role="teacher"))
+        db.commit()
+
+    teacher_inactive_update = client.patch(
+        f"/api/classes/{class_id}/members/{teacher_membership_id}",
+        headers={**_auth_header(admin_token), "X-Request-ID": "class-teacher-inactive"},
+        json={"status": "inactive"},
+    )
+    assert teacher_inactive_update.status_code == 200
+    assert teacher_inactive_update.json()["role"] == "teacher"
+    assert teacher_inactive_update.json()["status"] == "inactive"
+
+    inactive_teacher_members = client.get(
+        f"/api/classes/{class_id}/members?role=teacher&status=inactive",
+        headers=_auth_header(admin_token),
+    )
+    assert inactive_teacher_members.status_code == 200
+    assert [item["username"] for item in inactive_teacher_members.json()] == ["teacher02"]
+
+    active_teacher_members = client.get(
+        f"/api/classes/{class_id}/members?role=teacher",
+        headers=_auth_header(admin_token),
+    )
+    assert active_teacher_members.status_code == 200
+    assert [item["username"] for item in active_teacher_members.json()] == ["teacher_member_assistant"]
+
+    teacher_after_inactive = client.get(f"/api/classes/{class_id}/members", headers=_auth_header(teacher_token))
+    assert teacher_after_inactive.status_code == 403
+    assert teacher_after_inactive.json()["detail"] == "Class members require class teacher scope"
+
+    teacher_update_audit = client.get(
+        f"/api/admin/audit-logs?action=class.member.status.update&resource_id={teacher_membership_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert teacher_update_audit.status_code == 200
+    assert teacher_update_audit.json()["total"] == 1
+    teacher_audit_item = teacher_update_audit.json()["items"][0]
+    assert teacher_audit_item["request_id"] == "class-teacher-inactive"
+    assert teacher_audit_item["snapshot_json"]["before"]["role"] == "teacher"
+    assert teacher_audit_item["snapshot_json"]["before"]["status"] == "active"
+    assert teacher_audit_item["snapshot_json"]["after"]["status"] == "inactive"
 
 
 def test_teacher_cannot_self_join_other_school_class_as_teacher(client):
