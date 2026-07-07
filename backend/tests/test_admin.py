@@ -315,6 +315,8 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert audit_report_forbidden.status_code == 403
     audit_report_csv_forbidden = client.get("/api/admin/audit-logs/report.csv", headers=_auth_header(student_token))
     assert audit_report_csv_forbidden.status_code == 403
+    audit_frequency_forbidden = client.get("/api/admin/audit-logs/high-frequency", headers=_auth_header(student_token))
+    assert audit_frequency_forbidden.status_code == 403
 
     audit_logs = client.get("/api/admin/audit-logs?limit=10", headers=_auth_header(admin_token))
     assert audit_logs.status_code == 200
@@ -563,6 +565,92 @@ def test_admin_views_user_management_stats_and_bug_records(client):
         headers=_auth_header(admin_token),
     )
     assert report_invalid_window.status_code == 422
+
+    audit_high_frequency = client.get(
+        "/api/admin/audit-logs/high-frequency?min_count=2&bucket_limit=10&window_hours=24",
+        headers={**_auth_header(admin_token), "X-Request-ID": "audit-high-frequency-request"},
+    )
+    assert audit_high_frequency.status_code == 200
+    audit_high_frequency_body = audit_high_frequency.json()
+    assert audit_high_frequency_body["thresholds"] == {
+        "min_count": 2,
+        "min_failure_count": 3,
+        "min_failure_ratio": 0.5,
+        "bucket_limit": 10,
+    }
+    assert audit_high_frequency_body["window"]["window_hours"] == 24
+    assert audit_high_frequency_body["filters"] == {}
+    frequency_actions = {
+        item["action"]: item for item in audit_high_frequency_body["candidates"] if item["dimension"] == "action"
+    }
+    assert frequency_actions["admin.audit.export"]["total"] == 7
+    assert frequency_actions["admin.audit.export"]["success"] == 7
+    assert "count_threshold" in frequency_actions["admin.audit.export"]["reasons"]
+
+    failure_frequency = client.get(
+        "/api/admin/audit-logs/high-frequency?action=auth.login.failed"
+        "&failure_reason=user_disabled&min_failure_count=1&min_failure_ratio=1&bucket_limit=10",
+        headers=_auth_header(admin_token),
+    )
+    assert failure_frequency.status_code == 200
+    failure_candidate = next(
+        item for item in failure_frequency.json()["candidates"] if item["dimension"] == "failure_reason"
+    )
+    assert failure_candidate["failure_reason"] == "user_disabled"
+    assert failure_candidate["failure"] == 1
+    assert failure_candidate["failure_ratio"] == 1
+    assert "failure_count_threshold" in failure_candidate["reasons"]
+    assert "failure_ratio_threshold" in failure_candidate["reasons"]
+
+    path_frequency = client.get(
+        f"/api/admin/audit-logs/high-frequency?action=school.create&resource_id={school_id}&min_count=1",
+        headers=_auth_header(admin_token),
+    )
+    assert path_frequency.status_code == 200
+    path_frequency_body = path_frequency.json()
+    assert path_frequency_body["filters"] == {"action": "school.create", "resource_id": str(school_id)}
+    resource_candidate = next(
+        item for item in path_frequency_body["candidates"] if item["dimension"] == "resource_action"
+    )
+    assert resource_candidate["key"] == f"school:{school_id}"
+    assert resource_candidate["action"] == "school.create"
+    assert resource_candidate["resource_type"] == "school"
+    assert resource_candidate["resource_id"] == str(school_id)
+    assert resource_candidate["total"] == 1
+    assert resource_candidate["success"] == 1
+
+    frequency_audit = client.get(
+        "/api/admin/audit-logs?action=admin.audit.high_frequency&resource_type=audit_log&request_id=audit-high-frequency-request",
+        headers=_auth_header(admin_token),
+    )
+    assert frequency_audit.status_code == 200
+    assert frequency_audit.json()["total"] == 1
+    frequency_snapshot = frequency_audit.json()["items"][0]["snapshot_json"]
+    assert frequency_snapshot["format"] == "high_frequency"
+    assert frequency_snapshot["filters"] == {}
+    assert frequency_snapshot["thresholds"]["min_count"] == 2
+    assert frequency_snapshot["thresholds"]["bucket_limit"] == 10
+    assert frequency_snapshot["candidate_count"] == len(audit_high_frequency_body["candidates"])
+    assert frequency_snapshot["dimension_counts"]["action"] >= 1
+    assert "candidates" not in frequency_snapshot
+
+    frequency_threshold_too_large = client.get(
+        "/api/admin/audit-logs/high-frequency?min_count=10001",
+        headers=_auth_header(admin_token),
+    )
+    assert frequency_threshold_too_large.status_code == 422
+
+    frequency_ratio_invalid = client.get(
+        "/api/admin/audit-logs/high-frequency?min_failure_ratio=1.1",
+        headers=_auth_header(admin_token),
+    )
+    assert frequency_ratio_invalid.status_code == 422
+
+    frequency_invalid_window = client.get(
+        "/api/admin/audit-logs/high-frequency?from=2026-07-06T10:00:00Z&to=2026-07-05T10:00:00Z",
+        headers=_auth_header(admin_token),
+    )
+    assert frequency_invalid_window.status_code == 422
 
     export_audit = client.get(
         "/api/admin/audit-logs?action=admin.audit.export&limit=10",

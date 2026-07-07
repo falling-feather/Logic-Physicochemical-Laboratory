@@ -1,11 +1,11 @@
 import csv
 import io
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -66,6 +66,8 @@ from app.schemas.admin import (
     AdminUserUpdate,
     AuditLogExport,
     AuditLogExportItem,
+    AuditLogFrequencyCandidate,
+    AuditLogFrequencyReport,
     AuditLogPage,
     AuditLogRead,
     AuditLogReport,
@@ -1087,6 +1089,84 @@ def report_audit_logs_csv(
         media_type="text/csv; charset=utf-8",
         headers=_audit_log_report_csv_headers(report),
     )
+
+
+@router.get("/audit-logs/high-frequency", response_model=AuditLogFrequencyReport)
+def report_audit_log_high_frequency(
+    request: Request,
+    actor_user_id: int | None = Query(default=None),
+    action: str | None = Query(default=None),
+    resource_type: str | None = Query(default=None),
+    resource_id: str | None = Query(default=None),
+    school_id: int | None = Query(default=None),
+    class_id: int | None = Query(default=None),
+    event_result: str | None = Query(default=None),
+    failure_reason: str | None = Query(default=None),
+    request_id: str | None = Query(default=None),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    window_hours: int = Query(default=24, ge=1, le=24 * 31),
+    min_count: int = Query(default=10, ge=1, le=10000),
+    min_failure_count: int = Query(default=3, ge=0, le=10000),
+    min_failure_ratio: float = Query(default=0.5, ge=0, le=1),
+    bucket_limit: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AuditLogFrequencyReport:
+    _require_admin(current_user)
+    generated_at = datetime.now(UTC)
+    effective_to = to_at or generated_at
+    effective_from = from_at or effective_to - timedelta(hours=window_hours)
+    statement = _audit_log_statement(
+        actor_user_id=actor_user_id,
+        action=action,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        school_id=school_id,
+        class_id=class_id,
+        event_result=event_result,
+        failure_reason=failure_reason,
+        request_id=request_id,
+        from_at=effective_from,
+        to_at=effective_to,
+    )
+    filters = _audit_log_filters(
+        actor_user_id=actor_user_id,
+        action=action,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        school_id=school_id,
+        class_id=class_id,
+        event_result=event_result,
+        failure_reason=failure_reason,
+        request_id=request_id,
+        from_at=from_at,
+        to_at=to_at,
+    )
+    report = _audit_log_frequency_report(
+        db,
+        statement=statement,
+        filters=filters,
+        effective_from=effective_from,
+        effective_to=effective_to,
+        window_hours=window_hours,
+        min_count=min_count,
+        min_failure_count=min_failure_count,
+        min_failure_ratio=min_failure_ratio,
+        bucket_limit=bucket_limit,
+        generated_at=generated_at,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.audit.high_frequency",
+        resource_type="audit_log",
+        event_result="success",
+        request=request,
+        snapshot=_audit_log_frequency_snapshot(report),
+    )
+    db.commit()
+    return report
 
 
 @router.get("/submissions/pending", response_model=AdminPendingSubmissionQueue)
@@ -2136,6 +2216,195 @@ def _audit_log_report_snapshot(report: AuditLogReport, *, report_format: Literal
         "actor_role_bucket_count": len(report.by_actor_role),
         "event_result_bucket_count": len(report.by_event_result),
         "failure_reason_bucket_count": len(report.by_failure_reason),
+        "generated_at": report.generated_at.isoformat(),
+    }
+
+
+def _audit_log_frequency_report(
+    db: Session,
+    *,
+    statement: Any,
+    filters: dict[str, Any],
+    effective_from: datetime,
+    effective_to: datetime,
+    window_hours: int,
+    min_count: int,
+    min_failure_count: int,
+    min_failure_ratio: float,
+    bucket_limit: int,
+    generated_at: datetime,
+) -> AuditLogFrequencyReport:
+    source = statement.order_by(None).subquery()
+    total = int(db.scalar(select(func.count()).select_from(source)) or 0)
+    minimum_activity = max(1, min(min_count, min_failure_count or min_count))
+    candidates: list[AuditLogFrequencyCandidate] = []
+    for dimension, columns in _audit_log_frequency_dimensions(source):
+        candidates.extend(
+            _audit_log_frequency_candidates(
+                db,
+                source=source,
+                dimension=dimension,
+                columns=columns,
+                minimum_activity=minimum_activity,
+                min_count=min_count,
+                min_failure_count=min_failure_count,
+                min_failure_ratio=min_failure_ratio,
+            )
+        )
+    candidates.sort(
+        key=lambda candidate: (
+            -candidate.total,
+            -candidate.failure,
+            candidate.dimension,
+            candidate.key or "",
+            candidate.action or "",
+        )
+    )
+    candidates = candidates[:bucket_limit]
+    return AuditLogFrequencyReport(
+        total=total,
+        generated_at=generated_at,
+        filters=filters,
+        window={
+            "from": effective_from.isoformat(),
+            "to": effective_to.isoformat(),
+            "window_hours": window_hours,
+        },
+        thresholds={
+            "min_count": min_count,
+            "min_failure_count": min_failure_count,
+            "min_failure_ratio": min_failure_ratio,
+            "bucket_limit": bucket_limit,
+        },
+        candidates=candidates,
+    )
+
+
+def _audit_log_frequency_dimensions(source: Any) -> list[tuple[str, dict[str, Any]]]:
+    return [
+        ("action", {"key": source.c.action, "action": source.c.action}),
+        (
+            "actor_action",
+            {
+                "key": source.c.actor_user_id,
+                "actor_user_id": source.c.actor_user_id,
+                "actor_role": source.c.actor_role,
+                "action": source.c.action,
+            },
+        ),
+        (
+            "ip_action",
+            {
+                "key": source.c.client_ip_hash,
+                "action": source.c.action,
+            },
+        ),
+        (
+            "resource_action",
+            {
+                "key": source.c.resource,
+                "resource_type": source.c.resource_type,
+                "resource_id": source.c.resource_id,
+                "school_id": source.c.school_id,
+                "class_id": source.c.class_id,
+                "action": source.c.action,
+            },
+        ),
+        (
+            "failure_reason",
+            {
+                "key": source.c.failure_reason,
+                "failure_reason": source.c.failure_reason,
+            },
+        ),
+    ]
+
+
+def _audit_log_frequency_candidates(
+    db: Session,
+    *,
+    source: Any,
+    dimension: str,
+    columns: dict[str, Any],
+    minimum_activity: int,
+    min_count: int,
+    min_failure_count: int,
+    min_failure_ratio: float,
+) -> list[AuditLogFrequencyCandidate]:
+    count_expr = func.count().label("total")
+    success_expr = func.coalesce(func.sum(case((source.c.event_result == "success", 1), else_=0)), 0).label("success")
+    failure_expr = func.coalesce(func.sum(case((source.c.event_result == "failure", 1), else_=0)), 0).label("failure")
+    group_columns = list(dict.fromkeys(columns.values()))
+    rows = db.execute(
+        select(
+            *[column.label(name) for name, column in columns.items()],
+            count_expr,
+            success_expr,
+            failure_expr,
+            func.count(func.distinct(source.c.actor_user_id)).label("distinct_actors"),
+            func.count(func.distinct(source.c.client_ip_hash)).label("distinct_ip_hashes"),
+            func.count(func.distinct(source.c.request_id)).label("distinct_request_ids"),
+            func.min(source.c.created_at).label("first_at"),
+            func.max(source.c.created_at).label("latest_at"),
+        )
+        .group_by(*group_columns)
+        .having(count_expr >= minimum_activity)
+    ).mappings()
+    candidates: list[AuditLogFrequencyCandidate] = []
+    for row in rows:
+        total = int(row["total"])
+        success = int(row["success"] or 0)
+        failure = int(row["failure"] or 0)
+        failure_ratio = _divide(failure, total)
+        reasons: list[str] = []
+        if total >= min_count:
+            reasons.append("count_threshold")
+        if min_failure_count > 0 and failure >= min_failure_count:
+            reasons.append("failure_count_threshold")
+        if min_failure_count > 0 and failure >= min_failure_count and failure_ratio >= min_failure_ratio:
+            reasons.append("failure_ratio_threshold")
+        if not reasons:
+            continue
+        candidates.append(
+            AuditLogFrequencyCandidate(
+                dimension=dimension,
+                key=str(row["key"]) if row["key"] is not None else None,
+                action=str(row["action"]) if row.get("action") is not None else None,
+                actor_user_id=row.get("actor_user_id"),
+                actor_role=row.get("actor_role"),
+                resource_type=row.get("resource_type"),
+                resource_id=row.get("resource_id"),
+                school_id=row.get("school_id"),
+                class_id=row.get("class_id"),
+                failure_reason=row.get("failure_reason"),
+                total=total,
+                success=success,
+                failure=failure,
+                other=max(total - success - failure, 0),
+                failure_ratio=failure_ratio,
+                distinct_actors=int(row["distinct_actors"] or 0),
+                distinct_ip_hashes=int(row["distinct_ip_hashes"] or 0),
+                distinct_request_ids=int(row["distinct_request_ids"] or 0),
+                first_at=row["first_at"],
+                latest_at=row["latest_at"],
+                reasons=reasons,
+            )
+        )
+    return candidates
+
+
+def _audit_log_frequency_snapshot(report: AuditLogFrequencyReport) -> dict[str, Any]:
+    dimension_counts: dict[str, int] = {}
+    for candidate in report.candidates:
+        dimension_counts[candidate.dimension] = dimension_counts.get(candidate.dimension, 0) + 1
+    return {
+        "format": "high_frequency",
+        "filters": report.filters,
+        "window": report.window,
+        "thresholds": report.thresholds,
+        "total": report.total,
+        "candidate_count": len(report.candidates),
+        "dimension_counts": dimension_counts,
         "generated_at": report.generated_at.isoformat(),
     }
 

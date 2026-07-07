@@ -441,6 +441,39 @@ class AuditLogReport(BaseModel):
     by_failure_reason: list[AuditLogReportBucket]
 
 
+class AuditLogFrequencyCandidate(BaseModel):
+    dimension: str
+    key: str | None = None
+    action: str | None = None
+    actor_user_id: int | None = None
+    actor_role: str | None = None
+    resource_type: str | None = None
+    resource_id: str | None = None
+    school_id: int | None = None
+    class_id: int | None = None
+    failure_reason: str | None = None
+    total: int
+    success: int
+    failure: int
+    other: int
+    failure_ratio: float
+    distinct_actors: int
+    distinct_ip_hashes: int
+    distinct_request_ids: int
+    first_at: datetime | None = None
+    latest_at: datetime | None = None
+    reasons: list[str]
+
+
+class AuditLogFrequencyReport(BaseModel):
+    total: int
+    generated_at: datetime
+    filters: dict[str, Any]
+    window: dict[str, Any]
+    thresholds: dict[str, Any]
+    candidates: list[AuditLogFrequencyCandidate]
+
+
 class BugRecordCreate(BaseModel):
     title: str = Field(min_length=1, max_length=240)
     category: str = Field(default="general", min_length=1, max_length=80)

@@ -1,6 +1,6 @@
 # 星序 Astra · Python 后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与 semantic 富语义摘要、登录、密码策略、登录失败锁定、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、跨班级提交唯一性、学生资源状态可见性、学生侧作业历史/复盘只读入口、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、中文路径/中文 slug 回归、待批改队列、缺陷记录外部 issue 链接、审计元数据、认证事件审计、审计日志链式哈希、审计日志 JSON/CSV 明细导出、报表摘要导出和导出行为审计留痕等能力。
+本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与 semantic 富语义摘要、登录、密码策略、登录失败锁定、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、跨班级提交唯一性、学生资源状态可见性、学生侧作业历史/复盘只读入口、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、中文路径/中文 slug 回归、待批改队列、缺陷记录外部 issue 链接、审计元数据、认证事件审计、审计日志链式哈希、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要和导出/摘要行为审计留痕等能力。
 
 ## 本地启动
 
@@ -60,6 +60,7 @@ python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-revi
 | GET | `/api/admin/audit-logs/export.csv` | 管理端审计日志 CSV 导出；复用 JSON 导出的筛选、排序、`limit/truncated` 和 `include_snapshot` 边界，响应为下载附件并返回 `X-Audit-Export-*` 元数据头；默认快照列为空，显式包含快照时写入紧凑 JSON 字符串，CSV 表头包含 `prev_hash/current_hash`，文本单元格会中和表格公式前缀；成功导出后同样写入 `admin.audit.export` 摘要 |
 | GET | `/api/admin/audit-logs/report` | 管理端审计日志 JSON 报表摘要；复用审计筛选，按 action/resource_type/actor_role/event_result/failure_reason 聚合，`bucket_limit` 默认 20、最大 100；成功生成后写入 `admin.audit.report` 摘要 |
 | GET | `/api/admin/audit-logs/report.csv` | 管理端审计日志 CSV 报表摘要；与 JSON 报表同源，响应为下载附件并返回 `X-Audit-Report-*` 元数据头，只导出聚合行，不导出原始审计条目 |
+| GET | `/api/admin/audit-logs/high-frequency` | 管理端审计高频候选摘要；复用审计筛选，默认查看最近 24 小时，按 action、actor/action、ip/action、resource/action 和 failure_reason 聚合候选；成功生成后写入 `admin.audit.high_frequency` 摘要，不记录候选明细 |
 | GET | `/api/admin/submissions/pending` | 管理端待批改队列，支持 school/class/course/assignment/student/status/时间窗过滤和 limit/offset 分页 |
 | GET/POST/PATCH | `/api/admin/bugs` | 缺陷/风险清单基础维护；可记录外部 issue provider/id/url，列表支持分页、状态过滤和关键字搜索 |
 | GET/POST | `/api/schools` | 当前用户可见学校 / 创建学校 |
@@ -158,7 +159,7 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 - `app.services.access_control` 负责学校、班级和课程范围判断，普通业务端点不再各自复制 `_require_*` helper；学生课程访问会额外要求课程 `published`，单元读取/事件/提交/复盘会继续要求单元 `published`，事件与提交写入要求作业 `active`；后续权限矩阵扩展应优先在这里收口。
 - `app.services.class_join_requests` 负责加入申请审批状态流转和成员关系补齐。
 - `POST /api/classes/{id}/join` 与 `POST /api/classes/{id}/join-requests` 长期并存：前者是保留给受控场景、导入/邀请码或旧 UI 的 direct join，后者是需要教师/admin 审批的申请流；前端不得把审批流表现为唯一加入路径。
-- `app.services.audit` 负责写入审计日志及 request_id、IP 哈希、user-agent 等请求元数据；新审计记录会以 `prev_hash/current_hash` 保存应用层 SHA-256 链式哈希，用于追踪篡改迹象，但不能替代备份、binlog、外部归档、WORM 或第三方时间戳；管理端 JSON/CSV 明细导出接口默认剥离 `snapshot_json`，需要审查内容快照时必须显式传入 `include_snapshot=true`，且导出完成后会以 `admin.audit.export` 记录筛选条件、导出格式、导出数量和截断状态，不记录导出条目明细；审计报表摘要以 `admin.audit.report` 留痕，只记录格式、筛选和 bucket 数量。
+- `app.services.audit` 负责写入审计日志及 request_id、IP 哈希、user-agent 等请求元数据；新审计记录会以 `prev_hash/current_hash` 保存应用层 SHA-256 链式哈希，用于追踪篡改迹象，但不能替代备份、binlog、外部归档、WORM 或第三方时间戳；管理端 JSON/CSV 明细导出接口默认剥离 `snapshot_json`，需要审查内容快照时必须显式传入 `include_snapshot=true`，且导出完成后会以 `admin.audit.export` 记录筛选条件、导出格式、导出数量和截断状态，不记录导出条目明细；审计报表摘要以 `admin.audit.report` 留痕，只记录格式、筛选和 bucket 数量；高频候选摘要以 `admin.audit.high_frequency` 留痕，只记录筛选、时间窗、阈值、总量和维度命中数，不记录候选明细、原始日志 id 或完整 IP 哈希清单。
 - `/api/admin/bugs` 负责缺陷与风险清单的最小维护；`external_issue_provider/external_issue_id/external_issue_url` 只是外部 issue 链接元数据，不代表已经实现外部平台自动创建或双向状态同步。
 - `app.services.request_metadata` 统一解析请求元数据；审计与会话治理共享 request_id、user-agent 和 IP 哈希口径。`AuthSession.device_label` 优先来自 `X-Device-Label` / `X-Device-Name`，缺省回退到登录 user-agent，因此只是 best-effort 设备摘要，不等同强设备绑定。
 - `app.api.deps.auth.get_current_auth_context()` 会在有效鉴权后按 `ASTRA_SESSION_LAST_SEEN_UPDATE_SECONDS` 刷新当前 `AuthSession.last_seen_at` 和 `last_seen_ip_hash`；默认 300 秒内同一 IP 哈希不重复写库，窗口过期、IP 哈希变化或配置为 `0` 时刷新。该机制只降低 last_seen 写放大，不等同强设备绑定或长期会话风控。
