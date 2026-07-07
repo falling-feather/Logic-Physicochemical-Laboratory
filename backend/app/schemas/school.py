@@ -55,6 +55,23 @@ class ClassMemberStatusUpdate(BaseModel):
     note: str | None = Field(default=None, max_length=500)
 
 
+class ClassMemberBatchStatusItem(BaseModel):
+    membership_id: int
+    status: Literal["active", "inactive"]
+    note: str | None = Field(default=None, max_length=500)
+
+
+class ClassMemberBatchStatusUpdate(BaseModel):
+    items: list[ClassMemberBatchStatusItem] = Field(min_length=1, max_length=100)
+
+
+class ClassTeacherTransfer(BaseModel):
+    source_membership_id: int
+    target_user_id: int
+    deactivate_source: bool = True
+    note: str | None = Field(default=None, max_length=500)
+
+
 class ClassJoinRequestRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -90,3 +107,8 @@ class ClassMemberRead(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+
+
+class ClassTeacherTransferRead(BaseModel):
+    source_membership: ClassMemberRead
+    target_membership: ClassMemberRead

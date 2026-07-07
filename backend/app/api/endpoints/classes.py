@@ -4,16 +4,19 @@ from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
 from app.db.session import get_db
-from app.models import ClassGroup, ClassJoinRequest, ClassMembership, User
+from app.models import ClassGroup, ClassJoinRequest, ClassMembership, SchoolMembership, User
 from app.models.base import utc_now
 from app.schemas.school import (
     ClassCreate,
+    ClassMemberBatchStatusUpdate,
     ClassJoinPayload,
     ClassJoinRequestCreate,
     ClassJoinRequestRead,
     ClassJoinRequestReview,
     ClassMemberRead,
     ClassMemberStatusUpdate,
+    ClassTeacherTransfer,
+    ClassTeacherTransferRead,
     ClassRead,
     MembershipRead,
 )
@@ -51,6 +54,33 @@ def _class_member_read(membership: ClassMembership, user: User) -> ClassMemberRe
         status=membership.status,
         created_at=membership.created_at,
         updated_at=membership.updated_at,
+    )
+
+
+def _active_teacher_count(db: Session, class_id: int) -> int:
+    return int(
+        db.scalar(
+            select(func.count())
+            .select_from(ClassMembership)
+            .where(
+                ClassMembership.class_id == class_id,
+                ClassMembership.role == "teacher",
+                ClassMembership.status == "active",
+            )
+        )
+        or 0
+    )
+
+
+def _active_teacher_ids(db: Session, class_id: int) -> set[int]:
+    return set(
+        db.scalars(
+            select(ClassMembership.id).where(
+                ClassMembership.class_id == class_id,
+                ClassMembership.role == "teacher",
+                ClassMembership.status == "active",
+            )
+        ).all()
     )
 
 
@@ -212,6 +242,129 @@ def join_class(
     return membership
 
 
+@router.post("/{class_id}/teachers/transfer", response_model=ClassTeacherTransferRead)
+def transfer_class_teacher(
+    class_id: int,
+    payload: ClassTeacherTransfer,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClassTeacherTransferRead:
+    class_group = db.get(ClassGroup, class_id)
+    if class_group is None:
+        raise HTTPException(status_code=404, detail="Class not found")
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can transfer class teacher membership")
+
+    source_row = db.execute(
+        select(ClassMembership, User)
+        .join(User, User.id == ClassMembership.user_id)
+        .where(
+            ClassMembership.id == payload.source_membership_id,
+            ClassMembership.class_id == class_group.id,
+            ClassMembership.role == "teacher",
+        )
+    ).one_or_none()
+    if source_row is None:
+        raise HTTPException(status_code=404, detail="Source teacher membership not found")
+    source_membership, source_user = source_row
+    if source_membership.status != "active":
+        raise HTTPException(status_code=409, detail="Source teacher membership is not active")
+    if source_membership.user_id == payload.target_user_id:
+        raise HTTPException(status_code=409, detail="Target teacher is already the source teacher")
+
+    target_user = db.get(User, payload.target_user_id)
+    if target_user is None:
+        raise HTTPException(status_code=404, detail="Target teacher not found")
+    if target_user.status != "active" or target_user.role not in {"admin", "teacher"}:
+        raise HTTPException(status_code=403, detail="Target teacher must be active same-school teacher/admin")
+    target_school_membership = db.scalar(
+        select(SchoolMembership).where(
+            SchoolMembership.school_id == class_group.school_id,
+            SchoolMembership.user_id == target_user.id,
+            SchoolMembership.role.in_(["admin", "teacher"]),
+            SchoolMembership.status == "active",
+        )
+    )
+    if target_school_membership is None:
+        raise HTTPException(status_code=403, detail="Target teacher must be active same-school teacher/admin")
+
+    target_membership = db.scalar(
+        select(ClassMembership).where(
+            ClassMembership.class_id == class_group.id,
+            ClassMembership.user_id == target_user.id,
+            ClassMembership.role == "teacher",
+        )
+    )
+    target_before = None
+    target_created = False
+    if target_membership is None:
+        target_membership = ClassMembership(
+            class_id=class_group.id,
+            user_id=target_user.id,
+            role="teacher",
+            status="active",
+        )
+        db.add(target_membership)
+        db.flush()
+        target_created = True
+    else:
+        target_before = {
+            "id": target_membership.id,
+            "user_id": target_membership.user_id,
+            "status": target_membership.status,
+        }
+        target_membership.status = "active"
+
+    source_before = {
+        "id": source_membership.id,
+        "user_id": source_membership.user_id,
+        "status": source_membership.status,
+    }
+    if payload.deactivate_source:
+        source_membership.status = "inactive"
+
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="class.teacher.transfer",
+        resource_type="class_membership",
+        resource_id=target_membership.id,
+        school_id=class_group.school_id,
+        class_id=class_group.id,
+        event_result="success",
+        request=request,
+        snapshot={
+            "before": {
+                "source": source_before,
+                "target": target_before,
+            },
+            "after": {
+                "source": {
+                    "id": source_membership.id,
+                    "user_id": source_membership.user_id,
+                    "status": source_membership.status,
+                },
+                "target": {
+                    "id": target_membership.id,
+                    "user_id": target_membership.user_id,
+                    "status": target_membership.status,
+                    "created": target_created,
+                },
+                "deactivate_source": payload.deactivate_source,
+                "has_note": trim_optional(payload.note) is not None,
+            },
+        },
+    )
+    db.commit()
+    db.refresh(source_membership)
+    db.refresh(target_membership)
+    return ClassTeacherTransferRead(
+        source_membership=_class_member_read(source_membership, source_user),
+        target_membership=_class_member_read(target_membership, target_user),
+    )
+
+
 @router.get("/{class_id}/members", response_model=list[ClassMemberRead])
 def list_class_members(
     class_id: int,
@@ -246,6 +399,120 @@ def list_class_members(
 
     rows = db.execute(statement).all()
     return [_class_member_read(membership, user) for membership, user in rows]
+
+
+@router.patch("/{class_id}/members/batch-status", response_model=list[ClassMemberRead])
+def batch_update_class_member_status(
+    class_id: int,
+    payload: ClassMemberBatchStatusUpdate,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[ClassMemberRead]:
+    class_group = db.get(ClassGroup, class_id)
+    if class_group is None:
+        raise HTTPException(status_code=404, detail="Class not found")
+    require_class_teacher_or_admin(
+        db,
+        current_user,
+        class_group,
+        detail="Class member updates require class teacher scope",
+    )
+
+    membership_ids = [item.membership_id for item in payload.items]
+    if len(set(membership_ids)) != len(membership_ids):
+        raise HTTPException(status_code=422, detail="Duplicate class membership in batch")
+
+    rows = db.execute(
+        select(ClassMembership, User)
+        .join(User, User.id == ClassMembership.user_id)
+        .where(
+            ClassMembership.class_id == class_group.id,
+            ClassMembership.id.in_(membership_ids),
+        )
+    ).all()
+    row_by_id = {membership.id: (membership, user) for membership, user in rows}
+    missing_ids = [membership_id for membership_id in membership_ids if membership_id not in row_by_id]
+    if missing_ids:
+        raise HTTPException(status_code=404, detail="Class member not found")
+
+    item_by_id = {item.membership_id: item for item in payload.items}
+    if current_user.role != "admin":
+        teacher_items = [
+            membership_id
+            for membership_id in membership_ids
+            if row_by_id[membership_id][0].role != "student"
+        ]
+        if teacher_items:
+            raise HTTPException(status_code=403, detail="Only admins can update teacher class membership")
+
+    next_active_teacher_ids = _active_teacher_ids(db, class_group.id)
+    for membership_id in membership_ids:
+        membership, _ = row_by_id[membership_id]
+        next_status = item_by_id[membership_id].status
+        if membership.role == "teacher":
+            if next_status == "active":
+                next_active_teacher_ids.add(membership.id)
+            else:
+                next_active_teacher_ids.discard(membership.id)
+    if not next_active_teacher_ids:
+        raise HTTPException(status_code=409, detail="Cannot deactivate the last active class teacher")
+
+    before: list[dict] = []
+    after: list[dict] = []
+    changed_count = 0
+    note_count = 0
+    for membership_id in membership_ids:
+        membership, _ = row_by_id[membership_id]
+        item = item_by_id[membership_id]
+        note = trim_optional(item.note)
+        if note is not None:
+            note_count += 1
+        before.append(
+            {
+                "membership_id": membership.id,
+                "user_id": membership.user_id,
+                "role": membership.role,
+                "status": membership.status,
+            }
+        )
+        if membership.status != item.status:
+            membership.status = item.status
+            changed_count += 1
+        after.append(
+            {
+                "membership_id": membership.id,
+                "user_id": membership.user_id,
+                "role": membership.role,
+                "status": membership.status,
+                "has_note": note is not None,
+            }
+        )
+
+    if changed_count:
+        record_audit_log(
+            db,
+            actor=current_user,
+            action="class.member.status.batch_update",
+            resource_type="class_membership_batch",
+            resource_id=class_group.id,
+            school_id=class_group.school_id,
+            class_id=class_group.id,
+            event_result="success",
+            request=request,
+            snapshot={
+                "before": before,
+                "after": after,
+                "item_count": len(payload.items),
+                "changed_count": changed_count,
+                "note_count": note_count,
+            },
+        )
+        db.commit()
+        for membership_id in membership_ids:
+            db.refresh(row_by_id[membership_id][0])
+
+    return [_class_member_read(*row_by_id[membership_id]) for membership_id in membership_ids]
 
 
 @router.patch("/{class_id}/members/{membership_id}", response_model=ClassMemberRead)
@@ -286,16 +553,7 @@ def update_class_member_status(
     note = trim_optional(payload.note)
     if previous_status != payload.status:
         if membership.role == "teacher" and previous_status == "active" and payload.status == "inactive":
-            active_teacher_count = db.scalar(
-                select(func.count())
-                .select_from(ClassMembership)
-                .where(
-                    ClassMembership.class_id == class_group.id,
-                    ClassMembership.role == "teacher",
-                    ClassMembership.status == "active",
-                )
-            )
-            if active_teacher_count is not None and active_teacher_count <= 1:
+            if _active_teacher_count(db, class_group.id) <= 1:
                 raise HTTPException(status_code=409, detail="Cannot deactivate the last active class teacher")
         membership.status = payload.status
         record_audit_log(

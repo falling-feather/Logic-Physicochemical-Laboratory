@@ -2,7 +2,7 @@ from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import ClassJoinRequest, ClassMembership, SchoolMembership
+from app.models import ClassJoinRequest, ClassMembership, SchoolMembership, User
 
 
 def _auth_header(token: str) -> dict:
@@ -411,6 +411,298 @@ def test_teacher_cannot_self_join_other_school_class_as_teacher(client):
         json={"role": "teacher"},
     )
     assert join_as_teacher.status_code == 403
+
+
+def test_admin_transfers_class_teacher_membership_scope(client):
+    admin_token = _bootstrap_admin(client, "admin_teacher_transfer")
+    owner_token = _register_and_login(client, "teacher_transfer_owner", "teacher")
+    target_token = _register_and_login(client, "teacher_transfer_target", "teacher")
+    outsider_token = _register_and_login(client, "teacher_transfer_outside", "teacher")
+    student_token = _register_and_login(client, "student_transfer_target", "student")
+
+    school_id, class_id = _create_school_and_class(
+        client,
+        owner_token,
+        "Astra Teacher Transfer School",
+        "Teacher Transfer Physics",
+    )
+
+    owner_members = client.get(
+        f"/api/classes/{class_id}/members?role=teacher",
+        headers=_auth_header(owner_token),
+    )
+    assert owner_members.status_code == 200
+    owner_membership_id = owner_members.json()[0]["id"]
+
+    target_me = client.get("/api/users/me", headers=_auth_header(target_token))
+    assert target_me.status_code == 200
+    target_user_id = target_me.json()["id"]
+    outsider_me = client.get("/api/users/me", headers=_auth_header(outsider_token))
+    assert outsider_me.status_code == 200
+    outsider_user_id = outsider_me.json()["id"]
+    student_me = client.get("/api/users/me", headers=_auth_header(student_token))
+    assert student_me.status_code == 200
+    student_user_id = student_me.json()["id"]
+
+    with get_session_factory(get_settings().database_url)() as db:
+        db.add(SchoolMembership(school_id=school_id, user_id=target_user_id, role="teacher", status="inactive"))
+        db.add(SchoolMembership(school_id=school_id, user_id=student_user_id, role="student", status="active"))
+        db.commit()
+
+    teacher_forbidden = client.post(
+        f"/api/classes/{class_id}/teachers/transfer",
+        headers=_auth_header(owner_token),
+        json={"source_membership_id": owner_membership_id, "target_user_id": target_user_id},
+    )
+    assert teacher_forbidden.status_code == 403
+    assert teacher_forbidden.json()["detail"] == "Only admins can transfer class teacher membership"
+
+    missing_target = client.post(
+        f"/api/classes/{class_id}/teachers/transfer",
+        headers=_auth_header(admin_token),
+        json={"source_membership_id": owner_membership_id, "target_user_id": 999999},
+    )
+    assert missing_target.status_code == 404
+
+    student_target = client.post(
+        f"/api/classes/{class_id}/teachers/transfer",
+        headers=_auth_header(admin_token),
+        json={"source_membership_id": owner_membership_id, "target_user_id": student_user_id},
+    )
+    assert student_target.status_code == 403
+    assert student_target.json()["detail"] == "Target teacher must be active same-school teacher/admin"
+
+    outsider_target = client.post(
+        f"/api/classes/{class_id}/teachers/transfer",
+        headers=_auth_header(admin_token),
+        json={"source_membership_id": owner_membership_id, "target_user_id": outsider_user_id},
+    )
+    assert outsider_target.status_code == 403
+
+    inactive_school_target = client.post(
+        f"/api/classes/{class_id}/teachers/transfer",
+        headers=_auth_header(admin_token),
+        json={"source_membership_id": owner_membership_id, "target_user_id": target_user_id},
+    )
+    assert inactive_school_target.status_code == 403
+
+    with get_session_factory(get_settings().database_url)() as db:
+        target_user = db.get(User, target_user_id)
+        assert target_user is not None
+        target_user.status = "disabled"
+        db.commit()
+    disabled_target = client.post(
+        f"/api/classes/{class_id}/teachers/transfer",
+        headers=_auth_header(admin_token),
+        json={"source_membership_id": owner_membership_id, "target_user_id": target_user_id},
+    )
+    assert disabled_target.status_code == 403
+
+    with get_session_factory(get_settings().database_url)() as db:
+        target_user = db.get(User, target_user_id)
+        assert target_user is not None
+        target_user.status = "active"
+        target_school_membership = db.scalar(
+            select(SchoolMembership).where(
+                SchoolMembership.school_id == school_id,
+                SchoolMembership.user_id == target_user_id,
+                SchoolMembership.role == "teacher",
+            )
+        )
+        assert target_school_membership is not None
+        target_school_membership.status = "active"
+        db.add(ClassMembership(class_id=class_id, user_id=target_user_id, role="teacher", status="inactive"))
+        db.commit()
+
+    transferred = client.post(
+        f"/api/classes/{class_id}/teachers/transfer",
+        headers={**_auth_header(admin_token), "X-Request-ID": "class-teacher-transfer"},
+        json={
+            "source_membership_id": owner_membership_id,
+            "target_user_id": target_user_id,
+            "deactivate_source": True,
+            "note": "  hand off class owner  ",
+        },
+    )
+    assert transferred.status_code == 200
+    transferred_body = transferred.json()
+    assert transferred_body["source_membership"]["status"] == "inactive"
+    assert transferred_body["target_membership"]["status"] == "active"
+    assert transferred_body["target_membership"]["username"] == "teacher_transfer_target"
+    target_membership_id = transferred_body["target_membership"]["id"]
+
+    old_teacher_members = client.get(f"/api/classes/{class_id}/members", headers=_auth_header(owner_token))
+    assert old_teacher_members.status_code == 403
+    new_teacher_members = client.get(f"/api/classes/{class_id}/members", headers=_auth_header(target_token))
+    assert new_teacher_members.status_code == 200
+    assert [item["username"] for item in new_teacher_members.json()] == ["teacher_transfer_target"]
+
+    duplicate_source = client.post(
+        f"/api/classes/{class_id}/teachers/transfer",
+        headers=_auth_header(admin_token),
+        json={"source_membership_id": target_membership_id, "target_user_id": target_user_id},
+    )
+    assert duplicate_source.status_code == 409
+
+    transfer_audit = client.get(
+        f"/api/admin/audit-logs?action=class.teacher.transfer&class_id={class_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert transfer_audit.status_code == 200
+    assert transfer_audit.json()["total"] == 1
+    audit_item = transfer_audit.json()["items"][0]
+    assert audit_item["request_id"] == "class-teacher-transfer"
+    assert audit_item["snapshot_json"]["before"]["source"]["status"] == "active"
+    assert audit_item["snapshot_json"]["before"]["target"]["status"] == "inactive"
+    assert audit_item["snapshot_json"]["after"]["source"]["status"] == "inactive"
+    assert audit_item["snapshot_json"]["after"]["target"]["created"] is False
+    assert audit_item["snapshot_json"]["after"]["has_note"] is True
+
+
+def test_class_member_batch_status_is_atomic_and_role_scoped(client):
+    admin_token = _bootstrap_admin(client, "admin_member_batch")
+    teacher_token = _register_and_login(client, "teacher_member_batch", "teacher")
+    assistant_token = _register_and_login(client, "teacher_member_batch_assistant", "teacher")
+    student_one_token = _register_and_login(client, "student_member_batch_one", "student")
+    student_two_token = _register_and_login(client, "student_member_batch_two", "student")
+
+    school_id, class_id = _create_school_and_class(
+        client,
+        teacher_token,
+        "Astra Batch School",
+        "Batch Physics",
+    )
+    student_one_join = client.post(
+        f"/api/classes/{class_id}/join",
+        headers=_auth_header(student_one_token),
+        json={"role": "student"},
+    )
+    assert student_one_join.status_code == 201
+    student_one_membership_id = student_one_join.json()["id"]
+    student_two_join = client.post(
+        f"/api/classes/{class_id}/join",
+        headers=_auth_header(student_two_token),
+        json={"role": "student"},
+    )
+    assert student_two_join.status_code == 201
+    student_two_membership_id = student_two_join.json()["id"]
+
+    teacher_members = client.get(
+        f"/api/classes/{class_id}/members?role=teacher",
+        headers=_auth_header(teacher_token),
+    )
+    assert teacher_members.status_code == 200
+    teacher_membership_id = teacher_members.json()[0]["id"]
+
+    assistant_me = client.get("/api/users/me", headers=_auth_header(assistant_token))
+    assert assistant_me.status_code == 200
+    assistant_user_id = assistant_me.json()["id"]
+    with get_session_factory(get_settings().database_url)() as db:
+        db.add(SchoolMembership(school_id=school_id, user_id=assistant_user_id, role="teacher", status="active"))
+        db.add(ClassMembership(class_id=class_id, user_id=assistant_user_id, role="teacher", status="active"))
+        db.commit()
+
+    teacher_only_student_batch = client.patch(
+        f"/api/classes/{class_id}/members/batch-status",
+        headers={**_auth_header(teacher_token), "X-Request-ID": "class-student-batch"},
+        json={
+            "items": [
+                {"membership_id": student_one_membership_id, "status": "inactive", "note": "  absent  "},
+                {"membership_id": student_two_membership_id, "status": "inactive"},
+            ]
+        },
+    )
+    assert teacher_only_student_batch.status_code == 200
+    assert {item["status"] for item in teacher_only_student_batch.json()} == {"inactive"}
+
+    active_student_members = client.get(
+        f"/api/classes/{class_id}/members?role=student",
+        headers=_auth_header(teacher_token),
+    )
+    assert active_student_members.status_code == 200
+    assert active_student_members.json() == []
+
+    teacher_batch_forbidden = client.patch(
+        f"/api/classes/{class_id}/members/batch-status",
+        headers=_auth_header(teacher_token),
+        json={
+            "items": [
+                {"membership_id": teacher_membership_id, "status": "inactive"},
+            ]
+        },
+    )
+    assert teacher_batch_forbidden.status_code == 403
+    assert teacher_batch_forbidden.json()["detail"] == "Only admins can update teacher class membership"
+
+    assistant_members = client.get(
+        f"/api/classes/{class_id}/members?role=teacher",
+        headers=_auth_header(admin_token),
+    )
+    assert assistant_members.status_code == 200
+    assistant_membership_id = next(
+        item["id"] for item in assistant_members.json() if item["username"] == "teacher_member_batch_assistant"
+    )
+
+    blocked_all_teachers = client.patch(
+        f"/api/classes/{class_id}/members/batch-status",
+        headers=_auth_header(admin_token),
+        json={
+            "items": [
+                {"membership_id": teacher_membership_id, "status": "inactive"},
+                {"membership_id": assistant_membership_id, "status": "inactive"},
+                {"membership_id": student_one_membership_id, "status": "active"},
+            ]
+        },
+    )
+    assert blocked_all_teachers.status_code == 409
+    assert blocked_all_teachers.json()["detail"] == "Cannot deactivate the last active class teacher"
+
+    student_one_after_blocked = client.get(
+        f"/api/classes/{class_id}/members?role=student&status=active",
+        headers=_auth_header(admin_token),
+    )
+    assert student_one_after_blocked.status_code == 200
+    assert student_one_after_blocked.json() == []
+
+    admin_batch = client.patch(
+        f"/api/classes/{class_id}/members/batch-status",
+        headers={**_auth_header(admin_token), "X-Request-ID": "class-mixed-batch"},
+        json={
+            "items": [
+                {"membership_id": teacher_membership_id, "status": "inactive"},
+                {"membership_id": student_one_membership_id, "status": "active"},
+            ]
+        },
+    )
+    assert admin_batch.status_code == 200
+    assert {item["id"]: item["status"] for item in admin_batch.json()} == {
+        teacher_membership_id: "inactive",
+        student_one_membership_id: "active",
+    }
+
+    duplicate_batch = client.patch(
+        f"/api/classes/{class_id}/members/batch-status",
+        headers=_auth_header(admin_token),
+        json={
+            "items": [
+                {"membership_id": student_two_membership_id, "status": "active"},
+                {"membership_id": student_two_membership_id, "status": "inactive"},
+            ]
+        },
+    )
+    assert duplicate_batch.status_code == 422
+
+    batch_audit = client.get(
+        f"/api/admin/audit-logs?action=class.member.status.batch_update&class_id={class_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert batch_audit.status_code == 200
+    assert batch_audit.json()["total"] == 2
+    request_ids = {item["request_id"] for item in batch_audit.json()["items"]}
+    assert request_ids == {"class-student-batch", "class-mixed-batch"}
+    mixed_audit = next(item for item in batch_audit.json()["items"] if item["request_id"] == "class-mixed-batch")
+    assert mixed_audit["snapshot_json"]["changed_count"] == 2
+    assert mixed_audit["snapshot_json"]["item_count"] == 2
 
 
 def test_class_join_request_requires_teacher_approval(client):
