@@ -7,12 +7,15 @@ from urllib.parse import quote, unquote
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import HTMLResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.session import get_db
+from app.models import ContentPageRecord, ContentScriptAsset
 from app.schemas.content import ContentPage
-from app.services.content_catalog import get_page_schema, get_published_page_schema
+from app.services.content_catalog import get_page_schema
+from app.services.content_script_assets import get_bound_content_script_asset
 from app.services.content_script_policy import collect_content_script_manifests
 
 
@@ -28,14 +31,15 @@ LOCAL_SCRIPT_ASSET_ROOTS = (
 
 @router.get("/script-sandboxes/{sandbox_id}/page/{slug:path}", response_class=HTMLResponse)
 def render_script_sandbox_document(sandbox_id: str, slug: str, response: Response, db: Session = Depends(get_db)) -> str:
-    page = get_published_page_schema(db, slug)
-    if page is None:
+    page_record = _published_content_page_record(db, slug)
+    if page_record is None:
         raise HTTPException(status_code=404, detail="Renderable page not found")
+    page = ContentPage.model_validate(page_record.schema_json)
     manifest = _find_script_sandbox_manifest(page, sandbox_id)
     sandbox = manifest["sandbox"]
     references = _script_manifest_references(manifest)
     for reference in references:
-        _local_script_asset_path(reference)
+        _script_asset_binding(db, page_record, sandbox_id, reference)
     nonce = _script_sandbox_nonce()
     csp = _harden_sandbox_csp(str(sandbox["csp"]), nonce=nonce)
     response.headers["Content-Security-Policy"] = csp
@@ -55,13 +59,14 @@ def render_script_sandbox_bootstrap(
     response: Response,
     db: Session = Depends(get_db),
 ) -> Response:
-    page = get_published_page_schema(db, slug)
-    if page is None:
+    page_record = _published_content_page_record(db, slug)
+    if page_record is None:
         raise HTTPException(status_code=404, detail="Renderable page not found")
+    page = ContentPage.model_validate(page_record.schema_json)
     manifest = _find_script_sandbox_manifest(page, sandbox_id)
     references = _script_manifest_references(manifest)
     for reference in references:
-        _local_script_asset_path(reference)
+        _script_asset_binding(db, page_record, sandbox_id, reference)
     asset_urls = [
         _script_sandbox_asset_url(slug=page.slug, sandbox_id=sandbox_id, asset_sha256=str(reference["valueSha256"]))
         for reference in references
@@ -89,18 +94,24 @@ def render_script_sandbox_asset(
     response: Response,
     db: Session = Depends(get_db),
 ) -> Response:
-    page = get_published_page_schema(db, slug)
-    if page is None:
+    page_record = _published_content_page_record(db, slug)
+    if page_record is None:
         raise HTTPException(status_code=404, detail="Renderable page not found")
+    page = ContentPage.model_validate(page_record.schema_json)
     manifest = _find_script_sandbox_manifest(page, sandbox_id)
     references = _script_manifest_references(manifest)
     reference = _script_reference_by_sha256(references, asset_sha256)
     if reference is None:
         raise HTTPException(status_code=404, detail="Script sandbox asset not found")
-    asset_path = _local_script_asset_path(reference)
-    payload = asset_path.read_bytes()
+    binding = _script_asset_binding(db, page_record, sandbox_id, reference)
+    if isinstance(binding, ContentScriptAsset):
+        payload = binding.content_bytes
+        response.headers["X-Astra-Content-Script-Asset-Bytes-Sha256"] = binding.asset_sha256
+    else:
+        payload = binding.read_bytes()
     response.headers["X-Astra-Content-Script-Sandbox-Id"] = sandbox_id
     response.headers["X-Astra-Content-Script-Asset-Sha256"] = asset_sha256
+    response.headers["X-Astra-Content-Script-Reference-Sha256"] = asset_sha256
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     return Response(
@@ -187,6 +198,15 @@ def _find_script_sandbox_manifest(page: ContentPage, sandbox_id: str) -> dict[st
     return manifest
 
 
+def _published_content_page_record(db: Session, slug: str) -> ContentPageRecord | None:
+    return db.scalar(
+        select(ContentPageRecord).where(
+            ContentPageRecord.slug == slug.strip("/"),
+            ContentPageRecord.status == "published",
+        )
+    )
+
+
 def _script_manifest_references(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     references = manifest.get("references")
     if not isinstance(references, list) or not references:
@@ -238,6 +258,61 @@ def _local_script_source_from_reference(reference: dict[str, Any]) -> str:
     if not path.endswith(".js"):
         raise HTTPException(status_code=409, detail="Script sandbox reference must point to a JavaScript asset")
     return path
+
+
+def _script_asset_binding(
+    db: Session,
+    page: ContentPageRecord,
+    sandbox_id: str,
+    reference: dict[str, Any],
+) -> Path | ContentScriptAsset:
+    if _is_external_script_reference(reference):
+        return _external_script_asset(db, page, sandbox_id, reference)
+    return _local_script_asset_path(reference)
+
+
+def _is_external_script_reference(reference: dict[str, Any]) -> bool:
+    value = reference.get("value")
+    if not isinstance(value, str):
+        return False
+    return value.strip().lower().startswith(("http://", "https://", "//"))
+
+
+def _external_script_asset(
+    db: Session,
+    page: ContentPageRecord,
+    sandbox_id: str,
+    reference: dict[str, Any],
+) -> ContentScriptAsset:
+    if page.current_version_id is None:
+        raise HTTPException(status_code=409, detail="External script sandbox asset is not bound to a published version")
+    value_sha256 = reference.get("valueSha256")
+    if not _is_valid_sha256(value_sha256):
+        raise HTTPException(status_code=409, detail="Script sandbox manifest references are invalid")
+    value = reference.get("value")
+    integrity = reference.get("integrity")
+    crossorigin = reference.get("crossorigin")
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or not value.strip().lower().startswith("https://")
+        or not isinstance(integrity, str)
+        or not integrity.strip()
+        or not isinstance(crossorigin, str)
+        or crossorigin.strip().lower() != "anonymous"
+    ):
+        raise HTTPException(status_code=409, detail="External script sandbox asset metadata is incomplete")
+    asset = get_bound_content_script_asset(
+        db,
+        page_version_id=page.current_version_id,
+        sandbox_id=sandbox_id,
+        reference_value_sha256=str(value_sha256),
+    )
+    if asset is None:
+        raise HTTPException(status_code=409, detail="External script sandbox asset is not mirrored")
+    if asset.slug != page.slug or asset.source_url != value.strip() or asset.integrity != integrity.strip():
+        raise HTTPException(status_code=409, detail="External script sandbox asset binding is stale")
+    return asset
 
 
 def _local_script_asset_path(reference: dict[str, Any]) -> Path:

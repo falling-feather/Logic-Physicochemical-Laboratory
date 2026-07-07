@@ -1,6 +1,6 @@
 from app.models.base import Base
 from app.models.admin import AuditLog, BugRecord
-from app.models.content import ContentDraft, ContentPageRecord, ContentPageVersion
+from app.models.content import ContentDraft, ContentPageRecord, ContentPageVersion, ContentScriptAsset
 from app.models.course import (
     Assignment,
     ClassKnowledgeSnapshot,
@@ -30,6 +30,7 @@ __all__ = [
     "ContentDraft",
     "ContentPageRecord",
     "ContentPageVersion",
+    "ContentScriptAsset",
     "Course",
     "CourseClass",
     "CourseCollaborator",

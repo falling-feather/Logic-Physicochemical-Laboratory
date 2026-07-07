@@ -28,6 +28,10 @@ from app.schemas.content import (
 from app.services.audit import record_audit_log
 from app.services.content_catalog import get_page_schema, list_page_summaries
 from app.services.content_identity import content_stable_identity_errors
+from app.services.content_script_assets import (
+    ContentScriptAssetMirrorError,
+    mirror_external_script_assets_for_version,
+)
 from app.services.content_script_policy import (
     SCRIPT_POLICY_VERSION,
     analyze_content_script_policy,
@@ -353,6 +357,22 @@ def publish_content_draft(
     page.current_version_id = version_record.id
     page.published_by_user_id = current_user.id
     page.published_at = version_record.published_at
+    try:
+        mirror_external_script_assets_for_version(
+            db,
+            page=page,
+            version=version_record,
+            page_schema=page_schema,
+            publisher=current_user,
+            policy_version=script_policy.policy_version,
+            policy_context_hash=script_policy.policy_context_hash,
+        )
+    except ContentScriptAssetMirrorError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Content draft external script assets could not be mirrored before publishing",
+        ) from exc
     draft_before = _content_draft_snapshot(draft)
     draft.status = CONTENT_DRAFT_STATUS_PUBLISHED
     draft.active_key = None

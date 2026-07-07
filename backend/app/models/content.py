@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -111,4 +111,35 @@ class ContentPageVersion(TimestampMixin, Base):
     published_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ContentScriptAsset(TimestampMixin, Base):
+    __tablename__ = "content_script_assets"
+    __table_args__ = (
+        UniqueConstraint(
+            "page_version_id",
+            "sandbox_id",
+            "reference_value_sha256",
+            name="uq_content_script_assets_version_sandbox_reference",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    page_id: Mapped[int] = mapped_column(ForeignKey("content_pages.id"), index=True, nullable=False)
+    page_version_id: Mapped[int] = mapped_column(ForeignKey("content_page_versions.id"), index=True, nullable=False)
+    slug: Mapped[str] = mapped_column(String(180), index=True, nullable=False)
+    sandbox_id: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    reference_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    reference_value_sha256: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    source_host: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    integrity: Mapped[str] = mapped_column(Text, nullable=False)
+    matched_algorithm: Mapped[str] = mapped_column(String(16), nullable=False)
+    asset_sha256: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    asset_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_bytes: Mapped[bytes] = mapped_column(LargeBinary(length=1_048_576), nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    policy_context_hash: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    published_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
 

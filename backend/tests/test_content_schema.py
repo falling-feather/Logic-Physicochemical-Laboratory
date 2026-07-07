@@ -7,7 +7,8 @@ from fastapi import HTTPException, Response
 from app.api.endpoints.render import _apply_script_contract_headers, _harden_sandbox_csp, _script_manifest_references
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import ContentPageRecord
+from app.models import ContentPageRecord, ContentPageVersion, User
+from app.models.base import utc_now
 from app.schemas.content import ContentPage
 from app.services.content_script_policy import public_content_page_schema
 
@@ -250,6 +251,67 @@ def test_render_script_sandbox_document_rejects_assets_outside_allowed_roots(cli
     bootstrap = client.get(f"/api/render/script-sandboxes/{manifest['sandboxId']}/bootstrap/page/physics/outside-root-sandbox")
     assert bootstrap.status_code == 409
     assert bootstrap.json()["detail"] == "Script sandbox asset path is outside allowed roots"
+
+
+def test_render_script_sandbox_document_requires_published_external_mirror(client):
+    payload = _content_page_payload()
+    payload["slug"] = "physics/unmirrored-external-sandbox"
+    payload["status"] = "published"
+    payload["version"] = "external-unmirrored-test"
+    payload["sections"][0]["props"] = {
+        "scriptUrl": "https://cdn.example.test/tool.js",
+        "scriptIntegrity": "sha384-AbCdEf0123456789+/=",
+        "scriptCrossorigin": "anonymous",
+        "scriptSandbox": {"mode": "isolated-iframe", "network": "same-origin", "storage": "none"},
+    }
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        publisher = User(
+            username="external_mirror_publisher",
+            normalized_username="external_mirror_publisher",
+            password_hash="x",
+            display_name="External Mirror Publisher",
+            role="admin",
+            status="active",
+        )
+        db.add(publisher)
+        db.flush()
+        page = ContentPageRecord(
+            slug=payload["slug"],
+            status="published",
+            version=payload["version"],
+            schema_json=payload,
+        )
+        db.add(page)
+        db.flush()
+        version = ContentPageVersion(
+            page_id=page.id,
+            slug=page.slug,
+            status=page.status,
+            version=page.version,
+            schema_hash="a" * 64,
+            schema_json=payload,
+            published_by_user_id=publisher.id,
+            published_at=utc_now(),
+        )
+        db.add(version)
+        db.flush()
+        page.current_version_id = version.id
+        db.commit()
+
+    render = client.get("/api/render/page/physics/unmirrored-external-sandbox")
+    manifest = render.json()["sections"][0]["props"]["scriptManifest"]
+    response = client.get(
+        f"/api/render/script-sandboxes/{manifest['sandboxId']}/page/physics/unmirrored-external-sandbox"
+    )
+    bootstrap = client.get(
+        f"/api/render/script-sandboxes/{manifest['sandboxId']}/bootstrap/page/physics/unmirrored-external-sandbox"
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "External script sandbox asset is not mirrored"
+    assert bootstrap.status_code == 409
+    assert bootstrap.json()["detail"] == "External script sandbox asset is not mirrored"
 
 
 def test_script_manifest_references_require_hashes():

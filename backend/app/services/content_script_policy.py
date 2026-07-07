@@ -712,7 +712,12 @@ def _collect_content_script_manifests(
         normalized_key = _normalize_key(str(raw_key))
         if normalized_key in SCRIPT_REFERENCE_KEYS:
             script_references.append(
-                _script_reference_manifest(str(raw_key), nested_value, include_private_value=include_private_values)
+                _script_reference_manifest(
+                    str(raw_key),
+                    nested_value,
+                    container=value,
+                    include_private_value=include_private_values,
+                )
             )
             continue
         if normalized_key in SCRIPT_SANDBOX_KEYS:
@@ -736,16 +741,33 @@ def _public_script_manifest(script_references: list[dict[str, Any]], sandbox: di
     }
 
 
-def _script_reference_manifest(key: str, value: Any, *, include_private_value: bool) -> dict[str, Any]:
+def _script_reference_manifest(
+    key: str,
+    value: Any,
+    *,
+    container: dict[str, Any] | None = None,
+    include_private_value: bool,
+) -> dict[str, Any]:
     reference = _public_script_reference(key, value)
     if include_private_value and isinstance(value, str):
         reference["value"] = value
+        if container is not None:
+            integrity_key, integrity = _container_value_by_normalized_key(container, SCRIPT_INTEGRITY_KEYS)
+            crossorigin_key, crossorigin = _container_value_by_normalized_key(container, SCRIPT_CROSSORIGIN_KEYS)
+            if integrity_key is not None and isinstance(integrity, str):
+                reference["integrity"] = integrity
+            if crossorigin_key is not None and isinstance(crossorigin, str):
+                reference["crossorigin"] = crossorigin
     return reference
 
 
 def _script_manifest_id(script_references: list[dict[str, Any]], sandbox: dict[str, Any]) -> str:
     public_references = [
-        {key: value for key, value in reference.items() if key != "value"}
+        {
+            key: value
+            for key, value in reference.items()
+            if key not in {"value", "integrity", "crossorigin"}
+        }
         for reference in script_references
     ]
     payload = json.dumps(

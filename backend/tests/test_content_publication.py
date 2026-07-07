@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from app.api.endpoints import content as content_endpoint
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import ContentDraft, ContentPageRecord, ContentPageVersion
+from app.models import ContentDraft, ContentPageRecord, ContentPageVersion, ContentScriptAsset
 from app.models.base import utc_now
 from app.services import content_script_policy
 
@@ -657,6 +657,7 @@ def test_allowlisted_external_script_asset_requires_review_before_publish(client
         assert "scriptUrl" not in props_after_publish
         assert "scriptIntegrity" not in props_after_publish
         assert "scriptCrossorigin" not in props_after_publish
+        assert "cdn.example.test" not in json.dumps(props_after_publish, sort_keys=True)
         assert props_after_publish["scriptManifest"]["referenceCount"] == 1
         assert props_after_publish["scriptManifest"]["sandboxId"].startswith("sm_")
         assert props_after_publish["scriptManifest"]["sandbox"]["enforcement"] == {
@@ -665,11 +666,52 @@ def test_allowlisted_external_script_asset_requires_review_before_publish(client
             "requiredContentSecurityPolicy": props_after_publish["scriptManifest"]["sandbox"]["csp"],
             "sandboxOrigin": "opaque",
         }
+        public_reference = props_after_publish["scriptManifest"]["references"][0]
+        assert len(public_reference["valueSha256"]) == 64
+        assert "value" not in public_reference
+        assert "integrity" not in public_reference
+        assert "crossorigin" not in public_reference
+        session_factory = get_session_factory(get_settings().database_url)
+        with session_factory() as db:
+            mirrored_asset = db.scalar(
+                select(ContentScriptAsset).where(
+                    ContentScriptAsset.page_version_id == publish_after_review.json()["version_id"],
+                    ContentScriptAsset.sandbox_id == props_after_publish["scriptManifest"]["sandboxId"],
+                    ContentScriptAsset.reference_value_sha256 == public_reference["valueSha256"],
+                )
+            )
+            assert mirrored_asset is not None
+            assert mirrored_asset.slug == slug
+            assert mirrored_asset.source_host == "cdn.example.test"
+            assert mirrored_asset.source_url == "https://cdn.example.test/tool.js"
+            assert mirrored_asset.integrity == _sri_sha384(asset_bytes)
+            assert mirrored_asset.asset_sha256 == hashlib.sha256(asset_bytes).hexdigest()
+            assert mirrored_asset.content_bytes == asset_bytes
         sandbox = client.get(
             f"/api/render/script-sandboxes/{props_after_publish['scriptManifest']['sandboxId']}/page/{slug}"
         )
-        assert sandbox.status_code == 409
-        assert sandbox.json()["detail"] == "External script sandbox documents require mirrored assets"
+        assert sandbox.status_code == 200
+        assert "https://cdn.example.test/tool.js" not in sandbox.text
+        bootstrap_url = (
+            f"/api/render/script-sandboxes/{props_after_publish['scriptManifest']['sandboxId']}/bootstrap/page/{slug}"
+        )
+        asset_url = (
+            f"/api/render/script-sandboxes/{props_after_publish['scriptManifest']['sandboxId']}"
+            f"/assets/{public_reference['valueSha256']}/page/{slug}"
+        )
+        assert bootstrap_url in sandbox.text
+
+        bootstrap = client.get(bootstrap_url)
+        assert bootstrap.status_code == 200
+        assert asset_url in bootstrap.text
+        assert "https://cdn.example.test/tool.js" not in bootstrap.text
+
+        asset = client.get(asset_url)
+        assert asset.status_code == 200
+        assert asset.content == asset_bytes
+        assert asset.headers["X-Astra-Content-Script-Asset-Sha256"] == public_reference["valueSha256"]
+        assert asset.headers["X-Astra-Content-Script-Reference-Sha256"] == public_reference["valueSha256"]
+        assert asset.headers["X-Astra-Content-Script-Asset-Bytes-Sha256"] == hashlib.sha256(asset_bytes).hexdigest()
     finally:
         monkeypatch.delenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", raising=False)
         get_settings.cache_clear()
@@ -732,6 +774,7 @@ def test_external_script_asset_publish_rechecks_current_sri_bytes(client, monkey
         )
         assert publish.status_code == 409
         assert publish.json()["detail"] == "Content draft script policy findings must be resolved before publishing"
+        assert _table_count(ContentScriptAsset) == 0
     finally:
         monkeypatch.delenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", raising=False)
         get_settings.cache_clear()
@@ -786,6 +829,7 @@ def test_external_script_asset_policy_rechecks_current_allowlist_before_publish(
         )
         assert publish.status_code == 409
         assert publish.json()["detail"] == "Content draft script policy findings must be resolved before publishing"
+        assert _table_count(ContentScriptAsset) == 0
     finally:
         monkeypatch.delenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", raising=False)
         get_settings.cache_clear()
