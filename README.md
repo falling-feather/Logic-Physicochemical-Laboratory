@@ -203,7 +203,7 @@ node server/dev-static-server.mjs --port 8766
 - 2026-07-07 已在 `houduan` 落地 BE-08 知识快照运行健康摘要：管理员可通过 `/api/admin/knowledge-snapshot-runs/health` 查看 stale running、lease expiring、claimable、retryable/exhausted failed、pending 与 problem runs 摘要；响应和 `admin.knowledge_snapshot_run.health_report` 审计均不暴露 lease token。
 - 2026-07-07 已在 `houduan` 落地 BE-08 知识快照运行取消：管理员可分页过滤 `knowledge_snapshot_runs`，并对 `pending` 或带 scheduler lease 的 `running` run 执行协作式取消；取消会标记 `cancelled`、清空 scheduler lease、写入 `admin.knowledge_snapshot_run.cancel` 审计且不返回 lease token。
 - 2026-07-07 已在 `houduan` 落地 BE-03 密码重置 token 留存清理脚本：默认 dry-run，显式 `--apply` 才删除；按已用时间或过期时间命中 cutoff，摘要只返回计数、截断、策略和首尾 id，不暴露用户名、IP 哈希、user-agent 或 token hash。
-- 2026-07-07 已在 `houduan` 落地 BE-03 用户自助密码重置令牌：请求接口泛化响应并按账号哈希/IP 哈希冷却，生产环境不回传 token；确认接口行锁消费一次性 token，重置密码后撤销会话、清理登录失败桶并写入脱敏审计。真实投递通道、MFA 和 MySQL 并发压测仍待后续。
+- 2026-07-07 已在 `houduan` 落地 BE-03 用户自助密码重置令牌：请求接口泛化响应并按账号哈希/IP 哈希冷却，生产环境不回传 token；确认接口行锁消费一次性 token，重置密码后撤销会话、清理登录失败桶并写入脱敏审计。真实投递通道/MFA 暂列 P4 最低优先级；MySQL 并发压测仍待后续。
 - 2026-07-07 已在 `houduan` 落地 BE-12 审计链完整性校验：`GET /api/admin/audit-logs/chain-integrity` 按时间窗与扫描上限重算应用层 hash chain，报告 `current_hash_mismatch`、`prev_hash_mismatch`、历史空 hash 与截断状态，并以 `admin.audit.chain_integrity` 记录摘要；接口只读，不修复、不删除、不提供 WORM 或外部锚定。
 - 2026-07-07 已在 `houduan` 落地 BE-12 本地审计归档包导出：`scripts.archive_audit_logs` 可按配置、`--retention-days` 或 `--before` 选择归档候选，输出 JSONL/CSV 数据文件和 Manifest，记录 SHA-256、导出数量、截断状态、链边界与 hash-chain 校验状态，并支持 `--verify`；脚本默认只读，不删除源表、不写管理端审计日志、不提供 WORM 或外部锚定。
 - 2026-07-07 已在 `houduan` 落地 BE-12 审计留存预检：`GET /api/admin/audit-logs/retention-plan` 复用审计筛选，按配置或查询参数计算 cutoff、归档候选、临期数量、聚合桶和哈希链边界，并以 `admin.audit.retention_plan` 记录不含候选明细的摘要；真实归档、删除、WORM、外部锚定和正式留存执行仍待后续。
