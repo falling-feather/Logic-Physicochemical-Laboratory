@@ -171,7 +171,7 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 
 ## 服务层边界
 
-- `app.services.access_control` 负责学校、班级和课程范围判断，普通业务端点不再各自复制 `_require_*` helper；学生课程访问会额外要求课程 `published`，单元读取/事件/提交/复盘会继续要求单元 `published`，事件与提交写入要求作业 `active`；后续权限矩阵扩展应优先在这里收口。
+- `app.services.access_control` 负责学校、班级和课程范围判断，普通业务端点不再各自复制 `_require_*` helper；学生课程访问会额外要求课程 `published`，单元读取/事件/提交/复盘会继续要求单元 `published`，事件与提交写入要求作业 `active`；教师端涉及班级挂课、查看提交和批改时必须具备对应班级的 active teacher membership，全局 admin 保留跨范围治理能力；后续权限矩阵扩展应优先在这里收口。
 - `app.services.class_join_requests` 负责加入申请审批状态流转和成员关系补齐。
 - `POST /api/classes/{id}/join` 与 `POST /api/classes/{id}/join-requests` 长期并存：前者是保留给受控场景、导入/邀请码或旧 UI 的 direct join，后者是需要教师/admin 审批的申请流；前端不得把审批流表现为唯一加入路径。
 - `app.services.audit` 负责写入审计日志及 request_id、IP 哈希、user-agent 等请求元数据；新审计记录会以 `prev_hash/current_hash` 保存应用层 SHA-256 链式哈希，用于追踪篡改迹象，但不能替代备份、binlog、外部归档、WORM 或第三方时间戳；管理端 JSON/CSV 明细导出接口默认剥离 `snapshot_json`，需要审查内容快照时必须显式传入 `include_snapshot=true`，且导出完成后会以 `admin.audit.export` 记录筛选条件、导出格式、导出数量和截断状态，不记录导出条目明细；审计报表摘要以 `admin.audit.report` 留痕，只记录格式、筛选和 bucket 数量；审计留存预检以 `admin.audit.retention_plan` 留痕，只记录策略、候选数量、临期数量、bucket 数量和链边界，不记录候选明细或原始快照；`scripts.archive_audit_logs` 是离线只读归档包导出工具，会生成 JSONL/CSV 数据文件与 Manifest，并支持 SHA-256 和记录数复验，默认不删除源数据、不写新的审计日志、不提供 WORM 或外部锚定；高频候选摘要以 `admin.audit.high_frequency` 留痕，只记录筛选、时间窗、阈值、总量和维度命中数，不记录候选明细、原始日志 id 或完整 IP 哈希清单。
@@ -188,7 +188,7 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 - `/api/content/drafts/{id}/submit`、`/request-changes`、`/withdraw` 与 `/publish` 负责草稿状态流转；创建草稿时绑定当前 published base 版本和 hash，写入 `active_key='active'`，并由 `(author_user_id, target_slug, active_key)` 唯一约束防止同一作者同一目标页并发创建多个 active 草稿；撤回或发布会清空 active key。发布前校验 base 未过期并复核当前配置下的脚本 policy，脚本引用必须带 `scriptSandbox.mode=isolated-iframe` 且不能声明危险能力；外部脚本还必须满足 allowlist/SRI/crossorigin 契约、完成管理员审核，并在审核批准和发布时通过后端下载/SRI 字节校验。发布阶段由 `(slug, version)` 和 `source_draft_id` 唯一约束兜底，冲突统一返回 `409`，发布后回填 page/version/publisher 元数据，审计只记录状态和版本元数据，不记录完整 schema。
 - `/api/content/page-versions/{id}/rollback` 负责内容版本追加式回滚：更新 `content_pages.current_version_id/schema_hash/published_*` 当前态、追加带 `previous_version_id` 的 `content_page_versions`，并在审计中只记录版本元数据与 schema hash，不记录完整 schema。
 - `app.services.knowledge_snapshot_runs` 与 `app.services.knowledge_snapshot_scheduler` 负责知识快照窗口重算、运行记录、进程内调度、数据库租约防重入、长重算自动心跳、健康摘要、调度积压摘要、协作式取消和手动 requeue；同一 `run_key` 通过 scheduler lease owner/token/expires/heartbeat 元数据抢占，调度器与 CLI 会把 token-guard heartbeat callback 注入重算循环，完成或失败释放使用 token guard，失去租约或被 admin 取消的旧 worker 会中止而不覆盖新状态；requeue 会把 failed、cancelled 或过期带租约 running run 重置为 pending，调度器会扫描 pending run 并重新抢占执行；积压摘要会显式区分 scheduler 实际会处理的 dispatchable now 和仅符合租约抢占规则的 claimable by lease rule，管理端响应不返回 `scheduler_lease_token` 或 `metadata_json`。
-- `POST /api/assignments/{id}/submissions` 的提交唯一性按 `assignment_id + student_id + class_id` 收口；同一课程作业挂到多个班级时，学生可在不同班级各提交一次，同班级重复提交仍返回 `409`；学生提交只允许 published 课程、published 单元下的 active 作业。
+- `POST /api/assignments/{id}/submissions` 的提交唯一性按 `assignment_id + student_id + class_id` 收口；同一课程作业挂到多个班级时，学生可在不同班级各提交一次，同班级重复提交仍返回 `409`；学生提交只允许 published 课程、published 单元下的 active 作业。`GET /api/assignments/{id}/submissions` 对教师默认只返回其任教班级内的提交，指定 `class_id` 时要求本班 teacher scope；`PATCH /api/submissions/{id}/grade` 同样要求本班 teacher scope。
 - `GET /api/assignments/{id}/review` 是学生侧只读复盘入口：只允许 student 访问自己的提交历史，可用 `class_id` 定位班级提交；published 课程/单元内 closed / archived 作业不允许再次提交但仍返回题目、成绩和反馈；教师和管理员继续使用 submissions 列表与批改接口。
 
 ## 验证

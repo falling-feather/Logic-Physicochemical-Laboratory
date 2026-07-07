@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import Course, CourseUnit, UserKnowledgeSnapshot
+from app.models import Course, CourseUnit, SchoolMembership, UserKnowledgeSnapshot
 from app.services import knowledge_snapshot_runs
 
 
@@ -103,6 +103,13 @@ def _create_learning_scope(client) -> dict:
     }
 
 
+def _grant_school_teacher_membership(user_id: int, school_id: int) -> None:
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        db.add(SchoolMembership(school_id=school_id, user_id=user_id, role="teacher", status="active"))
+        db.commit()
+
+
 def test_outside_users_cannot_cross_school_class_course_boundaries(client):
     scope = _create_learning_scope(client)
     outsider_student = _register_and_login(client, "scope_outside_student", "student")
@@ -175,6 +182,69 @@ def test_outside_users_cannot_cross_school_class_course_boundaries(client):
     for label, request in denied_requests:
         response = request()
         assert response.status_code == 403, label
+
+
+def test_school_teacher_without_class_scope_cannot_manage_class_assignments(client):
+    scope = _create_learning_scope(client)
+    peer_teacher = _register_and_login(client, "scope_peer_school_teacher", "teacher")
+    _grant_school_teacher_membership(peer_teacher["id"], scope["school_id"])
+
+    student_headers = _auth_header(scope["student"]["token"])
+    teacher_headers = _auth_header(scope["teacher"]["token"])
+    peer_headers = _auth_header(peer_teacher["token"])
+
+    peer_attach = client.post(
+        f"/api/courses/{scope['course_id']}/classes",
+        headers=peer_headers,
+        json={"class_id": scope["class_id"]},
+    )
+    assert peer_attach.status_code == 403
+    assert peer_attach.json()["detail"] == "Course class attachment requires class teacher role"
+
+    submission = client.post(
+        f"/api/assignments/{scope['assignment_id']}/submissions",
+        headers=student_headers,
+        json={"class_id": scope["class_id"], "content": {"answer": "scoped submission"}},
+    )
+    assert submission.status_code == 201
+    submission_id = submission.json()["id"]
+
+    peer_unscoped_list = client.get(
+        f"/api/assignments/{scope['assignment_id']}/submissions",
+        headers=peer_headers,
+    )
+    assert peer_unscoped_list.status_code == 200
+    assert peer_unscoped_list.json() == []
+
+    peer_class_list = client.get(
+        f"/api/assignments/{scope['assignment_id']}/submissions?class_id={scope['class_id']}",
+        headers=peer_headers,
+    )
+    assert peer_class_list.status_code == 403
+    assert peer_class_list.json()["detail"] == "Assignment submissions require class teacher scope"
+
+    peer_grade = client.patch(
+        f"/api/submissions/{submission_id}/grade",
+        headers=peer_headers,
+        json={"score": 12, "feedback": "out of scope"},
+    )
+    assert peer_grade.status_code == 403
+    assert peer_grade.json()["detail"] == "Submission grading requires class teacher scope"
+
+    owner_class_list = client.get(
+        f"/api/assignments/{scope['assignment_id']}/submissions?class_id={scope['class_id']}",
+        headers=teacher_headers,
+    )
+    assert owner_class_list.status_code == 200
+    assert [item["id"] for item in owner_class_list.json()] == [submission_id]
+
+    owner_grade = client.patch(
+        f"/api/submissions/{submission_id}/grade",
+        headers=teacher_headers,
+        json={"score": 12, "feedback": "in scope"},
+    )
+    assert owner_grade.status_code == 200
+    assert owner_grade.json()["score"] == 12
 
 
 def test_class_members_can_access_their_scoped_course_resources(client):

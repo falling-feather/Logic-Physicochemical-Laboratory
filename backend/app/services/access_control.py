@@ -53,6 +53,18 @@ def visible_class_ids(db: Session, user_id: int) -> list[int]:
     )
 
 
+def teacher_class_ids(db: Session, user_id: int) -> list[int]:
+    return list(
+        db.scalars(
+            select(ClassMembership.class_id).where(
+                ClassMembership.user_id == user_id,
+                ClassMembership.role == "teacher",
+                ClassMembership.status == "active",
+            )
+        ).all()
+    )
+
+
 def active_class_student_ids(db: Session, class_id: int) -> list[int]:
     return list(
         db.scalars(

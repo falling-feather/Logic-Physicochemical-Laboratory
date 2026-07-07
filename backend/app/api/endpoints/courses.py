@@ -26,6 +26,7 @@ from app.services.audit import record_audit_log
 from app.services.access_control import (
     get_course,
     require_class_member,
+    require_class_teacher_or_admin,
     require_course_visible,
     require_school_member,
     require_school_role,
@@ -143,6 +144,12 @@ def attach_course_class(
         raise HTTPException(status_code=404, detail="Class not found")
     if class_group.school_id != course.school_id:
         raise HTTPException(status_code=422, detail="Class must belong to course school")
+    require_class_teacher_or_admin(
+        db,
+        current_user,
+        class_group,
+        detail="Course class attachment requires class teacher role",
+    )
 
     existing = db.scalar(
         select(CourseClass).where(CourseClass.course_id == course.id, CourseClass.class_id == class_group.id)

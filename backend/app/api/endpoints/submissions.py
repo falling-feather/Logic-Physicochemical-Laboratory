@@ -20,9 +20,11 @@ from app.services.access_control import (
     course_attached_to_class,
     get_class,
     require_class_member,
+    require_class_teacher_or_admin,
     require_course_visible,
     require_school_role,
     require_student_unit_published,
+    teacher_class_ids,
 )
 
 
@@ -182,7 +184,18 @@ def list_assignment_submissions(
             raise HTTPException(status_code=422, detail="Class does not belong to assignment school")
         if not course_attached_to_class(db, course.id, class_group.id):
             raise HTTPException(status_code=403, detail="Course is not attached to this class")
+        require_class_teacher_or_admin(
+            db,
+            current_user,
+            class_group,
+            detail="Assignment submissions require class teacher scope",
+        )
         statement = statement.where(Submission.class_id == class_id)
+    elif current_user.role != "admin":
+        class_ids = teacher_class_ids(db, current_user.id)
+        if not class_ids:
+            return []
+        statement = statement.where(Submission.class_id.in_(class_ids))
     return list(db.scalars(statement).all())
 
 
@@ -199,6 +212,13 @@ def grade_submission(
         raise HTTPException(status_code=404, detail="Submission not found")
     assignment, _, course = _resolve_assignment(db, submission.assignment_id)
     require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    class_group = get_class(db, submission.class_id)
+    require_class_teacher_or_admin(
+        db,
+        current_user,
+        class_group,
+        detail="Submission grading requires class teacher scope",
+    )
     if payload.score > assignment.max_score:
         raise HTTPException(status_code=422, detail="Score cannot exceed assignment max_score")
 
