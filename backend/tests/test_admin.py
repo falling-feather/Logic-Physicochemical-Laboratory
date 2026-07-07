@@ -295,6 +295,10 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert audit_export_forbidden.status_code == 403
     audit_csv_export_forbidden = client.get("/api/admin/audit-logs/export.csv", headers=_auth_header(student_token))
     assert audit_csv_export_forbidden.status_code == 403
+    audit_report_forbidden = client.get("/api/admin/audit-logs/report", headers=_auth_header(student_token))
+    assert audit_report_forbidden.status_code == 403
+    audit_report_csv_forbidden = client.get("/api/admin/audit-logs/report.csv", headers=_auth_header(student_token))
+    assert audit_report_csv_forbidden.status_code == 403
 
     audit_logs = client.get("/api/admin/audit-logs?limit=10", headers=_auth_header(admin_token))
     assert audit_logs.status_code == 200
@@ -451,6 +455,82 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert disabled_login_export.status_code == 200
     assert disabled_login_export.json()["total"] == 1
     assert disabled_login_export.json()["items"][0]["event_result"] == "failure"
+
+    report_base_total = client.get("/api/admin/audit-logs?limit=1", headers=_auth_header(admin_token)).json()["total"]
+    audit_report = client.get(
+        "/api/admin/audit-logs/report?bucket_limit=20",
+        headers={**_auth_header(admin_token), "X-Request-ID": "audit-report-request"},
+    )
+    assert audit_report.status_code == 200
+    audit_report_body = audit_report.json()
+    assert audit_report_body["total"] == report_base_total
+    assert audit_report_body["bucket_limit"] == 20
+    assert audit_report_body["filters"] == {}
+    actions_report = {item["action"]: item for item in audit_report_body["by_action"]}
+    assert actions_report["school.create"]["total"] == 1
+    assert actions_report["school.create"]["success"] == 1
+    assert actions_report["auth.login.failed"]["failure"] == 1
+    assert actions_report["admin.audit.export"]["success"] == 7
+    event_results_report = {item["key"]: item["total"] for item in audit_report_body["by_event_result"]}
+    assert event_results_report["success"] >= 1
+    assert event_results_report["failure"] >= 1
+    failure_reasons_report = {item["key"]: item["total"] for item in audit_report_body["by_failure_reason"]}
+    assert failure_reasons_report["user_disabled"] == 1
+
+    report_audit = client.get(
+        "/api/admin/audit-logs?action=admin.audit.report&resource_type=audit_log&request_id=audit-report-request",
+        headers=_auth_header(admin_token),
+    )
+    assert report_audit.status_code == 200
+    assert report_audit.json()["total"] == 1
+    report_snapshot = report_audit.json()["items"][0]["snapshot_json"]
+    assert report_snapshot["format"] == "json"
+    assert report_snapshot["filters"] == {}
+    assert report_snapshot["total"] == report_base_total
+    assert report_snapshot["bucket_limit"] == 20
+    assert "by_action" not in report_snapshot
+
+    school_report_csv = client.get(
+        f"/api/admin/audit-logs/report.csv?action=school.create&resource_id={school_id}&bucket_limit=5",
+        headers={**_auth_header(admin_token), "X-Request-ID": "audit-report-csv-request"},
+    )
+    assert school_report_csv.status_code == 200
+    assert school_report_csv.headers["content-type"].startswith("text/csv")
+    assert school_report_csv.headers["content-disposition"].startswith('attachment; filename="audit-log-report-')
+    assert school_report_csv.headers["x-audit-report-total"] == "1"
+    assert school_report_csv.headers["x-audit-report-bucket-limit"] == "5"
+    school_report_rows = list(csv.DictReader(io.StringIO(school_report_csv.text)))
+    school_action_row = next(row for row in school_report_rows if row["section"] == "action")
+    assert school_action_row["key"] == "school.create"
+    assert school_action_row["total"] == "1"
+    assert school_action_row["success"] == "1"
+    assert school_action_row["failure"] == "0"
+    assert any(row["section"] == "resource_type" and row["key"] == "school" for row in school_report_rows)
+
+    csv_report_audit = client.get(
+        "/api/admin/audit-logs?action=admin.audit.report&resource_type=audit_log&request_id=audit-report-csv-request",
+        headers=_auth_header(admin_token),
+    )
+    assert csv_report_audit.status_code == 200
+    assert csv_report_audit.json()["total"] == 1
+    csv_report_snapshot = csv_report_audit.json()["items"][0]["snapshot_json"]
+    assert csv_report_snapshot["format"] == "csv"
+    assert csv_report_snapshot["filters"] == {"action": "school.create", "resource_id": str(school_id)}
+    assert csv_report_snapshot["total"] == 1
+    assert csv_report_snapshot["bucket_limit"] == 5
+    assert "items" not in csv_report_snapshot
+
+    report_bucket_limit_too_large = client.get(
+        "/api/admin/audit-logs/report?bucket_limit=101",
+        headers=_auth_header(admin_token),
+    )
+    assert report_bucket_limit_too_large.status_code == 422
+
+    report_invalid_window = client.get(
+        "/api/admin/audit-logs/report.csv?from=2026-07-06T10:00:00Z&to=2026-07-05T10:00:00Z",
+        headers=_auth_header(admin_token),
+    )
+    assert report_invalid_window.status_code == 422
 
     export_audit = client.get(
         "/api/admin/audit-logs?action=admin.audit.export&limit=10",

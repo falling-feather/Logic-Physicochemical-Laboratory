@@ -68,6 +68,9 @@ from app.schemas.admin import (
     AuditLogExportItem,
     AuditLogPage,
     AuditLogRead,
+    AuditLogReport,
+    AuditLogReportBucket,
+    AuditLogActionReport,
     BugRecordCreate,
     BugRecordPage,
     BugRecordRead,
@@ -110,6 +113,7 @@ _AUDIT_LOG_CSV_FIELDS = (
     "snapshot_json",
     "created_at",
 )
+_AUDIT_LOG_REPORT_CSV_FIELDS = ("section", "key", "total", "success", "failure", "other", "latest_at")
 
 
 @router.post("/bootstrap", response_model=AdminUserRead, status_code=status.HTTP_201_CREATED)
@@ -946,6 +950,140 @@ def export_audit_logs_csv(
             include_snapshot=include_snapshot,
             exported_at=exported_at,
         ),
+    )
+
+
+@router.get("/audit-logs/report", response_model=AuditLogReport)
+def report_audit_logs(
+    request: Request,
+    actor_user_id: int | None = Query(default=None),
+    action: str | None = Query(default=None),
+    resource_type: str | None = Query(default=None),
+    resource_id: str | None = Query(default=None),
+    school_id: int | None = Query(default=None),
+    class_id: int | None = Query(default=None),
+    event_result: str | None = Query(default=None),
+    failure_reason: str | None = Query(default=None),
+    request_id: str | None = Query(default=None),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    bucket_limit: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AuditLogReport:
+    _require_admin(current_user)
+    statement = _audit_log_statement(
+        actor_user_id=actor_user_id,
+        action=action,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        school_id=school_id,
+        class_id=class_id,
+        event_result=event_result,
+        failure_reason=failure_reason,
+        request_id=request_id,
+        from_at=from_at,
+        to_at=to_at,
+    )
+    generated_at = datetime.now(UTC)
+    report = _audit_log_report(
+        db,
+        statement=statement,
+        filters=_audit_log_filters(
+            actor_user_id=actor_user_id,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            school_id=school_id,
+            class_id=class_id,
+            event_result=event_result,
+            failure_reason=failure_reason,
+            request_id=request_id,
+            from_at=from_at,
+            to_at=to_at,
+        ),
+        bucket_limit=bucket_limit,
+        generated_at=generated_at,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.audit.report",
+        resource_type="audit_log",
+        event_result="success",
+        request=request,
+        snapshot=_audit_log_report_snapshot(report, report_format="json"),
+    )
+    db.commit()
+    return report
+
+
+@router.get("/audit-logs/report.csv")
+def report_audit_logs_csv(
+    request: Request,
+    actor_user_id: int | None = Query(default=None),
+    action: str | None = Query(default=None),
+    resource_type: str | None = Query(default=None),
+    resource_id: str | None = Query(default=None),
+    school_id: int | None = Query(default=None),
+    class_id: int | None = Query(default=None),
+    event_result: str | None = Query(default=None),
+    failure_reason: str | None = Query(default=None),
+    request_id: str | None = Query(default=None),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    bucket_limit: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    _require_admin(current_user)
+    statement = _audit_log_statement(
+        actor_user_id=actor_user_id,
+        action=action,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        school_id=school_id,
+        class_id=class_id,
+        event_result=event_result,
+        failure_reason=failure_reason,
+        request_id=request_id,
+        from_at=from_at,
+        to_at=to_at,
+    )
+    generated_at = datetime.now(UTC)
+    report = _audit_log_report(
+        db,
+        statement=statement,
+        filters=_audit_log_filters(
+            actor_user_id=actor_user_id,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            school_id=school_id,
+            class_id=class_id,
+            event_result=event_result,
+            failure_reason=failure_reason,
+            request_id=request_id,
+            from_at=from_at,
+            to_at=to_at,
+        ),
+        bucket_limit=bucket_limit,
+        generated_at=generated_at,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.audit.report",
+        resource_type="audit_log",
+        event_result="success",
+        request=request,
+        snapshot=_audit_log_report_snapshot(report, report_format="csv"),
+    )
+    db.commit()
+    return Response(
+        content=_audit_log_report_csv(report),
+        media_type="text/csv; charset=utf-8",
+        headers=_audit_log_report_csv_headers(report),
     )
 
 
@@ -1848,6 +1986,176 @@ def _audit_log_csv_headers(
     }
 
 
+def _audit_log_report(
+    db: Session,
+    *,
+    statement: Any,
+    filters: dict[str, Any],
+    bucket_limit: int,
+    generated_at: datetime,
+) -> AuditLogReport:
+    source = statement.order_by(None).subquery()
+    total = int(db.scalar(select(func.count()).select_from(source)) or 0)
+    return AuditLogReport(
+        total=total,
+        bucket_limit=bucket_limit,
+        generated_at=generated_at,
+        filters=filters,
+        by_action=_audit_log_action_report(db, source, bucket_limit),
+        by_resource_type=_audit_log_report_buckets(db, source, "resource_type", bucket_limit),
+        by_actor_role=_audit_log_report_buckets(db, source, "actor_role", bucket_limit),
+        by_event_result=_audit_log_report_buckets(db, source, "event_result", bucket_limit),
+        by_failure_reason=_audit_log_report_buckets(db, source, "failure_reason", bucket_limit),
+    )
+
+
+def _audit_log_action_report(db: Session, source: Any, bucket_limit: int) -> list[AuditLogActionReport]:
+    rows = db.execute(
+        select(
+            source.c.action,
+            source.c.event_result,
+            func.count().label("total"),
+            func.max(source.c.created_at).label("latest_at"),
+        ).group_by(source.c.action, source.c.event_result)
+    ).all()
+    buckets: dict[str, dict[str, Any]] = {}
+    for action, event_result, total, latest_at in rows:
+        action_key = str(action)
+        bucket = buckets.setdefault(
+            action_key,
+            {"total": 0, "success": 0, "failure": 0, "other": 0, "latest_at": None},
+        )
+        count = int(total)
+        bucket["total"] += count
+        if event_result == "success":
+            bucket["success"] += count
+        elif event_result == "failure":
+            bucket["failure"] += count
+        else:
+            bucket["other"] += count
+        if latest_at is not None and (bucket["latest_at"] is None or latest_at > bucket["latest_at"]):
+            bucket["latest_at"] = latest_at
+
+    ordered = sorted(buckets.items(), key=lambda item: (-int(item[1]["total"]), item[0]))[:bucket_limit]
+    return [
+        AuditLogActionReport(
+            action=action,
+            total=int(values["total"]),
+            success=int(values["success"]),
+            failure=int(values["failure"]),
+            other=int(values["other"]),
+            latest_at=values["latest_at"],
+        )
+        for action, values in ordered
+    ]
+
+
+def _audit_log_report_buckets(db: Session, source: Any, column_name: str, bucket_limit: int) -> list[AuditLogReportBucket]:
+    column = getattr(source.c, column_name)
+    count_expr = func.count().label("total")
+    rows = db.execute(
+        select(column, count_expr).group_by(column).order_by(count_expr.desc(), column).limit(bucket_limit)
+    ).all()
+    return [AuditLogReportBucket(key=str(key) if key is not None else None, total=int(total)) for key, total in rows]
+
+
+def _audit_log_report_csv(report: AuditLogReport) -> str:
+    buffer = io.StringIO(newline="")
+    writer = csv.DictWriter(buffer, fieldnames=_AUDIT_LOG_REPORT_CSV_FIELDS, lineterminator="\n")
+    writer.writeheader()
+    for item in report.by_action:
+        writer.writerow(
+            {
+                "section": "action",
+                "key": _audit_log_csv_value(item.action),
+                "total": item.total,
+                "success": item.success,
+                "failure": item.failure,
+                "other": item.other,
+                "latest_at": item.latest_at.isoformat() if item.latest_at is not None else "",
+            }
+        )
+    for section, buckets in {
+        "resource_type": report.by_resource_type,
+        "actor_role": report.by_actor_role,
+        "event_result": report.by_event_result,
+        "failure_reason": report.by_failure_reason,
+    }.items():
+        for bucket in buckets:
+            writer.writerow(
+                {
+                    "section": section,
+                    "key": _audit_log_csv_value(bucket.key),
+                    "total": bucket.total,
+                    "success": "",
+                    "failure": "",
+                    "other": "",
+                    "latest_at": "",
+                }
+            )
+    return buffer.getvalue()
+
+
+def _audit_log_report_csv_headers(report: AuditLogReport) -> dict[str, str]:
+    filename_stamp = report.generated_at.strftime("%Y%m%dT%H%M%SZ")
+    return {
+        "Content-Disposition": f'attachment; filename="audit-log-report-{filename_stamp}.csv"',
+        "X-Audit-Report-Total": str(report.total),
+        "X-Audit-Report-Bucket-Limit": str(report.bucket_limit),
+        "X-Audit-Report-Generated-At": report.generated_at.isoformat(),
+    }
+
+
+def _audit_log_report_snapshot(report: AuditLogReport, *, report_format: Literal["json", "csv"]) -> dict[str, Any]:
+    return {
+        "format": report_format,
+        "filters": report.filters,
+        "total": report.total,
+        "bucket_limit": report.bucket_limit,
+        "action_bucket_count": len(report.by_action),
+        "resource_type_bucket_count": len(report.by_resource_type),
+        "actor_role_bucket_count": len(report.by_actor_role),
+        "event_result_bucket_count": len(report.by_event_result),
+        "failure_reason_bucket_count": len(report.by_failure_reason),
+        "generated_at": report.generated_at.isoformat(),
+    }
+
+
+def _audit_log_filters(
+    *,
+    actor_user_id: int | None,
+    action: str | None,
+    resource_type: str | None,
+    resource_id: str | None,
+    school_id: int | None,
+    class_id: int | None,
+    event_result: str | None,
+    failure_reason: str | None,
+    request_id: str | None,
+    from_at: datetime | None,
+    to_at: datetime | None,
+) -> dict[str, Any]:
+    filters: dict[str, Any] = {}
+    for key, value in {
+        "actor_user_id": actor_user_id,
+        "action": action,
+        "resource_type": resource_type,
+        "resource_id": resource_id,
+        "school_id": school_id,
+        "class_id": class_id,
+        "event_result": event_result,
+        "failure_reason": failure_reason,
+        "request_id": request_id,
+    }.items():
+        if value is not None:
+            filters[key] = value.strip() if isinstance(value, str) else value
+    if from_at is not None:
+        filters["from"] = from_at.isoformat()
+    if to_at is not None:
+        filters["to"] = to_at.isoformat()
+    return filters
+
+
 def _audit_log_export_snapshot(
     *,
     export_format: Literal["json", "csv"],
@@ -1869,27 +2177,21 @@ def _audit_log_export_snapshot(
     truncated: bool,
     exported_at: datetime,
 ) -> dict[str, Any]:
-    filters: dict[str, Any] = {}
-    for key, value in {
-        "actor_user_id": actor_user_id,
-        "action": action,
-        "resource_type": resource_type,
-        "resource_id": resource_id,
-        "school_id": school_id,
-        "class_id": class_id,
-        "event_result": event_result,
-        "failure_reason": failure_reason,
-        "request_id": request_id,
-    }.items():
-        if value is not None:
-            filters[key] = value.strip() if isinstance(value, str) else value
-    if from_at is not None:
-        filters["from"] = from_at.isoformat()
-    if to_at is not None:
-        filters["to"] = to_at.isoformat()
     return {
         "format": export_format,
-        "filters": filters,
+        "filters": _audit_log_filters(
+            actor_user_id=actor_user_id,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            school_id=school_id,
+            class_id=class_id,
+            event_result=event_result,
+            failure_reason=failure_reason,
+            request_id=request_id,
+            from_at=from_at,
+            to_at=to_at,
+        ),
         "include_snapshot": include_snapshot,
         "limit": limit,
         "total": total,

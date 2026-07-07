@@ -411,6 +411,32 @@ class AuditLogExport(BaseModel):
     exported_at: datetime
 
 
+class AuditLogReportBucket(BaseModel):
+    key: str | None = None
+    total: int
+
+
+class AuditLogActionReport(BaseModel):
+    action: str
+    total: int
+    success: int
+    failure: int
+    other: int
+    latest_at: datetime | None = None
+
+
+class AuditLogReport(BaseModel):
+    total: int
+    bucket_limit: int
+    generated_at: datetime
+    filters: dict[str, Any]
+    by_action: list[AuditLogActionReport]
+    by_resource_type: list[AuditLogReportBucket]
+    by_actor_role: list[AuditLogReportBucket]
+    by_event_result: list[AuditLogReportBucket]
+    by_failure_reason: list[AuditLogReportBucket]
+
+
 class BugRecordCreate(BaseModel):
     title: str = Field(min_length=1, max_length=240)
     category: str = Field(default="general", min_length=1, max_length=80)
