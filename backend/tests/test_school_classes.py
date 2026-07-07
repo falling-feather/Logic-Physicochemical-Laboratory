@@ -344,6 +344,7 @@ def test_teacher_creates_school_class_and_student_joins(client):
 
 def test_teacher_cannot_self_join_other_school_class_as_teacher(client):
     owner_token = _register_and_login(client, "teacher_owner_scope", "teacher")
+    same_school_teacher_token = _register_and_login(client, "teacher_same_school_scope", "teacher")
     outsider_teacher_token = _register_and_login(client, "teacher_outside_scope", "teacher")
 
     school = client.post(
@@ -361,6 +362,48 @@ def test_teacher_cannot_self_join_other_school_class_as_teacher(client):
     )
     assert class_response.status_code == 201
     class_id = class_response.json()["id"]
+
+    same_school_teacher_me = client.get("/api/users/me", headers=_auth_header(same_school_teacher_token))
+    assert same_school_teacher_me.status_code == 200
+    same_school_teacher_id = same_school_teacher_me.json()["id"]
+    with get_session_factory(get_settings().database_url)() as db:
+        db.add(SchoolMembership(school_id=school_id, user_id=same_school_teacher_id, role="teacher"))
+        db.commit()
+
+    same_school_direct_join = client.post(
+        f"/api/classes/{class_id}/join",
+        headers=_auth_header(same_school_teacher_token),
+        json={"role": "teacher"},
+    )
+    assert same_school_direct_join.status_code == 403
+    assert same_school_direct_join.json()["detail"] == "Teacher class join requires approval"
+
+    teacher_join_request = client.post(
+        f"/api/classes/{class_id}/join-requests",
+        headers={**_auth_header(same_school_teacher_token), "X-Request-ID": "teacher-join-request"},
+        json={"role": "teacher", "message": "  Please add me as co-teacher.  "},
+    )
+    assert teacher_join_request.status_code == 201
+    assert teacher_join_request.json()["status"] == "pending"
+    assert teacher_join_request.json()["message"] == "Please add me as co-teacher."
+
+    approved_teacher = client.patch(
+        f"/api/classes/{class_id}/join-requests/{teacher_join_request.json()['id']}",
+        headers={**_auth_header(owner_token), "X-Request-ID": "teacher-join-approve"},
+        json={"status": "approved", "note": "approved"},
+    )
+    assert approved_teacher.status_code == 200
+    assert approved_teacher.json()["status"] == "approved"
+
+    teacher_members = client.get(
+        f"/api/classes/{class_id}/members?role=teacher",
+        headers=_auth_header(owner_token),
+    )
+    assert teacher_members.status_code == 200
+    assert {item["username"] for item in teacher_members.json()} == {
+        "teacher_owner_scope",
+        "teacher_same_school_scope",
+    }
 
     join_as_teacher = client.post(
         f"/api/classes/{class_id}/join",

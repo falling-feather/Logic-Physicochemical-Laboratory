@@ -143,6 +143,7 @@ def join_class(
         raise HTTPException(status_code=403, detail="Only teachers can join with teacher role")
     if role == "teacher" and current_user.role != "admin":
         require_school_role(db, current_user, class_group.school_id, {"admin", "teacher"})
+        raise HTTPException(status_code=403, detail="Teacher class join requires approval")
 
     ensure_school_membership(db, class_group.school_id, current_user.id, role)
     membership, membership_created = ensure_class_membership(db, class_group.id, current_user.id, role)

@@ -75,7 +75,7 @@ python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-revi
 | GET/POST | `/api/schools` | 当前用户可见学校 / 创建学校 |
 | GET | `/api/schools/{id}/classes` | 学校内班级 |
 | GET/POST | `/api/classes` | 当前用户可见班级 / 创建班级 |
-| POST | `/api/classes/{id}/join` | legacy/direct join 兼容入口：以学生或教师角色直接生成学校/班级成员关系；若同角色已有 pending 申请，会同步转为 approved |
+| POST | `/api/classes/{id}/join` | legacy/direct join 兼容入口：学生可直接生成学校/班级成员关系；teacher 角色 direct join 仅保留给全局 admin 或受控导入/邀请码路径，非 admin 教师必须走 join request 审批；若同角色已有 pending 申请，会同步转为 approved |
 | GET | `/api/classes/{id}/members` | 班级教师或管理员查看成员列表；默认 `status=active`，可按 `role=student/teacher` 和 `status=active/inactive` 过滤 |
 | PATCH | `/api/classes/{id}/members/{membership_id}` | 维护成员状态；班级教师仅可维护 student membership，管理员可维护 student/teacher membership，均只支持 `active/inactive` 并写入审计 |
 | POST | `/api/classes/{id}/join-requests` | 审批流入口：创建班级加入申请；不立即生成成员关系 |
@@ -177,10 +177,10 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 
 ## 服务层边界
 
-- `app.services.access_control` 负责学校、班级和课程范围判断，普通业务端点不再各自复制 `_require_*` helper；学生课程访问会额外要求课程 `published`，单元读取/事件/提交/复盘会继续要求单元 `published`，事件与提交写入要求作业 `active`；教师端涉及班级挂课、班级成员列表、学生成员状态维护、学习事件查询、积分流水、学生进度、查看提交、批改和待批改队列时必须具备对应班级的 active teacher membership；学校/班级深度统计分别要求对应 school teacher scope / class teacher scope，且非授权用户不通过统计端点暴露对象存在性；课程结构写入（单元/作业创建）和 assignment 级积分规则维护要求课程创建者、active editor 协作者或全局 admin，协作者管理和课程 owner 转让仅限课程创建者或全局 admin；全局 admin 保留跨范围治理能力，并可维护 teacher membership 的 `active/inactive`，但不能禁用班级最后一个 active teacher；后续权限矩阵扩展应优先在这里收口。
+- `app.services.access_control` 负责学校、班级和课程范围判断，普通业务端点不再各自复制 `_require_*` helper；学生课程访问会额外要求课程 `published`，单元读取/事件/提交/复盘会继续要求单元 `published`，事件与提交写入要求作业 `active`；教师端涉及班级挂课、班级成员列表、学生成员状态维护、学习事件查询、积分流水、学生进度、查看提交、批改和待批改队列时必须具备对应班级的 active teacher membership；同校非本班教师不能通过 legacy direct join 自助成为班级 teacher，必须提交 join request 并由本班 active teacher 或 admin 审批；学校/班级深度统计分别要求对应 school teacher scope / class teacher scope，且非授权用户不通过统计端点暴露对象存在性；课程结构写入（单元/作业创建）和 assignment 级积分规则维护要求课程创建者、active editor 协作者或全局 admin，协作者管理和课程 owner 转让仅限课程创建者或全局 admin；全局 admin 保留跨范围治理能力，并可维护 teacher membership 的 `active/inactive`，但不能禁用班级最后一个 active teacher；后续权限矩阵扩展应优先在这里收口。
 - `app.services.points` 负责 assignment 级积分规则规范化与批改积分计算；默认规则为 `enabled=true`、`points_per_score=1`、`max_points=null`，批改时写入“规则目标积分 - 当前 submission 已入账 assignment_grade 积分”的差额流水，避免重复批改累计膨胀，并支持封顶或禁用规则后的反向校正。
 - `app.services.class_join_requests` 负责加入申请审批状态流转和成员关系补齐。
-- `POST /api/classes/{id}/join` 与 `POST /api/classes/{id}/join-requests` 长期并存：前者是保留给受控场景、导入/邀请码或旧 UI 的 direct join，后者是需要教师/admin 审批的申请流；前端不得把审批流表现为唯一加入路径。
+- `POST /api/classes/{id}/join` 与 `POST /api/classes/{id}/join-requests` 长期并存：前者是保留给学生自助加入、admin 治理、受控导入/邀请码或旧 UI 的 direct join；teacher 角色的普通教师加入必须走后者，由教师/admin 审批后生成 teacher membership；前端不得把审批流表现为唯一加入路径，也不得让普通教师绕过审批自助成为班级 teacher。
 - `app.services.audit` 负责写入审计日志及 request_id、IP 哈希、user-agent 等请求元数据；新审计记录会以 `prev_hash/current_hash` 保存应用层 SHA-256 链式哈希，用于追踪篡改迹象，但不能替代备份、binlog、外部归档、WORM 或第三方时间戳；管理端 JSON/CSV 明细导出接口默认剥离 `snapshot_json`，需要审查内容快照时必须显式传入 `include_snapshot=true`，且导出完成后会以 `admin.audit.export` 记录筛选条件、导出格式、导出数量和截断状态，不记录导出条目明细；审计报表摘要以 `admin.audit.report` 留痕，只记录格式、筛选和 bucket 数量；审计留存预检以 `admin.audit.retention_plan` 留痕，只记录策略、候选数量、临期数量、bucket 数量和链边界，不记录候选明细或原始快照；`scripts.archive_audit_logs` 是离线只读归档包导出工具，会生成 JSONL/CSV 数据文件与 Manifest，并支持 SHA-256 和记录数复验，默认不删除源数据、不写新的审计日志、不提供 WORM 或外部锚定；高频候选摘要以 `admin.audit.high_frequency` 留痕，只记录筛选、时间窗、阈值、总量和维度命中数，不记录候选明细、原始日志 id 或完整 IP 哈希清单。
 - `app.services.audit_chain` 负责复用型审计链校验：按传入顺序重算 `current_hash`、检查相邻记录 `prev_hash` 是否衔接上一条 `current_hash`，并把历史空 hash 作为 partial 状态暴露给 API 与归档 Manifest；它只报告 `current_hash_mismatch`、`prev_hash_mismatch` 和 `null_current_hash`，不执行修复、删除、回填或外部锚定。
 - `/api/admin/bugs` 负责缺陷与风险清单的最小维护；`external_issue_provider/external_issue_id/external_issue_url` 只是外部 issue 链接元数据，不代表已经实现外部平台自动创建或双向状态同步。

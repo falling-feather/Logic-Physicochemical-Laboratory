@@ -1037,12 +1037,18 @@ def test_assignment_point_rule_controls_grading_points(client):
         db.add(SchoolMembership(school_id=school_id, user_id=peer_teacher_id, role="teacher", status="active"))
         db.commit()
 
-    peer_join = client.post(
-        f"/api/classes/{class_id}/join",
+    peer_join_request = client.post(
+        f"/api/classes/{class_id}/join-requests",
         headers=_auth_header(peer_teacher_token),
         json={"role": "teacher"},
     )
-    assert peer_join.status_code == 201
+    assert peer_join_request.status_code == 201
+    peer_join = client.patch(
+        f"/api/classes/{class_id}/join-requests/{peer_join_request.json()['id']}",
+        headers=_auth_header(teacher_token),
+        json={"status": "approved"},
+    )
+    assert peer_join.status_code == 200
     student_join = client.post(
         f"/api/classes/{class_id}/join",
         headers=_auth_header(student_token),
