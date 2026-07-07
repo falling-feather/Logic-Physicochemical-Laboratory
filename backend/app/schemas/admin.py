@@ -504,6 +504,49 @@ class AdminKnowledgeSnapshotRunQueueReport(BaseModel):
     next_lease_expires_at: datetime | None = None
 
 
+class AdminKnowledgeSnapshotRunAlertCandidate(BaseModel):
+    severity: Literal["critical", "warning", "info"]
+    code: str
+    source: Literal["health", "queue"]
+    action_hint: Literal["requeue", "dispatch", "investigate", "monitor"]
+    run_id: int | None = None
+    run_key: str
+    granularity: str
+    status: str
+    trigger_source: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    scheduler_lease_owner: str | None = None
+    scheduler_lease_expires_at: datetime | None = None
+    scheduler_heartbeat_at: datetime | None = None
+    attempt_count: int | None = None
+    health_flags: list[str] = Field(default_factory=list)
+    queue_reason: str | None = None
+    retryable: bool = False
+    claimable: bool = False
+    cancellable: bool = False
+    ready: bool = False
+
+
+class AdminKnowledgeSnapshotRunAlertReport(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    alert_status: Literal["ok", "warning", "critical"]
+    health_status: Literal["ok", "warning", "attention"]
+    queue_status: Literal["empty", "ready", "backlog"]
+    candidate_count: int
+    critical_count: int
+    warning_count: int
+    info_count: int
+    needs_attention_count: int
+    lease_expiring_count: int
+    dispatchable_now_count: int
+    manual_requeue_count: int
+    blocked_count: int
+    candidates: list[AdminKnowledgeSnapshotRunAlertCandidate]
+
+
 class AuditLogRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

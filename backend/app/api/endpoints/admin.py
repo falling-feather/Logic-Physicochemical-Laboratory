@@ -56,6 +56,8 @@ from app.schemas.admin import (
     AdminContentPageVersionRead,
     AdminKnowledgeSnapshotRunHealthReport,
     AdminKnowledgeSnapshotRunHealthItem,
+    AdminKnowledgeSnapshotRunAlertCandidate,
+    AdminKnowledgeSnapshotRunAlertReport,
     AdminKnowledgeSnapshotRunPage,
     AdminKnowledgeSnapshotRunQueueItem,
     AdminKnowledgeSnapshotRunQueueReport,
@@ -950,6 +952,78 @@ def read_knowledge_snapshot_run_queue(
         event_result="success",
         request=request,
         snapshot=_knowledge_snapshot_run_queue_snapshot(report),
+    )
+    db.commit()
+    return report
+
+
+@router.get("/knowledge-snapshot-runs/alerts", response_model=AdminKnowledgeSnapshotRunAlertReport)
+def read_knowledge_snapshot_run_alerts(
+    request: Request,
+    granularity: str | None = Query(default=None),
+    trigger_source: str | None = Query(default=None),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    now_at: datetime | None = Query(default=None, alias="now"),
+    lease_expiring_seconds: int = Query(default=900, ge=0, le=24 * 60 * 60),
+    candidate_limit: int = Query(default=20, ge=0, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminKnowledgeSnapshotRunAlertReport:
+    _require_admin(current_user)
+    if from_at is not None and to_at is not None and from_at > to_at:
+        raise HTTPException(status_code=422, detail="from must be earlier than to")
+    settings = get_settings()
+    generated_at = now_at or datetime.now(UTC)
+    statement = _knowledge_snapshot_run_statement(
+        granularity=granularity,
+        trigger_source=trigger_source,
+        from_at=from_at,
+        to_at=to_at,
+    )
+    filters = _knowledge_snapshot_run_filters(
+        granularity=granularity,
+        trigger_source=trigger_source,
+        from_at=from_at,
+        to_at=to_at,
+    )
+    filters["now"] = now_at.isoformat() if now_at is not None else None
+    health_report = _knowledge_snapshot_run_health_report(
+        db,
+        statement=statement,
+        filters=filters,
+        retry_attempts=settings.knowledge_snapshot_retry_attempts,
+        lease_seconds=settings.knowledge_snapshot_scheduler_lease_seconds,
+        lease_expiring_seconds=lease_expiring_seconds,
+        problem_limit=100,
+        generated_at=generated_at,
+    )
+    queue_report = _knowledge_snapshot_run_queue_report(
+        db,
+        statement=statement,
+        filters=filters,
+        schedule_config=_knowledge_snapshot_schedule_config(settings),
+        retry_attempts=settings.knowledge_snapshot_retry_attempts,
+        lease_seconds=settings.knowledge_snapshot_scheduler_lease_seconds,
+        item_limit=100,
+        generated_at=generated_at,
+    )
+    report = _knowledge_snapshot_run_alert_report(
+        health_report=health_report,
+        queue_report=queue_report,
+        candidate_limit=candidate_limit,
+        generated_at=generated_at,
+        filters=filters,
+        lease_expiring_seconds=lease_expiring_seconds,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.knowledge_snapshot_run.alert_report",
+        resource_type="knowledge_snapshot_run",
+        event_result="success",
+        request=request,
+        snapshot=_knowledge_snapshot_run_alert_snapshot(report),
     )
     db.commit()
     return report
@@ -2439,6 +2513,205 @@ def _knowledge_snapshot_run_queue_snapshot(report: AdminKnowledgeSnapshotRunQueu
         "active_running_count": report.active_running_count,
         "legacy_running_without_lease_count": report.legacy_running_without_lease_count,
         "by_granularity": report.by_granularity,
+    }
+
+
+def _knowledge_snapshot_run_alert_report(
+    *,
+    health_report: AdminKnowledgeSnapshotRunHealthReport,
+    queue_report: AdminKnowledgeSnapshotRunQueueReport,
+    candidate_limit: int,
+    generated_at: datetime,
+    filters: dict[str, Any],
+    lease_expiring_seconds: int,
+) -> AdminKnowledgeSnapshotRunAlertReport:
+    candidates: list[AdminKnowledgeSnapshotRunAlertCandidate] = []
+    for item in health_report.problem_runs:
+        candidates.extend(_knowledge_snapshot_health_alert_candidates(item))
+    for item in queue_report.ready_jobs:
+        candidates.append(
+            _knowledge_snapshot_queue_alert_candidate(
+                item,
+                code=f"queue_{item.source}",
+                severity="warning",
+                action_hint="dispatch",
+            )
+        )
+    for item in queue_report.manual_requeue_runs:
+        candidates.append(
+            _knowledge_snapshot_queue_alert_candidate(
+                item,
+                code=f"manual_{item.source}",
+                severity="critical" if item.source in {"stale_running", "exhausted_failed"} else "warning",
+                action_hint="requeue" if item.claimable else "investigate",
+            )
+        )
+    for item in queue_report.blocked_runs:
+        candidates.append(
+            _knowledge_snapshot_queue_alert_candidate(
+                item,
+                code=f"blocked_{item.source}",
+                severity="critical" if item.source == "legacy_running" else "info",
+                action_hint="investigate" if item.source == "legacy_running" else "monitor",
+            )
+        )
+
+    sorted_candidates = _sort_knowledge_snapshot_alert_candidates(candidates)
+    critical_count = sum(1 for item in sorted_candidates if item.severity == "critical")
+    warning_count = sum(1 for item in sorted_candidates if item.severity == "warning")
+    info_count = sum(1 for item in sorted_candidates if item.severity == "info")
+    if critical_count > 0:
+        alert_status: Literal["ok", "warning", "critical"] = "critical"
+    elif warning_count > 0:
+        alert_status = "warning"
+    else:
+        alert_status = "ok"
+    return AdminKnowledgeSnapshotRunAlertReport(
+        generated_at=generated_at,
+        filters=filters,
+        policy={
+            "retry_attempts": health_report.policy.get("retry_attempts"),
+            "lease_seconds": health_report.policy.get("lease_seconds"),
+            "lease_expiring_seconds": lease_expiring_seconds,
+            "candidate_limit": candidate_limit,
+            "source": "health_queue_derived",
+        },
+        alert_status=alert_status,
+        health_status=health_report.health_status,
+        queue_status=queue_report.queue_status,
+        candidate_count=len(sorted_candidates),
+        critical_count=critical_count,
+        warning_count=warning_count,
+        info_count=info_count,
+        needs_attention_count=health_report.needs_attention_count,
+        lease_expiring_count=health_report.lease_expiring_count,
+        dispatchable_now_count=queue_report.dispatchable_now_count,
+        manual_requeue_count=queue_report.manual_requeue_count,
+        blocked_count=queue_report.blocked_count,
+        candidates=sorted_candidates[:candidate_limit],
+    )
+
+
+def _knowledge_snapshot_health_alert_candidates(
+    item: AdminKnowledgeSnapshotRunHealthItem,
+) -> list[AdminKnowledgeSnapshotRunAlertCandidate]:
+    candidates: list[AdminKnowledgeSnapshotRunAlertCandidate] = []
+    for flag in item.health_flags:
+        if flag == "stale_running":
+            severity: Literal["critical", "warning", "info"] = "critical"
+            action_hint: Literal["requeue", "dispatch", "investigate", "monitor"] = (
+                "requeue" if item.claimable else "investigate"
+            )
+        elif flag in {"retryable_failed", "pending"}:
+            severity = "warning"
+            action_hint = "requeue" if flag == "retryable_failed" else "dispatch"
+        elif flag in {"exhausted_failed", "legacy_running_without_lease"}:
+            severity = "critical"
+            action_hint = "investigate"
+        elif flag == "lease_expiring":
+            severity = "warning"
+            action_hint = "monitor"
+        else:
+            severity = "info"
+            action_hint = "monitor"
+        candidates.append(
+            AdminKnowledgeSnapshotRunAlertCandidate(
+                severity=severity,
+                code=flag,
+                source="health",
+                action_hint=action_hint,
+                run_id=item.id,
+                run_key=item.run_key,
+                granularity=item.granularity,
+                status=item.status,
+                trigger_source=item.trigger_source,
+                started_at=item.started_at,
+                finished_at=item.finished_at,
+                scheduler_lease_owner=item.scheduler_lease_owner,
+                scheduler_lease_expires_at=item.scheduler_lease_expires_at,
+                scheduler_heartbeat_at=item.scheduler_heartbeat_at,
+                attempt_count=item.attempt_count,
+                health_flags=[flag],
+                retryable=item.retryable,
+                claimable=item.claimable,
+                cancellable=item.cancellable,
+            )
+        )
+    return candidates
+
+
+def _knowledge_snapshot_queue_alert_candidate(
+    item: AdminKnowledgeSnapshotRunQueueItem,
+    *,
+    code: str,
+    severity: Literal["critical", "warning", "info"],
+    action_hint: Literal["requeue", "dispatch", "investigate", "monitor"],
+) -> AdminKnowledgeSnapshotRunAlertCandidate:
+    return AdminKnowledgeSnapshotRunAlertCandidate(
+        severity=severity,
+        code=code,
+        source="queue",
+        action_hint=action_hint,
+        run_id=item.run_id,
+        run_key=item.run_key,
+        granularity=item.granularity,
+        status=item.status,
+        trigger_source=item.trigger_source,
+        started_at=item.started_at,
+        finished_at=item.finished_at,
+        scheduler_lease_owner=item.scheduler_lease_owner,
+        scheduler_lease_expires_at=item.scheduler_lease_expires_at,
+        scheduler_heartbeat_at=item.scheduler_heartbeat_at,
+        attempt_count=item.attempt_count,
+        queue_reason=item.reason,
+        claimable=item.claimable,
+        ready=item.ready,
+    )
+
+
+def _sort_knowledge_snapshot_alert_candidates(
+    candidates: list[AdminKnowledgeSnapshotRunAlertCandidate],
+) -> list[AdminKnowledgeSnapshotRunAlertCandidate]:
+    severity_order = {"critical": 0, "warning": 1, "info": 2}
+    action_order = {"requeue": 0, "dispatch": 1, "investigate": 2, "monitor": 3}
+
+    def sort_key(item: AdminKnowledgeSnapshotRunAlertCandidate) -> tuple[int, int, datetime, str, int]:
+        base_time = item.started_at or item.finished_at or datetime.max
+        return (
+            severity_order.get(item.severity, 99),
+            action_order.get(item.action_hint, 99),
+            _naive_utc(base_time),
+            item.run_key,
+            item.run_id or 0,
+        )
+
+    return sorted(candidates, key=sort_key)
+
+
+def _knowledge_snapshot_run_alert_snapshot(report: AdminKnowledgeSnapshotRunAlertReport) -> dict[str, Any]:
+    by_code: dict[str, int] = {}
+    by_severity: dict[str, int] = {}
+    for item in report.candidates:
+        by_code[item.code] = by_code.get(item.code, 0) + 1
+        by_severity[item.severity] = by_severity.get(item.severity, 0) + 1
+    return {
+        "format": "alert_candidates",
+        "filters": report.filters,
+        "policy": report.policy,
+        "alert_status": report.alert_status,
+        "health_status": report.health_status,
+        "queue_status": report.queue_status,
+        "candidate_count": report.candidate_count,
+        "critical_count": report.critical_count,
+        "warning_count": report.warning_count,
+        "info_count": report.info_count,
+        "needs_attention_count": report.needs_attention_count,
+        "lease_expiring_count": report.lease_expiring_count,
+        "dispatchable_now_count": report.dispatchable_now_count,
+        "manual_requeue_count": report.manual_requeue_count,
+        "blocked_count": report.blocked_count,
+        "candidate_codes": by_code,
+        "candidate_severities": by_severity,
     }
 
 

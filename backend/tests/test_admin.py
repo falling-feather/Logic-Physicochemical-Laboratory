@@ -1735,6 +1735,161 @@ def test_admin_can_read_knowledge_snapshot_run_queue(client):
     assert "secret-" not in json.dumps(audit_snapshot, ensure_ascii=False)
 
 
+def test_admin_can_read_knowledge_snapshot_run_alert_candidates(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "snapshot_alert_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    settings = get_settings()
+    now = datetime(2026, 7, 21, 4, 30, tzinfo=UTC)
+    with session_factory() as db:
+        runs = [
+            KnowledgeSnapshotRun(
+                run_key="knowledge:alerts:pending",
+                granularity="day",
+                period_start=datetime(2026, 7, 10),
+                period_end=datetime(2026, 7, 10, 23, 59),
+                trigger_source="admin_requeue",
+                status="pending",
+                started_at=datetime(2026, 7, 21, 1, 0),
+                attempt_count=0,
+                metadata_json={"trigger_source": "admin_requeue", "requeue_reason": "secret-alert-reason"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:alerts:retryable",
+                granularity="day",
+                period_start=datetime(2026, 7, 9),
+                period_end=datetime(2026, 7, 9, 23, 59),
+                trigger_source="scheduler",
+                status="failed",
+                started_at=datetime(2026, 7, 20, 1, 0),
+                finished_at=datetime(2026, 7, 20, 1, 1),
+                attempt_count=max(settings.knowledge_snapshot_retry_attempts - 1, 0),
+                error_message="SnapshotRunLeaseLost",
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:alerts:exhausted",
+                granularity="day",
+                period_start=datetime(2026, 7, 8),
+                period_end=datetime(2026, 7, 8, 23, 59),
+                trigger_source="scheduler",
+                status="failed",
+                started_at=datetime(2026, 7, 20, 2, 0),
+                finished_at=datetime(2026, 7, 20, 2, 1),
+                attempt_count=settings.knowledge_snapshot_retry_attempts,
+                error_message="RuntimeError",
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:alerts:expiring",
+                granularity="day",
+                period_start=datetime(2026, 7, 7),
+                period_end=datetime(2026, 7, 7, 23, 59),
+                trigger_source="scheduler",
+                status="running",
+                started_at=datetime(2026, 7, 21, 3, 50),
+                scheduler_lease_owner="worker-alert-expiring",
+                scheduler_lease_token="secret-alert-expiring-token",
+                scheduler_lease_expires_at=datetime(2026, 7, 21, 4, 35),
+                scheduler_heartbeat_at=datetime(2026, 7, 21, 4, 25),
+                attempt_count=1,
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:alerts:stale",
+                granularity="day",
+                period_start=datetime(2026, 7, 6),
+                period_end=datetime(2026, 7, 6, 23, 59),
+                trigger_source="scheduler",
+                status="running",
+                started_at=datetime(2026, 7, 21, 1, 30),
+                scheduler_lease_owner="worker-alert-stale",
+                scheduler_lease_token="secret-alert-stale-token",
+                scheduler_lease_expires_at=datetime(2026, 7, 21, 3, 0),
+                scheduler_heartbeat_at=datetime(2026, 7, 21, 2, 0),
+                attempt_count=1,
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:alerts:cancelled",
+                granularity="week",
+                period_start=datetime(2026, 7, 7),
+                period_end=datetime(2026, 7, 13, 23, 59),
+                trigger_source="admin",
+                status="cancelled",
+                started_at=datetime(2026, 7, 20, 3, 0),
+                finished_at=datetime(2026, 7, 20, 3, 1),
+                attempt_count=1,
+                error_message="cancelled_by_admin",
+                metadata_json={"trigger_source": "admin", "cancelled_by_user_id": 1},
+            ),
+        ]
+        db.add_all(runs)
+        db.commit()
+
+    forbidden = client.get(
+        "/api/admin/knowledge-snapshot-runs/alerts",
+        headers=_auth_header(teacher_token),
+        params={"now": now.isoformat()},
+    )
+    assert forbidden.status_code == 403
+
+    response = client.get(
+        "/api/admin/knowledge-snapshot-runs/alerts",
+        headers={**_auth_header(admin_token), "X-Request-ID": "snapshot-alert-request"},
+        params={"now": now.isoformat(), "lease_expiring_seconds": "600", "candidate_limit": "100"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["alert_status"] == "critical"
+    assert body["health_status"] == "attention"
+    assert body["candidate_count"] >= 6
+    assert body["critical_count"] >= 2
+    assert body["warning_count"] >= 3
+    assert body["manual_requeue_count"] >= 3
+    assert body["dispatchable_now_count"] >= 1
+    codes = {item["code"] for item in body["candidates"]}
+    assert {"stale_running", "exhausted_failed", "retryable_failed", "pending", "lease_expiring"} <= codes
+    assert "manual_cancelled" in codes
+    severities = [item["severity"] for item in body["candidates"]]
+    assert severities[: body["critical_count"]] == ["critical"] * body["critical_count"]
+    serialized = json.dumps(body, ensure_ascii=False)
+    assert "scheduler_lease_token" not in serialized
+    assert "secret-" not in serialized
+    assert "metadata_json" not in serialized
+    assert "secret-alert-reason" not in serialized
+
+    limited = client.get(
+        "/api/admin/knowledge-snapshot-runs/alerts",
+        headers=_auth_header(admin_token),
+        params={"now": now.isoformat(), "candidate_limit": "2"},
+    )
+    assert limited.status_code == 200
+    assert len(limited.json()["candidates"]) == 2
+    assert limited.json()["candidate_count"] >= 6
+
+    invalid_window = client.get(
+        "/api/admin/knowledge-snapshot-runs/alerts",
+        headers=_auth_header(admin_token),
+        params={"from": "2026-07-06T10:00:00Z", "to": "2026-07-05T10:00:00Z"},
+    )
+    assert invalid_window.status_code == 422
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.knowledge_snapshot_run.alert_report"
+        "&resource_type=knowledge_snapshot_run&request_id=snapshot-alert-request",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    audit_snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert audit_snapshot["format"] == "alert_candidates"
+    assert audit_snapshot["alert_status"] == "critical"
+    assert audit_snapshot["candidate_count"] >= 6
+    assert audit_snapshot["candidate_codes"]["stale_running"] >= 1
+    assert "candidates" not in audit_snapshot
+    assert "secret-" not in json.dumps(audit_snapshot, ensure_ascii=False)
+
+
 def test_admin_can_requeue_knowledge_snapshot_runs(client):
     admin_token = _bootstrap_admin(client)
     teacher_token = _register_and_login(client, "snapshot_requeue_teacher", "teacher")
