@@ -172,6 +172,13 @@ def initialize_builtin_content_pages(
 
 
 def get_page_schema(db: Session, slug: str) -> ContentPage | None:
+    page = get_published_page_schema(db, slug)
+    if page is None:
+        return None
+    return public_content_page_schema(page)
+
+
+def get_published_page_schema(db: Session, slug: str) -> ContentPage | None:
     record = db.scalar(
         select(ContentPageRecord).where(
             ContentPageRecord.slug == slug.strip("/"),
@@ -180,7 +187,7 @@ def get_page_schema(db: Session, slug: str) -> ContentPage | None:
     )
     if record is None:
         return None
-    return public_content_page_schema(ContentPage.model_validate(record.schema_json))
+    return ContentPage.model_validate(record.schema_json)
 
 
 def list_page_summaries(db: Session) -> list[dict]:

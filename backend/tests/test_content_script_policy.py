@@ -281,6 +281,8 @@ def test_public_schema_strips_script_asset_metadata_from_manifest():
     assert "scriptCrossorigin" not in props
     assert "scriptSandbox" not in props
     assert props["scriptManifest"]["executionMode"] == "sandbox-required"
+    assert props["scriptManifest"]["sandboxId"].startswith("sm_")
+    assert len(props["scriptManifest"]["sandboxId"]) == 27
     assert props["scriptManifest"]["references"][0]["key"] == "scriptUrl"
     assert len(props["scriptManifest"]["references"][0]["valueSha256"]) == 64
     sandbox = props["scriptManifest"]["sandbox"]

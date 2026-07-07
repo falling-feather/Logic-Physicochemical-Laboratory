@@ -573,6 +573,15 @@ def test_script_draft_requires_approved_review_before_publish(client):
     assert publish_after_review.status_code == 200
     assert publish_after_review.json()["version"] == "v1"
 
+    render = client.get(f"/api/render/page/{slug}")
+    assert render.status_code == 200
+    manifest = render.json()["sections"][0]["props"]["scriptManifest"]
+    assert manifest["sandboxId"].startswith("sm_")
+    sandbox = client.get(f"/api/render/script-sandboxes/{manifest['sandboxId']}/page/{slug}")
+    assert sandbox.status_code == 200
+    assert sandbox.headers["X-Astra-Content-Script-Iframe-Sandbox"] == "allow-scripts"
+    assert '<script src="/drafts/custom-publish.js" defer></script>' in sandbox.text
+
 
 def test_allowlisted_external_script_asset_requires_review_before_publish(client, monkeypatch):
     first_admin_token = _bootstrap_admin(client, username="admin_external_script_first")
@@ -650,12 +659,18 @@ def test_allowlisted_external_script_asset_requires_review_before_publish(client
         assert "scriptIntegrity" not in props_after_publish
         assert "scriptCrossorigin" not in props_after_publish
         assert props_after_publish["scriptManifest"]["referenceCount"] == 1
+        assert props_after_publish["scriptManifest"]["sandboxId"].startswith("sm_")
         assert props_after_publish["scriptManifest"]["sandbox"]["enforcement"] == {
             "browserContext": "sandboxed-iframe",
             "requiredIframeSandbox": "allow-scripts",
             "requiredContentSecurityPolicy": props_after_publish["scriptManifest"]["sandbox"]["csp"],
             "sandboxOrigin": "opaque",
         }
+        sandbox = client.get(
+            f"/api/render/script-sandboxes/{props_after_publish['scriptManifest']['sandboxId']}/page/{slug}"
+        )
+        assert sandbox.status_code == 409
+        assert sandbox.json()["detail"] == "External script sandbox documents require mirrored assets"
     finally:
         monkeypatch.delenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", raising=False)
         get_settings.cache_clear()

@@ -31,6 +31,8 @@ def test_energy_conservation_render_schema(client):
     assert "scriptPath" not in experiment_props
     assert "scriptSandbox" not in experiment_props
     assert experiment_props["scriptManifest"]["executionMode"] == "sandbox-required"
+    assert experiment_props["scriptManifest"]["sandboxId"].startswith("sm_")
+    assert len(experiment_props["scriptManifest"]["sandboxId"]) == 27
     assert experiment_props["scriptManifest"]["sandbox"]["status"] == "isolated"
     assert experiment_props["scriptManifest"]["sandbox"]["network"] == "same-origin"
     assert "connect-src 'self'" in experiment_props["scriptManifest"]["sandbox"]["csp"]
@@ -45,6 +47,97 @@ def test_energy_conservation_render_schema(client):
     assert len(experiment_props["scriptManifest"]["references"][0]["valueSha256"]) == 64
     assert payload["courseUnit"]["unitId"] == "physics-energy-conservation"
     assert payload["sources"][0]["sourceId"] == "openstax-conservation-energy"
+
+
+def test_render_script_sandbox_document_serves_isolated_html(client):
+    render = client.get("/api/render/page/physics/energy-conservation")
+    manifest = render.json()["sections"][2]["props"]["scriptManifest"]
+    sandbox_id = manifest["sandboxId"]
+
+    response = client.get(f"/api/render/script-sandboxes/{sandbox_id}/page/physics/energy-conservation")
+
+    assert response.status_code == 200
+    assert response.headers["Content-Type"].startswith("text/html")
+    assert response.headers["X-Astra-Content-Script-Sandbox-Id"] == sandbox_id
+    assert response.headers["X-Astra-Content-Script-Iframe-Sandbox"] == "allow-scripts"
+    assert response.headers["X-Astra-Content-Script-Reference-Count"] == "1"
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+    assert "connect-src 'self'" in response.headers["Content-Security-Policy"]
+    assert "frame-ancestors 'self'" in response.headers["Content-Security-Policy"]
+    assert "form-action 'none'" in response.headers["Content-Security-Policy"]
+    body = response.text
+    assert f'data-sandbox-id="{sandbox_id}"' in body
+    assert '<script src="/pages/physics/energy-conservation.js" defer></script>' in body
+    assert "scriptSandbox" not in body
+    assert "valueSha256" not in body
+
+
+def test_render_script_sandbox_document_fails_closed_for_missing_or_blocked_manifest(client):
+    missing = client.get("/api/render/script-sandboxes/sm_missing/page/physics/energy-conservation")
+    assert missing.status_code == 404
+
+    payload = _content_page_payload()
+    payload["slug"] = "physics/blocked-sandbox"
+    payload["status"] = "published"
+    payload["sections"][0]["props"] = {
+        "scriptPath": "pages/physics/blocked.js",
+        "scriptSandbox": {"mode": "isolated-iframe", "network": "external", "storage": "none"},
+    }
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        db.add(
+            ContentPageRecord(
+                slug=payload["slug"],
+                status="published",
+                version="blocked-test",
+                schema_json=payload,
+            )
+        )
+        db.commit()
+
+    render = client.get("/api/render/page/physics/blocked-sandbox")
+    manifest = render.json()["sections"][0]["props"]["scriptManifest"]
+    blocked = client.get(f"/api/render/script-sandboxes/{manifest['sandboxId']}/page/physics/blocked-sandbox")
+
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"] == "Script sandbox manifest is not executable"
+
+
+def test_render_script_sandbox_document_rejects_ambiguous_manifest_id(client):
+    payload = _content_page_payload()
+    payload["slug"] = "physics/ambiguous-sandbox"
+    payload["status"] = "published"
+    shared_props = {
+        "scriptPath": "pages/physics/ambiguous.js",
+        "scriptSandbox": {"mode": "isolated-iframe", "network": "same-origin", "storage": "none"},
+    }
+    payload["sections"][0]["props"] = dict(shared_props)
+    payload["sections"][1]["props"] = dict(shared_props)
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        db.add(
+            ContentPageRecord(
+                slug=payload["slug"],
+                status="published",
+                version="ambiguous-test",
+                schema_json=payload,
+            )
+        )
+        db.commit()
+
+    render = client.get("/api/render/page/physics/ambiguous-sandbox")
+    manifests = [
+        section["props"]["scriptManifest"]
+        for section in render.json()["sections"]
+        if "scriptManifest" in section["props"]
+    ]
+    assert manifests[0]["sandboxId"] == manifests[1]["sandboxId"]
+
+    response = client.get(f"/api/render/script-sandboxes/{manifests[0]['sandboxId']}/page/physics/ambiguous-sandbox")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Script sandbox manifest is ambiguous"
 
 
 def test_render_contract_headers_require_uniform_script_sandbox_contract():

@@ -197,6 +197,17 @@ def public_content_page_schema(page_schema: ContentPage | dict[str, Any]) -> Con
     return ContentPage.model_validate(payload)
 
 
+def collect_content_script_manifests(
+    page_schema: ContentPage | dict[str, Any],
+    *,
+    include_private_values: bool = False,
+) -> list[dict[str, Any]]:
+    payload = page_schema.model_dump(mode="json") if isinstance(page_schema, ContentPage) else page_schema
+    manifests: list[dict[str, Any]] = []
+    _collect_content_script_manifests(payload, manifests, include_private_values=include_private_values)
+    return manifests
+
+
 def _scan_value(
     value: Any,
     path: str,
@@ -678,12 +689,76 @@ def _strip_public_script_fields(value: Any) -> None:
         _strip_public_script_fields(nested_value)
 
     if script_references:
-        value["scriptManifest"] = {
-            "executionMode": "sandbox-required",
-            "sandbox": _public_sandbox_manifest(sandbox),
-            "referenceCount": len(script_references),
-            "references": script_references,
-        }
+        value["scriptManifest"] = _public_script_manifest(script_references, _public_sandbox_manifest(sandbox))
+
+
+def _collect_content_script_manifests(
+    value: Any,
+    manifests: list[dict[str, Any]],
+    *,
+    include_private_values: bool,
+) -> None:
+    if isinstance(value, list):
+        for item in value:
+            _collect_content_script_manifests(item, manifests, include_private_values=include_private_values)
+        return
+    if not isinstance(value, dict):
+        return
+
+    script_references: list[dict[str, Any]] = []
+    sandbox: dict[str, Any] | None = None
+    contains_script_reference = any(_normalize_key(str(key)) in SCRIPT_REFERENCE_KEYS for key in value)
+    for raw_key, nested_value in value.items():
+        normalized_key = _normalize_key(str(raw_key))
+        if normalized_key in SCRIPT_REFERENCE_KEYS:
+            script_references.append(
+                _script_reference_manifest(str(raw_key), nested_value, include_private_value=include_private_values)
+            )
+            continue
+        if normalized_key in SCRIPT_SANDBOX_KEYS:
+            sandbox = nested_value if isinstance(nested_value, dict) else None
+            continue
+        if contains_script_reference and normalized_key in SCRIPT_ASSET_METADATA_KEYS:
+            continue
+        _collect_content_script_manifests(nested_value, manifests, include_private_values=include_private_values)
+
+    if script_references:
+        manifests.append(_public_script_manifest(script_references, _public_sandbox_manifest(sandbox)))
+
+
+def _public_script_manifest(script_references: list[dict[str, Any]], sandbox: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "sandboxId": _script_manifest_id(script_references, sandbox),
+        "executionMode": "sandbox-required",
+        "sandbox": sandbox,
+        "referenceCount": len(script_references),
+        "references": script_references,
+    }
+
+
+def _script_reference_manifest(key: str, value: Any, *, include_private_value: bool) -> dict[str, Any]:
+    reference = _public_script_reference(key, value)
+    if include_private_value and isinstance(value, str):
+        reference["value"] = value
+    return reference
+
+
+def _script_manifest_id(script_references: list[dict[str, Any]], sandbox: dict[str, Any]) -> str:
+    public_references = [
+        {key: value for key, value in reference.items() if key != "value"}
+        for reference in script_references
+    ]
+    payload = json.dumps(
+        {
+            "references": public_references,
+            "sandbox": sandbox,
+            "policyVersion": SCRIPT_POLICY_VERSION,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return f"sm_{hashlib.sha256(payload.encode('utf-8')).hexdigest()[:24]}"
 
 
 def _public_script_reference(key: str, value: Any) -> dict[str, Any]:
