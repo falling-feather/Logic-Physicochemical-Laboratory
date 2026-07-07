@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     auto_create_tables: bool = False
     session_cookie_name: str = "astra_session"
     session_days: int = 7
+    session_last_seen_update_seconds: int = Field(default=300, ge=0)
     login_max_attempts: int = 5
     login_lockout_seconds: int = 15 * 60
     login_attempt_window_seconds: int = 15 * 60

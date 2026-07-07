@@ -140,6 +140,202 @@ def test_authenticated_request_refreshes_session_last_seen(client):
         assert "198.51.100.10" not in refreshed_session.last_seen_ip_hash
 
 
+def test_session_last_seen_refresh_is_throttled_for_same_ip(client):
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "last_seen_throttle_owner",
+            "password": "secret123",
+            "display_name": "Last Seen Throttle Owner",
+            "role": "student",
+        },
+    )
+    assert register.status_code == 201
+    login = client.post(
+        "/api/auth/login",
+        headers={"X-Forwarded-For": "198.51.100.50"},
+        json={"username": "last_seen_throttle_owner", "password": "secret123"},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        auth_session = db.scalar(select(AuthSession))
+        assert auth_session is not None
+        recent_seen = datetime.now(UTC)
+        auth_session.last_seen_at = recent_seen
+        existing_ip_hash = auth_session.last_seen_ip_hash
+        db.commit()
+        stored_recent_seen = auth_session.last_seen_at
+
+    me = client.get("/api/users/me", headers={**_auth_header(token), "X-Forwarded-For": "198.51.100.50"})
+    assert me.status_code == 200
+
+    with session_factory() as db:
+        throttled_session = db.scalar(select(AuthSession))
+        assert throttled_session is not None
+        assert throttled_session.last_seen_at == stored_recent_seen
+        assert throttled_session.last_seen_ip_hash == existing_ip_hash
+
+
+def test_session_last_seen_refreshes_after_throttle_window(client):
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "last_seen_window_owner",
+            "password": "secret123",
+            "display_name": "Last Seen Window Owner",
+            "role": "teacher",
+        },
+    )
+    assert register.status_code == 201
+    login = client.post(
+        "/api/auth/login",
+        headers={"X-Forwarded-For": "198.51.100.60"},
+        json={"username": "last_seen_window_owner", "password": "secret123"},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+
+    stale_seen = datetime.now(UTC) - timedelta(seconds=get_settings().session_last_seen_update_seconds + 1)
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        auth_session = db.scalar(select(AuthSession))
+        assert auth_session is not None
+        auth_session.last_seen_at = stale_seen
+        existing_ip_hash = auth_session.last_seen_ip_hash
+        db.commit()
+        stored_stale_seen = auth_session.last_seen_at
+
+    me = client.get("/api/users/me", headers={**_auth_header(token), "X-Forwarded-For": "198.51.100.60"})
+    assert me.status_code == 200
+
+    with session_factory() as db:
+        refreshed_session = db.scalar(select(AuthSession))
+        assert refreshed_session is not None
+        assert refreshed_session.last_seen_at is not None
+        assert refreshed_session.last_seen_at != stored_stale_seen
+        assert refreshed_session.last_seen_ip_hash == existing_ip_hash
+
+
+def test_session_last_seen_refreshes_when_missing(client):
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "missing_last_seen_owner",
+            "password": "secret123",
+            "display_name": "Missing Last Seen Owner",
+            "role": "student",
+        },
+    )
+    assert register.status_code == 201
+    login = client.post(
+        "/api/auth/login",
+        headers={"X-Forwarded-For": "198.51.100.70"},
+        json={"username": "missing_last_seen_owner", "password": "secret123"},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        auth_session = db.scalar(select(AuthSession))
+        assert auth_session is not None
+        auth_session.last_seen_at = None
+        auth_session.last_seen_ip_hash = None
+        db.commit()
+
+    me = client.get("/api/users/me", headers={**_auth_header(token), "X-Forwarded-For": "198.51.100.70"})
+    assert me.status_code == 200
+
+    with session_factory() as db:
+        refreshed_session = db.scalar(select(AuthSession))
+        assert refreshed_session is not None
+        assert refreshed_session.last_seen_at is not None
+        assert refreshed_session.last_seen_ip_hash is not None
+
+
+def test_session_last_seen_refreshes_when_ip_hash_changes_inside_window(client):
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "last_seen_ip_change_owner",
+            "password": "secret123",
+            "display_name": "Last Seen IP Change Owner",
+            "role": "teacher",
+        },
+    )
+    assert register.status_code == 201
+    login = client.post(
+        "/api/auth/login",
+        headers={"X-Forwarded-For": "198.51.100.80"},
+        json={"username": "last_seen_ip_change_owner", "password": "secret123"},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        auth_session = db.scalar(select(AuthSession))
+        assert auth_session is not None
+        recent_seen = datetime.now(UTC)
+        auth_session.last_seen_at = recent_seen
+        old_ip_hash = auth_session.last_seen_ip_hash
+        db.commit()
+        stored_recent_seen = auth_session.last_seen_at
+
+    me = client.get("/api/users/me", headers={**_auth_header(token), "X-Forwarded-For": "198.51.100.81"})
+    assert me.status_code == 200
+
+    with session_factory() as db:
+        refreshed_session = db.scalar(select(AuthSession))
+        assert refreshed_session is not None
+        assert refreshed_session.last_seen_at != stored_recent_seen
+        assert refreshed_session.last_seen_ip_hash != old_ip_hash
+
+
+def test_session_last_seen_throttle_can_be_disabled(client, monkeypatch):
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "last_seen_no_throttle_owner",
+            "password": "secret123",
+            "display_name": "Last Seen No Throttle Owner",
+            "role": "student",
+        },
+    )
+    assert register.status_code == 201
+    login = client.post(
+        "/api/auth/login",
+        headers={"X-Forwarded-For": "198.51.100.90"},
+        json={"username": "last_seen_no_throttle_owner", "password": "secret123"},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        auth_session = db.scalar(select(AuthSession))
+        assert auth_session is not None
+        recent_seen = datetime.now(UTC)
+        auth_session.last_seen_at = recent_seen
+        existing_ip_hash = auth_session.last_seen_ip_hash
+        db.commit()
+        stored_recent_seen = auth_session.last_seen_at
+
+    monkeypatch.setenv("ASTRA_SESSION_LAST_SEEN_UPDATE_SECONDS", "0")
+    get_settings.cache_clear()
+    me = client.get("/api/users/me", headers={**_auth_header(token), "X-Forwarded-For": "198.51.100.90"})
+    assert me.status_code == 200
+
+    with session_factory() as db:
+        refreshed_session = db.scalar(select(AuthSession))
+        assert refreshed_session is not None
+        assert refreshed_session.last_seen_at != stored_recent_seen
+        assert refreshed_session.last_seen_ip_hash == existing_ip_hash
+
+
 def test_user_can_list_and_revoke_individual_sessions(client):
     register = client.post(
         "/api/auth/register",
