@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import AuditLog, AuthSession, ContentPageRecord, KnowledgeSnapshotRun, LoginAttempt, User
+from app.models import AuditLog, AuthSession, ContentPageRecord, KnowledgeSnapshotRun, LoginAttempt, SchoolMembership, User
 from app.services.audit import audit_log_chain_hash, record_audit_log
 
 
@@ -49,6 +49,12 @@ def _register_and_login(client, username: str, role: str) -> str:
     login = client.post("/api/auth/login", json={"username": username, "password": "secret123"})
     assert login.status_code == 200
     return login.json()["access_token"]
+
+
+def _current_user_id(client, token: str) -> int:
+    response = client.get("/api/users/me", headers=_auth_header(token))
+    assert response.status_code == 200
+    return response.json()["id"]
 
 
 def test_admin_bootstrap_rejects_weak_password(client):
@@ -728,6 +734,95 @@ def test_admin_views_user_management_stats_and_bug_records(client):
 
     student_forbidden = client.get("/api/admin/stats", headers=_auth_header(student_token))
     assert student_forbidden.status_code == 403
+
+
+def test_school_and_class_stats_are_available_to_scoped_teachers(client):
+    admin_token = _bootstrap_admin(client)
+    owner_teacher_token = _register_and_login(client, "stats_owner_teacher", "teacher")
+    school_peer_token = _register_and_login(client, "stats_school_peer", "teacher")
+    outside_teacher_token = _register_and_login(client, "stats_outside_teacher", "teacher")
+    student_token = _register_and_login(client, "stats_scoped_student", "student")
+
+    school = client.post(
+        "/api/schools",
+        headers=_auth_header(owner_teacher_token),
+        json={"name": "Scoped Stats School", "region": "Hangzhou"},
+    )
+    assert school.status_code == 201
+    school_id = school.json()["id"]
+
+    class_group = client.post(
+        "/api/classes",
+        headers=_auth_header(owner_teacher_token),
+        json={"school_id": school_id, "name": "Scoped Stats Class", "grade": "11"},
+    )
+    assert class_group.status_code == 201
+    class_id = class_group.json()["id"]
+
+    student_join = client.post(
+        f"/api/classes/{class_id}/join",
+        headers=_auth_header(student_token),
+        json={"role": "student"},
+    )
+    assert student_join.status_code == 201
+
+    peer_user_id = _current_user_id(client, school_peer_token)
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        db.add(SchoolMembership(school_id=school_id, user_id=peer_user_id, role="teacher", status="active"))
+        db.commit()
+
+    owner_school_stats = client.get(f"/api/admin/schools/{school_id}/stats", headers=_auth_header(owner_teacher_token))
+    assert owner_school_stats.status_code == 200
+    assert owner_school_stats.json()["school_id"] == school_id
+    assert owner_school_stats.json()["active_students"] == 1
+
+    peer_school_stats = client.get(f"/api/admin/schools/{school_id}/stats", headers=_auth_header(school_peer_token))
+    assert peer_school_stats.status_code == 200
+    assert peer_school_stats.json()["school_id"] == school_id
+
+    admin_school_stats = client.get(f"/api/admin/schools/{school_id}/stats", headers=_auth_header(admin_token))
+    assert admin_school_stats.status_code == 200
+    admin_missing_school = client.get("/api/admin/schools/999999/stats", headers=_auth_header(admin_token))
+    assert admin_missing_school.status_code == 404
+
+    owner_class_stats = client.get(f"/api/admin/classes/{class_id}/stats", headers=_auth_header(owner_teacher_token))
+    assert owner_class_stats.status_code == 200
+    assert owner_class_stats.json()["class_id"] == class_id
+    assert owner_class_stats.json()["active_students"] == 1
+
+    admin_class_stats = client.get(f"/api/admin/classes/{class_id}/stats", headers=_auth_header(admin_token))
+    assert admin_class_stats.status_code == 200
+
+    peer_class_stats = client.get(f"/api/admin/classes/{class_id}/stats", headers=_auth_header(school_peer_token))
+    assert peer_class_stats.status_code == 403
+    assert peer_class_stats.json()["detail"] == "Class statistics require class teacher scope"
+
+    outside_school_stats = client.get(
+        f"/api/admin/schools/{school_id}/stats",
+        headers=_auth_header(outside_teacher_token),
+    )
+    assert outside_school_stats.status_code == 403
+    assert outside_school_stats.json()["detail"] == "School statistics require school teacher scope"
+    outside_missing_school = client.get("/api/admin/schools/999999/stats", headers=_auth_header(outside_teacher_token))
+    assert outside_missing_school.status_code == 403
+
+    outside_class_stats = client.get(
+        f"/api/admin/classes/{class_id}/stats",
+        headers=_auth_header(outside_teacher_token),
+    )
+    assert outside_class_stats.status_code == 403
+    outside_missing_class = client.get("/api/admin/classes/999999/stats", headers=_auth_header(outside_teacher_token))
+    assert outside_missing_class.status_code == 403
+
+    student_school_stats = client.get(f"/api/admin/schools/{school_id}/stats", headers=_auth_header(student_token))
+    assert student_school_stats.status_code == 403
+
+    student_class_stats = client.get(f"/api/admin/classes/{class_id}/stats", headers=_auth_header(student_token))
+    assert student_class_stats.status_code == 403
+
+    global_stats_forbidden = client.get("/api/admin/stats", headers=_auth_header(owner_teacher_token))
+    assert global_stats_forbidden.status_code == 403
 
 
 def test_admin_audit_retention_plan_summarizes_candidates_without_deleting(client):

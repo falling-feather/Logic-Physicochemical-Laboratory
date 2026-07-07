@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Assignment, ClassGroup, ClassMembership, Course, CourseClass, CourseUnit, SchoolMembership, User
+from app.models import Assignment, ClassGroup, ClassMembership, Course, CourseClass, CourseUnit, School, SchoolMembership, User
 
 
 def get_class(db: Session, class_id: int) -> ClassGroup:
@@ -97,7 +97,14 @@ def require_school_member(db: Session, user: User, school_id: int) -> None:
         raise HTTPException(status_code=403, detail="School is outside current user scope")
 
 
-def require_school_role(db: Session, user: User, school_id: int, roles: set[str]) -> None:
+def require_school_role(
+    db: Session,
+    user: User,
+    school_id: int,
+    roles: set[str],
+    *,
+    detail: str = "School role is outside current user scope",
+) -> None:
     if user.role == "admin":
         return
     membership = db.scalar(
@@ -109,7 +116,34 @@ def require_school_role(db: Session, user: User, school_id: int, roles: set[str]
         )
     )
     if membership is None:
-        raise HTTPException(status_code=403, detail="School role is outside current user scope")
+        raise HTTPException(status_code=403, detail=detail)
+
+
+def require_school_teacher_or_admin(
+    db: Session,
+    user: User,
+    school_id: int,
+    *,
+    detail: str = "School statistics require school teacher scope",
+) -> School:
+    if user.role == "admin":
+        school = db.get(School, school_id)
+        if school is None:
+            raise HTTPException(status_code=404, detail="School not found")
+        return school
+    school = db.scalar(
+        select(School)
+        .join(SchoolMembership, SchoolMembership.school_id == School.id)
+        .where(
+            School.id == school_id,
+            SchoolMembership.user_id == user.id,
+            SchoolMembership.role.in_(["admin", "teacher"]),
+            SchoolMembership.status == "active",
+        )
+    )
+    if school is None:
+        raise HTTPException(status_code=403, detail=detail)
+    return school
 
 
 def require_class_member(db: Session, user: User, class_id: int) -> ClassGroup:
@@ -147,6 +181,30 @@ def require_class_teacher_or_admin(
     )
     if membership is None:
         raise HTTPException(status_code=403, detail=detail)
+
+
+def require_class_teacher_or_admin_by_id(
+    db: Session,
+    user: User,
+    class_id: int,
+    *,
+    detail: str = "Class statistics require class teacher scope",
+) -> ClassGroup:
+    if user.role == "admin":
+        return get_class(db, class_id)
+    class_group = db.scalar(
+        select(ClassGroup)
+        .join(ClassMembership, ClassMembership.class_id == ClassGroup.id)
+        .where(
+            ClassGroup.id == class_id,
+            ClassMembership.user_id == user.id,
+            ClassMembership.role == "teacher",
+            ClassMembership.status == "active",
+        )
+    )
+    if class_group is None:
+        raise HTTPException(status_code=403, detail=detail)
+    return class_group
 
 
 def require_course_author_or_admin(

@@ -48,15 +48,15 @@ python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-revi
 | GET/PATCH | `/api/admin/users` / `/api/admin/users/{id}` | 管理端用户列表与角色/状态维护；列表返回 `items/total/limit/offset/next_offset`；把用户置为 `disabled` 时撤销未撤销会话，并在 `admin.user.update` 快照记录 `revoked_sessions` |
 | POST | `/api/admin/users/{id}/password-reset` | 管理员重置用户密码；复用密码强度策略，成功后撤销目标用户未撤销会话、清理登录失败桶，并写入不含密码明文或 hash 的 `admin.user.password_reset` 审计 |
 | GET | `/api/admin/schools` | 管理端学校基础查看；支持分页与关键字搜索 |
-| GET | `/api/admin/schools/{id}/stats` | 管理端学校深度统计，聚合班级、成员、课程、作业、提交、事件和积分 |
+| GET | `/api/admin/schools/{id}/stats` | 学校深度统计；全局管理员或该校 active teacher/admin 读取，聚合班级、成员、课程、作业、提交、事件和积分 |
 | GET | `/api/admin/classes` | 管理端班级基础查看，可按学校过滤，支持分页与关键字搜索 |
-| GET | `/api/admin/classes/{id}/stats` | 管理端班级深度统计，含预期提交、待批改比例、积分和平均得分 |
+| GET | `/api/admin/classes/{id}/stats` | 班级深度统计；全局管理员或该班 active teacher 读取，含预期提交、待批改比例、积分和平均得分 |
 | GET/PATCH | `/api/admin/class-join-requests` / `/api/admin/class-join-requests/{id}` | 管理端班级加入申请队列与审批；队列支持 school/class/user/role/status/q/时间窗过滤 |
 | GET | `/api/admin/content/pages` | 管理端内容页状态查看；数据库侧支持 status 过滤、limit/offset 分页与 slug/title/galaxy/subject/layout 搜索，返回 `schema_hash/current_version_id/published_*` |
 | GET | `/api/admin/content/drafts` | 管理端内容草稿队列；支持 status/script_review_status/script_risk_level/author/q 分页过滤，返回 `schema_hash/base_version_id/base_schema_hash/script_risk_level/script_analysis` |
 | GET | `/api/admin/content/page-versions` | 管理端内容版本历史；支持 slug/source_draft/restored_from/q 分页过滤，返回 `previous_version_id` |
 | GET | `/api/admin/content/page-versions/{id}/diff` | 管理端内容版本 schema diff；默认沿显式 `previous_version_id` 链对比，`base_version_id` 可指定基线，跨 slug 返回 `422`；响应保留兼容 `changes` 并新增 `semantic` 摘要，section/source 变更项显式返回 `section_id_before/after` 与 `source_id_before/after`；raw changes 与 semantic field/prop changes 会对 token/key/secret/script/sandbox/integrity/crossorigin 等敏感字段返回结构化 redaction preview |
-| GET | `/api/admin/stats` | 管理端全站统计摘要 |
+| GET | `/api/admin/stats` | 管理端全站统计摘要；仅全局管理员读取 |
 | GET | `/api/admin/knowledge-snapshot-runs` | 管理端知识快照运行记录；支持 status/granularity/trigger_source/时间窗分页过滤，不返回 `scheduler_lease_token` |
 | GET | `/api/admin/knowledge-snapshot-runs/health` | 管理端知识快照运行健康摘要；汇总 stale running、lease expiring、claimable、retryable/exhausted failed、problem runs，不返回 lease token 或 metadata |
 | GET | `/api/admin/knowledge-snapshot-runs/queue` | 管理端知识快照调度积压摘要；区分 dispatchable now、claimable by lease rule、manual requeue 和 blocked runs，不返回 lease token 或 metadata |
@@ -171,7 +171,7 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 
 ## 服务层边界
 
-- `app.services.access_control` 负责学校、班级和课程范围判断，普通业务端点不再各自复制 `_require_*` helper；学生课程访问会额外要求课程 `published`，单元读取/事件/提交/复盘会继续要求单元 `published`，事件与提交写入要求作业 `active`；教师端涉及班级挂课、学习事件查询、积分流水、学生进度、查看提交和批改时必须具备对应班级的 active teacher membership；课程结构写入（单元/作业创建）要求课程作者或全局 admin；全局 admin 保留跨范围治理能力；后续权限矩阵扩展应优先在这里收口。
+- `app.services.access_control` 负责学校、班级和课程范围判断，普通业务端点不再各自复制 `_require_*` helper；学生课程访问会额外要求课程 `published`，单元读取/事件/提交/复盘会继续要求单元 `published`，事件与提交写入要求作业 `active`；教师端涉及班级挂课、学习事件查询、积分流水、学生进度、查看提交和批改时必须具备对应班级的 active teacher membership；学校/班级深度统计分别要求对应 school teacher scope / class teacher scope，且非授权用户不通过统计端点暴露对象存在性；课程结构写入（单元/作业创建）要求课程作者或全局 admin；全局 admin 保留跨范围治理能力；后续权限矩阵扩展应优先在这里收口。
 - `app.services.class_join_requests` 负责加入申请审批状态流转和成员关系补齐。
 - `POST /api/classes/{id}/join` 与 `POST /api/classes/{id}/join-requests` 长期并存：前者是保留给受控场景、导入/邀请码或旧 UI 的 direct join，后者是需要教师/admin 审批的申请流；前端不得把审批流表现为唯一加入路径。
 - `app.services.audit` 负责写入审计日志及 request_id、IP 哈希、user-agent 等请求元数据；新审计记录会以 `prev_hash/current_hash` 保存应用层 SHA-256 链式哈希，用于追踪篡改迹象，但不能替代备份、binlog、外部归档、WORM 或第三方时间戳；管理端 JSON/CSV 明细导出接口默认剥离 `snapshot_json`，需要审查内容快照时必须显式传入 `include_snapshot=true`，且导出完成后会以 `admin.audit.export` 记录筛选条件、导出格式、导出数量和截断状态，不记录导出条目明细；审计报表摘要以 `admin.audit.report` 留痕，只记录格式、筛选和 bucket 数量；审计留存预检以 `admin.audit.retention_plan` 留痕，只记录策略、候选数量、临期数量、bucket 数量和链边界，不记录候选明细或原始快照；`scripts.archive_audit_logs` 是离线只读归档包导出工具，会生成 JSONL/CSV 数据文件与 Manifest，并支持 SHA-256 和记录数复验，默认不删除源数据、不写新的审计日志、不提供 WORM 或外部锚定；高频候选摘要以 `admin.audit.high_frequency` 留痕，只记录筛选、时间窗、阈值、总量和维度命中数，不记录候选明细、原始日志 id 或完整 IP 哈希清单。

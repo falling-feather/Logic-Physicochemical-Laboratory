@@ -93,6 +93,7 @@ from app.schemas.admin import (
     BugRecordUpdate,
 )
 from app.services.audit import record_audit_log
+from app.services.access_control import require_class_teacher_or_admin_by_id, require_school_teacher_or_admin
 from app.services.audit_chain import verify_audit_log_chain
 from app.services.class_join_requests import (
     apply_class_join_request_review,
@@ -353,8 +354,7 @@ def read_admin_school_stats(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AdminSchoolStats:
-    _require_admin(current_user)
-    school = _get_school(db, school_id)
+    school = require_school_teacher_or_admin(db, current_user, school_id)
     return AdminSchoolStats(
         school_id=school.id,
         school_name=school.name,
@@ -431,8 +431,7 @@ def read_admin_class_stats(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AdminClassStats:
-    _require_admin(current_user)
-    class_group = _get_class(db, class_id)
+    class_group = require_class_teacher_or_admin_by_id(db, current_user, class_id)
     active_students = _distinct_count(
         db,
         ClassMembership.user_id,
