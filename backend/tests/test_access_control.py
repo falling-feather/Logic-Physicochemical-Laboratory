@@ -245,6 +245,29 @@ def test_school_teacher_without_class_scope_cannot_manage_class_assignments(clie
     assert peer_class_list.status_code == 403
     assert peer_class_list.json()["detail"] == "Assignment submissions require class teacher scope"
 
+    peer_pending_queue = client.get("/api/admin/submissions/pending", headers=peer_headers)
+    assert peer_pending_queue.status_code == 200
+    assert peer_pending_queue.json()["total"] == 0
+    assert peer_pending_queue.json()["items"] == []
+
+    peer_course_pending_queue = client.get(
+        f"/api/admin/submissions/pending?course_id={scope['course_id']}",
+        headers=peer_headers,
+    )
+    assert peer_course_pending_queue.status_code == 200
+    assert peer_course_pending_queue.json()["total"] == 0
+
+    peer_class_pending_queue = client.get(
+        f"/api/admin/submissions/pending?class_id={scope['class_id']}",
+        headers=peer_headers,
+    )
+    assert peer_class_pending_queue.status_code == 403
+    assert peer_class_pending_queue.json()["detail"] == "Pending submissions require class teacher scope"
+
+    student_pending_queue = client.get("/api/admin/submissions/pending", headers=student_headers)
+    assert student_pending_queue.status_code == 403
+    assert student_pending_queue.json()["detail"] == "Pending submissions require class teacher scope"
+
     peer_grade = client.patch(
         f"/api/submissions/{submission_id}/grade",
         headers=peer_headers,
@@ -275,6 +298,18 @@ def test_school_teacher_without_class_scope_cannot_manage_class_assignments(clie
     assert owner_class_list.status_code == 200
     assert [item["id"] for item in owner_class_list.json()] == [submission_id]
 
+    owner_pending_queue = client.get("/api/admin/submissions/pending", headers=teacher_headers)
+    assert owner_pending_queue.status_code == 200
+    assert owner_pending_queue.json()["total"] == 1
+    assert [item["id"] for item in owner_pending_queue.json()["items"]] == [submission_id]
+
+    owner_class_pending_queue = client.get(
+        f"/api/admin/submissions/pending?class_id={scope['class_id']}",
+        headers=teacher_headers,
+    )
+    assert owner_class_pending_queue.status_code == 200
+    assert owner_class_pending_queue.json()["total"] == 1
+
     owner_grade = client.patch(
         f"/api/submissions/{submission_id}/grade",
         headers=teacher_headers,
@@ -282,6 +317,13 @@ def test_school_teacher_without_class_scope_cannot_manage_class_assignments(clie
     )
     assert owner_grade.status_code == 200
     assert owner_grade.json()["score"] == 12
+
+    owner_graded_queue = client.get(
+        f"/api/admin/submissions/pending?class_id={scope['class_id']}&status=graded",
+        headers=teacher_headers,
+    )
+    assert owner_graded_queue.status_code == 403
+    assert owner_graded_queue.json()["detail"] == "Graded submission queue requires admin role"
 
     peer_unscoped_points = client.get("/api/points/ledger", headers=peer_headers)
     assert peer_unscoped_points.status_code == 200

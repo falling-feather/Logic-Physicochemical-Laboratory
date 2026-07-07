@@ -93,7 +93,11 @@ from app.schemas.admin import (
     BugRecordUpdate,
 )
 from app.services.audit import record_audit_log
-from app.services.access_control import require_class_teacher_or_admin_by_id, require_school_teacher_or_admin
+from app.services.access_control import (
+    require_class_teacher_or_admin_by_id,
+    require_school_teacher_or_admin,
+    teacher_class_ids,
+)
 from app.services.audit_chain import verify_audit_log_chain
 from app.services.class_join_requests import (
     apply_class_join_request_review,
@@ -1619,14 +1623,30 @@ def list_pending_submissions(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AdminPendingSubmissionQueue:
-    _require_admin(current_user)
     if from_at is not None and to_at is not None and from_at > to_at:
         raise HTTPException(status_code=422, detail="from must be earlier than to")
-    _validate_pending_submission_filters(db, school_id, class_id, course_id, assignment_id)
+    scoped_class_ids: list[int] | None = None
+    if current_user.role == "admin":
+        _validate_pending_submission_filters(db, school_id, class_id, course_id, assignment_id)
+    elif current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Pending submissions require class teacher scope")
+    elif status_filter == "graded":
+        raise HTTPException(status_code=403, detail="Graded submission queue requires admin role")
+    elif class_id is not None:
+        require_class_teacher_or_admin_by_id(
+            db,
+            current_user,
+            class_id,
+            detail="Pending submissions require class teacher scope",
+        )
+        scoped_class_ids = [class_id]
+    else:
+        scoped_class_ids = teacher_class_ids(db, current_user.id)
 
     criteria = _pending_submission_criteria(
         school_id=school_id,
         class_id=class_id,
+        scoped_class_ids=scoped_class_ids,
         course_id=course_id,
         assignment_id=assignment_id,
         student_id=student_id,
@@ -3014,6 +3034,7 @@ def _pending_submission_criteria(
     *,
     school_id: int | None,
     class_id: int | None,
+    scoped_class_ids: list[int] | None = None,
     course_id: int | None,
     assignment_id: int | None,
     student_id: int | None,
@@ -3030,6 +3051,8 @@ def _pending_submission_criteria(
         criteria.append(Course.school_id == school_id)
     if class_id is not None:
         criteria.append(Submission.class_id == class_id)
+    if scoped_class_ids is not None:
+        criteria.append(Submission.class_id.in_(scoped_class_ids))
     if course_id is not None:
         criteria.append(Course.id == course_id)
     if assignment_id is not None:

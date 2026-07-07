@@ -70,7 +70,7 @@ python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-revi
 | GET | `/api/admin/audit-logs/retention-plan` | 管理端审计留存预检；复用审计筛选，按 `ASTRA_AUDIT_LOG_RETENTION_DAYS`、`retention_days` 或 `before` 计算归档候选、临期数量、聚合桶和哈希链边界；成功生成后写入 `admin.audit.retention_plan` 摘要，响应显式标记不导出归档、不删除、不提供 WORM 或外部锚定 |
 | GET | `/api/admin/audit-logs/chain-integrity` | 管理端审计链完整性校验；按 `from/to`、`limit` 和 `issue_limit` 顺序扫描审计日志，重算 `current_hash`、检查相邻 `prev_hash`、把历史空 hash 标记为 partial，并返回 `valid/partial/invalid`、计数和受限 issue 样本；成功生成后写入 `admin.audit.chain_integrity` 摘要，不修复、不删除、不提供 WORM 或外部锚定 |
 | GET | `/api/admin/audit-logs/high-frequency` | 管理端审计高频候选摘要；复用审计筛选，默认查看最近 24 小时，按 action、actor/action、ip/action、resource/action 和 failure_reason 聚合候选；成功生成后写入 `admin.audit.high_frequency` 摘要，不记录候选明细 |
-| GET | `/api/admin/submissions/pending` | 管理端待批改队列，支持 school/class/course/assignment/student/status/时间窗过滤和 limit/offset 分页 |
+| GET | `/api/admin/submissions/pending` | 待批改队列；全局管理员可跨范围过滤，教师仅可读取本人任教班级内 `submitted/returned` 提交，`status=graded` 仍为管理员治理视图 |
 | GET/POST/PATCH | `/api/admin/bugs` | 缺陷/风险清单基础维护；可记录外部 issue provider/id/url，列表支持分页、状态过滤和关键字搜索 |
 | GET/POST | `/api/schools` | 当前用户可见学校 / 创建学校 |
 | GET | `/api/schools/{id}/classes` | 学校内班级 |
@@ -171,7 +171,7 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 
 ## 服务层边界
 
-- `app.services.access_control` 负责学校、班级和课程范围判断，普通业务端点不再各自复制 `_require_*` helper；学生课程访问会额外要求课程 `published`，单元读取/事件/提交/复盘会继续要求单元 `published`，事件与提交写入要求作业 `active`；教师端涉及班级挂课、学习事件查询、积分流水、学生进度、查看提交和批改时必须具备对应班级的 active teacher membership；学校/班级深度统计分别要求对应 school teacher scope / class teacher scope，且非授权用户不通过统计端点暴露对象存在性；课程结构写入（单元/作业创建）要求课程作者或全局 admin；全局 admin 保留跨范围治理能力；后续权限矩阵扩展应优先在这里收口。
+- `app.services.access_control` 负责学校、班级和课程范围判断，普通业务端点不再各自复制 `_require_*` helper；学生课程访问会额外要求课程 `published`，单元读取/事件/提交/复盘会继续要求单元 `published`，事件与提交写入要求作业 `active`；教师端涉及班级挂课、学习事件查询、积分流水、学生进度、查看提交、批改和待批改队列时必须具备对应班级的 active teacher membership；学校/班级深度统计分别要求对应 school teacher scope / class teacher scope，且非授权用户不通过统计端点暴露对象存在性；课程结构写入（单元/作业创建）要求课程作者或全局 admin；全局 admin 保留跨范围治理能力；后续权限矩阵扩展应优先在这里收口。
 - `app.services.class_join_requests` 负责加入申请审批状态流转和成员关系补齐。
 - `POST /api/classes/{id}/join` 与 `POST /api/classes/{id}/join-requests` 长期并存：前者是保留给受控场景、导入/邀请码或旧 UI 的 direct join，后者是需要教师/admin 审批的申请流；前端不得把审批流表现为唯一加入路径。
 - `app.services.audit` 负责写入审计日志及 request_id、IP 哈希、user-agent 等请求元数据；新审计记录会以 `prev_hash/current_hash` 保存应用层 SHA-256 链式哈希，用于追踪篡改迹象，但不能替代备份、binlog、外部归档、WORM 或第三方时间戳；管理端 JSON/CSV 明细导出接口默认剥离 `snapshot_json`，需要审查内容快照时必须显式传入 `include_snapshot=true`，且导出完成后会以 `admin.audit.export` 记录筛选条件、导出格式、导出数量和截断状态，不记录导出条目明细；审计报表摘要以 `admin.audit.report` 留痕，只记录格式、筛选和 bucket 数量；审计留存预检以 `admin.audit.retention_plan` 留痕，只记录策略、候选数量、临期数量、bucket 数量和链边界，不记录候选明细或原始快照；`scripts.archive_audit_logs` 是离线只读归档包导出工具，会生成 JSONL/CSV 数据文件与 Manifest，并支持 SHA-256 和记录数复验，默认不删除源数据、不写新的审计日志、不提供 WORM 或外部锚定；高频候选摘要以 `admin.audit.high_frequency` 留痕，只记录筛选、时间窗、阈值、总量和维度命中数，不记录候选明细、原始日志 id 或完整 IP 哈希清单。
