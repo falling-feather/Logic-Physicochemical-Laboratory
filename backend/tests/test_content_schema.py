@@ -68,11 +68,31 @@ def test_render_script_sandbox_document_serves_isolated_html(client):
     assert "form-action 'none'" in response.headers["Content-Security-Policy"]
     body = response.text
     assert f'data-sandbox-id="{sandbox_id}"' in body
+    bootstrap_url = f"/api/render/script-sandboxes/{sandbox_id}/bootstrap/page/physics/energy-conservation"
     asset_sha256 = manifest["references"][0]["valueSha256"]
     asset_url = f"/api/render/script-sandboxes/{sandbox_id}/assets/{asset_sha256}/page/physics/energy-conservation"
-    assert f'<script src="{asset_url}" defer></script>' in body
+    assert f'<script src="{bootstrap_url}" defer></script>' in body
+    assert f'<script src="{asset_url}" defer></script>' not in body
     assert "scriptSandbox" not in body
     assert "valueSha256" not in body
+
+    bootstrap = client.get(bootstrap_url)
+    assert bootstrap.status_code == 200
+    assert bootstrap.headers["Content-Type"].startswith("application/javascript")
+    assert bootstrap.headers["Cache-Control"] == "no-store"
+    assert bootstrap.headers["X-Astra-Content-Script-Sandbox-Id"] == sandbox_id
+    assert bootstrap.headers["X-Astra-Content-Script-Bootstrap-Version"] == "bootstrap-v1"
+    assert bootstrap.headers["X-Astra-Content-Script-Asset-Count"] == "1"
+    assert bootstrap.headers["X-Content-Type-Options"] == "nosniff"
+    assert bootstrap.headers["Cross-Origin-Resource-Policy"] == "same-origin"
+    assert "astra-script-sandbox-bootstrap-v1" in bootstrap.text
+    assert "__ASTRA_SCRIPT_SANDBOX__" in bootstrap.text
+    assert "document.currentScript" in bootstrap.text
+    assert "bootstrap-ready" in bootstrap.text
+    assert "assets-ready" in bootstrap.text
+    assert "unhandledrejection" in bootstrap.text
+    assert asset_url in bootstrap.text
+    assert "/pages/physics/energy-conservation.js" not in bootstrap.text
 
     asset = client.get(asset_url)
     assert asset.status_code == 200
@@ -92,6 +112,9 @@ def test_render_script_sandbox_document_serves_isolated_html(client):
 def test_render_script_sandbox_document_fails_closed_for_missing_or_blocked_manifest(client):
     missing = client.get("/api/render/script-sandboxes/sm_missing/page/physics/energy-conservation")
     assert missing.status_code == 404
+
+    missing_bootstrap = client.get("/api/render/script-sandboxes/sm_missing/bootstrap/page/physics/energy-conservation")
+    assert missing_bootstrap.status_code == 404
 
     payload = _content_page_payload()
     payload["slug"] = "physics/blocked-sandbox"
@@ -118,6 +141,10 @@ def test_render_script_sandbox_document_fails_closed_for_missing_or_blocked_mani
 
     assert blocked.status_code == 409
     assert blocked.json()["detail"] == "Script sandbox manifest is not executable"
+
+    blocked_bootstrap = client.get(f"/api/render/script-sandboxes/{manifest['sandboxId']}/bootstrap/page/physics/blocked-sandbox")
+    assert blocked_bootstrap.status_code == 409
+    assert blocked_bootstrap.json()["detail"] == "Script sandbox manifest is not executable"
 
 
 def test_render_script_sandbox_document_rejects_ambiguous_manifest_id(client):
@@ -182,6 +209,10 @@ def test_render_script_sandbox_document_rejects_assets_outside_allowed_roots(cli
 
     assert response.status_code == 409
     assert response.json()["detail"] == "Script sandbox asset path is outside allowed roots"
+
+    bootstrap = client.get(f"/api/render/script-sandboxes/{manifest['sandboxId']}/bootstrap/page/physics/outside-root-sandbox")
+    assert bootstrap.status_code == 409
+    assert bootstrap.json()["detail"] == "Script sandbox asset path is outside allowed roots"
 
 
 def test_script_manifest_references_require_hashes():

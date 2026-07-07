@@ -1,3 +1,4 @@
+import json
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -42,6 +43,39 @@ def render_script_sandbox_document(sandbox_id: str, slug: str, response: Respons
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     return _script_sandbox_html(slug=page.slug, sandbox_id=sandbox_id, references=references)
+
+
+@router.get("/script-sandboxes/{sandbox_id}/bootstrap/page/{slug:path}")
+def render_script_sandbox_bootstrap(
+    sandbox_id: str,
+    slug: str,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> Response:
+    page = get_published_page_schema(db, slug)
+    if page is None:
+        raise HTTPException(status_code=404, detail="Renderable page not found")
+    manifest = _find_script_sandbox_manifest(page, sandbox_id)
+    references = _script_manifest_references(manifest)
+    for reference in references:
+        _local_script_asset_path(reference)
+    asset_urls = [
+        _script_sandbox_asset_url(slug=page.slug, sandbox_id=sandbox_id, asset_sha256=str(reference["valueSha256"]))
+        for reference in references
+    ]
+    payload = _script_sandbox_bootstrap_js(slug=page.slug, sandbox_id=sandbox_id, asset_urls=asset_urls)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Astra-Content-Script-Sandbox-Id"] = sandbox_id
+    response.headers["X-Astra-Content-Script-Bootstrap-Version"] = "bootstrap-v1"
+    response.headers["X-Astra-Content-Script-Asset-Count"] = str(len(asset_urls))
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return Response(
+        content=payload,
+        media_type="application/javascript; charset=utf-8",
+        headers=dict(response.headers),
+    )
 
 
 @router.get("/script-sandboxes/{sandbox_id}/assets/{asset_sha256}/page/{slug:path}")
@@ -244,13 +278,7 @@ def _harden_sandbox_csp(csp: str) -> str:
 
 
 def _script_sandbox_html(*, slug: str, sandbox_id: str, references: list[dict[str, Any]]) -> str:
-    asset_urls = [
-        _script_sandbox_asset_url(slug=slug, sandbox_id=sandbox_id, asset_sha256=str(reference["valueSha256"]))
-        for reference in references
-    ]
-    script_tags = "\n".join(
-        f'    <script src="{escape(source, quote=True)}" defer></script>' for source in asset_urls
-    )
+    bootstrap_url = _script_sandbox_bootstrap_url(slug=slug, sandbox_id=sandbox_id)
     return (
         "<!doctype html>\n"
         '<html lang="zh-CN">\n'
@@ -264,10 +292,86 @@ def _script_sandbox_html(*, slug: str, sandbox_id: str, references: list[dict[st
         "  <body>\n"
         f'    <div id="astra-sandbox-root" data-slug="{escape(slug, quote=True)}" '
         f'data-sandbox-id="{escape(sandbox_id, quote=True)}"></div>\n'
-        f"{script_tags}\n"
+        f'    <script src="{escape(bootstrap_url, quote=True)}" defer></script>\n'
         "  </body>\n"
         "</html>\n"
     )
+
+
+def _script_sandbox_bootstrap_js(*, slug: str, sandbox_id: str, asset_urls: list[str]) -> str:
+    slug_literal = _js_string_literal(slug)
+    sandbox_id_literal = _js_string_literal(sandbox_id)
+    asset_urls_literal = json.dumps(asset_urls)
+    return (
+        "(() => {\n"
+        '  "use strict";\n'
+        "  const metadata = Object.freeze({\n"
+        "    protocolVersion: \"astra-script-sandbox-bootstrap-v1\",\n"
+        f"    slug: {slug_literal},\n"
+        f"    sandboxId: {sandbox_id_literal},\n"
+        f"    assetCount: {len(asset_urls)},\n"
+        "  });\n"
+        f"  const assetUrls = Object.freeze({asset_urls_literal});\n"
+        "  const nonce = document.currentScript && document.currentScript.nonce ? document.currentScript.nonce : \"\";\n"
+        "  const post = (type, payload = {}) => {\n"
+        "    if (window.parent === window) return;\n"
+        "    window.parent.postMessage({ source: \"astra-content-script-sandbox\", type, metadata, payload }, \"*\");\n"
+        "  };\n"
+        "  const normalizeError = (value) => {\n"
+        "    if (!value) return \"\";\n"
+        "    if (typeof value === \"string\") return value.slice(0, 500);\n"
+        "    if (value && typeof value.message === \"string\") return value.message.slice(0, 500);\n"
+        "    return String(value).slice(0, 500);\n"
+        "  };\n"
+        "  window.__ASTRA_SCRIPT_SANDBOX__ = Object.freeze({\n"
+        "    metadata,\n"
+        "    assetUrls,\n"
+        "    nonce,\n"
+        "    ready(payload = {}) { post(\"ready\", payload); },\n"
+        "    error(payload = {}) { post(\"error\", payload); },\n"
+        "    post(type, payload = {}) { post(String(type || \"message\"), payload); },\n"
+        "  });\n"
+        "  const loadAsset = (url) => new Promise((resolve, reject) => {\n"
+        "    const script = document.createElement(\"script\");\n"
+        "    script.src = url;\n"
+        "    script.defer = true;\n"
+        "    if (nonce) script.nonce = nonce;\n"
+        "    script.onload = () => resolve(url);\n"
+        "    script.onerror = () => reject(new Error(`Failed to load sandbox asset: ${url}`));\n"
+        "    document.head.appendChild(script);\n"
+        "  });\n"
+        "  const loadAssets = async () => {\n"
+        "    for (const url of assetUrls) {\n"
+        "      await loadAsset(url);\n"
+        "    }\n"
+        "  };\n"
+        "  window.addEventListener(\"error\", (event) => {\n"
+        "    post(\"error\", {\n"
+        "      message: normalizeError(event.message),\n"
+        "      filename: event.filename || \"\",\n"
+        "      lineno: event.lineno || 0,\n"
+        "      colno: event.colno || 0,\n"
+        "    });\n"
+        "  });\n"
+        "  window.addEventListener(\"unhandledrejection\", (event) => {\n"
+        "    post(\"unhandledrejection\", { message: normalizeError(event.reason) });\n"
+        "  });\n"
+        "  post(\"bootstrap-ready\");\n"
+        "  loadAssets()\n"
+        "    .then(() => post(\"assets-ready\", { assetCount: assetUrls.length }))\n"
+        "    .catch((error) => post(\"error\", { message: normalizeError(error) }));\n"
+        "})();\n"
+    )
+
+
+def _js_string_literal(value: str) -> str:
+    return json.dumps(value)
+
+
+def _script_sandbox_bootstrap_url(*, slug: str, sandbox_id: str) -> str:
+    api_prefix = get_settings().api_prefix.rstrip("/")
+    encoded_slug = quote(slug, safe="/")
+    return f"{api_prefix}/render/script-sandboxes/{sandbox_id}/bootstrap/page/{encoded_slug}"
 
 
 def _script_sandbox_asset_url(*, slug: str, sandbox_id: str, asset_sha256: str) -> str:
