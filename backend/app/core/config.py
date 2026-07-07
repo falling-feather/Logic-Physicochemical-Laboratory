@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     login_max_attempts: int = 5
     login_lockout_seconds: int = 15 * 60
     login_attempt_window_seconds: int = 15 * 60
+    audit_log_retention_days: int = Field(default=365, ge=1)
     audit_ip_hash_salt: str = "astra-dev-audit-salt"
     cors_origins: str = "http://127.0.0.1:8766,http://localhost:8766"
     admin_bootstrap_token: str | None = None

@@ -1,8 +1,9 @@
 import csv
 import io
 import json
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
@@ -315,6 +316,11 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert audit_report_forbidden.status_code == 403
     audit_report_csv_forbidden = client.get("/api/admin/audit-logs/report.csv", headers=_auth_header(student_token))
     assert audit_report_csv_forbidden.status_code == 403
+    audit_retention_forbidden = client.get(
+        "/api/admin/audit-logs/retention-plan",
+        headers=_auth_header(student_token),
+    )
+    assert audit_retention_forbidden.status_code == 403
     audit_frequency_forbidden = client.get("/api/admin/audit-logs/high-frequency", headers=_auth_header(student_token))
     assert audit_frequency_forbidden.status_code == 403
 
@@ -717,6 +723,132 @@ def test_admin_views_user_management_stats_and_bug_records(client):
 
     student_forbidden = client.get("/api/admin/stats", headers=_auth_header(student_token))
     assert student_forbidden.status_code == 403
+
+
+def test_admin_audit_retention_plan_summarizes_candidates_without_deleting(client):
+    admin_token = _bootstrap_admin(client)
+    now = datetime.now(UTC)
+    old_created_at = now - timedelta(days=45)
+    expiring_created_at = now - timedelta(days=20)
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        old_log = AuditLog(
+            action="legacy.audit",
+            resource="legacy:old",
+            resource_type="legacy",
+            resource_id="old",
+            event_result="success",
+            prev_hash="a" * 64,
+            current_hash="b" * 64,
+            snapshot_json={"sensitive": "kept-out-of-plan"},
+            created_at=old_created_at,
+            updated_at=old_created_at,
+        )
+        expiring_log = AuditLog(
+            action="legacy.audit",
+            resource="legacy:expiring",
+            resource_type="legacy",
+            resource_id="expiring",
+            event_result="failure",
+            failure_reason="legacy_check",
+            prev_hash="b" * 64,
+            current_hash="c" * 64,
+            snapshot_json={"sensitive": "also-kept-out-of-plan"},
+            created_at=expiring_created_at,
+            updated_at=expiring_created_at,
+        )
+        db.add_all([old_log, expiring_log])
+        db.commit()
+        old_log_id = old_log.id
+        expiring_log_id = expiring_log.id
+
+    plan_response = client.get(
+        "/api/admin/audit-logs/retention-plan?action=legacy.audit&retention_days=30&warning_days=15&bucket_limit=5",
+        headers={**_auth_header(admin_token), "X-Request-ID": "audit-retention-plan-request"},
+    )
+    assert plan_response.status_code == 200
+    plan = plan_response.json()
+    assert plan["filters"] == {"action": "legacy.audit"}
+    assert plan["capabilities"] == {
+        "archive_export": False,
+        "delete": False,
+        "worm": False,
+        "external_anchor": False,
+    }
+    assert plan["policy"]["source"] == "query"
+    assert plan["policy"]["retention_days"] == 30
+    assert plan["policy"]["warning_days"] == 15
+    assert plan["summary"]["total"] == 2
+    assert plan["summary"]["archive_candidates"] == 1
+    assert plan["summary"]["expiring_soon"] == 1
+    assert plan["summary"]["retained"] == 1
+    assert plan["summary"]["first_candidate_id"] == old_log_id
+    assert plan["summary"]["last_candidate_id"] == old_log_id
+    assert plan["summary"]["chain_start_prev_hash"] == "a" * 64
+    assert plan["summary"]["chain_start_current_hash"] == "b" * 64
+    assert plan["summary"]["chain_end_current_hash"] == "b" * 64
+    assert plan["by_action"] == [{"key": "legacy.audit", "total": 1}]
+    assert plan["by_resource_type"] == [{"key": "legacy", "total": 1}]
+    assert plan["by_event_result"] == [{"key": "success", "total": 1}]
+    assert "items" not in plan
+    assert "snapshot_json" not in json.dumps(plan)
+
+    retention_audit = client.get(
+        "/api/admin/audit-logs?action=admin.audit.retention_plan"
+        "&resource_type=audit_log&request_id=audit-retention-plan-request",
+        headers=_auth_header(admin_token),
+    )
+    assert retention_audit.status_code == 200
+    assert retention_audit.json()["total"] == 1
+    retention_snapshot = retention_audit.json()["items"][0]["snapshot_json"]
+    assert retention_snapshot["format"] == "retention_plan"
+    assert retention_snapshot["filters"] == {"action": "legacy.audit"}
+    assert retention_snapshot["capabilities"]["delete"] is False
+    assert retention_snapshot["policy"]["retention_days"] == 30
+    assert retention_snapshot["archive_candidates"] == 1
+    assert retention_snapshot["expiring_soon"] == 1
+    assert retention_snapshot["first_candidate_id"] == old_log_id
+    assert retention_snapshot["last_candidate_id"] == old_log_id
+    assert "by_action" not in retention_snapshot
+    assert "items" not in retention_snapshot
+
+    with session_factory() as db:
+        assert db.get(AuditLog, old_log_id) is not None
+        assert db.get(AuditLog, expiring_log_id) is not None
+        assert (
+            db.scalar(select(func.count()).select_from(AuditLog).where(AuditLog.action == "legacy.audit"))
+            == 2
+        )
+
+    default_plan = client.get(
+        "/api/admin/audit-logs/retention-plan?action=legacy.audit",
+        headers=_auth_header(admin_token),
+    )
+    assert default_plan.status_code == 200
+    assert default_plan.json()["policy"]["source"] == "config"
+    assert default_plan.json()["policy"]["retention_days"] == 365
+
+    before_plan = client.get(
+        "/api/admin/audit-logs/retention-plan",
+        params={"action": "legacy.audit", "before": expiring_created_at.isoformat()},
+        headers=_auth_header(admin_token),
+    )
+    assert before_plan.status_code == 200
+    assert before_plan.json()["policy"]["source"] == "before"
+    assert before_plan.json()["policy"]["retention_days"] is None
+    assert before_plan.json()["summary"]["archive_candidates"] == 2
+
+    invalid_policy = client.get(
+        "/api/admin/audit-logs/retention-plan?before=2026-07-01T00:00:00Z&retention_days=30",
+        headers=_auth_header(admin_token),
+    )
+    assert invalid_policy.status_code == 422
+
+    invalid_window = client.get(
+        "/api/admin/audit-logs/retention-plan?from=2026-07-06T10:00:00Z&to=2026-07-05T10:00:00Z",
+        headers=_auth_header(admin_token),
+    )
+    assert invalid_window.status_code == 422
 
 
 def test_audit_hash_chain_links_multiple_logs_in_one_transaction(client):

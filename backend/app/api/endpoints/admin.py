@@ -72,6 +72,9 @@ from app.schemas.admin import (
     AuditLogRead,
     AuditLogReport,
     AuditLogReportBucket,
+    AuditLogRetentionPlan,
+    AuditLogRetentionPolicy,
+    AuditLogRetentionSummary,
     AuditLogActionReport,
     BugRecordCreate,
     BugRecordPage,
@@ -1089,6 +1092,95 @@ def report_audit_logs_csv(
         media_type="text/csv; charset=utf-8",
         headers=_audit_log_report_csv_headers(report),
     )
+
+
+@router.get("/audit-logs/retention-plan", response_model=AuditLogRetentionPlan)
+def plan_audit_log_retention(
+    request: Request,
+    actor_user_id: int | None = Query(default=None),
+    action: str | None = Query(default=None),
+    resource_type: str | None = Query(default=None),
+    resource_id: str | None = Query(default=None),
+    school_id: int | None = Query(default=None),
+    class_id: int | None = Query(default=None),
+    event_result: str | None = Query(default=None),
+    failure_reason: str | None = Query(default=None),
+    request_id: str | None = Query(default=None),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    before_at: datetime | None = Query(default=None, alias="before"),
+    retention_days: int | None = Query(default=None, ge=1, le=3650),
+    warning_days: int = Query(default=30, ge=0, le=3650),
+    bucket_limit: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AuditLogRetentionPlan:
+    _require_admin(current_user)
+    if before_at is not None and retention_days is not None:
+        raise HTTPException(status_code=422, detail="before and retention_days cannot be used together")
+    settings = get_settings()
+    generated_at = datetime.now(UTC)
+    policy_retention_days = retention_days or settings.audit_log_retention_days
+    if before_at is not None:
+        cutoff_at = before_at
+        policy_source: Literal["config", "query", "before"] = "before"
+        policy_days: int | None = None
+    else:
+        cutoff_at = generated_at - timedelta(days=policy_retention_days)
+        policy_source = "query" if retention_days is not None else "config"
+        policy_days = policy_retention_days
+    expiring_soon_cutoff_at = cutoff_at + timedelta(days=warning_days)
+    statement = _audit_log_statement(
+        actor_user_id=actor_user_id,
+        action=action,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        school_id=school_id,
+        class_id=class_id,
+        event_result=event_result,
+        failure_reason=failure_reason,
+        request_id=request_id,
+        from_at=from_at,
+        to_at=to_at,
+    )
+    filters = _audit_log_filters(
+        actor_user_id=actor_user_id,
+        action=action,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        school_id=school_id,
+        class_id=class_id,
+        event_result=event_result,
+        failure_reason=failure_reason,
+        request_id=request_id,
+        from_at=from_at,
+        to_at=to_at,
+    )
+    plan = _audit_log_retention_plan(
+        db,
+        statement=statement,
+        filters=filters,
+        policy=AuditLogRetentionPolicy(
+            retention_days=policy_days,
+            warning_days=warning_days,
+            cutoff_at=cutoff_at,
+            expiring_soon_cutoff_at=expiring_soon_cutoff_at,
+            source=policy_source,
+        ),
+        bucket_limit=bucket_limit,
+        generated_at=generated_at,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.audit.retention_plan",
+        resource_type="audit_log",
+        event_result="success",
+        request=request,
+        snapshot=_audit_log_retention_snapshot(plan),
+    )
+    db.commit()
+    return plan
 
 
 @router.get("/audit-logs/high-frequency", response_model=AuditLogFrequencyReport)
@@ -2217,6 +2309,117 @@ def _audit_log_report_snapshot(report: AuditLogReport, *, report_format: Literal
         "event_result_bucket_count": len(report.by_event_result),
         "failure_reason_bucket_count": len(report.by_failure_reason),
         "generated_at": report.generated_at.isoformat(),
+    }
+
+
+def _audit_log_retention_plan(
+    db: Session,
+    *,
+    statement: Any,
+    filters: dict[str, Any],
+    policy: AuditLogRetentionPolicy,
+    bucket_limit: int,
+    generated_at: datetime,
+) -> AuditLogRetentionPlan:
+    source = statement.order_by(None).subquery()
+    total = int(db.scalar(select(func.count()).select_from(source)) or 0)
+    archive_candidates = int(
+        db.scalar(select(func.count()).select_from(source).where(source.c.created_at <= policy.cutoff_at)) or 0
+    )
+    expiring_soon = int(
+        db.scalar(
+            select(func.count())
+            .select_from(source)
+            .where(source.c.created_at > policy.cutoff_at, source.c.created_at <= policy.expiring_soon_cutoff_at)
+        )
+        or 0
+    )
+    oldest_at, newest_at = db.execute(
+        select(func.min(source.c.created_at), func.max(source.c.created_at)).select_from(source)
+    ).one()
+    first_candidate = db.execute(
+        select(source.c.id, source.c.prev_hash, source.c.current_hash)
+        .select_from(source)
+        .where(source.c.created_at <= policy.cutoff_at)
+        .order_by(source.c.created_at.asc(), source.c.id.asc())
+        .limit(1)
+    ).first()
+    last_candidate = db.execute(
+        select(source.c.id, source.c.current_hash)
+        .select_from(source)
+        .where(source.c.created_at <= policy.cutoff_at)
+        .order_by(source.c.created_at.desc(), source.c.id.desc())
+        .limit(1)
+    ).first()
+    return AuditLogRetentionPlan(
+        generated_at=generated_at,
+        filters=filters,
+        capabilities={
+            "archive_export": False,
+            "delete": False,
+            "worm": False,
+            "external_anchor": False,
+        },
+        policy=policy,
+        summary=AuditLogRetentionSummary(
+            total=total,
+            retained=max(total - archive_candidates, 0),
+            archive_candidates=archive_candidates,
+            expiring_soon=expiring_soon,
+            oldest_at=oldest_at,
+            newest_at=newest_at,
+            first_candidate_id=int(first_candidate.id) if first_candidate is not None else None,
+            last_candidate_id=int(last_candidate.id) if last_candidate is not None else None,
+            chain_start_prev_hash=first_candidate.prev_hash if first_candidate is not None else None,
+            chain_start_current_hash=first_candidate.current_hash if first_candidate is not None else None,
+            chain_end_current_hash=last_candidate.current_hash if last_candidate is not None else None,
+        ),
+        bucket_limit=bucket_limit,
+        by_action=_audit_log_retention_buckets(db, source, policy.cutoff_at, "action", bucket_limit),
+        by_resource_type=_audit_log_retention_buckets(db, source, policy.cutoff_at, "resource_type", bucket_limit),
+        by_event_result=_audit_log_retention_buckets(db, source, policy.cutoff_at, "event_result", bucket_limit),
+    )
+
+
+def _audit_log_retention_buckets(
+    db: Session,
+    source: Any,
+    cutoff_at: datetime,
+    column_name: str,
+    bucket_limit: int,
+) -> list[AuditLogReportBucket]:
+    column = getattr(source.c, column_name)
+    count_expr = func.count().label("total")
+    rows = db.execute(
+        select(column, count_expr)
+        .select_from(source)
+        .where(source.c.created_at <= cutoff_at)
+        .group_by(column)
+        .order_by(count_expr.desc(), column)
+        .limit(bucket_limit)
+    ).all()
+    return [AuditLogReportBucket(key=str(key) if key is not None else None, total=int(total)) for key, total in rows]
+
+
+def _audit_log_retention_snapshot(plan: AuditLogRetentionPlan) -> dict[str, Any]:
+    return {
+        "format": "retention_plan",
+        "filters": plan.filters,
+        "capabilities": plan.capabilities,
+        "policy": plan.policy.model_dump(mode="json"),
+        "total": plan.summary.total,
+        "archive_candidates": plan.summary.archive_candidates,
+        "expiring_soon": plan.summary.expiring_soon,
+        "bucket_limit": plan.bucket_limit,
+        "action_bucket_count": len(plan.by_action),
+        "resource_type_bucket_count": len(plan.by_resource_type),
+        "event_result_bucket_count": len(plan.by_event_result),
+        "first_candidate_id": plan.summary.first_candidate_id,
+        "last_candidate_id": plan.summary.last_candidate_id,
+        "chain_start_prev_hash": plan.summary.chain_start_prev_hash,
+        "chain_start_current_hash": plan.summary.chain_start_current_hash,
+        "chain_end_current_hash": plan.summary.chain_end_current_hash,
+        "generated_at": plan.generated_at.isoformat(),
     }
 
 

@@ -474,6 +474,40 @@ class AuditLogFrequencyReport(BaseModel):
     candidates: list[AuditLogFrequencyCandidate]
 
 
+class AuditLogRetentionPolicy(BaseModel):
+    retention_days: int | None = None
+    warning_days: int
+    cutoff_at: datetime
+    expiring_soon_cutoff_at: datetime
+    source: Literal["config", "query", "before"]
+
+
+class AuditLogRetentionSummary(BaseModel):
+    total: int
+    retained: int
+    archive_candidates: int
+    expiring_soon: int
+    oldest_at: datetime | None = None
+    newest_at: datetime | None = None
+    first_candidate_id: int | None = None
+    last_candidate_id: int | None = None
+    chain_start_prev_hash: str | None = None
+    chain_start_current_hash: str | None = None
+    chain_end_current_hash: str | None = None
+
+
+class AuditLogRetentionPlan(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    capabilities: dict[str, bool]
+    policy: AuditLogRetentionPolicy
+    summary: AuditLogRetentionSummary
+    bucket_limit: int
+    by_action: list[AuditLogReportBucket]
+    by_resource_type: list[AuditLogReportBucket]
+    by_event_result: list[AuditLogReportBucket]
+
+
 class BugRecordCreate(BaseModel):
     title: str = Field(min_length=1, max_length=240)
     category: str = Field(default="general", min_length=1, max_length=80)
