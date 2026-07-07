@@ -164,6 +164,8 @@ class AdminContentPageVersionSemanticSectionChange(BaseModel):
     key: str
     index_before: int | None = None
     index_after: int | None = None
+    section_id_before: str | None = None
+    section_id_after: str | None = None
     type_before: str | None = None
     type_after: str | None = None
     title_before: str | None = None
@@ -178,6 +180,8 @@ class AdminContentPageVersionSemanticSourceChange(BaseModel):
     key: str
     index_before: int | None = None
     index_after: int | None = None
+    source_id_before: str | None = None
+    source_id_after: str | None = None
     label_before: str | None = None
     label_after: str | None = None
     url_before: str | None = None

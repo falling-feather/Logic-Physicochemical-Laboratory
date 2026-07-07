@@ -945,9 +945,17 @@ def test_admin_content_page_version_diff_includes_semantic_schema_summary(client
             "experimentId": "energy-conservation",
             "props": {"mode": "basic"},
         },
+        {
+            "sectionId": "legacy-note",
+            "type": "learning-task",
+            "title": "Legacy Note",
+            "summary": "Remove this note in the target version.",
+            "props": {},
+        },
     ]
     base_payload["schema"]["sources"] = [
         {"sourceId": "teacher-guide", "label": "Teacher Guide", "url": "https://example.com/guide-v1"},
+        {"sourceId": "old-reference", "label": "Old Reference", "url": "https://example.com/old-ref"},
     ]
     base_draft_id = _create_draft_from_payload(client, teacher_token, base_payload)
     _submit_draft(client, teacher_token, base_draft_id)
@@ -1015,6 +1023,8 @@ def test_admin_content_page_version_diff_includes_semantic_schema_summary(client
     sections = {change["key"]: change for change in semantic["section_changes"]}
     experiment = sections["section:id:energy-lab"]
     assert experiment["action"] == "modified"
+    assert experiment["section_id_before"] == "energy-lab"
+    assert experiment["section_id_after"] == "energy-lab"
     assert experiment["moved"] is True
     assert experiment["index_before"] == 1
     assert experiment["index_after"] == 0
@@ -1025,22 +1035,40 @@ def test_admin_content_page_version_diff_includes_semantic_schema_summary(client
         "field_changes"
     ]
     assert {"field": "props.mode", "before": "basic", "after": "guided"} in experiment["prop_changes"]
-    assert sections["section:id:energy-checkpoint"]["action"] == "added"
+    checkpoint = sections["section:id:energy-checkpoint"]
+    assert checkpoint["action"] == "added"
+    assert checkpoint["section_id_before"] is None
+    assert checkpoint["section_id_after"] == "energy-checkpoint"
+    legacy_note = sections["section:id:legacy-note"]
+    assert legacy_note["action"] == "removed"
+    assert legacy_note["section_id_before"] == "legacy-note"
+    assert legacy_note["section_id_after"] is None
     observe = sections["section:id:observe-task"]
     assert observe["action"] == "modified"
+    assert observe["section_id_before"] == "observe-task"
+    assert observe["section_id_after"] == "observe-task"
     assert observe["moved"] is True
     assert {"field": "title", "before": "Observe", "after": "Observe Again"} in observe["field_changes"]
 
     sources = {change["key"]: change for change in semantic["source_changes"]}
     guide = sources["source:id:teacher-guide"]
     assert guide["action"] == "modified"
+    assert guide["source_id_before"] == "teacher-guide"
+    assert guide["source_id_after"] == "teacher-guide"
     assert {"field": "label", "before": "Teacher Guide", "after": "Teacher Guide Updated"} in guide["field_changes"]
     assert {
         "field": "url",
         "before": "https://example.com/guide-v1",
         "after": "https://example.com/guide-v2",
     } in guide["field_changes"]
-    assert sources["source:id:simulation-notes"]["action"] == "added"
+    simulation_notes = sources["source:id:simulation-notes"]
+    assert simulation_notes["action"] == "added"
+    assert simulation_notes["source_id_before"] is None
+    assert simulation_notes["source_id_after"] == "simulation-notes"
+    old_reference = sources["source:id:old-reference"]
+    assert old_reference["action"] == "removed"
+    assert old_reference["source_id_before"] == "old-reference"
+    assert old_reference["source_id_after"] is None
 
 
 def _create_draft(client, teacher_token: str, slug: str, title: str) -> int:

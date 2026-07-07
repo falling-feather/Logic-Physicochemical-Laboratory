@@ -2627,6 +2627,7 @@ def _semantic_section_changes(before: Any, after: Any) -> list[AdminContentPageV
                     action="added",
                     key=key,
                     index_after=after_entry["index"] if after_entry is not None else None,
+                    section_id_after=_semantic_stable_id(after_item, "sectionId"),
                     type_after=_semantic_text(after_item, "type"),
                     title_after=_semantic_text(after_item, "title"),
                 )
@@ -2638,6 +2639,7 @@ def _semantic_section_changes(before: Any, after: Any) -> list[AdminContentPageV
                     action="removed",
                     key=key,
                     index_before=before_entry["index"],
+                    section_id_before=_semantic_stable_id(before_item, "sectionId"),
                     type_before=_semantic_text(before_item, "type"),
                     title_before=_semantic_text(before_item, "title"),
                 )
@@ -2658,6 +2660,8 @@ def _semantic_section_changes(before: Any, after: Any) -> list[AdminContentPageV
                     key=key,
                     index_before=before_entry["index"],
                     index_after=after_entry["index"],
+                    section_id_before=_semantic_stable_id(before_item, "sectionId"),
+                    section_id_after=_semantic_stable_id(after_item, "sectionId"),
                     type_before=_semantic_text(before_item, "type"),
                     type_after=_semantic_text(after_item, "type"),
                     title_before=_semantic_text(before_item, "title"),
@@ -2685,6 +2689,7 @@ def _semantic_source_changes(before: Any, after: Any) -> list[AdminContentPageVe
                     action="added",
                     key=key,
                     index_after=after_entry["index"] if after_entry is not None else None,
+                    source_id_after=_semantic_stable_id(after_item, "sourceId"),
                     label_after=_semantic_text(after_item, "label"),
                     url_after=_semantic_text(after_item, "url"),
                 )
@@ -2696,6 +2701,7 @@ def _semantic_source_changes(before: Any, after: Any) -> list[AdminContentPageVe
                     action="removed",
                     key=key,
                     index_before=before_entry["index"],
+                    source_id_before=_semantic_stable_id(before_item, "sourceId"),
                     label_before=_semantic_text(before_item, "label"),
                     url_before=_semantic_text(before_item, "url"),
                 )
@@ -2711,6 +2717,8 @@ def _semantic_source_changes(before: Any, after: Any) -> list[AdminContentPageVe
                     key=key,
                     index_before=before_entry["index"],
                     index_after=after_entry["index"],
+                    source_id_before=_semantic_stable_id(before_item, "sourceId"),
+                    source_id_after=_semantic_stable_id(after_item, "sourceId"),
                     label_before=_semantic_text(before_item, "label"),
                     label_after=_semantic_text(after_item, "label"),
                     url_before=_semantic_text(before_item, "url"),
@@ -2829,6 +2837,10 @@ def _semantic_text(value: Any, field: str) -> str | None:
         return None
     field_value = value.get(field)
     return str(field_value) if field_value is not None else None
+
+
+def _semantic_stable_id(value: Any, field: str) -> str | None:
+    return _semantic_text(value, field)
 
 
 def _semantic_action_count(changes: list[Any], action: str) -> int:
