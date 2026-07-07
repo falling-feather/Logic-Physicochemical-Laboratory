@@ -20,6 +20,7 @@ def test_deploy_smoke_reports_ready_database_and_api(monkeypatch):
 
         assert report["ok"] is True
         assert report["preflight"]["ok"] is True
+        assert report["preflight"]["compatibility"]["status"] == "skipped_non_mysql"
         assert report["schema"]["status"] == "ready"
         assert report["schema"]["dialect"] == "sqlite"
         assert report["schema"]["missing_tables"] == []
@@ -41,7 +42,9 @@ def test_deploy_smoke_can_require_mysql(monkeypatch):
         report = run_smoke(database_url=database_url, backend_root=backend_root, require_mysql=True)
 
         assert report["ok"] is False
-        assert report["preflight"]["ok"] is True
+        assert report["preflight"]["ok"] is False
+        assert report["preflight"]["compatibility"]["status"] == "unexpected_dialect"
+        assert report["preflight"]["compatibility"]["dialect"] == "sqlite"
         assert report["schema"]["status"] == "unexpected_dialect"
         assert report["schema"]["dialect"] == "sqlite"
         assert report["schema"]["require_mysql"] is True

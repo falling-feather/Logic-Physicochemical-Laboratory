@@ -9,6 +9,7 @@ from sqlalchemy import text
 
 from app.core.config import get_settings
 from app.db.session import make_engine, reset_database_state
+import scripts.deploy_preflight as deploy_preflight
 from scripts.deploy_preflight import run_preflight
 
 
@@ -33,12 +34,86 @@ def test_deploy_preflight_reports_migrated_database(monkeypatch):
         assert report["database"]["ok"] is True
         assert report["migrations"]["status"] == "up_to_date"
         assert report["migrations"]["current"] == report["migrations"]["heads"]
+        assert report["compatibility"]["ok"] is True
+        assert report["compatibility"]["status"] == "skipped_non_mysql"
+        assert report["compatibility"]["dialect"] == "sqlite"
+        assert report["compatibility"]["require_mysql"] is False
     finally:
         make_engine(database_url).dispose()
         get_settings.cache_clear()
         reset_database_state()
         if database_path.exists():
             database_path.unlink()
+
+
+def test_deploy_preflight_can_require_mysql(monkeypatch):
+    backend_root = Path(__file__).resolve().parents[1]
+    runtime_dir = backend_root / "pytest-cache-files-preflight"
+    runtime_dir.mkdir(exist_ok=True)
+    database_path = runtime_dir / f"preflight-{uuid4().hex}.db"
+    database_url = f"sqlite+pysqlite:///{database_path.as_posix()}"
+    try:
+        monkeypatch.setenv("ASTRA_DATABASE_URL", database_url)
+        get_settings.cache_clear()
+        reset_database_state()
+
+        config = Config(str(backend_root / "alembic.ini"))
+        config.set_main_option("script_location", str(backend_root / "alembic"))
+        command.upgrade(config, "head")
+
+        report = run_preflight(database_url=database_url, backend_root=backend_root, require_mysql=True)
+
+        assert report["ok"] is False
+        assert report["database"]["ok"] is True
+        assert report["migrations"]["status"] == "up_to_date"
+        assert report["compatibility"]["ok"] is False
+        assert report["compatibility"]["status"] == "unexpected_dialect"
+        assert report["compatibility"]["dialect"] == "sqlite"
+        assert report["compatibility"]["require_mysql"] is True
+    finally:
+        make_engine(database_url).dispose()
+        get_settings.cache_clear()
+        reset_database_state()
+        if database_path.exists():
+            database_path.unlink()
+
+
+def test_deploy_preflight_mysql_compatibility_accepts_utf8mb4(monkeypatch):
+    report = _mysql_compatibility_report(
+        monkeypatch,
+        {
+            "character_set_database": "utf8mb4",
+            "collation_database": "utf8mb4_unicode_ci",
+            "character_set_connection": "utf8mb4",
+            "collation_connection": "utf8mb4_unicode_ci",
+            "time_zone": "+00:00",
+        },
+    )
+
+    assert report["ok"] is True
+    assert report["status"] == "ready"
+    assert report["dialect"] == "mysql"
+    assert report["driver"] == "pymysql"
+    assert report["expected_character_set"] == "utf8mb4"
+    assert report["expected_collation_prefix"] == "utf8mb4_"
+
+
+def test_deploy_preflight_mysql_compatibility_rejects_charset_mismatch(monkeypatch):
+    report = _mysql_compatibility_report(
+        monkeypatch,
+        {
+            "character_set_database": "utf8",
+            "collation_database": "utf8_general_ci",
+            "character_set_connection": "utf8mb4",
+            "collation_connection": "utf8mb4_unicode_ci",
+            "time_zone": "SYSTEM",
+        },
+    )
+
+    assert report["ok"] is False
+    assert report["status"] == "mysql_charset_mismatch"
+    assert report["character_set_database"] == "utf8"
+    assert report["collation_database"] == "utf8_general_ci"
 
 
 def test_user_normalized_username_migration_rejects_duplicates(monkeypatch):
@@ -180,6 +255,57 @@ def _alembic_config(backend_root: Path) -> Config:
     config = Config(str(backend_root / "alembic.ini"))
     config.set_main_option("script_location", str(backend_root / "alembic"))
     return config
+
+
+def _mysql_compatibility_report(monkeypatch, variables: dict[str, str]) -> dict[str, object]:
+    monkeypatch.setattr(deploy_preflight, "make_engine", lambda database_url: _FakeMysqlEngine(variables))
+    return deploy_preflight._database_compatibility_report(
+        "mysql+pymysql://astra:secret@127.0.0.1:3306/astra?charset=utf8mb4",
+        require_mysql=True,
+    )
+
+
+class _FakeMysqlDialect:
+    name = "mysql"
+    driver = "pymysql"
+
+
+class _FakeMysqlEngine:
+    dialect = _FakeMysqlDialect()
+
+    def __init__(self, variables: dict[str, str]) -> None:
+        self._variables = variables
+
+    def connect(self) -> "_FakeMysqlConnection":
+        return _FakeMysqlConnection(self._variables)
+
+    def dispose(self) -> None:
+        pass
+
+
+class _FakeMysqlConnection:
+    def __init__(self, variables: dict[str, str]) -> None:
+        self._variables = variables
+
+    def __enter__(self) -> "_FakeMysqlConnection":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        return None
+
+    def execute(self, statement: object) -> "_FakeMysqlResult":
+        return _FakeMysqlResult(self._variables)
+
+
+class _FakeMysqlResult:
+    def __init__(self, variables: dict[str, str]) -> None:
+        self._variables = variables
+
+    def mappings(self) -> "_FakeMysqlResult":
+        return self
+
+    def one(self) -> dict[str, str]:
+        return self._variables
 
 
 def _insert_user(database_url: str, username: str) -> None:

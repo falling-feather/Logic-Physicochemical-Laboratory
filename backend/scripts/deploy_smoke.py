@@ -36,7 +36,7 @@ def run_smoke(
     previous_env = _capture_env()
     try:
         _configure_runtime(url)
-        preflight = run_preflight(database_url=url, backend_root=root)
+        preflight = run_preflight(database_url=url, backend_root=root, require_mysql=require_mysql)
         schema = _schema_report(url, require_mysql=require_mysql)
         api = _api_report()
         return {

@@ -118,7 +118,8 @@ python -m uvicorn app.main:app --reload --port 8000
 # 访问 http://127.0.0.1:8000/api/health
 # 内容协议样例：http://127.0.0.1:8000/api/render/page/physics/energy-conservation
 
-# 部署 smoke（生产 MySQL 门禁，需先配置 ASTRA_DATABASE_URL 并执行迁移）
+# 部署预检与 smoke（生产 MySQL 门禁，需先配置 ASTRA_DATABASE_URL 并执行迁移）
+python -m scripts.deploy_preflight --require-mysql
 python -m scripts.deploy_smoke --require-mysql
 
 # 正式内容初始化（迁移和预检通过后执行，建议先 dry-run）
