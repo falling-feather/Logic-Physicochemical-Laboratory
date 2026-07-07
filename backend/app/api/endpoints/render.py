@@ -126,8 +126,105 @@ def render_page(slug: str, response: Response, db: Session = Depends(get_db)) ->
     page = get_page_schema(db, slug)
     if page is None:
         raise HTTPException(status_code=404, detail="Renderable page not found")
+    _apply_script_sandbox_embed_descriptors(page)
     _apply_script_contract_headers(response, page)
     return page
+
+
+def _apply_script_sandbox_embed_descriptors(page: ContentPage) -> None:
+    payload = page.model_dump(mode="json")
+    sandbox_id_counts = _script_manifest_sandbox_id_counts(payload)
+    _inject_script_sandbox_embed_descriptors(payload, slug=page.slug, sandbox_id_counts=sandbox_id_counts)
+    updated = ContentPage.model_validate(payload)
+    page.sections = updated.sections
+
+
+def _script_manifest_sandbox_id_counts(payload: dict[str, Any]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for manifest in _collect_script_manifests(payload):
+        sandbox_id = manifest.get("sandboxId")
+        if isinstance(sandbox_id, str):
+            counts[sandbox_id] = counts.get(sandbox_id, 0) + 1
+    return counts
+
+
+def _inject_script_sandbox_embed_descriptors(
+    value: Any,
+    *,
+    slug: str,
+    sandbox_id_counts: dict[str, int],
+) -> None:
+    if isinstance(value, list):
+        for item in value:
+            _inject_script_sandbox_embed_descriptors(item, slug=slug, sandbox_id_counts=sandbox_id_counts)
+        return
+    if not isinstance(value, dict):
+        return
+    manifest = value.get("scriptManifest")
+    if isinstance(manifest, dict):
+        descriptor = _script_sandbox_iframe_descriptor(
+            slug=slug,
+            manifest=manifest,
+            sandbox_id_counts=sandbox_id_counts,
+        )
+        if descriptor is not None:
+            manifest["embed"] = descriptor
+    for item in value.values():
+        _inject_script_sandbox_embed_descriptors(item, slug=slug, sandbox_id_counts=sandbox_id_counts)
+
+
+def _script_sandbox_iframe_descriptor(
+    *,
+    slug: str,
+    manifest: dict[str, Any],
+    sandbox_id_counts: dict[str, int],
+) -> dict[str, Any] | None:
+    sandbox_id = manifest.get("sandboxId")
+    sandbox = manifest.get("sandbox")
+    references = manifest.get("references")
+    if (
+        not isinstance(sandbox_id, str)
+        or sandbox_id_counts.get(sandbox_id, 0) != 1
+        or not isinstance(sandbox, dict)
+        or sandbox.get("status") != "isolated"
+        or not isinstance(sandbox.get("iframeSandbox"), str)
+        or not isinstance(sandbox.get("csp"), str)
+        or not isinstance(references, list)
+        or not references
+    ):
+        return None
+    if not all(isinstance(reference, dict) and _is_valid_sha256(reference.get("valueSha256")) for reference in references):
+        return None
+    capabilities = sandbox.get("capabilities") if isinstance(sandbox.get("capabilities"), dict) else {}
+    system_message_types = [
+        "bootstrap-ready",
+        "assets-ready",
+        "ready",
+        "error",
+        "unhandledrejection",
+    ]
+    return {
+        "descriptorVersion": "astra-script-sandbox-embed-v1",
+        "status": "embeddable",
+        "sandboxId": sandbox_id,
+        "iframe": {
+            "src": _script_sandbox_page_url(slug=slug, sandbox_id=sandbox_id),
+            "sandbox": sandbox["iframeSandbox"],
+            "referrerPolicy": "no-referrer",
+            "loading": "lazy",
+            "title": "Astra Script Sandbox",
+        },
+        "requiredContentSecurityPolicy": sandbox["csp"],
+        "originModel": "opaque",
+        "capabilities": capabilities,
+        "messageProtocol": {
+            "source": "astra-content-script-sandbox",
+            "sandboxId": sandbox_id,
+            "bootstrapProtocolVersion": "astra-script-sandbox-bootstrap-v1",
+            "systemMessageTypes": system_message_types,
+        },
+        "assetCount": len(references),
+    }
 
 
 def _apply_script_contract_headers(response: Response, page: ContentPage) -> None:
@@ -478,6 +575,12 @@ def _script_sandbox_bootstrap_url(*, slug: str, sandbox_id: str) -> str:
     api_prefix = get_settings().api_prefix.rstrip("/")
     encoded_slug = quote(slug, safe="/")
     return f"{api_prefix}/render/script-sandboxes/{sandbox_id}/bootstrap/page/{encoded_slug}"
+
+
+def _script_sandbox_page_url(*, slug: str, sandbox_id: str) -> str:
+    api_prefix = get_settings().api_prefix.rstrip("/")
+    encoded_slug = quote(slug, safe="/")
+    return f"{api_prefix}/render/script-sandboxes/{sandbox_id}/page/{encoded_slug}"
 
 
 def _script_sandbox_asset_url(*, slug: str, sandbox_id: str, asset_sha256: str) -> str:

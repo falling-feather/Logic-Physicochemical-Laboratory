@@ -1,4 +1,5 @@
 import re
+from urllib.parse import quote
 
 from sqlalchemy import delete, func, select
 import pytest
@@ -48,6 +49,40 @@ def test_energy_conservation_render_schema(client):
     assert experiment_props["scriptManifest"]["sandbox"]["capabilities"]["sameOrigin"] is False
     assert experiment_props["scriptManifest"]["referenceCount"] == 1
     assert len(experiment_props["scriptManifest"]["references"][0]["valueSha256"]) == 64
+    embed = experiment_props["scriptManifest"]["embed"]
+    assert embed["descriptorVersion"] == "astra-script-sandbox-embed-v1"
+    assert embed["status"] == "embeddable"
+    assert embed["sandboxId"] == experiment_props["scriptManifest"]["sandboxId"]
+    assert embed["iframe"] == {
+        "src": f"/api/render/script-sandboxes/{embed['sandboxId']}/page/physics/energy-conservation",
+        "sandbox": "allow-scripts",
+        "referrerPolicy": "no-referrer",
+        "loading": "lazy",
+        "title": "Astra Script Sandbox",
+    }
+    assert embed["requiredContentSecurityPolicy"] == experiment_props["scriptManifest"]["sandbox"]["csp"]
+    assert embed["originModel"] == "opaque"
+    assert embed["capabilities"] == experiment_props["scriptManifest"]["sandbox"]["capabilities"]
+    assert embed["messageProtocol"] == {
+        "source": "astra-content-script-sandbox",
+        "sandboxId": embed["sandboxId"],
+        "bootstrapProtocolVersion": "astra-script-sandbox-bootstrap-v1",
+        "systemMessageTypes": [
+            "bootstrap-ready",
+            "assets-ready",
+            "ready",
+            "error",
+            "unhandledrejection",
+        ],
+    }
+    assert embed["assetCount"] == 1
+    public_render_text = response.text
+    assert "scriptUrl" not in public_render_text
+    assert "scriptIntegrity" not in public_render_text
+    assert "scriptCrossorigin" not in public_render_text
+    assert "pages/physics/energy-conservation.js" not in public_render_text
+    assert "/assets/" not in public_render_text
+    assert "nonce-" not in public_render_text
     assert payload["courseUnit"]["unitId"] == "physics-energy-conservation"
     assert payload["sources"][0]["sourceId"] == "openstax-conservation-energy"
 
@@ -56,8 +91,9 @@ def test_render_script_sandbox_document_serves_isolated_html(client):
     render = client.get("/api/render/page/physics/energy-conservation")
     manifest = render.json()["sections"][2]["props"]["scriptManifest"]
     sandbox_id = manifest["sandboxId"]
+    assert manifest["embed"]["iframe"]["src"] == f"/api/render/script-sandboxes/{sandbox_id}/page/physics/energy-conservation"
 
-    response = client.get(f"/api/render/script-sandboxes/{sandbox_id}/page/physics/energy-conservation")
+    response = client.get(manifest["embed"]["iframe"]["src"])
 
     assert response.status_code == 200
     assert response.headers["Content-Type"].startswith("text/html")
@@ -175,6 +211,7 @@ def test_render_script_sandbox_document_fails_closed_for_missing_or_blocked_mani
 
     render = client.get("/api/render/page/physics/blocked-sandbox")
     manifest = render.json()["sections"][0]["props"]["scriptManifest"]
+    assert "embed" not in manifest
     blocked = client.get(f"/api/render/script-sandboxes/{manifest['sandboxId']}/page/physics/blocked-sandbox")
 
     assert blocked.status_code == 409
@@ -214,6 +251,8 @@ def test_render_script_sandbox_document_rejects_ambiguous_manifest_id(client):
         if "scriptManifest" in section["props"]
     ]
     assert manifests[0]["sandboxId"] == manifests[1]["sandboxId"]
+    assert "embed" not in manifests[0]
+    assert "embed" not in manifests[1]
 
     response = client.get(f"/api/render/script-sandboxes/{manifests[0]['sandboxId']}/page/physics/ambiguous-sandbox")
 
@@ -301,6 +340,10 @@ def test_render_script_sandbox_document_requires_published_external_mirror(clien
 
     render = client.get("/api/render/page/physics/unmirrored-external-sandbox")
     manifest = render.json()["sections"][0]["props"]["scriptManifest"]
+    assert manifest["embed"]["iframe"]["src"].endswith("/page/physics/unmirrored-external-sandbox")
+    assert "https://cdn.example.test/tool.js" not in render.text
+    assert "scriptIntegrity" not in render.text
+    assert "scriptCrossorigin" not in render.text
     response = client.get(
         f"/api/render/script-sandboxes/{manifest['sandboxId']}/page/physics/unmirrored-external-sandbox"
     )
@@ -312,6 +355,38 @@ def test_render_script_sandbox_document_requires_published_external_mirror(clien
     assert response.json()["detail"] == "External script sandbox asset is not mirrored"
     assert bootstrap.status_code == 409
     assert bootstrap.json()["detail"] == "External script sandbox asset is not mirrored"
+
+
+def test_script_sandbox_embed_descriptor_encodes_unicode_slug(client):
+    slug = "物理/脚本嵌入测试"
+    encoded_slug = quote(slug, safe="/")
+    payload = _content_page_payload()
+    payload["slug"] = slug
+    payload["status"] = "published"
+    payload["version"] = "unicode-embed-test"
+    payload["sections"][0]["props"] = {
+        "scriptPath": "pages/physics/energy-conservation.js",
+        "scriptSandbox": {"mode": "isolated-iframe", "network": "same-origin", "storage": "none"},
+    }
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        db.add(
+            ContentPageRecord(
+                slug=payload["slug"],
+                status="published",
+                version="unicode-embed-test",
+                schema_json=payload,
+            )
+        )
+        db.commit()
+
+    render = client.get(f"/api/render/page/{encoded_slug}")
+
+    assert render.status_code == 200
+    manifest = render.json()["sections"][0]["props"]["scriptManifest"]
+    assert manifest["embed"]["iframe"]["src"] == f"/api/render/script-sandboxes/{manifest['sandboxId']}/page/{encoded_slug}"
+    sandbox = client.get(manifest["embed"]["iframe"]["src"])
+    assert sandbox.status_code == 200
 
 
 def test_script_manifest_references_require_hashes():

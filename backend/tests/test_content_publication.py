@@ -666,6 +666,19 @@ def test_allowlisted_external_script_asset_requires_review_before_publish(client
             "requiredContentSecurityPolicy": props_after_publish["scriptManifest"]["sandbox"]["csp"],
             "sandboxOrigin": "opaque",
         }
+        embed = props_after_publish["scriptManifest"]["embed"]
+        assert embed["descriptorVersion"] == "astra-script-sandbox-embed-v1"
+        assert embed["status"] == "embeddable"
+        assert embed["sandboxId"] == props_after_publish["scriptManifest"]["sandboxId"]
+        assert embed["iframe"]["src"] == (
+            f"/api/render/script-sandboxes/{props_after_publish['scriptManifest']['sandboxId']}/page/{slug}"
+        )
+        assert embed["iframe"]["sandbox"] == "allow-scripts"
+        assert embed["iframe"]["referrerPolicy"] == "no-referrer"
+        assert embed["originModel"] == "opaque"
+        assert embed["assetCount"] == 1
+        assert "cdn.example.test" not in json.dumps(embed, sort_keys=True)
+        assert "/assets/" not in json.dumps(embed, sort_keys=True)
         public_reference = props_after_publish["scriptManifest"]["references"][0]
         assert len(public_reference["valueSha256"]) == 64
         assert "value" not in public_reference
