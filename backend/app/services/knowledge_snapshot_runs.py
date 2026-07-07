@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta
 from typing import Literal
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.api.endpoints import knowledge as knowledge_endpoint
@@ -12,6 +12,10 @@ from app.models.base import utc_now
 
 
 SnapshotGranularity = Literal["day", "week"]
+
+
+class SnapshotRunLeaseLost(RuntimeError):
+    pass
 
 
 def snapshot_window(
@@ -38,6 +42,8 @@ def rebuild_periodic_knowledge_snapshots(
     granularity: SnapshotGranularity,
     reference_date: date | datetime | None = None,
     trigger_source: str = "script",
+    scheduler_lease_owner: str | None = None,
+    scheduler_lease_token: str | None = None,
 ) -> KnowledgeSnapshotRun:
     period_start, period_end = snapshot_window(granularity, reference_date)
     run_key = _run_key(granularity, period_start, period_end)
@@ -55,25 +61,35 @@ def rebuild_periodic_knowledge_snapshots(
     db.flush()
     try:
         counts = _rebuild_window(db, granularity, period_start, period_end)
-        run.status = "success"
-        run.user_snapshot_count = counts["user_snapshot_count"]
-        run.class_snapshot_count = counts["class_snapshot_count"]
-        run.finished_at = utc_now()
-        run.metadata_json = {
+        success_metadata = {
             "trigger_source": trigger_source,
             "class_course_pairs": counts["class_course_pairs"],
         }
+        _finish_run_success(
+            db,
+            run,
+            user_snapshot_count=counts["user_snapshot_count"],
+            class_snapshot_count=counts["class_snapshot_count"],
+            metadata_json=success_metadata,
+            scheduler_lease_owner=scheduler_lease_owner,
+            scheduler_lease_token=scheduler_lease_token,
+        )
         db.commit()
+        db.refresh(run)
     except Exception as exc:
         db.rollback()
+        if isinstance(exc, SnapshotRunLeaseLost):
+            raise
         run = _get_or_create_run(db, run_key, granularity, period_start, period_end, trigger_source)
-        run.status = "failed"
-        run.trigger_source = trigger_source
-        run.started_at = run.started_at or utc_now()
-        run.finished_at = utc_now()
-        run.attempt_count = attempt_count
-        run.error_message = exc.__class__.__name__
-        run.metadata_json = {"trigger_source": trigger_source}
+        _finish_run_failure(
+            db,
+            run,
+            trigger_source=trigger_source,
+            attempt_count=attempt_count,
+            error_message=exc.__class__.__name__,
+            scheduler_lease_owner=scheduler_lease_owner,
+            scheduler_lease_token=scheduler_lease_token,
+        )
         db.commit()
         raise
     return run
@@ -220,6 +236,92 @@ def _get_or_create_run(
     )
     db.add(run)
     return run
+
+
+def _finish_run_success(
+    db: Session,
+    run: KnowledgeSnapshotRun,
+    *,
+    user_snapshot_count: int,
+    class_snapshot_count: int,
+    metadata_json: dict,
+    scheduler_lease_owner: str | None,
+    scheduler_lease_token: str | None,
+) -> None:
+    if scheduler_lease_owner is None:
+        run.status = "success"
+        run.user_snapshot_count = user_snapshot_count
+        run.class_snapshot_count = class_snapshot_count
+        run.finished_at = utc_now()
+        run.metadata_json = metadata_json
+        return
+    result = db.execute(
+        update(KnowledgeSnapshotRun)
+        .where(
+            KnowledgeSnapshotRun.id == run.id,
+            KnowledgeSnapshotRun.status == "running",
+            KnowledgeSnapshotRun.scheduler_lease_owner == scheduler_lease_owner,
+            KnowledgeSnapshotRun.scheduler_lease_token == scheduler_lease_token,
+        )
+        .values(
+            status="success",
+            user_snapshot_count=user_snapshot_count,
+            class_snapshot_count=class_snapshot_count,
+            finished_at=utc_now(),
+            error_message=None,
+            scheduler_lease_owner=None,
+            scheduler_lease_token=None,
+            scheduler_lease_expires_at=None,
+            scheduler_heartbeat_at=None,
+            metadata_json=metadata_json,
+        )
+    )
+    if result.rowcount != 1:
+        raise SnapshotRunLeaseLost("knowledge snapshot run lease was lost before success")
+
+
+def _finish_run_failure(
+    db: Session,
+    run: KnowledgeSnapshotRun,
+    *,
+    trigger_source: str,
+    attempt_count: int,
+    error_message: str,
+    scheduler_lease_owner: str | None,
+    scheduler_lease_token: str | None,
+) -> None:
+    if scheduler_lease_owner is None:
+        run.status = "failed"
+        run.trigger_source = trigger_source
+        run.started_at = run.started_at or utc_now()
+        run.finished_at = utc_now()
+        run.attempt_count = attempt_count
+        run.error_message = error_message
+        run.metadata_json = {"trigger_source": trigger_source}
+        return
+    result = db.execute(
+        update(KnowledgeSnapshotRun)
+        .where(
+            KnowledgeSnapshotRun.id == run.id,
+            KnowledgeSnapshotRun.status == "running",
+            KnowledgeSnapshotRun.scheduler_lease_owner == scheduler_lease_owner,
+            KnowledgeSnapshotRun.scheduler_lease_token == scheduler_lease_token,
+        )
+        .values(
+            status="failed",
+            trigger_source=trigger_source,
+            finished_at=utc_now(),
+            attempt_count=attempt_count,
+            error_message=error_message,
+            scheduler_lease_owner=None,
+            scheduler_lease_token=None,
+            scheduler_lease_expires_at=None,
+            scheduler_heartbeat_at=None,
+            metadata_json={"trigger_source": trigger_source},
+        )
+    )
+    if result.rowcount != 1:
+        raise SnapshotRunLeaseLost("knowledge snapshot run lease was lost before failure")
 
 
 def _run_key(granularity: SnapshotGranularity, period_start: datetime, period_end: datetime) -> str:

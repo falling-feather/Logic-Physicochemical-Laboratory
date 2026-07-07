@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
+import os
+import socket
 from typing import Callable
+import uuid
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.session import get_session_factory
@@ -34,6 +38,14 @@ class SnapshotScheduleJob:
     reference_date: date
 
 
+@dataclass(frozen=True)
+class SnapshotJobLease:
+    run_key: str
+    lease_owner: str
+    lease_token: str
+    lease_expires_at: datetime
+
+
 class KnowledgeSnapshotScheduler:
     def __init__(
         self,
@@ -42,15 +54,21 @@ class KnowledgeSnapshotScheduler:
         schedule_config: SnapshotScheduleConfig,
         retry_attempts: int,
         interval_seconds: int,
+        lease_seconds: int,
+        heartbeat_seconds: int,
         run_on_start: bool = False,
         clock: Callable[[], datetime] = utc_now,
+        instance_id: str | None = None,
     ) -> None:
         self.database_url = database_url
         self.schedule_config = schedule_config
         self.retry_attempts = retry_attempts
         self.interval_seconds = interval_seconds
+        self.lease_seconds = lease_seconds
+        self.heartbeat_seconds = heartbeat_seconds
         self.run_on_start = run_on_start
         self.clock = clock
+        self.instance_id = instance_id or _default_scheduler_instance_id()
         self._lock = asyncio.Lock()
         self._stop_event: asyncio.Event | None = None
         self._task: asyncio.Task | None = None
@@ -92,17 +110,28 @@ class KnowledgeSnapshotScheduler:
         session_factory = get_session_factory(self.database_url)
         with session_factory() as db:
             try:
-                if not should_run_snapshot_job(db, job, retry_attempts=self.retry_attempts):
+                lease = acquire_snapshot_job_lease(
+                    db,
+                    job,
+                    retry_attempts=self.retry_attempts,
+                    lease_owner=self.instance_id,
+                    lease_seconds=self.lease_seconds,
+                    now=self.clock(),
+                )
+                if lease is None:
                     return {
                         "granularity": job.granularity,
                         "reference_date": job.reference_date.isoformat(),
                         "status": "skipped",
+                        "reason": "lease_unavailable",
                     }
                 run = rebuild_periodic_knowledge_snapshots(
                     db,
                     granularity=job.granularity,
                     reference_date=job.reference_date,
                     trigger_source="scheduler",
+                    scheduler_lease_owner=lease.lease_owner,
+                    scheduler_lease_token=lease.lease_token,
                 )
             except Exception as exc:
                 return {
@@ -134,17 +163,177 @@ def due_snapshot_jobs(now: datetime, config: SnapshotScheduleConfig) -> list[Sna
     return jobs
 
 
-def should_run_snapshot_job(db: Session, job: SnapshotScheduleJob, *, retry_attempts: int) -> bool:
+def acquire_snapshot_job_lease(
+    db: Session,
+    job: SnapshotScheduleJob,
+    *,
+    retry_attempts: int,
+    lease_owner: str,
+    lease_seconds: int,
+    trigger_source: str = "scheduler",
+    now: datetime | None = None,
+) -> SnapshotJobLease | None:
+    period_start, period_end = snapshot_window(job.granularity, job.reference_date)
+    run_key = snapshot_run_key(job.granularity, period_start, period_end)
+    now_value = _as_naive_utc(now or utc_now())
+    lease_expires_at = now_value + timedelta(seconds=lease_seconds)
+    lease_token = uuid.uuid4().hex
+    run = db.scalar(select(KnowledgeSnapshotRun).where(KnowledgeSnapshotRun.run_key == run_key))
+    if run is None:
+        run = KnowledgeSnapshotRun(
+            run_key=run_key,
+            granularity=job.granularity,
+            period_start=period_start,
+            period_end=period_end,
+            trigger_source=trigger_source,
+            status="running",
+            started_at=now_value,
+            scheduler_lease_owner=lease_owner,
+            scheduler_lease_token=lease_token,
+            scheduler_lease_expires_at=lease_expires_at,
+            scheduler_heartbeat_at=now_value,
+            attempt_count=0,
+            user_snapshot_count=0,
+            class_snapshot_count=0,
+            metadata_json={"trigger_source": trigger_source, "scheduler_lease_owner": lease_owner},
+        )
+        db.add(run)
+        try:
+            db.commit()
+            return SnapshotJobLease(
+                run_key=run_key,
+                lease_owner=lease_owner,
+                lease_token=lease_token,
+                lease_expires_at=lease_expires_at,
+            )
+        except IntegrityError:
+            db.rollback()
+            return _claim_existing_snapshot_job_lease(
+                db,
+                run_key,
+                retry_attempts=retry_attempts,
+                lease_owner=lease_owner,
+                lease_token=lease_token,
+                lease_expires_at=lease_expires_at,
+                now=now_value,
+                lease_seconds=lease_seconds,
+                trigger_source=trigger_source,
+            )
+    return _claim_existing_snapshot_job_lease(
+        db,
+        run_key,
+        retry_attempts=retry_attempts,
+        lease_owner=lease_owner,
+        lease_token=lease_token,
+        lease_expires_at=lease_expires_at,
+        now=now_value,
+        lease_seconds=lease_seconds,
+        trigger_source=trigger_source,
+    )
+
+
+def should_run_snapshot_job(
+    db: Session,
+    job: SnapshotScheduleJob,
+    *,
+    retry_attempts: int,
+    lease_seconds: int | None = None,
+    now: datetime | None = None,
+) -> bool:
     period_start, period_end = snapshot_window(job.granularity, job.reference_date)
     run_key = snapshot_run_key(job.granularity, period_start, period_end)
     run = db.scalar(select(KnowledgeSnapshotRun).where(KnowledgeSnapshotRun.run_key == run_key))
     if run is None:
         return True
     if run.status in {"running", "success"}:
+        if run.status == "running" and lease_seconds is not None:
+            return _run_lease_expired(run, now or utc_now(), lease_seconds)
         return False
     if run.status == "failed":
         return run.attempt_count < retry_attempts
     return False
+
+
+def _claim_existing_snapshot_job_lease(
+    db: Session,
+    run_key: str,
+    *,
+    retry_attempts: int,
+    lease_owner: str,
+    lease_token: str,
+    lease_expires_at: datetime,
+    now: datetime,
+    lease_seconds: int,
+    trigger_source: str,
+) -> SnapshotJobLease | None:
+    legacy_running_cutoff = now - timedelta(seconds=lease_seconds)
+    claimable = or_(
+        and_(
+            KnowledgeSnapshotRun.status == "failed",
+            KnowledgeSnapshotRun.attempt_count < retry_attempts,
+        ),
+        and_(
+            KnowledgeSnapshotRun.status == "running",
+            or_(
+                KnowledgeSnapshotRun.scheduler_lease_expires_at <= now,
+                and_(
+                    KnowledgeSnapshotRun.scheduler_lease_expires_at.is_(None),
+                    KnowledgeSnapshotRun.started_at <= legacy_running_cutoff,
+                ),
+            ),
+        ),
+    )
+    result = db.execute(
+        update(KnowledgeSnapshotRun)
+        .where(KnowledgeSnapshotRun.run_key == run_key, claimable)
+        .values(
+            status="running",
+            trigger_source=trigger_source,
+            started_at=now,
+            finished_at=None,
+            error_message=None,
+            scheduler_lease_owner=lease_owner,
+            scheduler_lease_token=lease_token,
+            scheduler_lease_expires_at=lease_expires_at,
+            scheduler_heartbeat_at=now,
+            metadata_json={"trigger_source": trigger_source, "scheduler_lease_owner": lease_owner},
+        )
+    )
+    db.commit()
+    if result.rowcount != 1:
+        return None
+    return SnapshotJobLease(
+        run_key=run_key,
+        lease_owner=lease_owner,
+        lease_token=lease_token,
+        lease_expires_at=lease_expires_at,
+    )
+
+
+def heartbeat_snapshot_job_lease(
+    db: Session,
+    lease: SnapshotJobLease,
+    *,
+    lease_seconds: int,
+    now: datetime | None = None,
+) -> bool:
+    now_value = _as_naive_utc(now or utc_now())
+    lease_expires_at = now_value + timedelta(seconds=lease_seconds)
+    result = db.execute(
+        update(KnowledgeSnapshotRun)
+        .where(
+            KnowledgeSnapshotRun.run_key == lease.run_key,
+            KnowledgeSnapshotRun.status == "running",
+            KnowledgeSnapshotRun.scheduler_lease_owner == lease.lease_owner,
+            KnowledgeSnapshotRun.scheduler_lease_token == lease.lease_token,
+        )
+        .values(
+            scheduler_lease_expires_at=lease_expires_at,
+            scheduler_heartbeat_at=now_value,
+        )
+    )
+    db.commit()
+    return result.rowcount == 1
 
 
 def scheduler_from_settings(settings) -> KnowledgeSnapshotScheduler:
@@ -159,9 +348,28 @@ def scheduler_from_settings(settings) -> KnowledgeSnapshotScheduler:
         ),
         retry_attempts=settings.knowledge_snapshot_retry_attempts,
         interval_seconds=settings.knowledge_snapshot_scheduler_interval_seconds,
+        lease_seconds=settings.knowledge_snapshot_scheduler_lease_seconds,
+        heartbeat_seconds=settings.knowledge_snapshot_scheduler_heartbeat_seconds,
         run_on_start=settings.knowledge_snapshot_scheduler_run_on_start,
     )
 
 
 def _hour_reached(now: datetime, hour: int) -> bool:
     return now.time() >= time(hour=hour)
+
+
+def _run_lease_expired(run: KnowledgeSnapshotRun, now: datetime, lease_seconds: int) -> bool:
+    now_value = _as_naive_utc(now)
+    if run.scheduler_lease_expires_at is not None:
+        return _as_naive_utc(run.scheduler_lease_expires_at) <= now_value
+    return _as_naive_utc(run.started_at) <= now_value - timedelta(seconds=lease_seconds)
+
+
+def _as_naive_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(UTC).replace(tzinfo=None)
+
+
+def _default_scheduler_instance_id() -> str:
+    return f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:12]}"

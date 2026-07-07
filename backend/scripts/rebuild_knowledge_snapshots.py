@@ -4,10 +4,13 @@ import argparse
 from datetime import date
 import json
 import sys
+from uuid import uuid4
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
+from app.models.base import utc_now
 from app.services.knowledge_snapshot_runs import rebuild_periodic_knowledge_snapshots, snapshot_run_report
+from app.services.knowledge_snapshot_scheduler import SnapshotScheduleJob, acquire_snapshot_job_lease
 
 
 def run_rebuild(
@@ -16,14 +19,37 @@ def run_rebuild(
     reference_date: date | None = None,
     database_url: str | None = None,
 ) -> dict:
-    url = database_url or get_settings().database_url
+    settings = get_settings()
+    url = database_url or settings.database_url
     session_factory = get_session_factory(url)
     with session_factory() as db:
+        job = SnapshotScheduleJob(
+            granularity=granularity,
+            reference_date=reference_date or utc_now().date(),
+        )
+        lease = acquire_snapshot_job_lease(
+            db,
+            job,
+            retry_attempts=settings.knowledge_snapshot_retry_attempts,
+            lease_owner=f"script:{uuid4().hex[:24]}",
+            lease_seconds=settings.knowledge_snapshot_scheduler_lease_seconds,
+            trigger_source="script",
+        )
+        if lease is None:
+            return {
+                "ok": True,
+                "status": "skipped",
+                "reason": "lease_unavailable",
+                "granularity": granularity,
+                "reference_date": job.reference_date.isoformat(),
+            }
         run = rebuild_periodic_knowledge_snapshots(
             db,
             granularity=granularity,
-            reference_date=reference_date,
+            reference_date=job.reference_date,
             trigger_source="script",
+            scheduler_lease_owner=lease.lease_owner,
+            scheduler_lease_token=lease.lease_token,
         )
         return snapshot_run_report(run)
 

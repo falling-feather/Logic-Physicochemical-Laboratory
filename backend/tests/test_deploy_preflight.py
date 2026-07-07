@@ -134,6 +134,37 @@ def test_audit_log_chain_hash_migration_preserves_legacy_logs(monkeypatch):
         _dispose_and_remove(database_url, database_path)
 
 
+def test_knowledge_snapshot_run_lease_migration_preserves_legacy_runs(monkeypatch):
+    backend_root = Path(__file__).resolve().parents[1]
+    database_path, database_url = _empty_sqlite_database(monkeypatch, backend_root)
+    config = _alembic_config(backend_root)
+    try:
+        command.upgrade(config, "20260707_0025")
+        run_id = _insert_knowledge_snapshot_run(database_url)
+
+        command.upgrade(config, "head")
+
+        engine = make_engine(database_url)
+        with engine.connect() as connection:
+            row = connection.execute(
+                text(
+                    """
+                    SELECT scheduler_lease_owner, scheduler_lease_token,
+                           scheduler_lease_expires_at, scheduler_heartbeat_at
+                    FROM knowledge_snapshot_runs
+                    WHERE id = :run_id
+                    """
+                ),
+                {"run_id": run_id},
+            ).mappings().one()
+            assert row["scheduler_lease_owner"] is None
+            assert row["scheduler_lease_token"] is None
+            assert row["scheduler_lease_expires_at"] is None
+            assert row["scheduler_heartbeat_at"] is None
+    finally:
+        _dispose_and_remove(database_url, database_path)
+
+
 def _empty_sqlite_database(monkeypatch, backend_root: Path) -> tuple[Path, str]:
     runtime_dir = backend_root / "pytest-cache-files-preflight"
     runtime_dir.mkdir(exist_ok=True)
@@ -279,6 +310,36 @@ def _insert_audit_log(database_url: str) -> int:
                 """
             ),
             {"created_at": now, "updated_at": now},
+        )
+        return int(result.lastrowid)
+
+
+def _insert_knowledge_snapshot_run(database_url: str) -> int:
+    now = datetime.now(UTC)
+    engine = make_engine(database_url)
+    with engine.begin() as connection:
+        result = connection.execute(
+            text(
+                """
+                INSERT INTO knowledge_snapshot_runs (
+                    run_key, granularity, period_start, period_end, trigger_source, status,
+                    started_at, finished_at, user_snapshot_count, class_snapshot_count,
+                    error_message, metadata_json, created_at, updated_at, attempt_count
+                )
+                VALUES (
+                    'knowledge:day:legacy', 'day', :period_start, :period_end, 'scheduler', 'success',
+                    :started_at, :finished_at, 0, 0, NULL, '{}', :created_at, :updated_at, 1
+                )
+                """
+            ),
+            {
+                "period_start": now,
+                "period_end": now,
+                "started_at": now,
+                "finished_at": now,
+                "created_at": now,
+                "updated_at": now,
+            },
         )
         return int(result.lastrowid)
 
