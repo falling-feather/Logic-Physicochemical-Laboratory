@@ -1,8 +1,10 @@
 from sqlalchemy import delete, func, select
+import pytest
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
 from app.models import ContentPageRecord
+from app.schemas.content import ContentPage
 
 
 def test_energy_conservation_render_schema(client):
@@ -14,7 +16,9 @@ def test_energy_conservation_render_schema(client):
     payload = response.json()
     assert payload["slug"] == "physics/energy-conservation"
     assert payload["layout"] == "experiment-page"
+    assert payload["sections"][0]["sectionId"] == "energy-hero"
     assert payload["sections"][2]["type"] == "experiment"
+    assert payload["sections"][2]["sectionId"] == "energy-interactive-lab"
     assert payload["sections"][2]["experimentId"] == "energy-conservation"
     experiment_props = payload["sections"][2]["props"]
     assert "scriptPath" not in experiment_props
@@ -24,6 +28,42 @@ def test_energy_conservation_render_schema(client):
     assert experiment_props["scriptManifest"]["referenceCount"] == 1
     assert len(experiment_props["scriptManifest"]["references"][0]["valueSha256"]) == 64
     assert payload["courseUnit"]["unitId"] == "physics-energy-conservation"
+    assert payload["sources"][0]["sourceId"] == "openstax-conservation-energy"
+
+
+def test_content_schema_rejects_duplicate_stable_ids():
+    payload = _content_page_payload()
+    payload["sections"][1]["sectionId"] = payload["sections"][0]["sectionId"]
+
+    with pytest.raises(ValueError, match="Duplicate content sectionId"):
+        ContentPage.model_validate(payload)
+
+
+def test_content_schema_rejects_duplicate_source_ids():
+    payload = _content_page_payload()
+    payload["sources"].append(
+        {
+            "sourceId": payload["sources"][0]["sourceId"],
+            "label": "Duplicate",
+            "url": "https://example.com/duplicate",
+        }
+    )
+
+    with pytest.raises(ValueError, match="Duplicate content sourceId"):
+        ContentPage.model_validate(payload)
+
+
+@pytest.mark.parametrize("field", ["sectionId", "sourceId"])
+@pytest.mark.parametrize("value", ["UpperCase", "-leading-dash", "has space", "中文标识"])
+def test_content_schema_rejects_invalid_stable_id_format(field, value):
+    payload = _content_page_payload()
+    if field == "sectionId":
+        payload["sections"][0]["sectionId"] = value
+    else:
+        payload["sources"][0]["sourceId"] = value
+
+    with pytest.raises(ValueError):
+        ContentPage.model_validate(payload)
 
 
 def test_unknown_render_schema_returns_404(client):
@@ -64,3 +104,39 @@ def _content_page_count() -> int:
     session_factory = get_session_factory(get_settings().database_url)
     with session_factory() as db:
         return int(db.scalar(select(func.count()).select_from(ContentPageRecord)) or 0)
+
+
+def _content_page_payload() -> dict:
+    return {
+        "slug": "physics/stable-ids",
+        "galaxy": "englab",
+        "subject": "physics",
+        "title": "Stable IDs",
+        "layout": "experiment-page",
+        "status": "draft",
+        "version": "draft-local",
+        "summary": "Stable identity test.",
+        "sections": [
+            {
+                "sectionId": "stable-hero",
+                "type": "hero",
+                "title": "Stable Hero",
+                "summary": "Hero.",
+                "props": {},
+            },
+            {
+                "sectionId": "stable-task",
+                "type": "learning-task",
+                "title": "Stable Task",
+                "summary": "Task.",
+                "props": {},
+            },
+        ],
+        "sources": [
+            {
+                "sourceId": "stable-source",
+                "label": "Stable Source",
+                "url": "https://example.com/stable-source",
+            }
+        ],
+    }

@@ -27,6 +27,7 @@ from app.schemas.content import (
 )
 from app.services.audit import record_audit_log
 from app.services.content_catalog import get_page_schema, list_page_summaries
+from app.services.content_identity import content_stable_identity_errors
 from app.services.content_script_policy import (
     SCRIPT_POLICY_VERSION,
     analyze_content_script_policy,
@@ -67,6 +68,7 @@ def create_content_draft(
     if target_slug != page_schema.slug.strip():
         raise HTTPException(status_code=422, detail="target_slug must match schema.slug")
     page_schema = page_schema.model_copy(update={"slug": target_slug})
+    _validate_content_stable_identity_contract(page_schema)
     script_policy = _analyze_content_script_policy(page_schema)
     if script_policy.has_blocking_findings:
         raise HTTPException(status_code=422, detail="Content schema contains blocked script policy findings")
@@ -153,6 +155,7 @@ def update_content_draft(
     if target_slug != page_schema.slug.strip():
         raise HTTPException(status_code=422, detail="schema.slug must match draft target_slug")
     page_schema = page_schema.model_copy(update={"slug": target_slug})
+    _validate_content_stable_identity_contract(page_schema)
     script_policy = _analyze_content_script_policy(page_schema)
     if script_policy.has_blocking_findings:
         raise HTTPException(status_code=422, detail="Content schema contains blocked script policy findings")
@@ -311,6 +314,7 @@ def publish_content_draft(
         raise HTTPException(status_code=409, detail="Content schema includes script references; script review is required")
     if script_policy.requires_review and draft.script_review_status != SCRIPT_REVIEW_APPROVED:
         raise HTTPException(status_code=409, detail="Content draft script review must be approved before publishing")
+    _validate_content_stable_identity_contract(ContentPage.model_validate(draft.schema_json), status_code=409)
     _reject_stale_content_draft(db, draft)
 
     target_slug = draft.target_slug.strip()
@@ -768,6 +772,18 @@ def _analyze_content_script_policy(page_schema: ContentPage):
         page_schema,
         allowed_external_hosts=get_settings().content_script_allowed_host_list,
     )
+
+
+def _validate_content_stable_identity_contract(page_schema: ContentPage, *, status_code: int = 422) -> None:
+    errors = content_stable_identity_errors(page_schema)
+    if errors:
+        raise HTTPException(
+            status_code=status_code,
+            detail={
+                "code": "content_stable_identity_required",
+                "errors": errors,
+            },
+        )
 
 
 def _content_script_policy_context_hash() -> str:

@@ -61,6 +61,7 @@ def _draft_payload(slug: str, *, allow_script: bool = False) -> dict:
             "summary": "A teacher-authored draft that is not public yet.",
             "sections": [
                 {
+                    "sectionId": "observe-task",
                     "type": "learning-task",
                     "title": "Observe",
                     "summary": "Explain what changes when friction is introduced.",
@@ -164,6 +165,27 @@ def test_teacher_creates_content_draft_without_publishing(client):
         json={"status": "approved", "note": "No script to review"},
     )
     assert review_no_script.status_code == 409
+
+
+def test_content_draft_requires_stable_section_identity_contract(client):
+    _bootstrap_admin(client, username="admin_stable_identity")
+    _, teacher_token = _register_and_login(client, "teacher_stable_identity", "teacher")
+    payload = _draft_payload("physics/stable-identity-required")
+    payload["schema"]["sections"][0].pop("sectionId")
+
+    missing = client.post("/api/content/drafts", headers=_auth_header(teacher_token), json=payload)
+
+    assert missing.status_code == 422
+    assert missing.json()["detail"]["code"] == "content_stable_identity_required"
+    assert "sections[0].sectionId is required" in missing.json()["detail"]["errors"]
+
+    conflict_payload = _draft_payload("physics/stable-identity-conflict")
+    conflict_payload["schema"]["sections"][0]["props"]["sectionId"] = "different-section"
+    conflict = client.post("/api/content/drafts", headers=_auth_header(teacher_token), json=conflict_payload)
+
+    assert conflict.status_code == 422
+    assert conflict.json()["detail"]["code"] == "content_stable_identity_required"
+    assert "sections[0].props.sectionId conflicts with sections[0].sectionId" in conflict.json()["detail"]["errors"]
 
 
 def test_content_draft_submit_request_changes_resubmit_and_withdraw(client):

@@ -118,9 +118,9 @@ router = APIRouter()
 PENDING_SUBMISSION_STATUSES = ["submitted", "returned"]
 _DIFF_MISSING = object()
 _CONTENT_METADATA_FIELDS = ("slug", "galaxy", "subject", "title", "layout", "status", "version", "summary")
-_CONTENT_SECTION_FIELDS = ("type", "title", "summary", "experimentId", "questionSetId")
+_CONTENT_SECTION_FIELDS = ("sectionId", "type", "title", "summary", "experimentId", "questionSetId")
 _CONTENT_COURSE_UNIT_FIELDS = ("courseId", "unitId", "order", "title")
-_CONTENT_SOURCE_FIELDS = ("label", "url")
+_CONTENT_SOURCE_FIELDS = ("sourceId", "label", "url")
 _AUDIT_LOG_CSV_FIELDS = (
     "id",
     "actor_user_id",
@@ -2788,7 +2788,7 @@ def _section_identity(item: Any, index: int) -> str:
     if not isinstance(item, dict):
         return f"section:index:{index}"
     props = _semantic_mapping(item.get("props"))
-    explicit_id = item.get("id") or props.get("id") or props.get("sectionId")
+    explicit_id = item.get("sectionId") or item.get("id") or props.get("sectionId") or props.get("id")
     if explicit_id:
         return f"section:id:{_identity_token(explicit_id)}"
     if item.get("experimentId"):
@@ -2807,6 +2807,8 @@ def _section_identity(item: Any, index: int) -> str:
 def _source_identity(item: Any, index: int) -> str:
     if not isinstance(item, dict):
         return f"source:index:{index}"
+    if item.get("sourceId"):
+        return f"source:id:{_identity_token(item['sourceId'])}"
     if item.get("label"):
         return f"source:label:{_identity_token(item['label'])}"
     if item.get("url"):

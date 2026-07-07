@@ -65,6 +65,7 @@ def _draft_payload(slug: str, *, title: str, allow_script: bool = False) -> dict
             "summary": f"{title} summary",
             "sections": [
                 {
+                    "sectionId": "observe-task",
                     "type": "learning-task",
                     "title": "Observe",
                     "summary": "Compare the observed trend and explain the evidence.",
@@ -930,12 +931,14 @@ def test_admin_content_page_version_diff_includes_semantic_schema_summary(client
     }
     base_payload["schema"]["sections"] = [
         {
+            "sectionId": "observe-task",
             "type": "learning-task",
             "title": "Observe",
             "summary": "Compare the baseline observation.",
             "props": {},
         },
         {
+            "sectionId": "energy-lab",
             "type": "experiment",
             "title": "Energy Lab",
             "summary": "Run the basic model.",
@@ -944,7 +947,7 @@ def test_admin_content_page_version_diff_includes_semantic_schema_summary(client
         },
     ]
     base_payload["schema"]["sources"] = [
-        {"label": "Teacher Guide", "url": "https://example.com/guide-v1"},
+        {"sourceId": "teacher-guide", "label": "Teacher Guide", "url": "https://example.com/guide-v1"},
     ]
     base_draft_id = _create_draft_from_payload(client, teacher_token, base_payload)
     _submit_draft(client, teacher_token, base_draft_id)
@@ -960,13 +963,15 @@ def test_admin_content_page_version_diff_includes_semantic_schema_summary(client
     }
     target_payload["schema"]["sections"] = [
         {
+            "sectionId": "energy-lab",
             "type": "experiment",
-            "title": "Energy Lab",
+            "title": "Guided Energy Lab",
             "summary": "Run the guided model.",
             "experimentId": "energy-conservation",
             "props": {"mode": "guided"},
         },
         {
+            "sectionId": "energy-checkpoint",
             "type": "assessment",
             "title": "Checkpoint",
             "summary": "Check conservation evidence.",
@@ -974,15 +979,16 @@ def test_admin_content_page_version_diff_includes_semantic_schema_summary(client
             "props": {},
         },
         {
+            "sectionId": "observe-task",
             "type": "learning-task",
-            "title": "Observe",
+            "title": "Observe Again",
             "summary": "Compare the baseline observation.",
             "props": {},
         },
     ]
     target_payload["schema"]["sources"] = [
-        {"label": "Teacher Guide", "url": "https://example.com/guide-v2"},
-        {"label": "Simulation Notes", "url": "https://example.com/sim-notes"},
+        {"sourceId": "teacher-guide", "label": "Teacher Guide Updated", "url": "https://example.com/guide-v2"},
+        {"sourceId": "simulation-notes", "label": "Simulation Notes", "url": "https://example.com/sim-notes"},
     ]
     target_draft_id = _create_draft_from_payload(client, teacher_token, target_payload)
     _submit_draft(client, teacher_token, target_draft_id)
@@ -1007,27 +1013,34 @@ def test_admin_content_page_version_diff_includes_semantic_schema_summary(client
     assert {"field": "title", "before": "Energy", "after": "Energy Extension"} in semantic["course_unit_changes"]
 
     sections = {change["key"]: change for change in semantic["section_changes"]}
-    experiment = sections["section:experiment:energy-conservation"]
+    experiment = sections["section:id:energy-lab"]
     assert experiment["action"] == "modified"
     assert experiment["moved"] is True
     assert experiment["index_before"] == 1
     assert experiment["index_after"] == 0
+    assert experiment["title_before"] == "Energy Lab"
+    assert experiment["title_after"] == "Guided Energy Lab"
+    assert {"field": "title", "before": "Energy Lab", "after": "Guided Energy Lab"} in experiment["field_changes"]
     assert {"field": "summary", "before": "Run the basic model.", "after": "Run the guided model."} in experiment[
         "field_changes"
     ]
     assert {"field": "props.mode", "before": "basic", "after": "guided"} in experiment["prop_changes"]
-    assert sections["section:question-set:energy-check"]["action"] == "added"
-    assert sections["section:learning-task:observe"]["action"] == "moved"
+    assert sections["section:id:energy-checkpoint"]["action"] == "added"
+    observe = sections["section:id:observe-task"]
+    assert observe["action"] == "modified"
+    assert observe["moved"] is True
+    assert {"field": "title", "before": "Observe", "after": "Observe Again"} in observe["field_changes"]
 
     sources = {change["key"]: change for change in semantic["source_changes"]}
-    guide = sources["source:label:teacher guide"]
+    guide = sources["source:id:teacher-guide"]
     assert guide["action"] == "modified"
+    assert {"field": "label", "before": "Teacher Guide", "after": "Teacher Guide Updated"} in guide["field_changes"]
     assert {
         "field": "url",
         "before": "https://example.com/guide-v1",
         "after": "https://example.com/guide-v2",
     } in guide["field_changes"]
-    assert sources["source:label:simulation notes"]["action"] == "added"
+    assert sources["source:id:simulation-notes"]["action"] == "added"
 
 
 def _create_draft(client, teacher_token: str, slug: str, title: str) -> int:

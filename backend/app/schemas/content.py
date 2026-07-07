@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 SectionType = Literal[
@@ -14,6 +14,7 @@ SectionType = Literal[
 
 
 class ContentSection(BaseModel):
+    sectionId: str | None = Field(default=None, min_length=1, max_length=120, pattern=r"^[a-z0-9][a-z0-9._:-]*$")
     type: SectionType
     title: str | None = None
     summary: str | None = None
@@ -30,6 +31,7 @@ class CourseUnitRef(BaseModel):
 
 
 class SourceRef(BaseModel):
+    sourceId: str | None = Field(default=None, min_length=1, max_length=120, pattern=r"^[a-z0-9][a-z0-9._:-]*$")
     label: str
     url: str
 
@@ -46,6 +48,29 @@ class ContentPage(BaseModel):
     sections: list[ContentSection]
     courseUnit: CourseUnitRef | None = None
     sources: list[SourceRef] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_stable_identity_uniqueness(self) -> "ContentPage":
+        _reject_duplicate_stable_ids(
+            "sectionId",
+            [section.sectionId for section in self.sections],
+        )
+        _reject_duplicate_stable_ids(
+            "sourceId",
+            [source.sourceId for source in self.sources],
+        )
+        return self
+
+
+def _reject_duplicate_stable_ids(field_name: str, values: list[str | None]) -> None:
+    seen: set[str] = set()
+    for value in values:
+        if value is None:
+            continue
+        normalized = value.strip().lower()
+        if normalized in seen:
+            raise ValueError(f"Duplicate content {field_name}: {value}")
+        seen.add(normalized)
 
 
 class ContentDraftCreate(BaseModel):

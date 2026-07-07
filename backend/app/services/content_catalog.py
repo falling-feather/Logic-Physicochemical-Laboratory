@@ -10,6 +10,7 @@ from app.models import ContentDraft, ContentPageRecord, ContentPageVersion, User
 from app.models.base import utc_now
 from app.schemas.content import ContentPage
 from app.services.audit import record_audit_log
+from app.services.content_identity import content_stable_identity_errors, content_stable_identity_snapshot
 from app.services.content_script_policy import analyze_content_script_policy, public_content_page_schema
 
 
@@ -20,15 +21,17 @@ ENERGY_CONSERVATION_PAGE = ContentPage(
     title="机械能守恒",
     layout="experiment-page",
     status="published",
-    version="2026.07-v6.5-schema.1",
+    version="2026.07-v6.5-schema.2",
     summary="以物理能量守恒实验为后端内容协议第一试点，保留现有实验交互并由后端提供页面结构。",
     sections=[
         {
+            "sectionId": "energy-hero",
             "type": "hero",
             "title": "机械能守恒",
             "summary": "观察动能、势能和耗散之间的转换，理解机械能守恒的适用条件。",
         },
         {
+            "sectionId": "energy-observation-task",
             "type": "learning-task",
             "title": "观察任务",
             "summary": "打开耗散后，比较机械能和能量总量的变化趋势。",
@@ -39,6 +42,7 @@ ENERGY_CONSERVATION_PAGE = ContentPage(
             },
         },
         {
+            "sectionId": "energy-interactive-lab",
             "type": "experiment",
             "title": "交互实验",
             "experimentId": "energy-conservation",
@@ -55,12 +59,14 @@ ENERGY_CONSERVATION_PAGE = ContentPage(
             },
         },
         {
+            "sectionId": "energy-checkpoint",
             "type": "assessment",
             "title": "章节小测",
             "questionSetId": "energy-conservation",
             "summary": "沿用现有工科试验室题库，后续迁入数据库题组。",
         },
         {
+            "sectionId": "energy-sources",
             "type": "source-list",
             "title": "参考资料",
             "summary": "首批 schema 保留来源引用，后续进入内容审核与来源索引模型。",
@@ -74,6 +80,7 @@ ENERGY_CONSERVATION_PAGE = ContentPage(
     },
     sources=[
         {
+            "sourceId": "openstax-conservation-energy",
             "label": "OpenStax College Physics 2e · Conservation of Energy",
             "url": "https://openstax.org/books/college-physics-2e/pages/7-introduction-to-work-energy-and-energy-resources",
         }
@@ -209,7 +216,25 @@ def _initialize_builtin_content_page(
     seed_schema_hash = _schema_hash(page_payload)
     script_policy = _analyze_content_script_policy(seed_page)
     active_drafts = _active_content_draft_count(db, seed_page.slug)
-    context = _initialization_context(seed_page, seed_schema_hash, script_policy, active_drafts)
+    stable_identity_errors = content_stable_identity_errors(seed_page)
+    context = _initialization_context(
+        seed_page,
+        seed_schema_hash,
+        script_policy,
+        active_drafts,
+        stable_identity_errors=stable_identity_errors,
+    )
+    if stable_identity_errors:
+        return _initialization_item(
+            slug=seed_page.slug,
+            action="stable_identity_invalid",
+            changed=False,
+            page=None,
+            version=None,
+            ok=False,
+            error="stable_identity_contract_invalid",
+            **context,
+        )
     if script_policy.has_blocking_findings:
         return _initialization_item(
             slug=seed_page.slug,
@@ -634,11 +659,13 @@ def _initialization_context(
     seed_schema_hash: str,
     script_policy,
     active_drafts: int,
+    stable_identity_errors: list[str],
 ) -> dict[str, Any]:
     return {
         "seed_version": seed_page.version,
         "seed_schema_hash": seed_schema_hash,
         "active_drafts": active_drafts,
+        "stable_identity": content_stable_identity_snapshot(stable_identity_errors),
         "script_policy": {
             "policy_version": script_policy.policy_version,
             "status": script_policy.status,
@@ -664,6 +691,7 @@ def _initialization_item(
     seed_schema_hash: str | None = None,
     current_schema_hash: str | None = None,
     active_drafts: int = 0,
+    stable_identity: dict[str, Any] | None = None,
     script_policy: dict[str, Any] | None = None,
     error: str | None = None,
 ) -> dict[str, Any]:
@@ -683,6 +711,7 @@ def _initialization_item(
         "seed_schema_hash": seed_schema_hash,
         "current_schema_hash": current_schema_hash,
         "active_drafts": active_drafts,
+        "stable_identity": stable_identity,
         "script_policy": script_policy,
     }
     if error is not None:
