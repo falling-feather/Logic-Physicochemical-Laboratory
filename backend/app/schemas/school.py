@@ -72,3 +72,16 @@ class MembershipRead(BaseModel):
     id: int
     role: str
     status: str
+
+
+class ClassMemberRead(BaseModel):
+    id: int
+    class_id: int
+    user_id: int
+    username: str
+    display_name: str
+    user_status: str
+    role: str
+    status: str
+    created_at: datetime
+    updated_at: datetime

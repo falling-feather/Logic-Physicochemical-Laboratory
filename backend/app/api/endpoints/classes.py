@@ -12,6 +12,7 @@ from app.schemas.school import (
     ClassJoinRequestCreate,
     ClassJoinRequestRead,
     ClassJoinRequestReview,
+    ClassMemberRead,
     ClassRead,
     MembershipRead,
 )
@@ -192,6 +193,56 @@ def join_class(
     db.commit()
     db.refresh(membership)
     return membership
+
+
+@router.get("/{class_id}/members", response_model=list[ClassMemberRead])
+def list_class_members(
+    class_id: int,
+    role: str | None = Query(default=None, max_length=32),
+    status_filter: str | None = Query(default="active", alias="status", max_length=32),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[ClassMemberRead]:
+    class_group = db.get(ClassGroup, class_id)
+    if class_group is None:
+        raise HTTPException(status_code=404, detail="Class not found")
+    require_class_teacher_or_admin(
+        db,
+        current_user,
+        class_group,
+        detail="Class members require class teacher scope",
+    )
+
+    statement = (
+        select(ClassMembership, User)
+        .join(User, User.id == ClassMembership.user_id)
+        .where(ClassMembership.class_id == class_group.id)
+        .order_by(ClassMembership.role, User.username, ClassMembership.id)
+    )
+    if role is not None:
+        statement = statement.where(ClassMembership.role == normalize_class_role(role))
+    if status_filter is not None:
+        membership_status = status_filter.strip().lower()
+        if membership_status not in {"active", "inactive"}:
+            raise HTTPException(status_code=400, detail="Unsupported class member status")
+        statement = statement.where(ClassMembership.status == membership_status)
+
+    rows = db.execute(statement).all()
+    return [
+        ClassMemberRead(
+            id=membership.id,
+            class_id=membership.class_id,
+            user_id=user.id,
+            username=user.username,
+            display_name=user.display_name,
+            user_status=user.status,
+            role=membership.role,
+            status=membership.status,
+            created_at=membership.created_at,
+            updated_at=membership.updated_at,
+        )
+        for membership, user in rows
+    ]
 
 
 @router.post(

@@ -62,8 +62,10 @@ def _create_school_and_class(client, teacher_token: str, school_name: str, class
 
 
 def test_teacher_creates_school_class_and_student_joins(client):
+    admin_token = _bootstrap_admin(client, "admin_class_members")
     teacher_token = _register_and_login(client, "teacher02", "teacher")
     student_token = _register_and_login(client, "student01", "student")
+    outsider_teacher_token = _register_and_login(client, "teacher_member_outsider", "teacher")
 
     school = client.post(
         "/api/schools",
@@ -124,6 +126,69 @@ def test_teacher_creates_school_class_and_student_joins(client):
             )
         )
         assert join_request is None
+
+    members = client.get(f"/api/classes/{class_id}/members", headers=_auth_header(teacher_token))
+    assert members.status_code == 200
+    members_body = members.json()
+    assert [(item["username"], item["role"]) for item in members_body] == [
+        ("student01", "student"),
+        ("teacher02", "teacher"),
+    ]
+    assert {item["username"]: item["user_status"] for item in members_body} == {
+        "student01": "active",
+        "teacher02": "active",
+    }
+
+    student_members = client.get(
+        f"/api/classes/{class_id}/members?role=student",
+        headers=_auth_header(teacher_token),
+    )
+    assert student_members.status_code == 200
+    assert [item["username"] for item in student_members.json()] == ["student01"]
+
+    admin_members = client.get(f"/api/classes/{class_id}/members", headers=_auth_header(admin_token))
+    assert admin_members.status_code == 200
+    assert {item["username"] for item in admin_members.json()} == {"teacher02", "student01"}
+
+    student_forbidden = client.get(f"/api/classes/{class_id}/members", headers=_auth_header(student_token))
+    assert student_forbidden.status_code == 403
+    assert student_forbidden.json()["detail"] == "Class members require class teacher scope"
+
+    outsider_forbidden = client.get(f"/api/classes/{class_id}/members", headers=_auth_header(outsider_teacher_token))
+    assert outsider_forbidden.status_code == 403
+
+    with get_session_factory(get_settings().database_url)() as db:
+        class_membership = db.scalar(
+            select(ClassMembership).where(
+                ClassMembership.class_id == class_id,
+                ClassMembership.user_id == student_id,
+                ClassMembership.role == "student",
+            )
+        )
+        assert class_membership is not None
+        class_membership.status = "inactive"
+        db.commit()
+
+    active_members = client.get(f"/api/classes/{class_id}/members", headers=_auth_header(teacher_token))
+    assert active_members.status_code == 200
+    assert [item["username"] for item in active_members.json()] == ["teacher02"]
+
+    inactive_members = client.get(
+        f"/api/classes/{class_id}/members?status=inactive",
+        headers=_auth_header(teacher_token),
+    )
+    assert inactive_members.status_code == 200
+    assert [item["username"] for item in inactive_members.json()] == ["student01"]
+
+    unsupported_status = client.get(
+        f"/api/classes/{class_id}/members?status=archived",
+        headers=_auth_header(teacher_token),
+    )
+    assert unsupported_status.status_code == 400
+    assert unsupported_status.json()["detail"] == "Unsupported class member status"
+
+    missing_class_members = client.get("/api/classes/999999/members", headers=_auth_header(admin_token))
+    assert missing_class_members.status_code == 404
 
     student_classes = client.get(f"/api/classes?school_id={school_id}", headers=_auth_header(student_token))
     assert student_classes.status_code == 200
@@ -207,6 +272,10 @@ def test_class_join_request_requires_teacher_approval(client):
     assert pending_requests.status_code == 200
     assert [item["id"] for item in pending_requests.json()] == [join_request_body["id"]]
 
+    members_before_approval = client.get(f"/api/classes/{class_id}/members", headers=_auth_header(teacher_token))
+    assert members_before_approval.status_code == 200
+    assert [item["username"] for item in members_before_approval.json()] == ["teacher_join_request"]
+
     approval = client.patch(
         f"/api/classes/{class_id}/join-requests/{join_request_body['id']}",
         headers={**_auth_header(teacher_token), "X-Request-ID": "join-request-approve"},
@@ -217,6 +286,13 @@ def test_class_join_request_requires_teacher_approval(client):
     assert approval_body["status"] == "approved"
     assert approval_body["reviewed_by_user_id"] is not None
     assert approval_body["reviewed_at"] is not None
+
+    members_after_approval = client.get(f"/api/classes/{class_id}/members", headers=_auth_header(teacher_token))
+    assert members_after_approval.status_code == 200
+    assert {item["username"] for item in members_after_approval.json()} == {
+        "teacher_join_request",
+        "student_join_request",
+    }
 
     repeat_approval = client.patch(
         f"/api/classes/{class_id}/join-requests/{join_request_body['id']}",
