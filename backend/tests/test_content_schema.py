@@ -1,10 +1,13 @@
 from sqlalchemy import delete, func, select
 import pytest
+from fastapi import Response
 
+from app.api.endpoints.render import _apply_script_contract_headers
 from app.core.config import get_settings
 from app.db.session import get_session_factory
 from app.models import ContentPageRecord
 from app.schemas.content import ContentPage
+from app.services.content_script_policy import public_content_page_schema
 
 
 def test_energy_conservation_render_schema(client):
@@ -13,6 +16,10 @@ def test_energy_conservation_render_schema(client):
     assert response.status_code == 200
     assert response.headers["Cache-Control"] == "no-store"
     assert response.headers["Pragma"] == "no-cache"
+    assert response.headers["X-Astra-Content-Script-Sandbox"] == "required"
+    assert response.headers["X-Astra-Content-Script-Manifest-Count"] == "1"
+    assert response.headers["X-Astra-Content-Script-Iframe-Sandbox"] == "allow-scripts"
+    assert "connect-src 'self'" in response.headers["X-Astra-Content-Script-CSP"]
     payload = response.json()
     assert payload["slug"] == "physics/energy-conservation"
     assert payload["layout"] == "experiment-page"
@@ -25,10 +32,40 @@ def test_energy_conservation_render_schema(client):
     assert "scriptSandbox" not in experiment_props
     assert experiment_props["scriptManifest"]["executionMode"] == "sandbox-required"
     assert experiment_props["scriptManifest"]["sandbox"]["status"] == "isolated"
+    assert experiment_props["scriptManifest"]["sandbox"]["network"] == "same-origin"
+    assert "connect-src 'self'" in experiment_props["scriptManifest"]["sandbox"]["csp"]
+    assert experiment_props["scriptManifest"]["sandbox"]["enforcement"] == {
+        "browserContext": "sandboxed-iframe",
+        "requiredIframeSandbox": "allow-scripts",
+        "requiredContentSecurityPolicy": experiment_props["scriptManifest"]["sandbox"]["csp"],
+        "sandboxOrigin": "opaque",
+    }
+    assert experiment_props["scriptManifest"]["sandbox"]["capabilities"]["sameOrigin"] is False
     assert experiment_props["scriptManifest"]["referenceCount"] == 1
     assert len(experiment_props["scriptManifest"]["references"][0]["valueSha256"]) == 64
     assert payload["courseUnit"]["unitId"] == "physics-energy-conservation"
     assert payload["sources"][0]["sourceId"] == "openstax-conservation-energy"
+
+
+def test_render_contract_headers_require_uniform_script_sandbox_contract():
+    payload = _content_page_payload()
+    payload["sections"][0]["props"] = {
+        "scriptPath": "pages/physics/stable-hero.js",
+        "scriptSandbox": {"mode": "isolated-iframe", "network": "none", "storage": "none"},
+    }
+    payload["sections"][1]["props"] = {
+        "scriptPath": "pages/physics/stable-task.js",
+        "scriptSandbox": {"mode": "isolated-iframe", "network": "external", "storage": "none"},
+    }
+    page = public_content_page_schema(payload)
+    response = Response()
+
+    _apply_script_contract_headers(response, page)
+
+    assert response.headers["X-Astra-Content-Script-Sandbox"] == "required"
+    assert response.headers["X-Astra-Content-Script-Manifest-Count"] == "2"
+    assert "X-Astra-Content-Script-Iframe-Sandbox" not in response.headers
+    assert "X-Astra-Content-Script-CSP" not in response.headers
 
 
 def test_content_schema_rejects_duplicate_stable_ids():

@@ -141,6 +141,10 @@ def test_admin_publishes_draft_to_public_page_and_version_history(client):
 
     render_after = client.get(f"/api/render/page/{slug}")
     assert render_after.status_code == 200
+    assert render_after.headers["X-Astra-Content-Script-Sandbox"] == "not-required"
+    assert render_after.headers["X-Astra-Content-Script-Manifest-Count"] == "0"
+    assert "X-Astra-Content-Script-Iframe-Sandbox" not in render_after.headers
+    assert "X-Astra-Content-Script-CSP" not in render_after.headers
     assert render_after.json()["title"] == "First Published Energy"
     assert render_after.json()["status"] == "published"
     assert render_after.json()["version"] == "v1"
@@ -637,11 +641,21 @@ def test_allowlisted_external_script_asset_requires_review_before_publish(client
 
         render = client.get(f"/api/render/page/{slug}")
         assert render.status_code == 200
+        assert render.headers["X-Astra-Content-Script-Sandbox"] == "required"
+        assert render.headers["X-Astra-Content-Script-Manifest-Count"] == "1"
+        assert render.headers["X-Astra-Content-Script-Iframe-Sandbox"] == "allow-scripts"
+        assert "connect-src 'self'" in render.headers["X-Astra-Content-Script-CSP"]
         props_after_publish = render.json()["sections"][0]["props"]
         assert "scriptUrl" not in props_after_publish
         assert "scriptIntegrity" not in props_after_publish
         assert "scriptCrossorigin" not in props_after_publish
         assert props_after_publish["scriptManifest"]["referenceCount"] == 1
+        assert props_after_publish["scriptManifest"]["sandbox"]["enforcement"] == {
+            "browserContext": "sandboxed-iframe",
+            "requiredIframeSandbox": "allow-scripts",
+            "requiredContentSecurityPolicy": props_after_publish["scriptManifest"]["sandbox"]["csp"],
+            "sandboxOrigin": "opaque",
+        }
     finally:
         monkeypatch.delenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", raising=False)
         get_settings.cache_clear()

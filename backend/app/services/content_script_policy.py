@@ -14,7 +14,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 from app.schemas.content import ContentPage
 
 
-SCRIPT_POLICY_VERSION = "2026-07-07.4"
+SCRIPT_POLICY_VERSION = "2026-07-07.5"
 MAX_FINDINGS = 50
 MAX_EXTERNAL_SCRIPT_BYTES = 1_000_000
 EXTERNAL_SCRIPT_FETCH_TIMEOUT_SECONDS = 10
@@ -28,6 +28,10 @@ SCRIPT_ASSET_METADATA_KEYS = SCRIPT_INTEGRITY_KEYS | SCRIPT_CROSSORIGIN_KEYS
 SCRIPT_SANDBOX_MODE = "isolated-iframe"
 SCRIPT_SANDBOX_IFRAME_DIRECTIVE = "allow-scripts"
 SCRIPT_SANDBOX_CSP = "default-src 'none'; script-src 'self'; connect-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
+SCRIPT_SANDBOX_SAME_ORIGIN_CSP = (
+    "default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self' data:; "
+    "style-src 'self' 'unsafe-inline'"
+)
 BLOCKED_PROTOCOLS = ("javascript:", "data:", "vbscript:", "blob:")
 SRI_PATTERN = re.compile(r"^(sha256|sha384|sha512)-[A-Za-z0-9+/]+={0,2}$")
 BLOCKED_SANDBOX_CAPABILITIES = {
@@ -698,14 +702,44 @@ def _public_script_reference(key: str, value: Any) -> dict[str, Any]:
 def _public_sandbox_manifest(sandbox: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(sandbox, dict) or sandbox.get("mode") != SCRIPT_SANDBOX_MODE:
         return {"status": "blocked"}
+    network = sandbox.get("network", "none")
+    if (
+        any(_is_enabled(sandbox.get(capability)) for capability in BLOCKED_SANDBOX_CAPABILITIES)
+        or network not in {"none", "same-origin"}
+        or sandbox.get("storage", "none") != "none"
+    ):
+        return {"status": "blocked"}
+    effective_network = network
+    csp = _script_sandbox_csp(effective_network)
     return {
         "status": "isolated",
         "mode": SCRIPT_SANDBOX_MODE,
         "iframeSandbox": SCRIPT_SANDBOX_IFRAME_DIRECTIVE,
-        "csp": SCRIPT_SANDBOX_CSP,
-        "network": sandbox.get("network", "none"),
+        "csp": csp,
+        "network": effective_network,
         "storage": "none",
+        "enforcement": {
+            "browserContext": "sandboxed-iframe",
+            "requiredIframeSandbox": SCRIPT_SANDBOX_IFRAME_DIRECTIVE,
+            "requiredContentSecurityPolicy": csp,
+            "sandboxOrigin": "opaque",
+        },
+        "capabilities": {
+            "scripts": True,
+            "sameOrigin": False,
+            "topNavigation": False,
+            "popups": False,
+            "downloads": False,
+            "network": effective_network,
+            "storage": "none",
+        },
     }
+
+
+def _script_sandbox_csp(network: str) -> str:
+    if network == "same-origin":
+        return SCRIPT_SANDBOX_SAME_ORIGIN_CSP
+    return SCRIPT_SANDBOX_CSP
 
 
 def _script_reference_finding(path: str, key: str, value: Any, normalized_key: str) -> ScriptPolicyFinding:

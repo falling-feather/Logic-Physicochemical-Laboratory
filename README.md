@@ -8,10 +8,10 @@
 
 星序总览页负责承载一级星系入口；进入某个星系后，才显示该星系自己的二级学科或知识目录。内置 C++ httplib 后端服务器，支持静态文件托管。
 
-> **当前状态**: v6.5（2026-07-03 起）— `houduan` 分支已接入 Python 后端骨架、健康检查、部署预检、部署 smoke 门禁、API no-store 缓存边界、工科试验室内容协议持久化样例、内容 seed 启动初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、脚本资产 allowlist/SRI 静态门禁、脚本资产下载/SRI 哈希校验与校验证据、公开 render 脚本 manifest 脱敏、稳定 `sectionId/sourceId` 新写入契约、草稿编辑、草稿提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 敏感预览脱敏与富语义摘要、本地账号认证安全基线、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、用户自助密码重置令牌、密码重置 token 留存清理脚本、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校/班级最小闭环与加入申请审批、课程/作业/学习事件/提交批改/作业只读复盘/跨班级提交唯一性/学生资源状态可见性/积分统计、知识状态/班级规则统计、个人/班级知识快照、知识快照周期重算脚本、运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端知识快照运行列表/健康摘要、协作式取消、手动 requeue 与调度积压摘要、管理端 API、缺陷记录外部 issue 链接、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、待批改队列、审计元数据与认证事件审计、审计日志链式哈希、审计链完整性校验、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要、审计留存预检、本地审计归档包导出/Manifest 校验与导出/摘要行为审计留痕、学校/班级/课程访问控制服务层、跨范围权限矩阵测试，以及前端 opt-in schema 渲染试点
+> **当前状态**: v6.5（2026-07-03 起）— `houduan` 分支已接入 Python 后端骨架、健康检查、部署预检、部署 smoke 门禁、API no-store 缓存边界、工科试验室内容协议持久化样例、内容 seed 启动初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、脚本资产 allowlist/SRI 静态门禁、脚本资产下载/SRI 哈希校验与校验证据、公开 render 脚本 manifest 脱敏和沙箱执行契约头、稳定 `sectionId/sourceId` 新写入契约、草稿编辑、草稿提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 敏感预览脱敏与富语义摘要、本地账号认证安全基线、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、用户自助密码重置令牌、密码重置 token 留存清理脚本、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校/班级最小闭环与加入申请审批、课程/作业/学习事件/提交批改/作业只读复盘/跨班级提交唯一性/学生资源状态可见性/积分统计、知识状态/班级规则统计、个人/班级知识快照、知识快照周期重算脚本、运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端知识快照运行列表/健康摘要、协作式取消、手动 requeue 与调度积压摘要、管理端 API、缺陷记录外部 issue 链接、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、待批改队列、审计元数据与认证事件审计、审计日志链式哈希、审计链完整性校验、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要、审计留存预检、本地审计归档包导出/Manifest 校验与导出/摘要行为审计留痕、学校/班级/课程访问控制服务层、跨范围权限矩阵测试，以及前端 opt-in schema 渲染试点
 > **Review 回流状态**: 2026-07-06，`review` 分支已交付代码审查报告（审查基线 `V6.5.23 Review 前基线快照`，范围 `re1` 至 `re17`）。本 `houduan` 分支未合并 review 代码修复；后续仅按 `02` / `07` 中记录的优先级在 `houduan` 上选择性吸收。
-> **最新治理**: 2026-07-07，`houduan` 已补齐 BE-02 内容脚本资产校验证据：外部脚本下载/SRI 校验 finding 会在 `metadata` 中记录 `asset_sha256`、`asset_size_bytes`、`integrity_token_count` 和匹配算法，管理员审核响应和 stored analysis 均可保留这份资产指纹证据；下载失败、SRI mismatch 或发布前 CDN 字节漂移继续阻断流程。
-> **最新回归**: 2026-07-07，脚本资产校验证据已覆盖服务层 verified/mismatch metadata、stored analysis roundtrip、API 响应 schema 透出 metadata、审核响应保存 `script_integrity_verified.metadata` 和发布阶段再次校验；真实 iframe/worker 执行隔离、浏览器 CSP 强制和 CDN/供应链治理仍属后续。
+> **最新治理**: 2026-07-07，`houduan` 已补齐 BE-02 内容脚本公开 render 沙箱执行契约：`scriptManifest.sandbox` 会按 `network` 派生 CSP、显式返回 enforcement/capabilities，unsafe sandbox 不再被公开标记为 isolated；`/api/render/page/{slug}` 同步返回脚本沙箱契约响应头，供前端执行层消费。
+> **最新回归**: 2026-07-07，脚本沙箱执行契约已覆盖 public schema 的 `none/same-origin` CSP、unsafe sandbox 防御性降级、seed render 响应头、无脚本 render `not-required` 头和外部脚本发布后 render 契约；真实 iframe/worker 执行容器和浏览器端 CSP 注入仍属后续。
 > **下一阶段规划**: Python + MySQL 后端化、内容协议、登录用户体系与管理员 / 教师 / 学生三端平台设计，详见 [`doc/07-后端优化与设计.md`](doc/07-后端优化与设计.md)
 > **当前分支**: `houduan` — 后端化设计与重构开发分支；`main` 保持主线维护
 > **v6.4 主线**：未来星系产品内容保留，比赛提交/评审/截图临时层清理 + `20260630mainV64` 资产版本同步
@@ -191,6 +191,7 @@ node server/dev-static-server.mjs --port 8766
 > 完整的细碎微版本详见 [doc/03-发布历史.md](doc/03-发布历史.md)。当前主线在 `main` 分支维护。
 
 ### v6.5 — 2026-07-05（houduan）
+- 2026-07-07 已在 `houduan` 落地 BE-02 内容脚本沙箱执行契约：公开 `scriptManifest.sandbox` 返回 enforcement/capabilities，按 `network=none/same-origin` 派生 CSP，unsafe sandbox 防御性降级为 blocked，render API 返回 `X-Astra-Content-Script-*` 契约头。
 - 2026-07-07 已在 `houduan` 落地 BE-02 内容脚本资产校验证据：`script_integrity_verified` 与 `script_integrity_mismatch` finding 会携带资产 SHA-256、字节大小、SRI token 数量和匹配算法，用于管理员审核响应、stored analysis 和后续供应链审计。
 - 2026-07-07 已在 `houduan` 落地 BE-02 内容脚本资产下载校验：管理员批准外部脚本和发布已审核草稿时，后端会下载脚本资产并按声明 SRI 比对字节；下载失败、SRI mismatch 或发布前 CDN 字节漂移返回 `409`，默认下载器不跟随重定向。
 - 2026-07-07 已在 `houduan` 落地 BE-02 内容协议稳定身份：`sectionId/sourceId` 作为新写入必填契约进入草稿创建、编辑、发布和内置内容初始化；schema 对历史内容保持可选兼容，semantic diff 优先使用稳定 ID，避免章节重排、标题改名或来源 label/url 改动被误判为删除新增。

@@ -283,6 +283,66 @@ def test_public_schema_strips_script_asset_metadata_from_manifest():
     assert props["scriptManifest"]["executionMode"] == "sandbox-required"
     assert props["scriptManifest"]["references"][0]["key"] == "scriptUrl"
     assert len(props["scriptManifest"]["references"][0]["valueSha256"]) == 64
+    sandbox = props["scriptManifest"]["sandbox"]
+    assert sandbox["csp"] == (
+        "default-src 'none'; script-src 'self'; connect-src 'none'; img-src 'self' data:; "
+        "style-src 'self' 'unsafe-inline'"
+    )
+    assert sandbox["enforcement"] == {
+        "browserContext": "sandboxed-iframe",
+        "requiredIframeSandbox": "allow-scripts",
+        "requiredContentSecurityPolicy": sandbox["csp"],
+        "sandboxOrigin": "opaque",
+    }
+    assert sandbox["capabilities"] == {
+        "scripts": True,
+        "sameOrigin": False,
+        "topNavigation": False,
+        "popups": False,
+        "downloads": False,
+        "network": "none",
+        "storage": "none",
+    }
+
+
+def test_public_schema_derives_same_origin_script_sandbox_csp():
+    payload = _page_payload(
+        {
+            "scriptPath": "pages/physics/energy-conservation.js",
+            "scriptSandbox": {"mode": "isolated-iframe", "network": "same-origin", "storage": "none"},
+        }
+    )
+
+    public_schema = public_content_page_schema(payload).model_dump(mode="json")
+
+    sandbox = public_schema["sections"][0]["props"]["scriptManifest"]["sandbox"]
+    assert sandbox["network"] == "same-origin"
+    assert sandbox["csp"] == (
+        "default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self' data:; "
+        "style-src 'self' 'unsafe-inline'"
+    )
+    assert sandbox["enforcement"]["requiredContentSecurityPolicy"] == sandbox["csp"]
+    assert sandbox["capabilities"]["network"] == "same-origin"
+    assert sandbox["capabilities"]["sameOrigin"] is False
+
+
+def test_public_schema_blocks_unsafe_public_sandbox_manifest():
+    payload = _page_payload(
+        {
+            "scriptPath": "drafts/custom-energy.js",
+            "scriptSandbox": {
+                "mode": "isolated-iframe",
+                "network": "external",
+                "storage": "local",
+                "allowSameOrigin": True,
+            },
+        }
+    )
+
+    public_schema = public_content_page_schema(payload).model_dump(mode="json")
+
+    sandbox = public_schema["sections"][0]["props"]["scriptManifest"]["sandbox"]
+    assert sandbox == {"status": "blocked"}
 
 
 def test_public_schema_preserves_non_script_integrity_metadata():
