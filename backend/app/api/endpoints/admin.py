@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 from hashlib import sha256
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, Response, status
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -61,6 +61,9 @@ from app.schemas.admin import (
     AdminContentPageVersionSemanticFieldChange,
     AdminContentPageVersionSemanticSectionChange,
     AdminContentPageVersionSemanticSourceChange,
+    AdminContentScriptHostPolicyPage,
+    AdminContentScriptHostPolicyRead,
+    AdminContentScriptHostPolicyUpdate,
     AdminContentPageVersionPage,
     AdminContentPageVersionRead,
     AdminKnowledgeSnapshotRunHealthReport,
@@ -136,6 +139,13 @@ from app.services.content_script_assets import (
     ContentScriptAssetRemoteDriftReport,
     audit_current_content_script_asset_mirrors,
     scan_current_content_script_asset_remote_drift,
+)
+from app.services.content_script_host_policies import (
+    ContentScriptHostPolicyRow,
+    content_script_host_policy_snapshot,
+    list_content_script_host_policy_rows,
+    normalize_content_script_source_host,
+    upsert_content_script_host_policy,
 )
 
 
@@ -832,6 +842,130 @@ def list_admin_content_script_assets(
         offset=offset,
         next_offset=_next_offset(total, offset, len(items)),
     )
+
+
+@router.get("/content/script-host-policies", response_model=AdminContentScriptHostPolicyPage)
+def list_admin_content_script_host_policies(
+    request: Request,
+    source_host: str | None = Query(default=None, max_length=255),
+    policy_status: Literal["trusted", "watch", "blocked", "unreviewed"] | None = Query(default=None, alias="status"),
+    q: str | None = Query(default=None, max_length=160),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminContentScriptHostPolicyPage:
+    _require_admin(current_user)
+    try:
+        page = list_content_script_host_policy_rows(
+            db,
+            allowed_hosts=get_settings().content_script_allowed_host_list,
+            source_host=source_host,
+            status=policy_status,
+            q=q,
+            limit=limit,
+            offset=offset,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    items = [_admin_content_script_host_policy_read(item) for item in page.items]
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.content_script_host_policy.list",
+        resource_type="content_script_host_policy",
+        event_result="success",
+        request=request,
+        snapshot={
+            "filters": _content_script_host_policy_filters(
+                source_host=source_host,
+                policy_status=policy_status,
+                q=q,
+            ),
+            "total": page.total,
+            "limit": limit,
+            "offset": offset,
+            "item_count": len(items),
+            "capabilities": {
+                "mutation": False,
+                "allows_host": False,
+                "blocks_publish_when_status_blocked": True,
+            },
+        },
+    )
+    db.commit()
+    return AdminContentScriptHostPolicyPage(
+        items=items,
+        total=page.total,
+        limit=limit,
+        offset=offset,
+        next_offset=_next_offset(page.total, offset, len(items)),
+    )
+
+
+@router.patch("/content/script-host-policies/{source_host}", response_model=AdminContentScriptHostPolicyRead)
+def update_admin_content_script_host_policy(
+    request: Request,
+    source_host: str = Path(..., min_length=1, max_length=255),
+    payload: AdminContentScriptHostPolicyUpdate = Body(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminContentScriptHostPolicyRead:
+    _require_admin(current_user)
+    try:
+        normalized_host = normalize_content_script_source_host(source_host)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    before_page = list_content_script_host_policy_rows(
+        db,
+        allowed_hosts=get_settings().content_script_allowed_host_list,
+        source_host=normalized_host,
+        limit=1,
+        offset=0,
+    )
+    before = _admin_content_script_host_policy_read(before_page.items[0]).model_dump(mode="json") if before_page.items else None
+    try:
+        policy = upsert_content_script_host_policy(
+            db,
+            source_host=normalized_host,
+            status=payload.status,
+            reason=payload.reason,
+            reviewer=current_user,
+        )
+        db.flush()
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    after_page = list_content_script_host_policy_rows(
+        db,
+        allowed_hosts=get_settings().content_script_allowed_host_list,
+        source_host=normalized_host,
+        limit=1,
+        offset=0,
+    )
+    after = _admin_content_script_host_policy_read(after_page.items[0])
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.content_script_host_policy.update",
+        resource_type="content_script_host_policy",
+        resource_id=policy.id,
+        event_result="success",
+        request=request,
+        snapshot={
+            "before": before,
+            "after": after.model_dump(mode="json"),
+            "policy": content_script_host_policy_snapshot(policy),
+            "capabilities": {
+                "allows_host": False,
+                "blocks_publish_when_status_blocked": policy.status == "blocked",
+                "external_network": False,
+                "mutation": True,
+            },
+        },
+    )
+    db.commit()
+    db.refresh(policy)
+    return after
 
 
 @router.get("/content/script-assets/mirror-audit", response_model=AdminContentScriptAssetAuditReport)
@@ -3054,6 +3188,23 @@ def _admin_content_script_asset_read(asset: ContentScriptAsset) -> AdminContentS
     )
 
 
+def _admin_content_script_host_policy_read(row: ContentScriptHostPolicyRow) -> AdminContentScriptHostPolicyRead:
+    return AdminContentScriptHostPolicyRead(
+        id=row.policy_id,
+        source_host=row.source_host,
+        status=row.status,
+        reason=row.reason,
+        configured_allowed=row.configured_allowed,
+        observed_asset_count=row.observed_asset_count,
+        observed_page_count=row.observed_page_count,
+        last_observed_at=row.last_observed_at,
+        reviewed_by_user_id=row.reviewed_by_user_id,
+        reviewed_at=row.reviewed_at,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
 def _admin_content_script_asset_audit_issue_read(
     issue: ContentScriptAssetMirrorAuditIssue,
 ) -> AdminContentScriptAssetAuditIssueRead:
@@ -3133,6 +3284,20 @@ def _content_script_asset_filters(
         "to": to_at,
         "q": q.strip() if q is not None and q.strip() else None,
     }
+
+
+def _content_script_host_policy_filters(
+    *,
+    source_host: str | None,
+    policy_status: str | None,
+    q: str | None,
+) -> dict[str, Any]:
+    filters = {
+        "source_host": source_host.strip().lower() if source_host is not None and source_host.strip() else None,
+        "status": policy_status.strip().lower() if policy_status is not None and policy_status.strip() else None,
+        "q": q.strip() if q is not None and q.strip() else None,
+    }
+    return {key: value for key, value in filters.items() if value is not None}
 
 
 def _content_script_asset_mirror_audit_snapshot(

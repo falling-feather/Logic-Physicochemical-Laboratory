@@ -730,6 +730,71 @@ def test_allowlisted_external_script_asset_requires_review_before_publish(client
         get_settings.cache_clear()
 
 
+def test_blocked_content_script_host_policy_rejects_review_and_publish(client, monkeypatch):
+    first_admin_token = _bootstrap_admin(client, username="admin_blocked_host_first")
+    second_admin_id, second_admin_token = _register_and_login(client, "admin_blocked_host_second", "teacher")
+    promote_second_admin = client.patch(
+        f"/api/admin/users/{second_admin_id}",
+        headers=_auth_header(first_admin_token),
+        json={"role": "admin"},
+    )
+    assert promote_second_admin.status_code == 200
+    _, teacher_token = _register_and_login(client, "teacher_blocked_host", "teacher")
+    slug = "physics/external-script-blocked-host"
+    asset_bytes = b"console.log('blocked host asset');\n"
+    payload = _draft_payload(slug, title="Blocked Host Asset", allow_script=True)
+    props = payload["schema"]["sections"][0]["props"]
+    props.update(
+        {
+            "scriptUrl": "https://cdn-blocked.example.test/tool.js",
+            "scriptIntegrity": _sri_sha384(asset_bytes),
+            "scriptCrossorigin": "anonymous",
+        }
+    )
+    props.pop("scriptPath", None)
+    monkeypatch.setenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", "cdn-blocked.example.test")
+    monkeypatch.setattr(content_script_policy, "_default_external_script_fetcher", lambda url: asset_bytes)
+    get_settings.cache_clear()
+    try:
+        create = client.post("/api/content/drafts", headers=_auth_header(teacher_token), json=payload)
+        assert create.status_code == 201
+        draft_id = create.json()["id"]
+        _submit_draft(client, teacher_token, draft_id)
+
+        block = client.patch(
+            "/api/admin/content/script-host-policies/cdn-blocked.example.test",
+            headers=_auth_header(first_admin_token),
+            json={"status": "blocked", "reason": "Manual supply-chain review block"},
+        )
+        assert block.status_code == 200
+
+        approve = client.patch(
+            f"/api/content/drafts/{draft_id}/script-review",
+            headers=_auth_header(second_admin_token),
+            json={"status": "approved", "note": "try blocked host"},
+        )
+        assert approve.status_code == 409
+        assert approve.json()["detail"] == {
+            "code": "content_script_host_blocked",
+            "source_hosts": ["cdn-blocked.example.test"],
+        }
+
+        publish = client.post(
+            f"/api/content/drafts/{draft_id}/publish",
+            headers=_auth_header(first_admin_token),
+            json={"note": "try blocked host"},
+        )
+        assert publish.status_code == 409
+        assert publish.json()["detail"] == {
+            "code": "content_script_host_blocked",
+            "source_hosts": ["cdn-blocked.example.test"],
+        }
+        assert _table_count(ContentScriptAsset) == 0
+    finally:
+        monkeypatch.delenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", raising=False)
+        get_settings.cache_clear()
+
+
 def test_external_script_asset_publish_rechecks_current_sri_bytes(client, monkeypatch):
     first_admin_token = _bootstrap_admin(client, username="admin_external_script_drift_first")
     second_admin_id, second_admin_token = _register_and_login(client, "admin_external_script_drift_second", "teacher")

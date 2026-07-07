@@ -176,6 +176,37 @@ class AdminContentScriptAssetPage(BaseModel):
     next_offset: int | None = None
 
 
+ContentScriptHostPolicyStatus = Literal["trusted", "watch", "blocked"]
+
+
+class AdminContentScriptHostPolicyRead(BaseModel):
+    id: int | None = None
+    source_host: str
+    status: str
+    reason: str | None = None
+    configured_allowed: bool
+    observed_asset_count: int
+    observed_page_count: int
+    last_observed_at: datetime | None = None
+    reviewed_by_user_id: int | None = None
+    reviewed_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class AdminContentScriptHostPolicyPage(BaseModel):
+    items: list[AdminContentScriptHostPolicyRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class AdminContentScriptHostPolicyUpdate(BaseModel):
+    status: ContentScriptHostPolicyStatus
+    reason: str | None = Field(default=None, max_length=500)
+
+
 class AdminContentScriptAssetAuditIssueRead(BaseModel):
     code: str
     severity: str

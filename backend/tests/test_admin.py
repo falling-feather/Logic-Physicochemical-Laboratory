@@ -2527,6 +2527,161 @@ def test_admin_lists_content_script_asset_inventory_with_redaction_and_audit(cli
     assert "secret-asset-bytes" not in audit_text
 
 
+def test_admin_manages_content_script_host_policies_with_audit(client, monkeypatch):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "teacher_script_host_policy", "teacher")
+    admin_user_id = _current_user_id(client, admin_token)
+    published_at = datetime(2026, 7, 8, 13, 30, tzinfo=UTC)
+    monkeypatch.setenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", "cdn-policy.example.test,allowed-only.example.test")
+    get_settings.cache_clear()
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        schema = {
+            "slug": "physics/script-host-policy",
+            "galaxy": "englab",
+            "subject": "physics",
+            "title": "Script Host Policy",
+            "layout": "experiment-page",
+            "status": "published",
+            "version": "v-test",
+            "sections": [],
+            "sources": [],
+        }
+        page = ContentPageRecord(
+            slug="physics/script-host-policy",
+            status="published",
+            version="v-test",
+            schema_json=schema,
+            schema_hash="a" * 64,
+            published_by_user_id=admin_user_id,
+            published_at=published_at,
+        )
+        db.add(page)
+        db.flush()
+        version = ContentPageVersion(
+            page_id=page.id,
+            slug=page.slug,
+            status="published",
+            version="v-test",
+            schema_hash="a" * 64,
+            schema_json=schema,
+            published_by_user_id=admin_user_id,
+            published_at=published_at,
+            note="content script host policy fixture",
+        )
+        db.add(version)
+        db.flush()
+        page.current_version_id = version.id
+        db.add(
+            ContentScriptAsset(
+                page_id=page.id,
+                page_version_id=version.id,
+                slug=page.slug,
+                sandbox_id="sb_policy",
+                reference_key="scriptUrl",
+                reference_value_sha256="a" * 64,
+                source_url="https://cdn-policy.example.test/assets/policy-secret-token.js",
+                source_host="cdn-policy.example.test",
+                integrity="sha384-policy-secret-integrity",
+                matched_algorithm="sha384",
+                asset_sha256="b" * 64,
+                asset_size_bytes=24,
+                content_bytes=b"policy-secret-asset-bytes",
+                policy_version="v6.6.25",
+                policy_context_hash="c" * 64,
+                published_by_user_id=admin_user_id,
+                published_at=published_at,
+            )
+        )
+        db.commit()
+
+    try:
+        forbidden = client.get("/api/admin/content/script-host-policies", headers=_auth_header(teacher_token))
+        assert forbidden.status_code == 403
+
+        unreviewed = client.get(
+            "/api/admin/content/script-host-policies?source_host=cdn-policy.example.test",
+            headers=_auth_header(admin_token),
+        )
+        assert unreviewed.status_code == 200
+        unreviewed_body = unreviewed.json()
+        assert unreviewed_body["total"] == 1
+        item = unreviewed_body["items"][0]
+        assert item["source_host"] == "cdn-policy.example.test"
+        assert item["status"] == "unreviewed"
+        assert item["configured_allowed"] is True
+        assert item["observed_asset_count"] == 1
+        assert item["observed_page_count"] == 1
+        assert item["id"] is None
+
+        allowed_only = client.get(
+            "/api/admin/content/script-host-policies?source_host=allowed-only.example.test",
+            headers=_auth_header(admin_token),
+        )
+        assert allowed_only.status_code == 200
+        allowed_only_item = allowed_only.json()["items"][0]
+        assert allowed_only_item["status"] == "unreviewed"
+        assert allowed_only_item["configured_allowed"] is True
+        assert allowed_only_item["observed_asset_count"] == 0
+
+        blocked = client.patch(
+            "/api/admin/content/script-host-policies/cdn-policy.example.test",
+            headers={**_auth_header(admin_token), "X-Request-ID": "script-host-policy-update"},
+            json={"status": "blocked", "reason": "Drift found during manual review"},
+        )
+        assert blocked.status_code == 200
+        blocked_body = blocked.json()
+        assert blocked_body["id"] is not None
+        assert blocked_body["source_host"] == "cdn-policy.example.test"
+        assert blocked_body["status"] == "blocked"
+        assert blocked_body["reason"] == "Drift found during manual review"
+        assert blocked_body["configured_allowed"] is True
+        assert blocked_body["observed_asset_count"] == 1
+
+        blocked_page = client.get(
+            "/api/admin/content/script-host-policies?status=blocked",
+            headers=_auth_header(admin_token),
+        )
+        assert blocked_page.status_code == 200
+        assert blocked_page.json()["total"] == 1
+        assert blocked_page.json()["items"][0]["source_host"] == "cdn-policy.example.test"
+
+        invalid_host = client.patch(
+            "/api/admin/content/script-host-policies/cdn-policy.example.test:443",
+            headers=_auth_header(admin_token),
+            json={"status": "watch"},
+        )
+        assert invalid_host.status_code == 422
+
+        audit = client.get(
+            "/api/admin/audit-logs?action=admin.content_script_host_policy.update"
+            "&resource_type=content_script_host_policy&request_id=script-host-policy-update",
+            headers=_auth_header(admin_token),
+        )
+        assert audit.status_code == 200
+        assert audit.json()["total"] == 1
+        snapshot = audit.json()["items"][0]["snapshot_json"]
+        assert snapshot["before"]["status"] == "unreviewed"
+        assert snapshot["after"]["status"] == "blocked"
+        assert snapshot["capabilities"] == {
+            "allows_host": False,
+            "blocks_publish_when_status_blocked": True,
+            "external_network": False,
+            "mutation": True,
+        }
+        audit_text = json.dumps(snapshot, ensure_ascii=False)
+        assert "source_url" not in audit_text
+        assert "integrity" not in audit_text
+        assert "content_bytes" not in audit_text
+        assert "policy-secret-token" not in audit_text
+        assert "policy-secret-integrity" not in audit_text
+        assert "policy-secret-asset-bytes" not in audit_text
+    finally:
+        monkeypatch.delenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", raising=False)
+        get_settings.cache_clear()
+
+
 def test_admin_reads_content_script_asset_mirror_audit_with_redaction(client):
     admin_token = _bootstrap_admin(client)
     teacher_token = _register_and_login(client, "teacher_script_asset_audit", "teacher")

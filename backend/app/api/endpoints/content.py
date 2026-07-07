@@ -32,6 +32,7 @@ from app.services.content_script_assets import (
     ContentScriptAssetMirrorError,
     mirror_external_script_assets_for_version,
 )
+from app.services.content_script_host_policies import blocked_content_script_host_policies
 from app.services.content_script_policy import (
     SCRIPT_POLICY_VERSION,
     analyze_content_script_policy,
@@ -76,6 +77,7 @@ def create_content_draft(
     script_policy = _analyze_content_script_policy(page_schema)
     if script_policy.has_blocking_findings:
         raise HTTPException(status_code=422, detail="Content schema contains blocked script policy findings")
+    _reject_blocked_content_script_hosts(db, page_schema, status_code=422)
     if script_policy.has_script_findings and not payload.allow_script:
         raise HTTPException(status_code=422, detail="Content schema includes script references; allow_script is required")
     existing = db.scalar(
@@ -163,6 +165,7 @@ def update_content_draft(
     script_policy = _analyze_content_script_policy(page_schema)
     if script_policy.has_blocking_findings:
         raise HTTPException(status_code=422, detail="Content schema contains blocked script policy findings")
+    _reject_blocked_content_script_hosts(db, page_schema, status_code=422)
     allow_script = draft.allow_script if payload.allow_script is None else payload.allow_script
     if script_policy.has_script_findings and not allow_script:
         raise HTTPException(status_code=422, detail="Content schema includes script references; allow_script is required")
@@ -314,6 +317,7 @@ def publish_content_draft(
     script_policy = _content_draft_script_policy(draft, verify_external_assets=True)
     if script_policy.has_blocking_findings:
         raise HTTPException(status_code=409, detail="Content draft script policy findings must be resolved before publishing")
+    _reject_blocked_content_script_hosts(db, ContentPage.model_validate(draft.schema_json), status_code=409)
     if script_policy.has_script_findings and not draft.allow_script:
         raise HTTPException(status_code=409, detail="Content schema includes script references; script review is required")
     if script_policy.requires_review and draft.script_review_status != SCRIPT_REVIEW_APPROVED:
@@ -422,6 +426,7 @@ def review_content_draft_script(
     script_policy = _content_draft_script_policy(draft, verify_external_assets=payload.status == SCRIPT_REVIEW_APPROVED)
     if script_policy.has_blocking_findings:
         raise HTTPException(status_code=409, detail="Content draft script policy findings must be resolved before review")
+    _reject_blocked_content_script_hosts(db, ContentPage.model_validate(draft.schema_json), status_code=409)
 
     before = _content_draft_snapshot(draft)
     draft.script_risk_level = script_policy.risk_level
@@ -464,6 +469,7 @@ def rollback_content_page_version(
     target_script_policy = _analyze_content_script_policy(ContentPage.model_validate(target_version.schema_json))
     if target_script_policy.has_blocking_findings:
         raise HTTPException(status_code=409, detail="Content page version script policy findings must be resolved before rollback")
+    _reject_blocked_content_script_hosts(db, ContentPage.model_validate(target_version.schema_json), status_code=409)
     if target_script_policy.findings:
         raise HTTPException(
             status_code=409,
@@ -560,6 +566,19 @@ def _validate_content_slug(slug: str) -> None:
         or any(part in {"", ".", ".."} for part in slug.split("/"))
     ):
         raise HTTPException(status_code=422, detail="Invalid content slug")
+
+
+def _reject_blocked_content_script_hosts(db: Session, page_schema: ContentPage, *, status_code: int) -> None:
+    blocked_policies = blocked_content_script_host_policies(db, page_schema)
+    if not blocked_policies:
+        return
+    raise HTTPException(
+        status_code=status_code,
+        detail={
+            "code": "content_script_host_blocked",
+            "source_hosts": [policy.source_host for policy in blocked_policies],
+        },
+    )
 
 
 def _content_draft_read(draft: ContentDraft) -> ContentDraftRead:
