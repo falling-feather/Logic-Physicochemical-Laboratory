@@ -1,8 +1,8 @@
 from sqlalchemy import delete, func, select
 import pytest
-from fastapi import Response
+from fastapi import HTTPException, Response
 
-from app.api.endpoints.render import _apply_script_contract_headers
+from app.api.endpoints.render import _apply_script_contract_headers, _script_manifest_references
 from app.core.config import get_settings
 from app.db.session import get_session_factory
 from app.models import ContentPageRecord
@@ -68,9 +68,25 @@ def test_render_script_sandbox_document_serves_isolated_html(client):
     assert "form-action 'none'" in response.headers["Content-Security-Policy"]
     body = response.text
     assert f'data-sandbox-id="{sandbox_id}"' in body
-    assert '<script src="/pages/physics/energy-conservation.js" defer></script>' in body
+    asset_sha256 = manifest["references"][0]["valueSha256"]
+    asset_url = f"/api/render/script-sandboxes/{sandbox_id}/assets/{asset_sha256}/page/physics/energy-conservation"
+    assert f'<script src="{asset_url}" defer></script>' in body
     assert "scriptSandbox" not in body
     assert "valueSha256" not in body
+
+    asset = client.get(asset_url)
+    assert asset.status_code == 200
+    assert asset.headers["Content-Type"].startswith("application/javascript")
+    assert asset.headers["X-Astra-Content-Script-Sandbox-Id"] == sandbox_id
+    assert asset.headers["X-Astra-Content-Script-Asset-Sha256"] == asset_sha256
+    assert asset.headers["X-Content-Type-Options"] == "nosniff"
+    assert "const EnergyConservation" in asset.text
+
+    missing_asset = client.get(
+        f"/api/render/script-sandboxes/{sandbox_id}/assets/{'0' * 64}/page/physics/energy-conservation"
+    )
+    assert missing_asset.status_code == 404
+    assert missing_asset.json()["detail"] == "Script sandbox asset not found"
 
 
 def test_render_script_sandbox_document_fails_closed_for_missing_or_blocked_manifest(client):
@@ -138,6 +154,42 @@ def test_render_script_sandbox_document_rejects_ambiguous_manifest_id(client):
 
     assert response.status_code == 409
     assert response.json()["detail"] == "Script sandbox manifest is ambiguous"
+
+
+def test_render_script_sandbox_document_rejects_assets_outside_allowed_roots(client):
+    payload = _content_page_payload()
+    payload["slug"] = "physics/outside-root-sandbox"
+    payload["status"] = "published"
+    payload["sections"][0]["props"] = {
+        "scriptPath": "muban/template.js",
+        "scriptSandbox": {"mode": "isolated-iframe", "network": "same-origin", "storage": "none"},
+    }
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        db.add(
+            ContentPageRecord(
+                slug=payload["slug"],
+                status="published",
+                version="outside-root-test",
+                schema_json=payload,
+            )
+        )
+        db.commit()
+
+    render = client.get("/api/render/page/physics/outside-root-sandbox")
+    manifest = render.json()["sections"][0]["props"]["scriptManifest"]
+    response = client.get(f"/api/render/script-sandboxes/{manifest['sandboxId']}/page/physics/outside-root-sandbox")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Script sandbox asset path is outside allowed roots"
+
+
+def test_script_manifest_references_require_hashes():
+    with pytest.raises(HTTPException) as exc_info:
+        _script_manifest_references({"references": [{"key": "scriptPath", "value": "pages/physics/tool.js"}]})
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "Script sandbox manifest references are invalid"
 
 
 def test_render_contract_headers_require_uniform_script_sandbox_contract():

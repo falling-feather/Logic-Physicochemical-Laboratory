@@ -578,9 +578,8 @@ def test_script_draft_requires_approved_review_before_publish(client):
     manifest = render.json()["sections"][0]["props"]["scriptManifest"]
     assert manifest["sandboxId"].startswith("sm_")
     sandbox = client.get(f"/api/render/script-sandboxes/{manifest['sandboxId']}/page/{slug}")
-    assert sandbox.status_code == 200
-    assert sandbox.headers["X-Astra-Content-Script-Iframe-Sandbox"] == "allow-scripts"
-    assert '<script src="/drafts/custom-publish.js" defer></script>' in sandbox.text
+    assert sandbox.status_code == 404
+    assert sandbox.json()["detail"] == "Script sandbox asset file not found"
 
 
 def test_allowlisted_external_script_asset_requires_review_before_publish(client, monkeypatch):
