@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.models import ContentDraft, ContentPageRecord, ContentPageVersion, User
 from app.models.base import utc_now
@@ -29,6 +30,7 @@ from app.services.content_catalog import get_page_schema, list_page_summaries
 from app.services.content_script_policy import (
     SCRIPT_POLICY_VERSION,
     analyze_content_script_policy,
+    script_policy_context_hash,
     script_policy_result_from_json,
 )
 
@@ -65,7 +67,7 @@ def create_content_draft(
     if target_slug != page_schema.slug.strip():
         raise HTTPException(status_code=422, detail="target_slug must match schema.slug")
     page_schema = page_schema.model_copy(update={"slug": target_slug})
-    script_policy = analyze_content_script_policy(page_schema)
+    script_policy = _analyze_content_script_policy(page_schema)
     if script_policy.has_blocking_findings:
         raise HTTPException(status_code=422, detail="Content schema contains blocked script policy findings")
     if script_policy.has_script_findings and not payload.allow_script:
@@ -151,7 +153,7 @@ def update_content_draft(
     if target_slug != page_schema.slug.strip():
         raise HTTPException(status_code=422, detail="schema.slug must match draft target_slug")
     page_schema = page_schema.model_copy(update={"slug": target_slug})
-    script_policy = analyze_content_script_policy(page_schema)
+    script_policy = _analyze_content_script_policy(page_schema)
     if script_policy.has_blocking_findings:
         raise HTTPException(status_code=422, detail="Content schema contains blocked script policy findings")
     allow_script = draft.allow_script if payload.allow_script is None else payload.allow_script
@@ -433,7 +435,7 @@ def rollback_content_page_version(
     page = db.get(ContentPageRecord, target_version.page_id)
     if page is None:
         raise HTTPException(status_code=409, detail="Published content page is missing")
-    target_script_policy = analyze_content_script_policy(ContentPage.model_validate(target_version.schema_json))
+    target_script_policy = _analyze_content_script_policy(ContentPage.model_validate(target_version.schema_json))
     if target_script_policy.has_blocking_findings:
         raise HTTPException(status_code=409, detail="Content page version script policy findings must be resolved before rollback")
     if target_script_policy.findings:
@@ -750,13 +752,28 @@ def _content_draft_script_policy(draft: ContentDraft):
     stored_policy = script_policy_result_from_json(stored_analysis)
     stored_schema_hash = stored_analysis.get("schema_hash") if stored_analysis else None
     stored_policy_version = stored_analysis.get("policy_version") if stored_analysis else None
+    stored_policy_context_hash = stored_analysis.get("policy_context_hash") if stored_analysis else None
     if (
         stored_policy is not None
         and stored_schema_hash == draft.schema_hash
         and stored_policy_version == SCRIPT_POLICY_VERSION
+        and stored_policy_context_hash == _content_script_policy_context_hash()
     ):
         return stored_policy
-    return analyze_content_script_policy(ContentPage.model_validate(draft.schema_json))
+    return _analyze_content_script_policy(ContentPage.model_validate(draft.schema_json))
+
+
+def _analyze_content_script_policy(page_schema: ContentPage):
+    return analyze_content_script_policy(
+        page_schema,
+        allowed_external_hosts=get_settings().content_script_allowed_host_list,
+    )
+
+
+def _content_script_policy_context_hash() -> str:
+    return script_policy_context_hash(
+        allowed_external_hosts=get_settings().content_script_allowed_host_list,
+    )
 
 
 def _content_draft_script_analysis_snapshot(draft: ContentDraft) -> dict | None:
@@ -765,6 +782,7 @@ def _content_draft_script_analysis_snapshot(draft: ContentDraft) -> dict | None:
         return None
     return {
         "policy_version": policy.policy_version,
+        "policy_context_hash": policy.policy_context_hash,
         "schema_hash": draft.schema_hash,
         "status": policy.status,
         "risk_level": policy.risk_level,

@@ -626,6 +626,44 @@ def test_admin_reviews_script_draft_and_records_audit(client):
     assert "schema" not in audit_item["snapshot_json"]["after"]
 
 
+def test_external_script_asset_requires_allowlist_sri_and_review(client, monkeypatch):
+    teacher_id, teacher_token = _register_and_login(client, "teacher_external_script", "teacher")
+    payload = _draft_payload("physics/external-script", allow_script=True)
+    props = payload["schema"]["sections"][0]["props"]
+    props.update(
+        {
+            "scriptUrl": "https://cdn.example.test/tool.js",
+            "scriptIntegrity": "sha384-AbCdEf0123456789+/=",
+            "scriptCrossorigin": "anonymous",
+        }
+    )
+    props.pop("scriptPath", None)
+
+    blocked = client.post("/api/content/drafts", headers=_auth_header(teacher_token), json=payload)
+    assert blocked.status_code == 422
+    assert blocked.json()["detail"] == "Content schema contains blocked script policy findings"
+
+    monkeypatch.setenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", "cdn.example.test")
+    get_settings.cache_clear()
+    try:
+        create = client.post("/api/content/drafts", headers=_auth_header(teacher_token), json=payload)
+        assert create.status_code == 201
+        draft = create.json()
+        assert draft["author_user_id"] == teacher_id
+        assert draft["script_review_status"] == "pending"
+        assert draft["script_risk_level"] == "high"
+        assert draft["script_analysis"]["status"] == "review_required"
+        assert draft["script_analysis"]["sandbox"]["status"] == "isolated"
+        codes = {finding["code"] for finding in draft["script_analysis"]["findings"]}
+        assert "external_script_url" in codes
+        assert "external_script_host_not_allowed" not in codes
+        assert "script_integrity_missing" not in codes
+        assert "script_crossorigin_missing" not in codes
+    finally:
+        monkeypatch.delenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", raising=False)
+        get_settings.cache_clear()
+
+
 def test_admin_cannot_review_own_script_draft(client):
     admin_token = _bootstrap_admin(client, username="admin_own_draft")
     create = client.post(

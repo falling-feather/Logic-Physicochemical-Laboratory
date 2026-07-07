@@ -565,6 +565,123 @@ def test_script_draft_requires_approved_review_before_publish(client):
     assert publish_after_review.json()["version"] == "v1"
 
 
+def test_allowlisted_external_script_asset_requires_review_before_publish(client, monkeypatch):
+    first_admin_token = _bootstrap_admin(client, username="admin_external_script_first")
+    second_admin_id, second_admin_token = _register_and_login(client, "admin_external_script_second", "teacher")
+    promote_second_admin = client.patch(
+        f"/api/admin/users/{second_admin_id}",
+        headers=_auth_header(first_admin_token),
+        json={"role": "admin"},
+    )
+    assert promote_second_admin.status_code == 200
+    _, teacher_token = _register_and_login(client, "teacher_external_script_publish", "teacher")
+    slug = "physics/external-script-publish"
+    payload = _draft_payload(slug, title="External Script Asset", allow_script=True)
+    props = payload["schema"]["sections"][0]["props"]
+    props.update(
+        {
+            "scriptUrl": "https://cdn.example.test/tool.js",
+            "scriptIntegrity": "sha384-AbCdEf0123456789+/=",
+            "scriptCrossorigin": "anonymous",
+        }
+    )
+    props.pop("scriptPath", None)
+    monkeypatch.setenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", "cdn.example.test")
+    get_settings.cache_clear()
+    try:
+        create = client.post("/api/content/drafts", headers=_auth_header(teacher_token), json=payload)
+        assert create.status_code == 201
+        draft_id = create.json()["id"]
+        assert create.json()["script_review_status"] == "pending"
+        assert create.json()["script_risk_level"] == "high"
+        _submit_draft(client, teacher_token, draft_id)
+
+        publish_before_review = client.post(
+            f"/api/content/drafts/{draft_id}/publish",
+            headers=_auth_header(first_admin_token),
+            json={"note": "try before review"},
+        )
+        assert publish_before_review.status_code == 409
+
+        approve = client.patch(
+            f"/api/content/drafts/{draft_id}/script-review",
+            headers=_auth_header(second_admin_token),
+            json={"status": "approved", "note": "External script host, SRI and crossorigin reviewed"},
+        )
+        assert approve.status_code == 200
+
+        publish_after_review = client.post(
+            f"/api/content/drafts/{draft_id}/publish",
+            headers=_auth_header(first_admin_token),
+            json={"note": "publish external asset"},
+        )
+        assert publish_after_review.status_code == 200
+        assert publish_after_review.json()["version"] == "v1"
+
+        render = client.get(f"/api/render/page/{slug}")
+        assert render.status_code == 200
+        props_after_publish = render.json()["sections"][0]["props"]
+        assert "scriptUrl" not in props_after_publish
+        assert "scriptIntegrity" not in props_after_publish
+        assert "scriptCrossorigin" not in props_after_publish
+        assert props_after_publish["scriptManifest"]["referenceCount"] == 1
+    finally:
+        monkeypatch.delenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", raising=False)
+        get_settings.cache_clear()
+
+
+def test_external_script_asset_policy_rechecks_current_allowlist_before_publish(client, monkeypatch):
+    first_admin_token = _bootstrap_admin(client, username="admin_external_script_context_first")
+    second_admin_id, second_admin_token = _register_and_login(client, "admin_external_script_context_second", "teacher")
+    promote_second_admin = client.patch(
+        f"/api/admin/users/{second_admin_id}",
+        headers=_auth_header(first_admin_token),
+        json={"role": "admin"},
+    )
+    assert promote_second_admin.status_code == 200
+    _, teacher_token = _register_and_login(client, "teacher_external_script_context", "teacher")
+    slug = "physics/external-script-context"
+    payload = _draft_payload(slug, title="External Script Context", allow_script=True)
+    props = payload["schema"]["sections"][0]["props"]
+    props.update(
+        {
+            "scriptUrl": "https://cdn.example.test/tool.js",
+            "scriptIntegrity": "sha384-AbCdEf0123456789+/=",
+            "scriptCrossorigin": "anonymous",
+        }
+    )
+    props.pop("scriptPath", None)
+    monkeypatch.setenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", "cdn.example.test")
+    get_settings.cache_clear()
+    try:
+        create = client.post("/api/content/drafts", headers=_auth_header(teacher_token), json=payload)
+        assert create.status_code == 201
+        draft_id = create.json()["id"]
+        assert len(create.json()["script_analysis"]["policy_context_hash"]) == 64
+        _submit_draft(client, teacher_token, draft_id)
+
+        approve = client.patch(
+            f"/api/content/drafts/{draft_id}/script-review",
+            headers=_auth_header(second_admin_token),
+            json={"status": "approved", "note": "External script host reviewed"},
+        )
+        assert approve.status_code == 200
+
+        monkeypatch.delenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", raising=False)
+        get_settings.cache_clear()
+
+        publish = client.post(
+            f"/api/content/drafts/{draft_id}/publish",
+            headers=_auth_header(first_admin_token),
+            json={"note": "host no longer allowed"},
+        )
+        assert publish.status_code == 409
+        assert publish.json()["detail"] == "Content draft script policy findings must be resolved before publishing"
+    finally:
+        monkeypatch.delenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", raising=False)
+        get_settings.cache_clear()
+
+
 def test_scripted_content_version_requires_new_review_before_rollback(client):
     first_admin_token = _bootstrap_admin(client, username="admin_script_rollback_first")
     second_admin_id, second_admin_token = _register_and_login(client, "admin_script_rollback_second", "teacher")

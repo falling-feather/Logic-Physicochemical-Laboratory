@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models import ContentDraft, ContentPageRecord, ContentPageVersion, User
 from app.models.base import utc_now
 from app.schemas.content import ContentPage
@@ -206,7 +207,7 @@ def _initialize_builtin_content_page(
 ) -> dict[str, Any]:
     page_payload = seed_page.model_dump(mode="json")
     seed_schema_hash = _schema_hash(page_payload)
-    script_policy = analyze_content_script_policy(seed_page)
+    script_policy = _analyze_content_script_policy(seed_page)
     active_drafts = _active_content_draft_count(db, seed_page.slug)
     context = _initialization_context(seed_page, seed_schema_hash, script_policy, active_drafts)
     if script_policy.has_blocking_findings:
@@ -711,6 +712,13 @@ def _has_published_versions(db: Session, slug: str) -> bool:
 def _schema_hash(payload: dict) -> str:
     serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _analyze_content_script_policy(page_schema: ContentPage):
+    return analyze_content_script_policy(
+        page_schema,
+        allowed_external_hosts=get_settings().content_script_allowed_host_list,
+    )
 
 
 def _strip_optional(value: str | None) -> str | None:

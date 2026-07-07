@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     login_attempt_window_seconds: int = 15 * 60
     audit_log_retention_days: int = Field(default=365, ge=1)
     audit_ip_hash_salt: str = "astra-dev-audit-salt"
+    content_script_allowed_hosts: str = ""
     cors_origins: str = "http://127.0.0.1:8766,http://localhost:8766"
     admin_bootstrap_token: str | None = None
     knowledge_snapshot_scheduler_enabled: bool = False
@@ -54,6 +55,10 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def content_script_allowed_host_list(self) -> list[str]:
+        return [host.strip().lower() for host in self.content_script_allowed_hosts.split(",") if host.strip()]
 
 
 @lru_cache

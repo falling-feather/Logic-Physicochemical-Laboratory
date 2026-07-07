@@ -3,21 +3,28 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 import hashlib
+import json
+import re
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 from app.schemas.content import ContentPage
 
 
-SCRIPT_POLICY_VERSION = "2026-07-05.1"
+SCRIPT_POLICY_VERSION = "2026-07-07.2"
 MAX_FINDINGS = 50
 SCRIPT_REFERENCE_KEYS = {"script", "scriptpath", "scripturl", "scriptsrc", "inlinescript"}
 INLINE_SCRIPT_KEYS = {"inlinescript"}
 SCRIPT_LOCATION_KEYS = {"script", "scriptpath", "scripturl", "scriptsrc"}
 SCRIPT_SANDBOX_KEYS = {"scriptsandbox"}
+SCRIPT_INTEGRITY_KEYS = {"scriptintegrity", "integrity"}
+SCRIPT_CROSSORIGIN_KEYS = {"scriptcrossorigin", "crossorigin"}
+SCRIPT_ASSET_METADATA_KEYS = SCRIPT_INTEGRITY_KEYS | SCRIPT_CROSSORIGIN_KEYS
 SCRIPT_SANDBOX_MODE = "isolated-iframe"
 SCRIPT_SANDBOX_IFRAME_DIRECTIVE = "allow-scripts"
 SCRIPT_SANDBOX_CSP = "default-src 'none'; script-src 'self'; connect-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
-BLOCKED_PROTOCOLS = ("javascript:", "data:", "vbscript:")
+BLOCKED_PROTOCOLS = ("javascript:", "data:", "vbscript:", "blob:")
+SRI_PATTERN = re.compile(r"^(sha256|sha384|sha512)-[A-Za-z0-9+/]+={0,2}$")
 BLOCKED_SANDBOX_CAPABILITIES = {
     "allowSameOrigin": "Script sandboxes cannot grant same-origin access with allow-scripts.",
     "allowTopNavigation": "Script sandboxes cannot navigate the top-level browsing context.",
@@ -65,6 +72,7 @@ class ScriptPolicyFinding:
 @dataclass(frozen=True)
 class ScriptPolicyResult:
     policy_version: str
+    policy_context_hash: str
     status: str
     risk_level: str
     findings: list[ScriptPolicyFinding]
@@ -85,6 +93,7 @@ class ScriptPolicyResult:
     def to_json(self, *, schema_hash: str | None = None) -> dict[str, Any]:
         return {
             "policy_version": self.policy_version,
+            "policy_context_hash": self.policy_context_hash,
             "schema_hash": schema_hash,
             "status": self.status,
             "risk_level": self.risk_level,
@@ -94,23 +103,43 @@ class ScriptPolicyResult:
         }
 
 
-def analyze_content_script_policy(page_schema: ContentPage | dict[str, Any]) -> ScriptPolicyResult:
+def analyze_content_script_policy(
+    page_schema: ContentPage | dict[str, Any],
+    *,
+    allowed_external_hosts: list[str] | tuple[str, ...] | set[str] | None = None,
+) -> ScriptPolicyResult:
     if isinstance(page_schema, ContentPage):
         payload = page_schema.model_dump(mode="json")
     else:
         payload = page_schema
     findings: list[ScriptPolicyFinding] = []
-    _scan_value(payload, "$", findings)
+    allowed_hosts = {host.strip().lower() for host in allowed_external_hosts or [] if host.strip()}
+    _scan_value(payload, "$", findings, allowed_external_hosts=allowed_hosts)
     risk_level = _risk_level(findings)
     status = "blocked" if risk_level == "blocked" else "review_required" if findings else "clean"
     sandbox = _sandbox_summary(findings)
     return ScriptPolicyResult(
         policy_version=SCRIPT_POLICY_VERSION,
+        policy_context_hash=script_policy_context_hash(allowed_external_hosts=allowed_hosts),
         status=status,
         risk_level=risk_level,
         findings=findings,
         sandbox=sandbox,
     )
+
+
+def script_policy_context_hash(
+    *,
+    allowed_external_hosts: list[str] | tuple[str, ...] | set[str] | None = None,
+) -> str:
+    normalized_hosts = sorted({host.strip().lower() for host in allowed_external_hosts or [] if host.strip()})
+    payload = json.dumps(
+        {"allowed_external_hosts": normalized_hosts},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def script_policy_result_from_json(payload: dict[str, Any] | None) -> ScriptPolicyResult | None:
@@ -132,6 +161,7 @@ def script_policy_result_from_json(payload: dict[str, Any] | None) -> ScriptPoli
     ]
     return ScriptPolicyResult(
         policy_version=str(payload.get("policy_version", SCRIPT_POLICY_VERSION)),
+        policy_context_hash=str(payload.get("policy_context_hash", "")),
         status=str(payload.get("status", "clean")),
         risk_level=str(payload.get("risk_level", _risk_level(findings))),
         findings=findings,
@@ -145,7 +175,14 @@ def public_content_page_schema(page_schema: ContentPage | dict[str, Any]) -> Con
     return ContentPage.model_validate(payload)
 
 
-def _scan_value(value: Any, path: str, findings: list[ScriptPolicyFinding], key: str | None = None) -> None:
+def _scan_value(
+    value: Any,
+    path: str,
+    findings: list[ScriptPolicyFinding],
+    key: str | None = None,
+    *,
+    allowed_external_hosts: set[str],
+) -> None:
     if len(findings) >= MAX_FINDINGS:
         return
     if isinstance(value, dict):
@@ -157,7 +194,16 @@ def _scan_value(value: Any, path: str, findings: list[ScriptPolicyFinding], key:
             normalized_key = _normalize_key(child_key)
             if normalized_key in SCRIPT_REFERENCE_KEYS:
                 findings.append(_script_reference_finding(child_path, child_key, nested_value, normalized_key))
-                _scan_script_reference_value(nested_value, child_path, child_key, normalized_key, findings)
+                _scan_script_reference_value(
+                    nested_value,
+                    child_path,
+                    child_key,
+                    normalized_key,
+                    findings,
+                    container=value,
+                    container_path=path,
+                    allowed_external_hosts=allowed_external_hosts,
+                )
                 if normalized_key in SCRIPT_LOCATION_KEYS:
                     _scan_script_sandbox_contract(value, path, child_path, findings)
             elif _looks_like_event_handler(child_key):
@@ -171,13 +217,13 @@ def _scan_value(value: Any, path: str, findings: list[ScriptPolicyFinding], key:
                         message="Inline event handler props require review and are not part of the stable schema.",
                     )
                 )
-            _scan_value(nested_value, child_path, findings, child_key)
+            _scan_value(nested_value, child_path, findings, child_key, allowed_external_hosts=allowed_external_hosts)
         return
     if isinstance(value, list):
         for index, nested_value in enumerate(value):
             if len(findings) >= MAX_FINDINGS:
                 return
-            _scan_value(nested_value, f"{path}[{index}]", findings, key)
+            _scan_value(nested_value, f"{path}[{index}]", findings, key, allowed_external_hosts=allowed_external_hosts)
         return
     if isinstance(value, str):
         _scan_string(value, path, key, findings)
@@ -189,6 +235,10 @@ def _scan_script_reference_value(
     key: str,
     normalized_key: str,
     findings: list[ScriptPolicyFinding],
+    *,
+    container: dict[str, Any],
+    container_path: str,
+    allowed_external_hosts: set[str],
 ) -> None:
     if normalized_key in INLINE_SCRIPT_KEYS:
         findings.append(
@@ -215,10 +265,10 @@ def _scan_script_reference_value(
                 path=path,
                 key=key,
                 value=value,
-                message="Script references cannot use javascript:, data:, or vbscript: protocols.",
+                message="Script references cannot use javascript:, data:, vbscript:, or blob: protocols.",
             )
         )
-    if ".." in stripped.replace("\\", "/").split("/"):
+    if ".." in unquote(stripped).replace("\\", "/").split("/"):
         findings.append(
             _finding(
                 code="script_path_traversal",
@@ -240,6 +290,112 @@ def _scan_script_reference_value(
                 message="External script URLs require explicit administrative review.",
             )
         )
+        _scan_external_script_asset(
+            stripped,
+            path,
+            key,
+            findings,
+            container=container,
+            container_path=container_path,
+            allowed_external_hosts=allowed_external_hosts,
+        )
+
+
+def _scan_external_script_asset(
+    url: str,
+    path: str,
+    key: str,
+    findings: list[ScriptPolicyFinding],
+    *,
+    container: dict[str, Any],
+    container_path: str,
+    allowed_external_hosts: set[str],
+) -> None:
+    parsed = _parse_external_url(url)
+    if parsed is None or parsed.scheme != "https":
+        findings.append(
+            _finding(
+                code="external_script_insecure_scheme",
+                severity="blocked",
+                path=path,
+                key=key,
+                value=url,
+                message="External script URLs must use an explicit https:// URL.",
+            )
+        )
+    if parsed is not None and (parsed.query or parsed.fragment):
+        findings.append(
+            _finding(
+                code="external_script_query_or_fragment",
+                severity="blocked",
+                path=path,
+                key=key,
+                value=url,
+                message="External script URLs must not include query strings or fragments.",
+            )
+        )
+    host = parsed.hostname.lower() if parsed is not None and parsed.hostname else ""
+    if not host or not _host_allowed(host, allowed_external_hosts):
+        findings.append(
+            _finding(
+                code="external_script_host_not_allowed",
+                severity="blocked",
+                path=path,
+                key=key,
+                value=url,
+                message="External script URLs must use a configured allowed host.",
+            )
+        )
+
+    integrity_key, integrity = _container_value_by_normalized_key(container, SCRIPT_INTEGRITY_KEYS)
+    integrity_path = f"{container_path}.{integrity_key}" if integrity_key is not None else path
+    if integrity_key is None:
+        findings.append(
+            _finding(
+                code="script_integrity_missing",
+                severity="blocked",
+                path=path,
+                key=key,
+                value=url,
+                message="External script URLs must declare a Subresource Integrity hash.",
+            )
+        )
+    elif not isinstance(integrity, str) or not _valid_sri(integrity):
+        findings.append(
+            _finding(
+                code="script_integrity_invalid",
+                severity="blocked",
+                path=integrity_path,
+                key=integrity_key,
+                value=integrity,
+                message="Script integrity must be a sha256, sha384, or sha512 SRI token.",
+            )
+        )
+
+    crossorigin_key, crossorigin = _container_value_by_normalized_key(container, SCRIPT_CROSSORIGIN_KEYS)
+    crossorigin_path = f"{container_path}.{crossorigin_key}" if crossorigin_key is not None else path
+    if crossorigin_key is None:
+        findings.append(
+            _finding(
+                code="script_crossorigin_missing",
+                severity="blocked",
+                path=path,
+                key=key,
+                value=url,
+                message="External script URLs must declare crossorigin=anonymous for SRI.",
+            )
+        )
+    elif not isinstance(crossorigin, str) or crossorigin.strip().lower() != "anonymous":
+        findings.append(
+            _finding(
+                code="script_crossorigin_invalid",
+                severity="blocked",
+                path=crossorigin_path,
+                key=crossorigin_key,
+                value=crossorigin,
+                message="External script crossorigin must be anonymous.",
+            )
+        )
 
 
 def _scan_string(value: str, path: str, key: str | None, findings: list[ScriptPolicyFinding]) -> None:
@@ -253,7 +409,7 @@ def _scan_string(value: str, path: str, key: str | None, findings: list[ScriptPo
                 path=path,
                 key=key,
                 value=value,
-                message="Content props cannot include javascript:, data:, or vbscript: values.",
+                message="Content props cannot include javascript:, data:, vbscript:, or blob: values.",
             )
         )
     if "<script" in lowered:
@@ -396,6 +552,7 @@ def _strip_public_script_fields(value: Any) -> None:
 
     script_references: list[dict[str, Any]] = []
     sandbox: dict[str, Any] | None = None
+    contains_script_reference = any(_normalize_key(str(key)) in SCRIPT_REFERENCE_KEYS for key in value)
     for raw_key in list(value):
         normalized_key = _normalize_key(str(raw_key))
         nested_value = value[raw_key]
@@ -405,6 +562,9 @@ def _strip_public_script_fields(value: Any) -> None:
             continue
         if normalized_key in SCRIPT_SANDBOX_KEYS:
             sandbox = nested_value if isinstance(nested_value, dict) else None
+            del value[raw_key]
+            continue
+        if contains_script_reference and normalized_key in SCRIPT_ASSET_METADATA_KEYS:
             del value[raw_key]
             continue
         _strip_public_script_fields(nested_value)
@@ -519,6 +679,30 @@ def _uses_blocked_protocol(value: str) -> bool:
 def _is_external_url(value: str) -> bool:
     lowered = value.lower()
     return lowered.startswith("http://") or lowered.startswith("https://") or lowered.startswith("//")
+
+
+def _parse_external_url(value: str):
+    if value.startswith("//"):
+        return urlsplit(value)
+    return urlsplit(value)
+
+
+def _host_allowed(host: str, allowed_hosts: set[str]) -> bool:
+    if not allowed_hosts:
+        return False
+    return host in allowed_hosts
+
+
+def _container_value_by_normalized_key(container: dict[str, Any], normalized_keys: set[str]) -> tuple[str | None, Any]:
+    for key, value in container.items():
+        if _normalize_key(str(key)) in normalized_keys:
+            return str(key), value
+    return None, None
+
+
+def _valid_sri(value: str) -> bool:
+    tokens = [token.strip() for token in value.split() if token.strip()]
+    return bool(tokens) and all(SRI_PATTERN.match(token) for token in tokens)
 
 
 def _preview(value: str | None) -> str | None:

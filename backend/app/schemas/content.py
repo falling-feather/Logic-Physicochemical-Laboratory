@@ -102,6 +102,7 @@ class ScriptAnalysisFindingRead(BaseModel):
 
 class ScriptAnalysisRead(BaseModel):
     policy_version: str
+    policy_context_hash: str | None = None
     schema_hash: str | None = None
     status: str
     risk_level: str
