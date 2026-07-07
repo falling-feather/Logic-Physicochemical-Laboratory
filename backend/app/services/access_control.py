@@ -2,7 +2,18 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Assignment, ClassGroup, ClassMembership, Course, CourseClass, CourseUnit, School, SchoolMembership, User
+from app.models import (
+    Assignment,
+    ClassGroup,
+    ClassMembership,
+    Course,
+    CourseClass,
+    CourseCollaborator,
+    CourseUnit,
+    School,
+    SchoolMembership,
+    User,
+)
 
 
 def get_class(db: Session, class_id: int) -> ClassGroup:
@@ -214,6 +225,28 @@ def require_course_author_or_admin(
     detail: str = "Course author role is required",
 ) -> None:
     if user.role == "admin" or course.creator_user_id == user.id:
+        return
+    raise HTTPException(status_code=403, detail=detail)
+
+
+def require_course_editor_or_admin(
+    db: Session,
+    user: User,
+    course: Course,
+    *,
+    detail: str = "Course editor role is required",
+) -> None:
+    if user.role == "admin" or course.creator_user_id == user.id:
+        return
+    collaborator = db.scalar(
+        select(CourseCollaborator).where(
+            CourseCollaborator.course_id == course.id,
+            CourseCollaborator.user_id == user.id,
+            CourseCollaborator.role == "editor",
+            CourseCollaborator.status == "active",
+        )
+    )
+    if collaborator is not None:
         return
     raise HTTPException(status_code=403, detail=detail)
 

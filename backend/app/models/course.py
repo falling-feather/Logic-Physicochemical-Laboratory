@@ -28,6 +28,17 @@ class CourseClass(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
 
 
+class CourseCollaborator(TimestampMixin, Base):
+    __tablename__ = "course_collaborators"
+    __table_args__ = (UniqueConstraint("course_id", "user_id", name="uq_course_collaborators_course_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), index=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    role: Mapped[str] = mapped_column(String(32), default="editor", nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
+
+
 class CourseUnit(TimestampMixin, Base):
     __tablename__ = "course_units"
     __table_args__ = (

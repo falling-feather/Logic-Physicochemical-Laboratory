@@ -9,7 +9,7 @@ from app.schemas.course import AssignmentPointRuleRead, AssignmentPointRuleUpdat
 from app.services.audit import record_audit_log
 from app.services.access_control import (
     get_class,
-    require_course_author_or_admin,
+    require_course_editor_or_admin,
     require_school_role,
     require_class_teacher_or_admin,
     teacher_class_ids,
@@ -58,10 +58,11 @@ def update_assignment_point_rule(
 ) -> AssignmentPointRuleRead:
     assignment, _, course = _resolve_assignment(db, assignment_id)
     require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
-    require_course_author_or_admin(
+    require_course_editor_or_admin(
+        db,
         current_user,
         course,
-        detail="Assignment point rule requires course author role",
+        detail="Assignment point rule requires course editor role",
     )
     previous = _assignment_point_rule_read(assignment)
     next_rule = payload.model_dump()

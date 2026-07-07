@@ -11,6 +11,8 @@ SubmissionStatus = Literal["submitted", "graded", "returned"]
 SubmissionGradeStatus = Literal["graded", "returned"]
 LearningEventType = Literal["visit", "start", "submit", "complete"]
 AssignmentPointRuleSource = Literal["default", "custom"]
+CourseCollaboratorRole = Literal["editor"]
+CourseCollaboratorStatus = Literal["active", "inactive"]
 
 
 class CourseCreate(BaseModel):
@@ -41,6 +43,25 @@ class CourseClassRead(BaseModel):
     id: int
     course_id: int
     class_id: int
+    status: str
+
+
+class CourseCollaboratorCreate(BaseModel):
+    user_id: int
+    role: CourseCollaboratorRole = "editor"
+
+
+class CourseCollaboratorUpdate(BaseModel):
+    status: CourseCollaboratorStatus
+
+
+class CourseCollaboratorRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    course_id: int
+    user_id: int
+    role: str
     status: str
 
 

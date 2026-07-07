@@ -83,16 +83,18 @@ python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-revi
 | PATCH | `/api/classes/{id}/join-requests/{request_id}` | 班级教师或管理员审批加入申请，支持 `approved` / `rejected` |
 | GET/POST | `/api/courses` | 当前用户可见课程 / 教师创建课程；学生仅返回本人 active 班级内 published 课程 |
 | POST | `/api/courses/{id}/classes` | 将课程挂接到班级 |
-| GET/POST | `/api/courses/{id}/units` | 课程单元列表 / 课程作者或管理员创建单元；学生仅可读取 published 课程下的 published 单元 |
+| GET/POST | `/api/courses/{id}/collaborators` | 课程协作者列表与创建；课程创建者或全局 admin 可创建 active editor，active editor 可读取列表但不能管理协作者 |
+| PATCH | `/api/courses/{id}/collaborators/{collaborator_id}` | 课程协作者状态维护；课程创建者或全局 admin 可将 editor 在 `active/inactive` 间切换 |
+| GET/POST | `/api/courses/{id}/units` | 课程单元列表 / 课程创建者、active editor 或全局 admin 创建单元；学生仅可读取 published 课程下的 published 单元 |
 | GET | `/api/courses/{id}/assignments` | 课程作业列表；学生仅可读取 published 单元下的 active 作业 |
-| POST | `/api/courses/{id}/units/{unit_id}/assignments` | 课程作者或管理员创建作业 |
+| POST | `/api/courses/{id}/units/{unit_id}/assignments` | 课程创建者、active editor 或全局 admin 创建作业 |
 | GET/POST | `/api/learning-events` | 学习事件查询 / 记录访问、提交、完成等事件；学生读写仅计入 published 课程、published 单元和 active 作业；教师查询按本班 teacher scope 收束 |
 | POST | `/api/assignments/{id}/submissions` | 学生按 `class_id` 提交作业；同一 `assignment/student/class` 只能提交一次，同一作业挂到多个班级时可分别提交；提交目标必须位于 published 课程和 published 单元下且作业 active |
 | GET | `/api/assignments/{id}/review` | 学生侧作业复盘入口；可用 `class_id` 定位班级提交，published 课程/单元内 active 未提交返回可提交，已提交、closed 或 archived 返回只读和 `submit_block_reason` |
 | GET | `/api/assignments/{id}/submissions` | 学生查看本人提交 / 教师查看作业提交 |
 | PATCH | `/api/submissions/{id}/grade` | 教师批改作业，并按作业积分规则目标值与当前 submission 已入账 `assignment_grade` 积分差额生成流水 |
 | GET | `/api/points/ledger` | 查询个人或班级范围积分流水；教师查询按本班 teacher scope 收束 |
-| GET/PATCH | `/api/points/assignments/{id}/rule` | 读取/维护 assignment 级积分规则；学校 teacher/admin 可读，课程作者或全局 admin 可写，默认规则不额外落库 |
+| GET/PATCH | `/api/points/assignments/{id}/rule` | 读取/维护 assignment 级积分规则；学校 teacher/admin 可读，课程创建者、active editor 或全局 admin 可写，默认规则不额外落库 |
 | GET | `/api/progress/me` | 当前用户个人进度摘要；学生个人口径仅计入当前可见资源 |
 | GET | `/api/progress/users/{id}` | 教师查看班级内学生进度摘要；要求本班 teacher scope |
 | GET | `/api/knowledge/me` | 当前用户知识状态规则统计，可按班级/课程/时间窗过滤；学生个人口径仅计入 published 课程、published 单元和 active 作业 |
@@ -174,7 +176,7 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 
 ## 服务层边界
 
-- `app.services.access_control` 负责学校、班级和课程范围判断，普通业务端点不再各自复制 `_require_*` helper；学生课程访问会额外要求课程 `published`，单元读取/事件/提交/复盘会继续要求单元 `published`，事件与提交写入要求作业 `active`；教师端涉及班级挂课、班级成员列表、学生成员状态维护、学习事件查询、积分流水、学生进度、查看提交、批改和待批改队列时必须具备对应班级的 active teacher membership；学校/班级深度统计分别要求对应 school teacher scope / class teacher scope，且非授权用户不通过统计端点暴露对象存在性；课程结构写入（单元/作业创建）和 assignment 级积分规则维护要求课程作者或全局 admin；全局 admin 保留跨范围治理能力，并可维护 teacher membership 的 `active/inactive`，但不能禁用班级最后一个 active teacher；后续权限矩阵扩展应优先在这里收口。
+- `app.services.access_control` 负责学校、班级和课程范围判断，普通业务端点不再各自复制 `_require_*` helper；学生课程访问会额外要求课程 `published`，单元读取/事件/提交/复盘会继续要求单元 `published`，事件与提交写入要求作业 `active`；教师端涉及班级挂课、班级成员列表、学生成员状态维护、学习事件查询、积分流水、学生进度、查看提交、批改和待批改队列时必须具备对应班级的 active teacher membership；学校/班级深度统计分别要求对应 school teacher scope / class teacher scope，且非授权用户不通过统计端点暴露对象存在性；课程结构写入（单元/作业创建）和 assignment 级积分规则维护要求课程创建者、active editor 协作者或全局 admin，协作者管理仅限课程创建者或全局 admin；全局 admin 保留跨范围治理能力，并可维护 teacher membership 的 `active/inactive`，但不能禁用班级最后一个 active teacher；后续权限矩阵扩展应优先在这里收口。
 - `app.services.points` 负责 assignment 级积分规则规范化与批改积分计算；默认规则为 `enabled=true`、`points_per_score=1`、`max_points=null`，批改时写入“规则目标积分 - 当前 submission 已入账 assignment_grade 积分”的差额流水，避免重复批改累计膨胀，并支持封顶或禁用规则后的反向校正。
 - `app.services.class_join_requests` 负责加入申请审批状态流转和成员关系补齐。
 - `POST /api/classes/{id}/join` 与 `POST /api/classes/{id}/join-requests` 长期并存：前者是保留给受控场景、导入/邀请码或旧 UI 的 direct join，后者是需要教师/admin 审批的申请流；前端不得把审批流表现为唯一加入路径。
@@ -192,7 +194,7 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 - `/api/content/drafts/{id}/submit`、`/request-changes`、`/withdraw` 与 `/publish` 负责草稿状态流转；创建草稿时绑定当前 published base 版本和 hash，写入 `active_key='active'`，并由 `(author_user_id, target_slug, active_key)` 唯一约束防止同一作者同一目标页并发创建多个 active 草稿；撤回或发布会清空 active key。发布前校验 base 未过期并复核当前配置下的脚本 policy，脚本引用必须带 `scriptSandbox.mode=isolated-iframe` 且不能声明危险能力；外部脚本还必须满足 allowlist/SRI/crossorigin 契约、完成管理员审核，并在审核批准和发布时通过后端下载/SRI 字节校验。发布阶段由 `(slug, version)` 和 `source_draft_id` 唯一约束兜底，冲突统一返回 `409`，发布后回填 page/version/publisher 元数据，审计只记录状态和版本元数据，不记录完整 schema。
 - `/api/content/page-versions/{id}/rollback` 负责内容版本追加式回滚：更新 `content_pages.current_version_id/schema_hash/published_*` 当前态、追加带 `previous_version_id` 的 `content_page_versions`，并在审计中只记录版本元数据与 schema hash，不记录完整 schema。
 - `app.services.knowledge_snapshot_runs` 与 `app.services.knowledge_snapshot_scheduler` 负责知识快照窗口重算、运行记录、进程内调度、数据库租约防重入、长重算自动心跳、健康摘要、调度积压摘要、协作式取消和手动 requeue；同一 `run_key` 通过 scheduler lease owner/token/expires/heartbeat 元数据抢占，调度器与 CLI 会把 token-guard heartbeat callback 注入重算循环，完成或失败释放使用 token guard，失去租约或被 admin 取消的旧 worker 会中止而不覆盖新状态；requeue 会把 failed、cancelled 或过期带租约 running run 重置为 pending，调度器会扫描 pending run 并重新抢占执行；积压摘要会显式区分 scheduler 实际会处理的 dispatchable now 和仅符合租约抢占规则的 claimable by lease rule，管理端响应不返回 `scheduler_lease_token` 或 `metadata_json`。
-- `POST /api/assignments/{id}/submissions` 的提交唯一性按 `assignment_id + student_id + class_id` 收口；同一课程作业挂到多个班级时，学生可在不同班级各提交一次，同班级重复提交仍返回 `409`；学生提交只允许 published 课程、published 单元下的 active 作业。`GET /api/classes/{id}/members` 只允许全局 admin 或该班 active teacher membership 读取，默认仅返回 active 成员，响应包含成员关系状态和用户状态但不暴露密码、会话或联系方式；`PATCH /api/classes/{id}/members/{membership_id}` 支持 student membership 的 `active/inactive`，teacher membership 仅限全局 admin 维护，且禁用最后一个 active teacher 返回 `409`。`GET /api/assignments/{id}/submissions` 对教师默认只返回其任教班级内的提交，指定 `class_id` 时要求本班 teacher scope；`PATCH /api/submissions/{id}/grade` 同样要求本班 teacher scope，并按 assignment 级积分规则写入差额流水。`GET /api/points/assignments/{id}/rule` 允许学校 teacher/admin 读取，`PATCH /api/points/assignments/{id}/rule` 只允许课程作者或全局 admin 维护；同校非作者教师可批改自己班级提交，但不能改写共享作业规则。`GET /api/learning-events`、`GET /api/points/ledger` 和 `GET /api/progress/users/{id}` 对教师也使用同一班级 teacher scope；不传 `class_id` 的事件/积分查询只返回教师任教班级内的数据。
+- `POST /api/assignments/{id}/submissions` 的提交唯一性按 `assignment_id + student_id + class_id` 收口；同一课程作业挂到多个班级时，学生可在不同班级各提交一次，同班级重复提交仍返回 `409`；学生提交只允许 published 课程、published 单元下的 active 作业。`GET /api/classes/{id}/members` 只允许全局 admin 或该班 active teacher membership 读取，默认仅返回 active 成员，响应包含成员关系状态和用户状态但不暴露密码、会话或联系方式；`PATCH /api/classes/{id}/members/{membership_id}` 支持 student membership 的 `active/inactive`，teacher membership 仅限全局 admin 维护，且禁用最后一个 active teacher 返回 `409`。`GET /api/assignments/{id}/submissions` 对教师默认只返回其任教班级内的提交，指定 `class_id` 时要求本班 teacher scope；`PATCH /api/submissions/{id}/grade` 同样要求本班 teacher scope，并按 assignment 级积分规则写入差额流水。`GET/POST /api/courses/{id}/collaborators` 与 `PATCH /api/courses/{id}/collaborators/{collaborator_id}` 提供课程协作者最小闭环，课程创建者或全局 admin 可把同校 active teacher/admin membership 用户设为 `editor` 或置为 `inactive`，active editor 可创建单元/作业和维护作业积分规则，但不能管理协作者。`GET /api/points/assignments/{id}/rule` 允许学校 teacher/admin 读取，`PATCH /api/points/assignments/{id}/rule` 只允许课程创建者、active editor 或全局 admin 维护；同校非作者/非协作者教师可批改自己班级提交，但不能改写共享作业规则。`GET /api/learning-events`、`GET /api/points/ledger` 和 `GET /api/progress/users/{id}` 对教师也使用同一班级 teacher scope；不传 `class_id` 的事件/积分查询只返回教师任教班级内的数据。
 - `GET /api/assignments/{id}/review` 是学生侧只读复盘入口：只允许 student 访问自己的提交历史，可用 `class_id` 定位班级提交；published 课程/单元内 closed / archived 作业不允许再次提交但仍返回题目、成绩和反馈；教师和管理员继续使用 submissions 列表与批改接口。
 
 ## 验证
@@ -215,7 +217,7 @@ $env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
 python -m alembic upgrade head
 ```
 
-当前 Alembic head：`20260707_0028`（assignment 级积分规则 JSON 字段）。
+当前 Alembic head：`20260707_0029`（课程协作者表）。
 
 知识快照周期重算：
 

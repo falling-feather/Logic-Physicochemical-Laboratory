@@ -1070,7 +1070,7 @@ def test_assignment_point_rule_controls_grading_points(client):
         json={"enabled": True, "points_per_score": 2, "max_points": 25},
     )
     assert peer_update.status_code == 403
-    assert peer_update.json()["detail"] == "Assignment point rule requires course author role"
+    assert peer_update.json()["detail"] == "Assignment point rule requires course editor role"
 
     update = client.patch(
         f"/api/points/assignments/{assignment_id}/rule",

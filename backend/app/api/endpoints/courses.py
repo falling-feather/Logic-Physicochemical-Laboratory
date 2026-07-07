@@ -9,7 +9,9 @@ from app.models import (
     ClassGroup,
     Course,
     CourseClass,
+    CourseCollaborator,
     CourseUnit,
+    SchoolMembership,
     User,
 )
 from app.schemas.course import (
@@ -17,6 +19,9 @@ from app.schemas.course import (
     AssignmentRead,
     CourseClassAttach,
     CourseClassRead,
+    CourseCollaboratorCreate,
+    CourseCollaboratorRead,
+    CourseCollaboratorUpdate,
     CourseCreate,
     CourseRead,
     CourseUnitCreate,
@@ -28,6 +33,7 @@ from app.services.access_control import (
     require_class_member,
     require_class_teacher_or_admin,
     require_course_author_or_admin,
+    require_course_editor_or_admin,
     require_course_visible,
     require_school_member,
     require_school_role,
@@ -184,6 +190,127 @@ def attach_course_class(
     return course_class
 
 
+@router.get("/{course_id}/collaborators", response_model=list[CourseCollaboratorRead])
+def list_course_collaborators(
+    course_id: int,
+    status_filter: str = Query(default="active", alias="status"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[CourseCollaborator]:
+    if status_filter not in {"active", "inactive", "all"}:
+        raise HTTPException(status_code=400, detail="Invalid collaborator status")
+    course = get_course(db, course_id)
+    require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    require_course_editor_or_admin(
+        db,
+        current_user,
+        course,
+        detail="Course collaborators require course editor role",
+    )
+    statement = select(CourseCollaborator).where(CourseCollaborator.course_id == course.id).order_by(
+        CourseCollaborator.id
+    )
+    if status_filter != "all":
+        statement = statement.where(CourseCollaborator.status == status_filter)
+    return list(db.scalars(statement).all())
+
+
+@router.post(
+    "/{course_id}/collaborators",
+    response_model=CourseCollaboratorRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_course_collaborator(
+    course_id: int,
+    payload: CourseCollaboratorCreate,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CourseCollaborator:
+    course = get_course(db, course_id)
+    require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    require_course_author_or_admin(
+        current_user,
+        course,
+        detail="Course collaborator management requires course owner role",
+    )
+    _require_active_school_teacher(db, course.school_id, payload.user_id)
+    if payload.user_id == course.creator_user_id:
+        raise HTTPException(status_code=409, detail="Course creator is already an owner")
+    existing = db.scalar(
+        select(CourseCollaborator).where(
+            CourseCollaborator.course_id == course.id,
+            CourseCollaborator.user_id == payload.user_id,
+        )
+    )
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="Course collaborator already exists")
+
+    collaborator = CourseCollaborator(
+        course_id=course.id,
+        user_id=payload.user_id,
+        role=payload.role,
+        status="active",
+    )
+    db.add(collaborator)
+    db.flush()
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="course.collaborator.create",
+        resource_type="course_collaborator",
+        resource_id=collaborator.id,
+        school_id=course.school_id,
+        event_result="success",
+        request=request,
+        snapshot={"after": _course_collaborator_snapshot(collaborator)},
+    )
+    db.commit()
+    db.refresh(collaborator)
+    return collaborator
+
+
+@router.patch("/{course_id}/collaborators/{collaborator_id}", response_model=CourseCollaboratorRead)
+def update_course_collaborator(
+    course_id: int,
+    collaborator_id: int,
+    payload: CourseCollaboratorUpdate,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CourseCollaborator:
+    course = get_course(db, course_id)
+    require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    require_course_author_or_admin(
+        current_user,
+        course,
+        detail="Course collaborator management requires course owner role",
+    )
+    collaborator = db.get(CourseCollaborator, collaborator_id)
+    if collaborator is None or collaborator.course_id != course.id:
+        raise HTTPException(status_code=404, detail="Course collaborator not found")
+    before = _course_collaborator_snapshot(collaborator)
+    if collaborator.status == payload.status:
+        return collaborator
+
+    collaborator.status = payload.status
+    after = _course_collaborator_snapshot(collaborator)
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="course.collaborator.update",
+        resource_type="course_collaborator",
+        resource_id=collaborator.id,
+        school_id=course.school_id,
+        event_result="success",
+        request=request,
+        snapshot={"before": before, "after": after},
+    )
+    db.commit()
+    db.refresh(collaborator)
+    return collaborator
+
+
 @router.get("/{course_id}/units", response_model=list[CourseUnitRead])
 def list_course_units(
     course_id: int,
@@ -207,10 +334,11 @@ def create_course_unit(
 ) -> CourseUnit:
     course = get_course(db, course_id)
     require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
-    require_course_author_or_admin(
+    require_course_editor_or_admin(
+        db,
         current_user,
         course,
-        detail="Course unit creation requires course author role",
+        detail="Course unit creation requires course editor role",
     )
     content_slug = (payload.content_slug or "").strip() or None
     title = require_trimmed_text(payload.title, "Course unit title is required")
@@ -292,10 +420,11 @@ def create_assignment(
 ) -> Assignment:
     course = get_course(db, course_id)
     require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
-    require_course_author_or_admin(
+    require_course_editor_or_admin(
+        db,
         current_user,
         course,
-        detail="Assignment creation requires course author role",
+        detail="Assignment creation requires course editor role",
     )
     unit = db.get(CourseUnit, unit_id)
     if unit is None or unit.course_id != course_id:
@@ -338,3 +467,29 @@ def create_assignment(
     db.commit()
     db.refresh(assignment)
     return assignment
+
+
+def _require_active_school_teacher(db: Session, school_id: int, user_id: int) -> None:
+    target = db.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Course collaborator user not found")
+    membership = db.scalar(
+        select(SchoolMembership).where(
+            SchoolMembership.school_id == school_id,
+            SchoolMembership.user_id == user_id,
+            SchoolMembership.role.in_(["admin", "teacher"]),
+            SchoolMembership.status == "active",
+        )
+    )
+    if membership is None:
+        raise HTTPException(status_code=422, detail="Course collaborator must be active school teacher/admin")
+
+
+def _course_collaborator_snapshot(collaborator: CourseCollaborator) -> dict:
+    return {
+        "id": collaborator.id,
+        "course_id": collaborator.course_id,
+        "user_id": collaborator.user_id,
+        "role": collaborator.role,
+        "status": collaborator.status,
+    }
