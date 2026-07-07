@@ -106,6 +106,34 @@ def test_auth_session_device_metadata_migration_preserves_legacy_sessions(monkey
         _dispose_and_remove(database_url, database_path)
 
 
+def test_audit_log_chain_hash_migration_preserves_legacy_logs(monkeypatch):
+    backend_root = Path(__file__).resolve().parents[1]
+    database_path, database_url = _empty_sqlite_database(monkeypatch, backend_root)
+    config = _alembic_config(backend_root)
+    try:
+        command.upgrade(config, "20260707_0024")
+        audit_id = _insert_audit_log(database_url)
+
+        command.upgrade(config, "head")
+
+        engine = make_engine(database_url)
+        with engine.connect() as connection:
+            row = connection.execute(
+                text(
+                    """
+                    SELECT prev_hash, current_hash
+                    FROM audit_logs
+                    WHERE id = :audit_id
+                    """
+                ),
+                {"audit_id": audit_id},
+            ).mappings().one()
+            assert row["prev_hash"] is None
+            assert row["current_hash"] is None
+    finally:
+        _dispose_and_remove(database_url, database_path)
+
+
 def _empty_sqlite_database(monkeypatch, backend_root: Path) -> tuple[Path, str]:
     runtime_dir = backend_root / "pytest-cache-files-preflight"
     runtime_dir.mkdir(exist_ok=True)
@@ -227,6 +255,30 @@ def _insert_auth_session(database_url: str, user_id: int) -> int:
                 "created_at": now,
                 "updated_at": now,
             },
+        )
+        return int(result.lastrowid)
+
+
+def _insert_audit_log(database_url: str) -> int:
+    now = datetime.now(UTC)
+    engine = make_engine(database_url)
+    with engine.begin() as connection:
+        result = connection.execute(
+            text(
+                """
+                INSERT INTO audit_logs (
+                    actor_user_id, actor_role, action, resource, resource_type, resource_id,
+                    school_id, class_id, event_result, failure_reason, request_id, client_ip_hash,
+                    user_agent, request_method, request_path, snapshot_json, created_at, updated_at
+                )
+                VALUES (
+                    NULL, 'admin', 'legacy.audit', 'legacy', 'legacy', NULL,
+                    NULL, NULL, 'success', NULL, 'legacy-request', NULL,
+                    'pytest', 'POST', '/api/legacy', '{}', :created_at, :updated_at
+                )
+                """
+            ),
+            {"created_at": now, "updated_at": now},
         )
         return int(result.lastrowid)
 

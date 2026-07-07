@@ -7,6 +7,7 @@ from sqlalchemy import select
 from app.core.config import get_settings
 from app.db.session import get_session_factory
 from app.models import AuditLog, AuthSession, ContentPageRecord, LoginAttempt, User
+from app.services.audit import audit_log_chain_hash, record_audit_log
 
 
 def _auth_header(token: str) -> dict:
@@ -318,6 +319,14 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     audit_logs = client.get("/api/admin/audit-logs?limit=10", headers=_auth_header(admin_token))
     assert audit_logs.status_code == 200
     assert audit_logs.json()["total"] == 10
+    ordered_chain_items = sorted(audit_logs.json()["items"], key=lambda item: item["id"])
+    assert ordered_chain_items[0]["prev_hash"] is None
+    for previous, current in zip(ordered_chain_items, ordered_chain_items[1:], strict=False):
+        assert previous["current_hash"]
+        assert len(previous["current_hash"]) == 64
+        assert current["prev_hash"] == previous["current_hash"]
+        assert current["current_hash"]
+        assert len(current["current_hash"]) == 64
     actions = {item["action"] for item in audit_logs.json()["items"]}
     assert actions == {
         "admin.bootstrap",
@@ -383,6 +392,12 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert school_audit_item["request_method"] == "POST"
     assert school_audit_item["request_path"] == "/api/schools"
     assert school_audit_item["client_ip_hash"]
+    assert school_audit_item["current_hash"]
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        stored_school_audit = db.get(AuditLog, school_audit_item["id"])
+        assert stored_school_audit is not None
+        assert stored_school_audit.current_hash == audit_log_chain_hash(stored_school_audit)
 
     school_export = client.get(
         f"/api/admin/audit-logs/export?action=school.create&resource_id={school_id}",
@@ -419,6 +434,8 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert school_csv_rows[0]["action"] == "school.create"
     assert school_csv_rows[0]["resource_id"] == str(school_id)
     assert school_csv_rows[0]["user_agent"] == "'=audit-csv-risk"
+    assert school_csv_rows[0]["current_hash"] == school_audit_item["current_hash"]
+    assert school_csv_rows[0]["prev_hash"] == school_audit_item["prev_hash"]
     assert school_csv_rows[0]["snapshot_json"] == ""
 
     school_csv_export_with_snapshot = client.get(
@@ -612,6 +629,38 @@ def test_admin_views_user_management_stats_and_bug_records(client):
 
     student_forbidden = client.get("/api/admin/stats", headers=_auth_header(student_token))
     assert student_forbidden.status_code == 403
+
+
+def test_audit_hash_chain_links_multiple_logs_in_one_transaction(client):
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        first = record_audit_log(
+            db,
+            action="test.audit.first",
+            resource_type="test_resource",
+            event_result="success",
+            snapshot={"value": 1},
+        )
+        second = record_audit_log(
+            db,
+            action="test.audit.second",
+            resource_type="test_resource",
+            event_result="success",
+            snapshot={"value": 2},
+        )
+
+        assert first.prev_hash is None
+        assert first.current_hash
+        assert len(first.current_hash) == 64
+        assert second.prev_hash == first.current_hash
+        assert second.current_hash
+        assert second.current_hash != first.current_hash
+        assert first.current_hash == audit_log_chain_hash(first)
+        assert second.current_hash == audit_log_chain_hash(second)
+
+        original_second_hash = second.current_hash
+        second.snapshot_json = {"value": "tampered"}
+        assert audit_log_chain_hash(second) != original_second_hash
 
 
 def test_admin_can_reset_user_password_and_revoke_sessions(client):

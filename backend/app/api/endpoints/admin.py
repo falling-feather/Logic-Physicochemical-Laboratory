@@ -110,6 +110,8 @@ _AUDIT_LOG_CSV_FIELDS = (
     "user_agent",
     "request_method",
     "request_path",
+    "prev_hash",
+    "current_hash",
     "snapshot_json",
     "created_at",
 )

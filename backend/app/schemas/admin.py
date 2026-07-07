@@ -369,6 +369,8 @@ class AuditLogRead(BaseModel):
     user_agent: str | None = None
     request_method: str | None = None
     request_path: str | None = None
+    prev_hash: str | None = None
+    current_hash: str | None = None
     snapshot_json: dict
     created_at: datetime
 
@@ -398,6 +400,8 @@ class AuditLogExportItem(BaseModel):
     user_agent: str | None = None
     request_method: str | None = None
     request_path: str | None = None
+    prev_hash: str | None = None
+    current_hash: str | None = None
     snapshot_json: dict | None = None
     created_at: datetime
 

@@ -8,9 +8,9 @@
 
 星序总览页负责承载一级星系入口；进入某个星系后，才显示该星系自己的二级学科或知识目录。内置 C++ httplib 后端服务器，支持静态文件托管。
 
-> **当前状态**: v6.5（2026-07-03 起）— `houduan` 分支已接入 Python 后端骨架、健康检查、部署预检、部署 smoke 门禁、API no-store 缓存边界、工科试验室内容协议持久化样例、内容 seed 启动初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、草稿提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与富语义摘要、本地账号认证安全基线、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校/班级最小闭环与加入申请审批、课程/作业/学习事件/提交批改/作业只读复盘/跨班级提交唯一性/学生资源状态可见性/积分统计、知识状态/班级规则统计、个人/班级知识快照、知识快照周期重算脚本、运行记录与进程内调度器、管理端 API、缺陷记录外部 issue 链接、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、待批改队列、审计元数据与认证事件审计、审计日志 JSON/CSV 明细导出、报表摘要导出与导出审计留痕、学校/班级/课程访问控制服务层、跨范围权限矩阵测试，以及前端 opt-in schema 渲染试点
+> **当前状态**: v6.5（2026-07-03 起）— `houduan` 分支已接入 Python 后端骨架、健康检查、部署预检、部署 smoke 门禁、API no-store 缓存边界、工科试验室内容协议持久化样例、内容 seed 启动初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、草稿提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 与富语义摘要、本地账号认证安全基线、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校/班级最小闭环与加入申请审批、课程/作业/学习事件/提交批改/作业只读复盘/跨班级提交唯一性/学生资源状态可见性/积分统计、知识状态/班级规则统计、个人/班级知识快照、知识快照周期重算脚本、运行记录与进程内调度器、管理端 API、缺陷记录外部 issue 链接、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、待批改队列、审计元数据与认证事件审计、审计日志链式哈希、审计日志 JSON/CSV 明细导出、报表摘要导出与导出审计留痕、学校/班级/课程访问控制服务层、跨范围权限矩阵测试，以及前端 opt-in schema 渲染试点
 > **Review 回流状态**: 2026-07-06，`review` 分支已交付代码审查报告（审查基线 `V6.5.23 Review 前基线快照`，范围 `re1` 至 `re17`）。本 `houduan` 分支未合并 review 代码修复；后续仅按 `02` / `07` 中记录的优先级在 `houduan` 上选择性吸收。
-> **最新治理**: 2026-07-07，`houduan` 已补齐 BE-12 缺陷记录外部 issue 链接字段：`BugRecord` 可保存 `external_issue_provider`、`external_issue_id` 和 `external_issue_url`，管理端创建/更新/搜索和审计快照均已覆盖；正式外部 issue 自动创建、双向同步、归档、防篡改和高频事件策略仍属后续治理。
+> **最新治理**: 2026-07-07，`houduan` 已补齐 BE-12 审计日志链式哈希：新写入 `AuditLog` 记录 `prev_hash/current_hash`，管理端查询与 JSON/CSV 导出可查看哈希链；该能力用于应用层篡改迹象追踪，不替代备份、binlog、外部归档、WORM 或第三方时间戳。
 > **最新回归**: 2026-07-07，`houduan` 已补齐 BE-03/BE-05 管理员密码重置：管理员可重置用户密码，复用密码强度策略，默认撤销目标用户未撤销会话并清理登录失败桶，写入 `admin.user.password_reset` 审计；用户自助找回、强设备绑定、长期会话策略和真实 MySQL 事务验证仍属后续治理。
 > **下一阶段规划**: Python + MySQL 后端化、内容协议、登录用户体系与管理员 / 教师 / 学生三端平台设计，详见 [`doc/07-后端优化与设计.md`](doc/07-后端优化与设计.md)
 > **当前分支**: `houduan` — 后端化设计与重构开发分支；`main` 保持主线维护
@@ -176,13 +176,14 @@ node server/dev-static-server.mjs --port 8766
 - **Canvas 2D API** — 可视化渲染（ResizeObserver + DPR 适配）
 - **cpp-httplib 0.18.3** — C++ HTTP 服务器
 - **CMake 3.14+** — C++ 构建系统
-- **Python 3 / FastAPI / SQLAlchemy** — v6.5 业务后端骨架、API、MySQL 连接、部署预检、部署 smoke、API no-store 缓存边界、内容协议、内容 seed 初始化与只读查询边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、active 草稿数据库唯一约束、内容发布/版本记录/追加式回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、管理端版本 JSON path diff 与富语义摘要、本地认证安全基线、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、禁用用户会话撤销、用户名大小写规范化与 normalized key 数据库唯一约束、必填文本修剪后校验、学校/班级加入申请审批、学校/班级/课程访问控制服务层、作业提交/批改/学生侧只读复盘、跨班级提交唯一性、学生资源状态可见性、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端学校/班级统计、加入申请治理、列表分页搜索、内容页数据库侧分页、待批改队列、缺陷记录外部 issue 链接、审计元数据、审计日志 JSON/CSV 明细导出、报表摘要导出和导出行为审计留痕
+- **Python 3 / FastAPI / SQLAlchemy** — v6.5 业务后端骨架、API、MySQL 连接、部署预检、部署 smoke、API no-store 缓存边界、内容协议、内容 seed 初始化与只读查询边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、公开 render 脚本 manifest 脱敏、草稿编辑、active 草稿数据库唯一约束、内容发布/版本记录/追加式回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、管理端版本 JSON path diff 与富语义摘要、本地认证安全基线、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、禁用用户会话撤销、用户名大小写规范化与 normalized key 数据库唯一约束、必填文本修剪后校验、学校/班级加入申请审批、学校/班级/课程访问控制服务层、作业提交/批改/学生侧只读复盘、跨班级提交唯一性、学生资源状态可见性、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录与进程内调度器、管理端学校/班级统计、加入申请治理、列表分页搜索、内容页数据库侧分页、待批改队列、缺陷记录外部 issue 链接、审计元数据、审计日志链式哈希、审计日志 JSON/CSV 明细导出、报表摘要导出和导出行为审计留痕
 
 ## 📝 更新日志
 
 > 完整的细碎微版本详见 [doc/03-发布历史.md](doc/03-发布历史.md)。当前主线在 `main` 分支维护。
 
 ### v6.5 — 2026-07-05（houduan）
+- 2026-07-07 已在 `houduan` 落地 BE-12 审计日志链式哈希：`AuditLog` 新增 `prev_hash/current_hash`，写入时以规范化审计 payload 串联 SHA-256 摘要，查询与 JSON/CSV 导出返回哈希字段；旧记录不回填，空值表示历史兼容段或链起点。
 - 2026-07-07 已在 `houduan` 落地 BE-12 缺陷记录外部 issue 链接：`BugRecord` 新增 `external_issue_provider`、`external_issue_id` 和 `external_issue_url`，管理端创建/更新会修剪字段，列表关键字搜索覆盖 issue 元数据，`admin.bug.*` 审计快照记录链接变化；正式双向同步仍待后续。
 - 2026-07-07 已在 `houduan` 落地 BE-12 审计日志报表摘要：`GET /api/admin/audit-logs/report` 与 `/report.csv` 复用审计筛选，按 action/resource_type/actor_role/event_result/failure_reason 聚合，记录 `admin.audit.report` 摘要，不导出原始条目或快照明细。
 - 2026-07-07 已在 `houduan` 落地 BE-12 审计日志 CSV 导出：`GET /api/admin/audit-logs/export.csv` 复用审计筛选、排序、`limit/truncated` 和 `include_snapshot` 边界，返回下载响应与导出元数据头，默认剥离快照并对表格公式前缀做基础中和；成功导出继续写入 `admin.audit.export` 摘要。

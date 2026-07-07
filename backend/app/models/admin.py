@@ -39,4 +39,6 @@ class AuditLog(TimestampMixin, Base):
     user_agent: Mapped[str | None] = mapped_column(String(240), nullable=True)
     request_method: Mapped[str | None] = mapped_column(String(12), nullable=True)
     request_path: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    current_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     snapshot_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
