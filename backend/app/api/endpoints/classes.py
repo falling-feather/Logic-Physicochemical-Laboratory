@@ -13,6 +13,7 @@ from app.schemas.school import (
     ClassJoinRequestRead,
     ClassJoinRequestReview,
     ClassMemberRead,
+    ClassMemberStatusUpdate,
     ClassRead,
     MembershipRead,
 )
@@ -36,6 +37,21 @@ from app.services.text import require_trimmed_text
 
 
 router = APIRouter()
+
+
+def _class_member_read(membership: ClassMembership, user: User) -> ClassMemberRead:
+    return ClassMemberRead(
+        id=membership.id,
+        class_id=membership.class_id,
+        user_id=user.id,
+        username=user.username,
+        display_name=user.display_name,
+        user_status=user.status,
+        role=membership.role,
+        status=membership.status,
+        created_at=membership.created_at,
+        updated_at=membership.updated_at,
+    )
 
 
 @router.get("", response_model=list[ClassRead])
@@ -228,21 +244,76 @@ def list_class_members(
         statement = statement.where(ClassMembership.status == membership_status)
 
     rows = db.execute(statement).all()
-    return [
-        ClassMemberRead(
-            id=membership.id,
-            class_id=membership.class_id,
-            user_id=user.id,
-            username=user.username,
-            display_name=user.display_name,
-            user_status=user.status,
-            role=membership.role,
-            status=membership.status,
-            created_at=membership.created_at,
-            updated_at=membership.updated_at,
+    return [_class_member_read(membership, user) for membership, user in rows]
+
+
+@router.patch("/{class_id}/members/{membership_id}", response_model=ClassMemberRead)
+def update_class_member_status(
+    class_id: int,
+    membership_id: int,
+    payload: ClassMemberStatusUpdate,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClassMemberRead:
+    class_group = db.get(ClassGroup, class_id)
+    if class_group is None:
+        raise HTTPException(status_code=404, detail="Class not found")
+    require_class_teacher_or_admin(
+        db,
+        current_user,
+        class_group,
+        detail="Class member updates require class teacher scope",
+    )
+
+    row = db.execute(
+        select(ClassMembership, User)
+        .join(User, User.id == ClassMembership.user_id)
+        .where(
+            ClassMembership.id == membership_id,
+            ClassMembership.class_id == class_group.id,
         )
-        for membership, user in rows
-    ]
+    ).one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Class member not found")
+
+    membership, user = row
+    if membership.role != "student":
+        raise HTTPException(status_code=403, detail="Only student class membership can be updated here")
+
+    previous_status = membership.status
+    note = trim_optional(payload.note)
+    if previous_status != payload.status:
+        membership.status = payload.status
+        record_audit_log(
+            db,
+            actor=current_user,
+            action="class.member.status.update",
+            resource_type="class_membership",
+            resource_id=membership.id,
+            school_id=class_group.school_id,
+            class_id=class_group.id,
+            event_result="success",
+            request=request,
+            snapshot={
+                "before": {
+                    "class_id": membership.class_id,
+                    "user_id": membership.user_id,
+                    "role": membership.role,
+                    "status": previous_status,
+                },
+                "after": {
+                    "class_id": membership.class_id,
+                    "user_id": membership.user_id,
+                    "role": membership.role,
+                    "status": membership.status,
+                    "has_note": note is not None,
+                },
+            },
+        )
+        db.commit()
+        db.refresh(membership)
+    return _class_member_read(membership, user)
 
 
 @router.post(

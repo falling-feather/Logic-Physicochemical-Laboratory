@@ -50,6 +50,11 @@ class ClassJoinRequestReview(BaseModel):
     note: str | None = Field(default=None, max_length=500)
 
 
+class ClassMemberStatusUpdate(BaseModel):
+    status: Literal["active", "inactive"]
+    note: str | None = Field(default=None, max_length=500)
+
+
 class ClassJoinRequestRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

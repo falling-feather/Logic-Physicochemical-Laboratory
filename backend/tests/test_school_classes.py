@@ -96,7 +96,9 @@ def test_teacher_creates_school_class_and_student_joins(client):
         json={"role": "student"},
     )
     assert join.status_code == 201
-    assert join.json()["role"] == "student"
+    join_body = join.json()
+    assert join_body["role"] == "student"
+    student_membership_id = join_body["id"]
     student_me = client.get("/api/users/me", headers=_auth_header(student_token))
     assert student_me.status_code == 200
     student_id = student_me.json()["id"]
@@ -138,6 +140,7 @@ def test_teacher_creates_school_class_and_student_joins(client):
         "student01": "active",
         "teacher02": "active",
     }
+    teacher_membership_id = next(item["id"] for item in members_body if item["username"] == "teacher02")
 
     student_members = client.get(
         f"/api/classes/{class_id}/members?role=student",
@@ -157,17 +160,79 @@ def test_teacher_creates_school_class_and_student_joins(client):
     outsider_forbidden = client.get(f"/api/classes/{class_id}/members", headers=_auth_header(outsider_teacher_token))
     assert outsider_forbidden.status_code == 403
 
-    with get_session_factory(get_settings().database_url)() as db:
-        class_membership = db.scalar(
-            select(ClassMembership).where(
-                ClassMembership.class_id == class_id,
-                ClassMembership.user_id == student_id,
-                ClassMembership.role == "student",
-            )
-        )
-        assert class_membership is not None
-        class_membership.status = "inactive"
-        db.commit()
+    student_update_forbidden = client.patch(
+        f"/api/classes/{class_id}/members/{student_membership_id}",
+        headers=_auth_header(student_token),
+        json={"status": "inactive"},
+    )
+    assert student_update_forbidden.status_code == 403
+    assert student_update_forbidden.json()["detail"] == "Class member updates require class teacher scope"
+
+    outsider_update_forbidden = client.patch(
+        f"/api/classes/{class_id}/members/{student_membership_id}",
+        headers=_auth_header(outsider_teacher_token),
+        json={"status": "inactive"},
+    )
+    assert outsider_update_forbidden.status_code == 403
+
+    teacher_member_update_forbidden = client.patch(
+        f"/api/classes/{class_id}/members/{teacher_membership_id}",
+        headers=_auth_header(teacher_token),
+        json={"status": "inactive"},
+    )
+    assert teacher_member_update_forbidden.status_code == 403
+    assert teacher_member_update_forbidden.json()["detail"] == "Only student class membership can be updated here"
+
+    unsupported_member_status = client.patch(
+        f"/api/classes/{class_id}/members/{student_membership_id}",
+        headers=_auth_header(teacher_token),
+        json={"status": "archived"},
+    )
+    assert unsupported_member_status.status_code == 422
+
+    missing_member_update = client.patch(
+        f"/api/classes/{class_id}/members/999999",
+        headers=_auth_header(admin_token),
+        json={"status": "inactive"},
+    )
+    assert missing_member_update.status_code == 404
+
+    other_class = client.post(
+        "/api/classes",
+        headers=_auth_header(teacher_token),
+        json={"school_id": school_id, "name": "Physics Class B", "grade": "10", "term": "2026A"},
+    )
+    assert other_class.status_code == 201
+    other_class_id = other_class.json()["id"]
+    mismatched_member_update = client.patch(
+        f"/api/classes/{other_class_id}/members/{student_membership_id}",
+        headers=_auth_header(teacher_token),
+        json={"status": "inactive"},
+    )
+    assert mismatched_member_update.status_code == 404
+
+    inactive_update = client.patch(
+        f"/api/classes/{class_id}/members/{student_membership_id}",
+        headers={**_auth_header(teacher_token), "X-Request-ID": "class-member-inactive"},
+        json={"status": "inactive", "note": "  roster cleanup  "},
+    )
+    assert inactive_update.status_code == 200
+    inactive_update_body = inactive_update.json()
+    assert inactive_update_body["id"] == student_membership_id
+    assert inactive_update_body["status"] == "inactive"
+    assert inactive_update_body["user_status"] == "active"
+
+    update_audit = client.get(
+        f"/api/admin/audit-logs?action=class.member.status.update&resource_id={student_membership_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert update_audit.status_code == 200
+    assert update_audit.json()["total"] == 1
+    audit_item = update_audit.json()["items"][0]
+    assert audit_item["request_id"] == "class-member-inactive"
+    assert audit_item["snapshot_json"]["before"]["status"] == "active"
+    assert audit_item["snapshot_json"]["after"]["status"] == "inactive"
+    assert audit_item["snapshot_json"]["after"]["has_note"] is True
 
     active_members = client.get(f"/api/classes/{class_id}/members", headers=_auth_header(teacher_token))
     assert active_members.status_code == 200
@@ -179,6 +244,28 @@ def test_teacher_creates_school_class_and_student_joins(client):
     )
     assert inactive_members.status_code == 200
     assert [item["username"] for item in inactive_members.json()] == ["student01"]
+
+    active_update = client.patch(
+        f"/api/classes/{class_id}/members/{student_membership_id}",
+        headers={**_auth_header(admin_token), "X-Request-ID": "class-member-active"},
+        json={"status": "active"},
+    )
+    assert active_update.status_code == 200
+    assert active_update.json()["status"] == "active"
+
+    restored_active_members = client.get(f"/api/classes/{class_id}/members", headers=_auth_header(teacher_token))
+    assert restored_active_members.status_code == 200
+    assert [(item["username"], item["role"]) for item in restored_active_members.json()] == [
+        ("student01", "student"),
+        ("teacher02", "teacher"),
+    ]
+
+    update_audits_after_restore = client.get(
+        f"/api/admin/audit-logs?action=class.member.status.update&resource_id={student_membership_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert update_audits_after_restore.status_code == 200
+    assert update_audits_after_restore.json()["total"] == 2
 
     unsupported_status = client.get(
         f"/api/classes/{class_id}/members?status=archived",
