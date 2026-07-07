@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import re
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 
@@ -121,6 +122,23 @@ _CONTENT_METADATA_FIELDS = ("slug", "galaxy", "subject", "title", "layout", "sta
 _CONTENT_SECTION_FIELDS = ("sectionId", "type", "title", "summary", "experimentId", "questionSetId")
 _CONTENT_COURSE_UNIT_FIELDS = ("courseId", "unitId", "order", "title")
 _CONTENT_SOURCE_FIELDS = ("sourceId", "label", "url")
+_CONTENT_DIFF_SENSITIVE_FIELD_TOKENS = (
+    "authorization",
+    "apikey",
+    "api_key",
+    "accesskey",
+    "access_key",
+    "credential",
+    "crossorigin",
+    "integrity",
+    "password",
+    "privatekey",
+    "private_key",
+    "sandbox",
+    "script",
+    "secret",
+    "token",
+)
 _AUDIT_LOG_CSV_FIELDS = (
     "id",
     "actor_user_id",
@@ -2562,8 +2580,8 @@ def _content_schema_diff(before: Any, after: Any, path: str = "$") -> list[Admin
         return [
             AdminContentPageVersionDiffItem(
                 path=path,
-                before=_diff_value(before),
-                after=_diff_value(after),
+                before=_diff_value(before, path),
+                after=_diff_value(after, path),
             )
         ]
     return []
@@ -2751,8 +2769,8 @@ def _semantic_field_changes(
             changes.append(
                 AdminContentPageVersionSemanticFieldChange(
                     field=field,
-                    before=before_value,
-                    after=after_value,
+                    before=_diff_value(before_value, field),
+                    after=_diff_value(after_value, field),
                 )
             )
     return changes
@@ -2772,8 +2790,8 @@ def _semantic_map_changes(
             changes.append(
                 AdminContentPageVersionSemanticFieldChange(
                     field=f"{prefix}{field}",
-                    before=before_value,
-                    after=after_value,
+                    before=_diff_value(before_value, f"{prefix}{field}"),
+                    after=_diff_value(after_value, f"{prefix}{field}"),
                 )
             )
     return changes
@@ -2847,10 +2865,66 @@ def _semantic_action_count(changes: list[Any], action: str) -> int:
     return sum(1 for change in changes if change.action == action)
 
 
-def _diff_value(value: Any) -> Any:
+def _diff_value(value: Any, path: str = "$") -> Any:
     if value is _DIFF_MISSING:
         return None
+    return _sanitize_diff_value(value, path)
+
+
+def _sanitize_diff_value(value: Any, path: str) -> Any:
+    if value is None:
+        return None
+    if _is_sensitive_diff_path(path):
+        return _redacted_diff_value(value)
+    if isinstance(value, dict):
+        return {key: _sanitize_diff_value(item, f"{path}.{key}") for key, item in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_diff_value(item, f"{path}[{index}]") for index, item in enumerate(value)]
     return value
+
+
+def _is_sensitive_diff_path(path: str) -> bool:
+    return any(_is_sensitive_diff_segment(segment) for segment in _diff_path_segments(path))
+
+
+def _diff_path_segments(path: str) -> list[str]:
+    return [
+        segment
+        for segment in path.replace("[", ".").replace("]", "").replace("$", "").split(".")
+        if segment and not segment.isdigit()
+    ]
+
+
+def _is_sensitive_diff_segment(segment: str) -> bool:
+    normalized = segment.replace("_", "").replace("-", "").lower()
+    words = _diff_segment_words(segment)
+    if normalized in {"authorization", "cookie", "credential", "credentials", "crossorigin", "integrity", "password"}:
+        return True
+    if normalized == "sandbox" or normalized.endswith("sandbox"):
+        return True
+    if normalized.startswith("script") or "script" in words:
+        return True
+    return any(
+        token.replace("_", "") in normalized
+        for token in _CONTENT_DIFF_SENSITIVE_FIELD_TOKENS
+        if token not in {"script", "sandbox", "integrity", "crossorigin"}
+    )
+
+
+def _diff_segment_words(segment: str) -> set[str]:
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", segment.replace("_", " ").replace("-", " "))
+    return {word.lower() for word in spaced.split() if word}
+
+
+def _redacted_diff_value(value: Any) -> dict[str, Any]:
+    preview: dict[str, Any] = {
+        "redacted": True,
+        "reason": "content_diff_sensitive_field",
+        "value_type": type(value).__name__,
+    }
+    if isinstance(value, (str, bytes, list, dict, tuple, set)):
+        preview["length"] = len(value)
+    return preview
 
 
 def _distinct_count(db: Session, column: Any, *criteria: Any) -> int:

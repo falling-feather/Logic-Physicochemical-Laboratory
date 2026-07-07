@@ -1,3 +1,4 @@
+import json
 from urllib.parse import quote
 
 import pytest
@@ -1069,6 +1070,120 @@ def test_admin_content_page_version_diff_includes_semantic_schema_summary(client
     assert old_reference["action"] == "removed"
     assert old_reference["source_id_before"] == "old-reference"
     assert old_reference["source_id_after"] is None
+
+
+def test_admin_content_page_version_diff_redacts_sensitive_values(client):
+    admin_token = _bootstrap_admin(client, username="admin_diff_redaction")
+    _, teacher_token = _register_and_login(client, "teacher_diff_redaction", "teacher")
+    slug = "physics/diff-redaction"
+
+    base_payload = _draft_payload(slug, title="Diff Redaction Base")
+    base_payload["schema"]["sections"][0]["props"] = {
+        "apiKey": "sk_test_old_secret_value",
+        "teacherToken": "teacher-token-old-secret",
+        "removedApiKey": "removed-secret-value",
+        "nullableToken": None,
+        "scriptNote": "old script note should hide",
+        "publicMode": "guided",
+        "transcript": "Keep visible old transcript",
+        "details": {"secretNote": "hide old nested note", "description": "Keep visible old description"},
+    }
+    base_draft_id = _create_draft_from_payload(client, teacher_token, base_payload)
+    _submit_draft(client, teacher_token, base_draft_id)
+    base_publish = _publish_draft(client, admin_token, base_draft_id, note="base redaction")
+
+    target_payload = _draft_payload(slug, title="Diff Redaction Target")
+    target_payload["schema"]["sections"][0]["props"] = {
+        "apiKey": "sk_test_new_secret_value",
+        "teacherToken": "teacher-token-new-secret",
+        "newApiKey": "new-secret-value",
+        "nullableToken": "nullable-token-new-secret",
+        "scriptNote": "new script note should hide",
+        "publicMode": "explore",
+        "transcript": "Keep visible new transcript",
+        "details": {"secretNote": "hide new nested note", "description": "Keep visible new description"},
+    }
+    target_draft_id = _create_draft_from_payload(client, teacher_token, target_payload)
+    _submit_draft(client, teacher_token, target_draft_id)
+    target_publish = _publish_draft(client, admin_token, target_draft_id, note="target redaction")
+
+    diff = client.get(
+        f"/api/admin/content/page-versions/{target_publish['version_id']}/diff"
+        f"?base_version_id={base_publish['version_id']}",
+        headers=_auth_header(admin_token),
+    )
+
+    assert diff.status_code == 200
+    body = diff.json()
+    serialized = json.dumps(body, ensure_ascii=False, sort_keys=True)
+    assert "sk_test_old_secret_value" not in serialized
+    assert "sk_test_new_secret_value" not in serialized
+    assert "teacher-token-old-secret" not in serialized
+    assert "teacher-token-new-secret" not in serialized
+    assert "removed-secret-value" not in serialized
+    assert "new-secret-value" not in serialized
+    assert "nullable-token-new-secret" not in serialized
+    assert "old script note should hide" not in serialized
+    assert "new script note should hide" not in serialized
+    assert "hide old nested note" not in serialized
+    assert "hide new nested note" not in serialized
+
+    raw_changes = {change["path"]: change for change in body["changes"]}
+    api_key_change = raw_changes["$.sections[0].props.apiKey"]
+    assert api_key_change["before"] == {
+        "redacted": True,
+        "reason": "content_diff_sensitive_field",
+        "value_type": "str",
+        "length": len("sk_test_old_secret_value"),
+    }
+    assert api_key_change["after"] == {
+        "redacted": True,
+        "reason": "content_diff_sensitive_field",
+        "value_type": "str",
+        "length": len("sk_test_new_secret_value"),
+    }
+    assert raw_changes["$.sections[0].props.newApiKey"]["before"] is None
+    assert raw_changes["$.sections[0].props.newApiKey"]["after"]["redacted"] is True
+    assert raw_changes["$.sections[0].props.removedApiKey"]["before"]["redacted"] is True
+    assert raw_changes["$.sections[0].props.removedApiKey"]["after"] is None
+    assert raw_changes["$.sections[0].props.nullableToken"]["before"] is None
+    assert raw_changes["$.sections[0].props.nullableToken"]["after"]["redacted"] is True
+    assert raw_changes["$.sections[0].props.scriptNote"]["before"]["redacted"] is True
+    assert raw_changes["$.sections[0].props.scriptNote"]["after"]["redacted"] is True
+    secret_note_change = raw_changes["$.sections[0].props.details.secretNote"]
+    assert secret_note_change["before"]["redacted"] is True
+    assert secret_note_change["after"]["redacted"] is True
+    assert raw_changes["$.sections[0].props.details.description"]["before"] == "Keep visible old description"
+    assert raw_changes["$.sections[0].props.details.description"]["after"] == "Keep visible new description"
+    assert raw_changes["$.sections[0].props.publicMode"]["before"] == "guided"
+    assert raw_changes["$.sections[0].props.publicMode"]["after"] == "explore"
+    assert raw_changes["$.sections[0].props.transcript"]["before"] == "Keep visible old transcript"
+    assert raw_changes["$.sections[0].props.transcript"]["after"] == "Keep visible new transcript"
+
+    sections = {change["key"]: change for change in body["semantic"]["section_changes"]}
+    props = {change["field"]: change for change in sections["section:id:observe-task"]["prop_changes"]}
+    assert props["props.apiKey"]["before"]["redacted"] is True
+    assert props["props.apiKey"]["after"]["redacted"] is True
+    assert props["props.newApiKey"]["before"] is None
+    assert props["props.newApiKey"]["after"]["redacted"] is True
+    assert props["props.removedApiKey"]["before"]["redacted"] is True
+    assert props["props.removedApiKey"]["after"] is None
+    assert props["props.nullableToken"]["before"] is None
+    assert props["props.nullableToken"]["after"]["redacted"] is True
+    assert props["props.scriptNote"]["before"]["redacted"] is True
+    assert props["props.scriptNote"]["after"]["redacted"] is True
+    assert props["props.teacherToken"]["before"]["redacted"] is True
+    assert props["props.teacherToken"]["after"]["redacted"] is True
+    assert props["props.details"]["before"]["secretNote"]["redacted"] is True
+    assert props["props.details"]["after"]["secretNote"]["redacted"] is True
+    assert props["props.details"]["before"]["description"] == "Keep visible old description"
+    assert props["props.details"]["after"]["description"] == "Keep visible new description"
+    assert props["props.publicMode"] == {"field": "props.publicMode", "before": "guided", "after": "explore"}
+    assert props["props.transcript"] == {
+        "field": "props.transcript",
+        "before": "Keep visible old transcript",
+        "after": "Keep visible new transcript",
+    }
 
 
 def _create_draft(client, teacher_token: str, slug: str, title: str) -> int:
