@@ -1,7 +1,10 @@
+import csv
+import io
+import json
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -87,6 +90,26 @@ _CONTENT_METADATA_FIELDS = ("slug", "galaxy", "subject", "title", "layout", "sta
 _CONTENT_SECTION_FIELDS = ("type", "title", "summary", "experimentId", "questionSetId")
 _CONTENT_COURSE_UNIT_FIELDS = ("courseId", "unitId", "order", "title")
 _CONTENT_SOURCE_FIELDS = ("label", "url")
+_AUDIT_LOG_CSV_FIELDS = (
+    "id",
+    "actor_user_id",
+    "actor_role",
+    "action",
+    "resource",
+    "resource_type",
+    "resource_id",
+    "school_id",
+    "class_id",
+    "event_result",
+    "failure_reason",
+    "request_id",
+    "client_ip_hash",
+    "user_agent",
+    "request_method",
+    "request_path",
+    "snapshot_json",
+    "created_at",
+)
 
 
 @router.post("/bootstrap", response_model=AdminUserRead, status_code=status.HTTP_201_CREATED)
@@ -815,6 +838,7 @@ def export_audit_logs(
         event_result="success",
         request=request,
         snapshot=_audit_log_export_snapshot(
+            export_format="json",
             actor_user_id=actor_user_id,
             action=action,
             resource_type=resource_type,
@@ -842,6 +866,86 @@ def export_audit_logs(
         truncated=truncated,
         include_snapshot=include_snapshot,
         exported_at=exported_at,
+    )
+
+
+@router.get("/audit-logs/export.csv")
+def export_audit_logs_csv(
+    request: Request,
+    actor_user_id: int | None = Query(default=None),
+    action: str | None = Query(default=None),
+    resource_type: str | None = Query(default=None),
+    resource_id: str | None = Query(default=None),
+    school_id: int | None = Query(default=None),
+    class_id: int | None = Query(default=None),
+    event_result: str | None = Query(default=None),
+    failure_reason: str | None = Query(default=None),
+    request_id: str | None = Query(default=None),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    include_snapshot: bool = Query(default=False),
+    limit: int = Query(default=1000, ge=1, le=5000),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    _require_admin(current_user)
+    statement = _audit_log_statement(
+        actor_user_id=actor_user_id,
+        action=action,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        school_id=school_id,
+        class_id=class_id,
+        event_result=event_result,
+        failure_reason=failure_reason,
+        request_id=request_id,
+        from_at=from_at,
+        to_at=to_at,
+    )
+    total = _statement_count(db, statement)
+    logs = list(db.scalars(statement.limit(limit)).all())
+    items = [_audit_log_export_item(log, include_snapshot=include_snapshot) for log in logs]
+    truncated = total > len(logs)
+    exported_at = datetime.now(UTC)
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.audit.export",
+        resource_type="audit_log",
+        event_result="success",
+        request=request,
+        snapshot=_audit_log_export_snapshot(
+            export_format="csv",
+            actor_user_id=actor_user_id,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            school_id=school_id,
+            class_id=class_id,
+            event_result=event_result,
+            failure_reason=failure_reason,
+            request_id=request_id,
+            from_at=from_at,
+            to_at=to_at,
+            include_snapshot=include_snapshot,
+            limit=limit,
+            total=total,
+            exported_count=len(logs),
+            truncated=truncated,
+            exported_at=exported_at,
+        ),
+    )
+    db.commit()
+    return Response(
+        content=_audit_log_csv(items),
+        media_type="text/csv; charset=utf-8",
+        headers=_audit_log_csv_headers(
+            total=total,
+            limit=limit,
+            truncated=truncated,
+            include_snapshot=include_snapshot,
+            exported_at=exported_at,
+        ),
     )
 
 
@@ -1703,8 +1807,50 @@ def _audit_log_export_item(log: AuditLog, *, include_snapshot: bool) -> AuditLog
     return AuditLogExportItem(**data)
 
 
+def _audit_log_csv(items: list[AuditLogExportItem]) -> str:
+    buffer = io.StringIO(newline="")
+    writer = csv.DictWriter(buffer, fieldnames=_AUDIT_LOG_CSV_FIELDS, lineterminator="\n")
+    writer.writeheader()
+    for item in items:
+        data = item.model_dump(mode="json")
+        writer.writerow({field: _audit_log_csv_value(data.get(field)) for field in _AUDIT_LOG_CSV_FIELDS})
+    return buffer.getvalue()
+
+
+def _audit_log_csv_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    text = str(value)
+    if text.startswith(("=", "+", "-", "@", "\t", "\r", "\n")):
+        return f"'{text}"
+    return text
+
+
+def _audit_log_csv_headers(
+    *,
+    total: int,
+    limit: int,
+    truncated: bool,
+    include_snapshot: bool,
+    exported_at: datetime,
+) -> dict[str, str]:
+    exported_at_text = exported_at.isoformat()
+    filename_stamp = exported_at.strftime("%Y%m%dT%H%M%SZ")
+    return {
+        "Content-Disposition": f'attachment; filename="audit-logs-{filename_stamp}.csv"',
+        "X-Audit-Export-Total": str(total),
+        "X-Audit-Export-Limit": str(limit),
+        "X-Audit-Export-Truncated": str(truncated).lower(),
+        "X-Audit-Export-Include-Snapshot": str(include_snapshot).lower(),
+        "X-Audit-Exported-At": exported_at_text,
+    }
+
+
 def _audit_log_export_snapshot(
     *,
+    export_format: Literal["json", "csv"],
     actor_user_id: int | None,
     action: str | None,
     resource_type: str | None,
@@ -1742,6 +1888,7 @@ def _audit_log_export_snapshot(
     if to_at is not None:
         filters["to"] = to_at.isoformat()
     return {
+        "format": export_format,
         "filters": filters,
         "include_snapshot": include_snapshot,
         "limit": limit,

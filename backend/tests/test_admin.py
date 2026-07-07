@@ -1,3 +1,7 @@
+import csv
+import io
+import json
+
 from sqlalchemy import select
 
 from app.core.config import get_settings
@@ -180,7 +184,7 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     school_request_id = "school-create-request"
     school = client.post(
         "/api/schools",
-        headers={**_auth_header(admin_token), "X-Request-ID": school_request_id},
+        headers={**_auth_header(admin_token), "X-Request-ID": school_request_id, "User-Agent": "=audit-csv-risk"},
         json={"name": "Admin Visible School", "region": "Shanghai"},
     )
     assert school.status_code == 201
@@ -289,6 +293,8 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert audit_forbidden.status_code == 403
     audit_export_forbidden = client.get("/api/admin/audit-logs/export", headers=_auth_header(student_token))
     assert audit_export_forbidden.status_code == 403
+    audit_csv_export_forbidden = client.get("/api/admin/audit-logs/export.csv", headers=_auth_header(student_token))
+    assert audit_csv_export_forbidden.status_code == 403
 
     audit_logs = client.get("/api/admin/audit-logs?limit=10", headers=_auth_header(admin_token))
     assert audit_logs.status_code == 200
@@ -377,6 +383,46 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert school_export_with_snapshot.json()["include_snapshot"] is True
     assert school_export_with_snapshot.json()["items"][0]["snapshot_json"]["after"]["name"] == "Admin Visible School"
 
+    school_csv_export = client.get(
+        f"/api/admin/audit-logs/export.csv?action=school.create&resource_id={school_id}",
+        headers={**_auth_header(admin_token), "X-Request-ID": "audit-export-csv-request"},
+    )
+    assert school_csv_export.status_code == 200
+    assert school_csv_export.headers["content-type"].startswith("text/csv")
+    assert school_csv_export.headers["content-disposition"].startswith('attachment; filename="audit-logs-')
+    assert school_csv_export.headers["x-audit-export-total"] == "1"
+    assert school_csv_export.headers["x-audit-export-limit"] == "1000"
+    assert school_csv_export.headers["x-audit-export-truncated"] == "false"
+    assert school_csv_export.headers["x-audit-export-include-snapshot"] == "false"
+    assert school_csv_export.headers["x-audit-exported-at"]
+    school_csv_rows = list(csv.DictReader(io.StringIO(school_csv_export.text)))
+    assert len(school_csv_rows) == 1
+    assert school_csv_rows[0]["action"] == "school.create"
+    assert school_csv_rows[0]["resource_id"] == str(school_id)
+    assert school_csv_rows[0]["user_agent"] == "'=audit-csv-risk"
+    assert school_csv_rows[0]["snapshot_json"] == ""
+
+    school_csv_export_with_snapshot = client.get(
+        f"/api/admin/audit-logs/export.csv?action=school.create&resource_id={school_id}&include_snapshot=true",
+        headers=_auth_header(admin_token),
+    )
+    assert school_csv_export_with_snapshot.status_code == 200
+    school_csv_snapshot_rows = list(csv.DictReader(io.StringIO(school_csv_export_with_snapshot.text)))
+    assert json.loads(school_csv_snapshot_rows[0]["snapshot_json"])["after"]["name"] == "Admin Visible School"
+
+    csv_export_audit = client.get(
+        "/api/admin/audit-logs?action=admin.audit.export&resource_type=audit_log&request_id=audit-export-csv-request",
+        headers=_auth_header(admin_token),
+    )
+    assert csv_export_audit.status_code == 200
+    assert csv_export_audit.json()["total"] == 1
+    csv_export_snapshot = csv_export_audit.json()["items"][0]["snapshot_json"]
+    assert csv_export_snapshot["format"] == "csv"
+    assert csv_export_snapshot["filters"] == {"action": "school.create", "resource_id": str(school_id)}
+    assert csv_export_snapshot["include_snapshot"] is False
+    assert csv_export_snapshot["exported_count"] == 1
+    assert "items" not in csv_export_snapshot
+
     request_filtered_audit = client.get(
         f"/api/admin/audit-logs?request_id={school_request_id}",
         headers=_auth_header(admin_token),
@@ -411,7 +457,7 @@ def test_admin_views_user_management_stats_and_bug_records(client):
         headers=_auth_header(admin_token),
     )
     assert export_audit.status_code == 200
-    assert export_audit.json()["total"] == 5
+    assert export_audit.json()["total"] == 7
     latest_export = export_audit.json()["items"][0]
     assert latest_export["resource_type"] == "audit_log"
     assert latest_export["event_result"] == "success"
