@@ -321,6 +321,11 @@ def test_admin_views_user_management_stats_and_bug_records(client):
         headers=_auth_header(student_token),
     )
     assert audit_retention_forbidden.status_code == 403
+    audit_chain_forbidden = client.get(
+        "/api/admin/audit-logs/chain-integrity",
+        headers=_auth_header(student_token),
+    )
+    assert audit_chain_forbidden.status_code == 403
     audit_frequency_forbidden = client.get("/api/admin/audit-logs/high-frequency", headers=_auth_header(student_token))
     assert audit_frequency_forbidden.status_code == 403
 
@@ -846,6 +851,166 @@ def test_admin_audit_retention_plan_summarizes_candidates_without_deleting(clien
 
     invalid_window = client.get(
         "/api/admin/audit-logs/retention-plan?from=2026-07-06T10:00:00Z&to=2026-07-05T10:00:00Z",
+        headers=_auth_header(admin_token),
+    )
+    assert invalid_window.status_code == 422
+
+
+def test_admin_audit_chain_integrity_reports_hash_and_link_issues(client):
+    admin_token = _bootstrap_admin(client)
+    session_factory = get_session_factory(get_settings().database_url)
+
+    def audit_log(
+        *,
+        action: str,
+        resource: str,
+        created_at: datetime,
+        prev_hash: str | None = None,
+        current_hash: str | None = "computed",
+    ) -> AuditLog:
+        log = AuditLog(
+            action=action,
+            resource=resource,
+            resource_type="chain_test",
+            resource_id=resource.rsplit(":", 1)[-1],
+            event_result="success",
+            request_id=f"{resource}-request",
+            prev_hash=prev_hash,
+            snapshot_json={"resource": resource},
+            created_at=created_at,
+            updated_at=created_at,
+        )
+        if current_hash == "computed":
+            log.current_hash = audit_log_chain_hash(log)
+        else:
+            log.current_hash = current_hash
+        return log
+
+    valid_base = datetime.now(UTC) + timedelta(minutes=1)
+    with session_factory() as db:
+        first = audit_log(action="chain.valid", resource="chain:valid:first", created_at=valid_base)
+        second = audit_log(
+            action="chain.valid",
+            resource="chain:valid:second",
+            created_at=valid_base + timedelta(seconds=1),
+            prev_hash=first.current_hash,
+        )
+        db.add_all([first, second])
+        db.commit()
+        first_id = first.id
+        second_id = second.id
+
+    valid_report = client.get(
+        "/api/admin/audit-logs/chain-integrity",
+        params={
+            "from": (valid_base - timedelta(seconds=1)).isoformat(),
+            "to": (valid_base + timedelta(seconds=5)).isoformat(),
+        },
+        headers={**_auth_header(admin_token), "X-Request-ID": "audit-chain-valid-request"},
+    )
+    assert valid_report.status_code == 200
+    valid_body = valid_report.json()
+    assert valid_body["status"] == "valid"
+    assert valid_body["valid"] is True
+    assert valid_body["total"] == 2
+    assert valid_body["scanned_count"] == 2
+    assert valid_body["truncated"] is False
+    assert valid_body["issue_count"] == 0
+    assert valid_body["first_id"] == first_id
+    assert valid_body["last_id"] == second_id
+
+    invalid_base = datetime.now(UTC) + timedelta(minutes=2)
+    with session_factory() as db:
+        intact_first = audit_log(action="chain.invalid", resource="chain:invalid:first", created_at=invalid_base)
+        intact_second = audit_log(
+            action="chain.invalid",
+            resource="chain:invalid:second",
+            created_at=invalid_base + timedelta(seconds=1),
+            prev_hash=intact_first.current_hash,
+        )
+        broken_prev = audit_log(
+            action="chain.invalid",
+            resource="chain:invalid:broken-prev",
+            created_at=invalid_base + timedelta(seconds=2),
+            prev_hash="9" * 64,
+        )
+        broken_current = audit_log(
+            action="chain.invalid",
+            resource="chain:invalid:broken-current",
+            created_at=invalid_base + timedelta(seconds=3),
+            prev_hash=broken_prev.current_hash,
+            current_hash="f" * 64,
+        )
+        legacy = audit_log(
+            action="chain.invalid",
+            resource="chain:invalid:legacy",
+            created_at=invalid_base + timedelta(seconds=4),
+            current_hash=None,
+        )
+        db.add_all([intact_first, intact_second, broken_prev, broken_current, legacy])
+        db.commit()
+
+    truncated_report = client.get(
+        "/api/admin/audit-logs/chain-integrity",
+        params={
+            "from": (invalid_base - timedelta(seconds=1)).isoformat(),
+            "to": (invalid_base + timedelta(seconds=10)).isoformat(),
+            "limit": 2,
+        },
+        headers=_auth_header(admin_token),
+    )
+    assert truncated_report.status_code == 200
+    assert truncated_report.json()["total"] == 5
+    assert truncated_report.json()["scanned_count"] == 2
+    assert truncated_report.json()["truncated"] is True
+    assert truncated_report.json()["status"] == "partial"
+    assert truncated_report.json()["valid"] is False
+
+    invalid_report = client.get(
+        "/api/admin/audit-logs/chain-integrity",
+        params={
+            "from": (invalid_base - timedelta(seconds=1)).isoformat(),
+            "to": (invalid_base + timedelta(seconds=10)).isoformat(),
+            "issue_limit": 2,
+        },
+        headers={**_auth_header(admin_token), "X-Request-ID": "audit-chain-invalid-request"},
+    )
+    assert invalid_report.status_code == 200
+    invalid_body = invalid_report.json()
+    assert invalid_body["status"] == "invalid"
+    assert invalid_body["valid"] is False
+    assert invalid_body["total"] == 5
+    assert invalid_body["scanned_count"] == 5
+    assert invalid_body["truncated"] is False
+    assert invalid_body["issue_count"] == 3
+    assert invalid_body["issues_truncated"] is True
+    assert invalid_body["current_hash_mismatch_count"] == 1
+    assert invalid_body["prev_hash_mismatch_count"] == 1
+    assert invalid_body["null_current_hash_count"] == 1
+    assert {issue["type"] for issue in invalid_body["issues"]} == {
+        "prev_hash_mismatch",
+        "current_hash_mismatch",
+    }
+    assert "snapshot_json" not in json.dumps(invalid_body)
+
+    chain_audit = client.get(
+        "/api/admin/audit-logs?action=admin.audit.chain_integrity&resource_type=audit_log&request_id=audit-chain-invalid-request",
+        headers=_auth_header(admin_token),
+    )
+    assert chain_audit.status_code == 200
+    assert chain_audit.json()["total"] == 1
+    chain_snapshot = chain_audit.json()["items"][0]["snapshot_json"]
+    assert chain_snapshot["format"] == "chain_integrity"
+    assert chain_snapshot["status"] == "invalid"
+    assert chain_snapshot["issue_count"] == 3
+    assert chain_snapshot["current_hash_mismatch_count"] == 1
+    assert chain_snapshot["prev_hash_mismatch_count"] == 1
+    assert chain_snapshot["null_current_hash_count"] == 1
+    assert "issues" not in chain_snapshot
+    assert "snapshot_json" not in json.dumps(chain_snapshot)
+
+    invalid_window = client.get(
+        "/api/admin/audit-logs/chain-integrity?from=2026-07-06T10:00:00Z&to=2026-07-05T10:00:00Z",
         headers=_auth_header(admin_token),
     )
     assert invalid_window.status_code == 422

@@ -508,6 +508,40 @@ class AuditLogRetentionPlan(BaseModel):
     by_event_result: list[AuditLogReportBucket]
 
 
+class AuditLogChainIssue(BaseModel):
+    type: Literal["null_current_hash", "current_hash_mismatch", "prev_hash_mismatch"]
+    log_id: int
+    previous_log_id: int | None = None
+    expected_hash: str | None = None
+    actual_hash: str | None = None
+
+
+class AuditLogChainVerification(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    capabilities: dict[str, bool]
+    algorithm: str
+    chain_version: int
+    status: Literal["valid", "partial", "invalid"]
+    valid: bool
+    total: int
+    scanned_count: int
+    limit: int
+    truncated: bool
+    issue_limit: int
+    issue_count: int
+    issues_truncated: bool
+    null_current_hash_count: int
+    current_hash_mismatch_count: int
+    prev_hash_mismatch_count: int
+    first_id: int | None = None
+    last_id: int | None = None
+    chain_start_prev_hash: str | None = None
+    chain_start_current_hash: str | None = None
+    chain_end_current_hash: str | None = None
+    issues: list[AuditLogChainIssue]
+
+
 class BugRecordCreate(BaseModel):
     title: str = Field(min_length=1, max_length=240)
     category: str = Field(default="general", min_length=1, max_length=80)

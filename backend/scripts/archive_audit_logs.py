@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from app.core.config import get_settings
 from app.db.session import get_session_factory
 from app.models import AuditLog
-from app.services.audit import audit_log_chain_hash
+from app.services.audit_chain import verify_audit_log_chain
 
 
 AUDIT_ARCHIVE_SCHEMA_VERSION = 1
@@ -132,7 +132,7 @@ def run_archive(
         limit=limit,
         total_candidates=total_candidates,
         records=records,
-        chain_report=_audit_chain_report(logs),
+        chain_report=verify_audit_log_chain(logs),
     )
     if dry_run:
         return {
@@ -354,33 +354,6 @@ def _archive_manifest(
         "archive_sha256": None,
         "archive_bytes": None,
         "manifest_file": None,
-    }
-
-
-def _audit_chain_report(logs: list[AuditLog]) -> dict[str, Any]:
-    null_hash_count = 0
-    current_hash_mismatch_count = 0
-    mismatched_ids: list[int] = []
-    for log in logs:
-        if log.current_hash is None:
-            null_hash_count += 1
-            continue
-        if audit_log_chain_hash(log) != log.current_hash:
-            current_hash_mismatch_count += 1
-            mismatched_ids.append(log.id)
-    status = "valid"
-    if null_hash_count:
-        status = "partial"
-    if current_hash_mismatch_count:
-        status = "invalid"
-    return {
-        "algorithm": "sha256",
-        "chain_version": 1,
-        "status": status,
-        "valid": status == "valid",
-        "null_hash_count": null_hash_count,
-        "current_hash_mismatch_count": current_hash_mismatch_count,
-        "mismatched_ids": mismatched_ids[:20],
     }
 
 

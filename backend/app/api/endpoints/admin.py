@@ -66,6 +66,7 @@ from app.schemas.admin import (
     AdminUserUpdate,
     AuditLogExport,
     AuditLogExportItem,
+    AuditLogChainVerification,
     AuditLogFrequencyCandidate,
     AuditLogFrequencyReport,
     AuditLogPage,
@@ -82,6 +83,7 @@ from app.schemas.admin import (
     BugRecordUpdate,
 )
 from app.services.audit import record_audit_log
+from app.services.audit_chain import verify_audit_log_chain
 from app.services.class_join_requests import (
     apply_class_join_request_review,
     normalize_class_role,
@@ -1181,6 +1183,67 @@ def plan_audit_log_retention(
     )
     db.commit()
     return plan
+
+
+@router.get("/audit-logs/chain-integrity", response_model=AuditLogChainVerification)
+def verify_audit_log_chain_integrity(
+    request: Request,
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    limit: int = Query(default=5000, ge=1, le=20000),
+    issue_limit: int = Query(default=50, ge=0, le=200),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AuditLogChainVerification:
+    _require_admin(current_user)
+    statement = _audit_log_statement(
+        actor_user_id=None,
+        action=None,
+        resource_type=None,
+        resource_id=None,
+        school_id=None,
+        class_id=None,
+        event_result=None,
+        failure_reason=None,
+        request_id=None,
+        from_at=from_at,
+        to_at=to_at,
+    ).order_by(None)
+    statement = statement.order_by(AuditLog.created_at.asc(), AuditLog.id.asc())
+    total = _statement_count(db, statement)
+    logs = list(db.scalars(statement.limit(limit)).all())
+    generated_at = datetime.now(UTC)
+    report = _audit_log_chain_verification(
+        logs=logs,
+        total=total,
+        filters=_audit_log_filters(
+            actor_user_id=None,
+            action=None,
+            resource_type=None,
+            resource_id=None,
+            school_id=None,
+            class_id=None,
+            event_result=None,
+            failure_reason=None,
+            request_id=None,
+            from_at=from_at,
+            to_at=to_at,
+        ),
+        limit=limit,
+        issue_limit=issue_limit,
+        generated_at=generated_at,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.audit.chain_integrity",
+        resource_type="audit_log",
+        event_result="success",
+        request=request,
+        snapshot=_audit_log_chain_verification_snapshot(report),
+    )
+    db.commit()
+    return report
 
 
 @router.get("/audit-logs/high-frequency", response_model=AuditLogFrequencyReport)
@@ -2420,6 +2483,79 @@ def _audit_log_retention_snapshot(plan: AuditLogRetentionPlan) -> dict[str, Any]
         "chain_start_current_hash": plan.summary.chain_start_current_hash,
         "chain_end_current_hash": plan.summary.chain_end_current_hash,
         "generated_at": plan.generated_at.isoformat(),
+    }
+
+
+def _audit_log_chain_verification(
+    *,
+    logs: list[AuditLog],
+    total: int,
+    filters: dict[str, Any],
+    limit: int,
+    issue_limit: int,
+    generated_at: datetime,
+) -> AuditLogChainVerification:
+    chain_report = verify_audit_log_chain(logs, issue_limit=issue_limit)
+    first = logs[0] if logs else None
+    last = logs[-1] if logs else None
+    truncated = total > chain_report["scanned_count"]
+    status = chain_report["status"]
+    if truncated and status == "valid":
+        status = "partial"
+    return AuditLogChainVerification(
+        generated_at=generated_at,
+        filters=filters,
+        capabilities={
+            "repair": False,
+            "delete": False,
+            "worm": False,
+            "external_anchor": False,
+        },
+        algorithm=chain_report["algorithm"],
+        chain_version=chain_report["chain_version"],
+        status=status,
+        valid=status == "valid",
+        total=total,
+        scanned_count=chain_report["scanned_count"],
+        limit=limit,
+        truncated=truncated,
+        issue_limit=issue_limit,
+        issue_count=chain_report["issue_count"],
+        issues_truncated=chain_report["issues_truncated"],
+        null_current_hash_count=chain_report["null_current_hash_count"],
+        current_hash_mismatch_count=chain_report["current_hash_mismatch_count"],
+        prev_hash_mismatch_count=chain_report["prev_hash_mismatch_count"],
+        first_id=first.id if first is not None else None,
+        last_id=last.id if last is not None else None,
+        chain_start_prev_hash=first.prev_hash if first is not None else None,
+        chain_start_current_hash=first.current_hash if first is not None else None,
+        chain_end_current_hash=last.current_hash if last is not None else None,
+        issues=chain_report["issues"],
+    )
+
+
+def _audit_log_chain_verification_snapshot(report: AuditLogChainVerification) -> dict[str, Any]:
+    return {
+        "format": "chain_integrity",
+        "filters": report.filters,
+        "capabilities": report.capabilities,
+        "status": report.status,
+        "valid": report.valid,
+        "total": report.total,
+        "scanned_count": report.scanned_count,
+        "limit": report.limit,
+        "truncated": report.truncated,
+        "issue_count": report.issue_count,
+        "issues_truncated": report.issues_truncated,
+        "null_current_hash_count": report.null_current_hash_count,
+        "current_hash_mismatch_count": report.current_hash_mismatch_count,
+        "prev_hash_mismatch_count": report.prev_hash_mismatch_count,
+        "first_id": report.first_id,
+        "last_id": report.last_id,
+        "chain_start_prev_hash": report.chain_start_prev_hash,
+        "chain_start_current_hash": report.chain_start_current_hash,
+        "chain_end_current_hash": report.chain_end_current_hash,
+        "generated_at": report.generated_at.isoformat(),
     }
 
 
