@@ -380,6 +380,10 @@ class AdminKnowledgeSnapshotRunPage(BaseModel):
     next_offset: int | None = None
 
 
+class AdminKnowledgeSnapshotRunRequeueRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)
+
+
 class AdminKnowledgeSnapshotRunStatusBucket(BaseModel):
     status: str | None = None
     total: int

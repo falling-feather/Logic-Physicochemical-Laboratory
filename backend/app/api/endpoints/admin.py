@@ -57,6 +57,7 @@ from app.schemas.admin import (
     AdminKnowledgeSnapshotRunHealthItem,
     AdminKnowledgeSnapshotRunPage,
     AdminKnowledgeSnapshotRunRead,
+    AdminKnowledgeSnapshotRunRequeueRequest,
     AdminKnowledgeSnapshotRunStatusBucket,
     AdminContentDraftPage,
     AdminContentDraftRead,
@@ -97,7 +98,7 @@ from app.services.class_join_requests import (
 )
 from app.services.text import require_trimmed_text
 from app.services.users import find_user_by_normalized_username, require_normalized_username
-from app.services.knowledge_snapshot_runs import cancel_knowledge_snapshot_run
+from app.services.knowledge_snapshot_runs import cancel_knowledge_snapshot_run, requeue_knowledge_snapshot_run
 
 
 router = APIRouter()
@@ -899,6 +900,62 @@ def cancel_admin_knowledge_snapshot_run(
             "previous_status": previous_status,
             "status": run.status,
             "cleared_lease": True,
+        },
+    )
+    db.commit()
+    db.refresh(run)
+    return _admin_knowledge_snapshot_run_read(run)
+
+
+@router.post("/knowledge-snapshot-runs/{run_id}/requeue", response_model=AdminKnowledgeSnapshotRunRead)
+def requeue_admin_knowledge_snapshot_run(
+    run_id: int,
+    payload: AdminKnowledgeSnapshotRunRequeueRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminKnowledgeSnapshotRunRead:
+    _require_admin(current_user)
+    run = db.get(KnowledgeSnapshotRun, run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Knowledge snapshot run not found")
+    previous_status = run.status
+    had_scheduler_lease = any(
+        (
+            run.scheduler_lease_owner,
+            run.scheduler_lease_token,
+            run.scheduler_lease_expires_at,
+            run.scheduler_heartbeat_at,
+        )
+    )
+    settings = get_settings()
+    try:
+        requeue_knowledge_snapshot_run(
+            run,
+            requeued_by_user_id=current_user.id,
+            lease_seconds=settings.knowledge_snapshot_scheduler_lease_seconds,
+            reason=payload.reason,
+        )
+    except ValueError:
+        raise HTTPException(status_code=409, detail="Knowledge snapshot run cannot be requeued")
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.knowledge_snapshot_run.requeue",
+        resource_type="knowledge_snapshot_run",
+        resource_id=run.id,
+        event_result="success",
+        request=request,
+        snapshot={
+            "run_id": run.id,
+            "run_key": run.run_key,
+            "granularity": run.granularity,
+            "trigger_source": run.trigger_source,
+            "previous_status": previous_status,
+            "status": run.status,
+            "attempt_count": run.attempt_count,
+            "cleared_lease": previous_status != "pending" and had_scheduler_lease,
+            "reason_provided": bool(payload.reason and payload.reason.strip()),
         },
     )
     db.commit()
@@ -1807,6 +1864,8 @@ def _knowledge_snapshot_run_health_report(
                 active_running_count += 1
         elif run.status == "pending":
             pending_count += 1
+            claimable = True
+            claimable_count += 1
             health_flags.append("pending")
         elif run.status == "success":
             success_count += 1

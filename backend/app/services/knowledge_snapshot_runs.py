@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Callable, Literal
 
 from sqlalchemy import select, update
@@ -13,6 +13,7 @@ from app.models.base import utc_now
 
 SnapshotGranularity = Literal["day", "week"]
 CANCELLABLE_SNAPSHOT_RUN_STATUSES = {"running", "pending"}
+REQUEUEABLE_SNAPSHOT_RUN_STATUSES = {"failed", "cancelled", "running"}
 
 
 class SnapshotRunLeaseLost(RuntimeError):
@@ -46,6 +47,61 @@ def cancel_knowledge_snapshot_run(
     return run
 
 
+def requeue_knowledge_snapshot_run(
+    run: KnowledgeSnapshotRun,
+    *,
+    requeued_by_user_id: int,
+    lease_seconds: int,
+    reason: str | None = None,
+    clock: Callable[[], datetime] = utc_now,
+) -> KnowledgeSnapshotRun:
+    requeued_at = clock()
+    if run.status == "pending":
+        return run
+    if run.status not in REQUEUEABLE_SNAPSHOT_RUN_STATUSES:
+        raise ValueError("knowledge snapshot run cannot be requeued")
+    if run.status == "running" and not run.scheduler_lease_token:
+        raise ValueError("running knowledge snapshot run cannot be requeued without a scheduler lease")
+    if run.status == "running" and not _snapshot_run_lease_expired(run, requeued_at, lease_seconds):
+        raise ValueError("running knowledge snapshot run cannot be requeued before its scheduler lease expires")
+    previous_status = run.status
+    previous_attempt_count = run.attempt_count
+    had_scheduler_lease = any(
+        (
+            run.scheduler_lease_owner,
+            run.scheduler_lease_token,
+            run.scheduler_lease_expires_at,
+            run.scheduler_heartbeat_at,
+        )
+    )
+    metadata = {
+        "trigger_source": "admin_requeue",
+        "requeued_by_user_id": requeued_by_user_id,
+        "requeued_at": requeued_at.isoformat(),
+        "previous_status": previous_status,
+        "previous_attempt_count": previous_attempt_count,
+        "cleared_lease": had_scheduler_lease,
+    }
+    if reason is not None:
+        stripped_reason = reason.strip()
+        if stripped_reason:
+            metadata["requeue_reason"] = stripped_reason
+    run.status = "pending"
+    run.trigger_source = "admin_requeue"
+    run.started_at = requeued_at
+    run.finished_at = None
+    run.error_message = None
+    run.scheduler_lease_owner = None
+    run.scheduler_lease_token = None
+    run.scheduler_lease_expires_at = None
+    run.scheduler_heartbeat_at = None
+    run.attempt_count = 0
+    run.user_snapshot_count = 0
+    run.class_snapshot_count = 0
+    run.metadata_json = metadata
+    return run
+
+
 def snapshot_window(
     granularity: SnapshotGranularity,
     reference_date: date | datetime | None = None,
@@ -62,6 +118,19 @@ def snapshot_window(
     start = datetime.combine(start_date, time.min)
     end = datetime.combine(start_date + timedelta(days=days), time.min) - timedelta(microseconds=1)
     return start, end
+
+
+def _snapshot_run_lease_expired(run: KnowledgeSnapshotRun, now: datetime, lease_seconds: int) -> bool:
+    now_value = _as_naive_utc(now)
+    if run.scheduler_lease_expires_at is not None:
+        return _as_naive_utc(run.scheduler_lease_expires_at) <= now_value
+    return _as_naive_utc(run.started_at) <= now_value - timedelta(seconds=lease_seconds)
+
+
+def _as_naive_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(UTC).replace(tzinfo=None)
 
 
 def rebuild_periodic_knowledge_snapshots(

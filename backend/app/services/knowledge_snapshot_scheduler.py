@@ -90,6 +90,13 @@ class KnowledgeSnapshotScheduler:
     async def run_once(self, now: datetime | None = None) -> list[dict]:
         async with self._lock:
             jobs = due_snapshot_jobs(now or self.clock(), self.schedule_config)
+            pending_jobs = await asyncio.to_thread(self._pending_jobs)
+            seen_jobs = {(job.granularity, job.reference_date) for job in jobs}
+            for job in pending_jobs:
+                key = (job.granularity, job.reference_date)
+                if key not in seen_jobs:
+                    jobs.append(job)
+                    seen_jobs.add(key)
             results: list[dict] = []
             for job in jobs:
                 result = await asyncio.to_thread(self._run_job_if_needed, job)
@@ -155,6 +162,11 @@ class KnowledgeSnapshotScheduler:
                 "attempt_count": run.attempt_count,
             }
 
+    def _pending_jobs(self) -> list[SnapshotScheduleJob]:
+        session_factory = get_session_factory(self.database_url)
+        with session_factory() as db:
+            return pending_snapshot_jobs(db)
+
 
 def due_snapshot_jobs(now: datetime, config: SnapshotScheduleConfig) -> list[SnapshotScheduleJob]:
     jobs: list[SnapshotScheduleJob] = []
@@ -168,6 +180,19 @@ def due_snapshot_jobs(now: datetime, config: SnapshotScheduleConfig) -> list[Sna
     ):
         jobs.append(SnapshotScheduleJob(granularity="week", reference_date=today - timedelta(days=7)))
     return jobs
+
+
+def pending_snapshot_jobs(db: Session) -> list[SnapshotScheduleJob]:
+    runs = db.scalars(
+        select(KnowledgeSnapshotRun)
+        .where(KnowledgeSnapshotRun.status == "pending")
+        .order_by(KnowledgeSnapshotRun.started_at.asc(), KnowledgeSnapshotRun.id.asc())
+    )
+    return [
+        SnapshotScheduleJob(granularity=run.granularity, reference_date=run.period_start.date())
+        for run in runs
+        if run.granularity in {"day", "week"}
+    ]
 
 
 def acquire_snapshot_job_lease(
@@ -252,6 +277,8 @@ def should_run_snapshot_job(
     run = db.scalar(select(KnowledgeSnapshotRun).where(KnowledgeSnapshotRun.run_key == run_key))
     if run is None:
         return True
+    if run.status == "pending":
+        return True
     if run.status in {"running", "success"}:
         if run.status == "running" and lease_seconds is not None:
             return _run_lease_expired(run, now or utc_now(), lease_seconds)
@@ -275,6 +302,7 @@ def _claim_existing_snapshot_job_lease(
 ) -> SnapshotJobLease | None:
     legacy_running_cutoff = now - timedelta(seconds=lease_seconds)
     claimable = or_(
+        KnowledgeSnapshotRun.status == "pending",
         and_(
             KnowledgeSnapshotRun.status == "failed",
             KnowledgeSnapshotRun.attempt_count < retry_attempts,

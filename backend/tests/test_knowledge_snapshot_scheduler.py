@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date, datetime
 from types import SimpleNamespace
 
@@ -13,6 +14,7 @@ from app.models.base import utc_now
 from app.services.knowledge_snapshot_runs import (
     SnapshotRunLeaseLost,
     cancel_knowledge_snapshot_run,
+    requeue_knowledge_snapshot_run,
     rebuild_periodic_knowledge_snapshots,
     snapshot_run_key,
     snapshot_window,
@@ -162,6 +164,109 @@ def test_running_snapshot_run_without_lease_cannot_be_cancelled(client):
 
         assert run.status == "running"
         assert run.finished_at is None
+
+
+def test_snapshot_scheduler_claims_pending_requeued_runs(client):
+    job = SnapshotScheduleJob(granularity="day", reference_date=date(2026, 7, 12))
+    period_start, period_end = snapshot_window(job.granularity, job.reference_date)
+    run_key = snapshot_run_key(job.granularity, period_start, period_end)
+
+    with get_session_factory(get_settings().database_url)() as db:
+        run = KnowledgeSnapshotRun(
+            run_key=run_key,
+            granularity=job.granularity,
+            period_start=period_start,
+            period_end=period_end,
+            trigger_source="scheduler",
+            status="failed",
+            started_at=datetime(2026, 7, 13, 3, 0),
+            finished_at=datetime(2026, 7, 13, 3, 1),
+            attempt_count=3,
+            error_message="RuntimeError",
+            metadata_json={"trigger_source": "scheduler"},
+        )
+        db.add(run)
+        db.commit()
+
+        requeue_knowledge_snapshot_run(
+            run,
+            requeued_by_user_id=1,
+            lease_seconds=3600,
+            clock=lambda: datetime(2026, 7, 13, 4, 0),
+        )
+        db.commit()
+
+        assert run.status == "pending"
+        assert run.attempt_count == 0
+        assert should_run_snapshot_job(db, job, retry_attempts=3, lease_seconds=3600) is True
+
+        lease = acquire_snapshot_job_lease(
+            db,
+            job,
+            retry_attempts=3,
+            lease_owner="worker-requeue",
+            lease_seconds=3600,
+            now=datetime(2026, 7, 13, 4, 5),
+        )
+        assert lease is not None
+        db.refresh(run)
+        assert run.status == "running"
+        assert run.scheduler_lease_owner == "worker-requeue"
+        assert run.scheduler_lease_token == lease.lease_token
+        assert run.scheduler_lease_expires_at == datetime(2026, 7, 13, 5, 5)
+
+
+def test_snapshot_scheduler_run_once_processes_pending_runs_outside_due_window(client, monkeypatch):
+    pending_job = SnapshotScheduleJob(granularity="day", reference_date=date(2026, 7, 14))
+    period_start, period_end = snapshot_window(pending_job.granularity, pending_job.reference_date)
+    with get_session_factory(get_settings().database_url)() as db:
+        db.add(
+            KnowledgeSnapshotRun(
+                run_key=snapshot_run_key(pending_job.granularity, period_start, period_end),
+                granularity=pending_job.granularity,
+                period_start=period_start,
+                period_end=period_end,
+                trigger_source="admin_requeue",
+                status="pending",
+                started_at=datetime(2026, 7, 20, 1, 0),
+                attempt_count=0,
+                metadata_json={"trigger_source": "admin_requeue"},
+            )
+        )
+        db.commit()
+
+    captured_jobs: list[tuple[str, date]] = []
+
+    def fake_rebuild(db, **kwargs):
+        captured_jobs.append((kwargs["granularity"], kwargs["reference_date"]))
+        return SimpleNamespace(status="success", id=789, attempt_count=1)
+
+    monkeypatch.setattr(
+        "app.services.knowledge_snapshot_scheduler.rebuild_periodic_knowledge_snapshots",
+        fake_rebuild,
+    )
+    scheduler = KnowledgeSnapshotScheduler(
+        database_url=get_settings().database_url,
+        schedule_config=SnapshotScheduleConfig(daily_enabled=False, weekly_enabled=False),
+        retry_attempts=3,
+        interval_seconds=300,
+        lease_seconds=3600,
+        heartbeat_seconds=45,
+        instance_id="scheduler-pending-test",
+    )
+
+    results = asyncio.run(scheduler.run_once(now=datetime(2026, 7, 20, 1, 30)))
+
+    assert results == [
+        {
+            "granularity": "day",
+            "reference_date": "2026-07-14",
+            "status": "success",
+            "run_id": 789,
+            "attempt_count": 1,
+        }
+    ]
+    assert captured_jobs == [("day", date(2026, 7, 14))]
 
 
 def test_snapshot_scheduler_lease_blocks_parallel_workers_until_expiry(client):

@@ -1437,7 +1437,7 @@ def test_admin_can_read_knowledge_snapshot_run_health(client):
     assert body["failed_count"] == 2
     assert body["retryable_failed_count"] == 1
     assert body["exhausted_failed_count"] == 1
-    assert body["claimable_count"] == 3
+    assert body["claimable_count"] == 4
     assert body["pending_count"] == 1
     assert body["cancelled_count"] == 1
     assert body["needs_attention_count"] == 5
@@ -1467,9 +1467,241 @@ def test_admin_can_read_knowledge_snapshot_run_health(client):
     audit_item = audit.json()["items"][0]
     assert audit_item["snapshot_json"]["health_status"] == "attention"
     assert audit_item["snapshot_json"]["problem_count"] == 6
-    assert audit_item["snapshot_json"]["claimable_count"] == 3
+    assert audit_item["snapshot_json"]["claimable_count"] == 4
     assert "secret-" not in json.dumps(audit_item["snapshot_json"], ensure_ascii=False)
     assert "problem_runs" not in audit_item["snapshot_json"]
+
+
+def test_admin_can_requeue_knowledge_snapshot_runs(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "snapshot_requeue_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    settings = get_settings()
+    now = datetime.now(UTC).replace(microsecond=0)
+    with session_factory() as db:
+        failed_run = KnowledgeSnapshotRun(
+            run_key="knowledge:requeue:failed",
+            granularity="day",
+            period_start=now - timedelta(days=5),
+            period_end=now - timedelta(days=5) + timedelta(hours=23, minutes=59),
+            trigger_source="scheduler",
+            status="failed",
+            started_at=now - timedelta(hours=5),
+            finished_at=now - timedelta(hours=4, minutes=59),
+            scheduler_lease_owner="old-worker",
+            scheduler_lease_token="secret-requeue-token",
+            scheduler_lease_expires_at=now - timedelta(hours=4),
+            scheduler_heartbeat_at=now - timedelta(hours=5),
+            attempt_count=settings.knowledge_snapshot_retry_attempts,
+            error_message="RuntimeError",
+            metadata_json={"trigger_source": "scheduler"},
+        )
+        pending_run = KnowledgeSnapshotRun(
+            run_key="knowledge:requeue:pending",
+            granularity="day",
+            period_start=now - timedelta(days=4),
+            period_end=now - timedelta(days=4) + timedelta(hours=23, minutes=59),
+            trigger_source="admin",
+            status="pending",
+            started_at=now - timedelta(hours=4),
+            attempt_count=0,
+            metadata_json={"trigger_source": "admin"},
+        )
+        cancelled_run = KnowledgeSnapshotRun(
+            run_key="knowledge:requeue:cancelled",
+            granularity="day",
+            period_start=now - timedelta(days=7),
+            period_end=now - timedelta(days=7) + timedelta(hours=23, minutes=59),
+            trigger_source="admin",
+            status="cancelled",
+            started_at=now - timedelta(days=7, hours=1),
+            finished_at=now - timedelta(days=7),
+            attempt_count=1,
+            error_message="cancelled_by_admin",
+            metadata_json={"trigger_source": "admin", "cancelled_by_user_id": 1},
+        )
+        active_running_run = KnowledgeSnapshotRun(
+            run_key="knowledge:requeue:active",
+            granularity="day",
+            period_start=now - timedelta(days=3),
+            period_end=now - timedelta(days=3) + timedelta(hours=23, minutes=59),
+            trigger_source="scheduler",
+            status="running",
+            started_at=now - timedelta(minutes=10),
+            scheduler_lease_owner="worker-active-requeue",
+            scheduler_lease_token="secret-active-requeue-token",
+            scheduler_lease_expires_at=now + timedelta(hours=1),
+            scheduler_heartbeat_at=now - timedelta(minutes=1),
+            attempt_count=1,
+            metadata_json={"trigger_source": "scheduler"},
+        )
+        stale_running_run = KnowledgeSnapshotRun(
+            run_key="knowledge:requeue:stale",
+            granularity="day",
+            period_start=now - timedelta(days=2),
+            period_end=now - timedelta(days=2) + timedelta(hours=23, minutes=59),
+            trigger_source="scheduler",
+            status="running",
+            started_at=now - timedelta(hours=3),
+            scheduler_lease_owner="worker-stale-requeue",
+            scheduler_lease_token="secret-stale-requeue-token",
+            scheduler_lease_expires_at=now - timedelta(minutes=1),
+            scheduler_heartbeat_at=now - timedelta(hours=2),
+            attempt_count=1,
+            metadata_json={"trigger_source": "scheduler"},
+        )
+        legacy_running_run = KnowledgeSnapshotRun(
+            run_key="knowledge:requeue:legacy-running",
+            granularity="day",
+            period_start=now - timedelta(days=1),
+            period_end=now - timedelta(days=1) + timedelta(hours=23, minutes=59),
+            trigger_source="scheduler",
+            status="running",
+            started_at=now - timedelta(hours=3),
+            attempt_count=1,
+            metadata_json={"trigger_source": "scheduler"},
+        )
+        success_run = KnowledgeSnapshotRun(
+            run_key="knowledge:requeue:success",
+            granularity="day",
+            period_start=now - timedelta(days=6),
+            period_end=now - timedelta(days=6) + timedelta(hours=23, minutes=59),
+            trigger_source="scheduler",
+            status="success",
+            started_at=now - timedelta(days=6, hours=1),
+            finished_at=now - timedelta(days=6),
+            attempt_count=1,
+            user_snapshot_count=2,
+            class_snapshot_count=1,
+            metadata_json={"trigger_source": "scheduler"},
+        )
+        db.add_all(
+            [
+                failed_run,
+                pending_run,
+                cancelled_run,
+                active_running_run,
+                stale_running_run,
+                legacy_running_run,
+                success_run,
+            ]
+        )
+        db.commit()
+        failed_run_id = failed_run.id
+        pending_run_id = pending_run.id
+        cancelled_run_id = cancelled_run.id
+        active_running_run_id = active_running_run.id
+        stale_running_run_id = stale_running_run.id
+        legacy_running_run_id = legacy_running_run.id
+        success_run_id = success_run.id
+
+    forbidden = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{failed_run_id}/requeue",
+        headers=_auth_header(teacher_token),
+        json={"reason": "retry after data fix"},
+    )
+    assert forbidden.status_code == 403
+
+    requeued = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{failed_run_id}/requeue",
+        headers={**_auth_header(admin_token), "X-Request-ID": "snapshot-requeue-request"},
+        json={"reason": " retry after data fix "},
+    )
+    assert requeued.status_code == 200
+    requeued_body = requeued.json()
+    assert requeued_body["status"] == "pending"
+    assert requeued_body["trigger_source"] == "admin_requeue"
+    assert requeued_body["attempt_count"] == 0
+    assert requeued_body["finished_at"] is None
+    assert requeued_body["error_message"] is None
+    assert requeued_body["scheduler_lease_owner"] is None
+    assert requeued_body["scheduler_lease_expires_at"] is None
+    assert requeued_body["scheduler_heartbeat_at"] is None
+    assert requeued_body["metadata_json"]["trigger_source"] == "admin_requeue"
+    assert requeued_body["metadata_json"]["previous_status"] == "failed"
+    assert requeued_body["metadata_json"]["previous_attempt_count"] == settings.knowledge_snapshot_retry_attempts
+    assert requeued_body["metadata_json"]["cleared_lease"] is True
+    assert requeued_body["metadata_json"]["requeue_reason"] == "retry after data fix"
+    assert "scheduler_lease_token" not in requeued_body
+    assert "secret-requeue-token" not in json.dumps(requeued_body, ensure_ascii=False)
+
+    pending_requeue = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{pending_run_id}/requeue",
+        headers=_auth_header(admin_token),
+        json={},
+    )
+    assert pending_requeue.status_code == 200
+    pending_body = pending_requeue.json()
+    assert pending_body["status"] == "pending"
+    assert pending_body["trigger_source"] == "admin"
+    assert pending_body["metadata_json"] == {"trigger_source": "admin"}
+
+    cancelled_requeue = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{cancelled_run_id}/requeue",
+        headers=_auth_header(admin_token),
+        json={},
+    )
+    assert cancelled_requeue.status_code == 200
+    cancelled_body = cancelled_requeue.json()
+    assert cancelled_body["status"] == "pending"
+    assert cancelled_body["trigger_source"] == "admin_requeue"
+    assert cancelled_body["metadata_json"]["previous_status"] == "cancelled"
+    assert cancelled_body["metadata_json"]["cleared_lease"] is False
+
+    active_requeue = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{active_running_run_id}/requeue",
+        headers=_auth_header(admin_token),
+        json={},
+    )
+    assert active_requeue.status_code == 409
+
+    legacy_running_requeue = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{legacy_running_run_id}/requeue",
+        headers=_auth_header(admin_token),
+        json={},
+    )
+    assert legacy_running_requeue.status_code == 409
+
+    success_requeue = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{success_run_id}/requeue",
+        headers=_auth_header(admin_token),
+        json={},
+    )
+    assert success_requeue.status_code == 409
+
+    stale_requeue = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{stale_running_run_id}/requeue",
+        headers=_auth_header(admin_token),
+        json={},
+    )
+    assert stale_requeue.status_code == 200
+    stale_body = stale_requeue.json()
+    assert stale_body["status"] == "pending"
+    assert stale_body["metadata_json"]["previous_status"] == "running"
+    assert "secret-stale-requeue-token" not in json.dumps(stale_body, ensure_ascii=False)
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.knowledge_snapshot_run.requeue"
+        "&resource_type=knowledge_snapshot_run&request_id=snapshot-requeue-request",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    audit_item = audit.json()["items"][0]
+    assert audit_item["snapshot_json"]["previous_status"] == "failed"
+    assert audit_item["snapshot_json"]["status"] == "pending"
+    assert audit_item["snapshot_json"]["attempt_count"] == 0
+    assert audit_item["snapshot_json"]["cleared_lease"] is True
+    assert audit_item["snapshot_json"]["reason_provided"] is True
+    assert "secret-" not in json.dumps(audit_item["snapshot_json"], ensure_ascii=False)
+
+    with session_factory() as db:
+        stored = db.get(KnowledgeSnapshotRun, failed_run_id)
+        assert stored is not None
+        assert stored.status == "pending"
+        assert stored.scheduler_lease_token is None
+        assert stored.error_message is None
+        assert stored.trigger_source == "admin_requeue"
+        assert stored.metadata_json["requeue_reason"] == "retry after data fix"
 
 
 def test_admin_content_pages_filter_count_and_paginate_in_database(client):
