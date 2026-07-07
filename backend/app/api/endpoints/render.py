@@ -1,4 +1,5 @@
 import json
+import secrets
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -35,14 +36,16 @@ def render_script_sandbox_document(sandbox_id: str, slug: str, response: Respons
     references = _script_manifest_references(manifest)
     for reference in references:
         _local_script_asset_path(reference)
-    csp = _harden_sandbox_csp(str(sandbox["csp"]))
+    nonce = _script_sandbox_nonce()
+    csp = _harden_sandbox_csp(str(sandbox["csp"]), nonce=nonce)
     response.headers["Content-Security-Policy"] = csp
     response.headers["X-Astra-Content-Script-Sandbox-Id"] = sandbox_id
     response.headers["X-Astra-Content-Script-Iframe-Sandbox"] = str(sandbox["iframeSandbox"])
     response.headers["X-Astra-Content-Script-Reference-Count"] = str(len(references))
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
-    return _script_sandbox_html(slug=page.slug, sandbox_id=sandbox_id, references=references)
+    response.headers["Cache-Control"] = "no-store"
+    return _script_sandbox_html(slug=page.slug, sandbox_id=sandbox_id, nonce=nonce)
 
 
 @router.get("/script-sandboxes/{sandbox_id}/bootstrap/page/{slug:path}")
@@ -267,17 +270,45 @@ def _is_allowed_local_script_asset(candidate: Path) -> bool:
     return False
 
 
-def _harden_sandbox_csp(csp: str) -> str:
-    hardening_directives = [
-        "base-uri 'none'",
-        "object-src 'none'",
-        "frame-ancestors 'self'",
-        "form-action 'none'",
-    ]
-    return "; ".join([csp.rstrip("; "), *hardening_directives])
+def _harden_sandbox_csp(csp: str, *, nonce: str) -> str:
+    directives = _parse_csp_directives(csp)
+    _upsert_script_src_nonce(directives, nonce=nonce)
+    for name, values in [
+        ("base-uri", ["'none'"]),
+        ("object-src", ["'none'"]),
+        ("frame-ancestors", ["'self'"]),
+        ("form-action", ["'none'"]),
+    ]:
+        directives[name] = values
+    return "; ".join(
+        f"{name} {' '.join(values)}" if values else name
+        for name, values in directives.items()
+    )
 
 
-def _script_sandbox_html(*, slug: str, sandbox_id: str, references: list[dict[str, Any]]) -> str:
+def _parse_csp_directives(csp: str) -> dict[str, list[str]]:
+    directives: dict[str, list[str]] = {}
+    for raw_directive in csp.split(";"):
+        parts = raw_directive.strip().split()
+        if not parts:
+            continue
+        name = parts[0].lower()
+        if name in directives:
+            continue
+        directives[name] = parts[1:]
+    return directives
+
+
+def _upsert_script_src_nonce(directives: dict[str, list[str]], *, nonce: str) -> None:
+    nonce_source = f"'nonce-{nonce}'"
+    directives["script-src"] = [nonce_source]
+
+
+def _script_sandbox_nonce() -> str:
+    return secrets.token_urlsafe(24)
+
+
+def _script_sandbox_html(*, slug: str, sandbox_id: str, nonce: str) -> str:
     bootstrap_url = _script_sandbox_bootstrap_url(slug=slug, sandbox_id=sandbox_id)
     return (
         "<!doctype html>\n"
@@ -292,7 +323,7 @@ def _script_sandbox_html(*, slug: str, sandbox_id: str, references: list[dict[st
         "  <body>\n"
         f'    <div id="astra-sandbox-root" data-slug="{escape(slug, quote=True)}" '
         f'data-sandbox-id="{escape(sandbox_id, quote=True)}"></div>\n'
-        f'    <script src="{escape(bootstrap_url, quote=True)}" defer></script>\n'
+        f'    <script src="{escape(bootstrap_url, quote=True)}" nonce="{escape(nonce, quote=True)}" defer></script>\n'
         "  </body>\n"
         "</html>\n"
     )

@@ -1,8 +1,10 @@
+import re
+
 from sqlalchemy import delete, func, select
 import pytest
 from fastapi import HTTPException, Response
 
-from app.api.endpoints.render import _apply_script_contract_headers, _script_manifest_references
+from app.api.endpoints.render import _apply_script_contract_headers, _harden_sandbox_csp, _script_manifest_references
 from app.core.config import get_settings
 from app.db.session import get_session_factory
 from app.models import ContentPageRecord
@@ -63,18 +65,29 @@ def test_render_script_sandbox_document_serves_isolated_html(client):
     assert response.headers["X-Astra-Content-Script-Reference-Count"] == "1"
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["Referrer-Policy"] == "no-referrer"
+    assert response.headers["Cache-Control"] == "no-store"
+    assert "X-Astra-Content-Script-Nonce" not in response.headers
     assert "connect-src 'self'" in response.headers["Content-Security-Policy"]
     assert "frame-ancestors 'self'" in response.headers["Content-Security-Policy"]
     assert "form-action 'none'" in response.headers["Content-Security-Policy"]
+    nonce = _nonce_from_csp(response.headers["Content-Security-Policy"])
+    assert nonce is not None
+    assert "script-src 'self'" not in response.headers["Content-Security-Policy"]
     body = response.text
     assert f'data-sandbox-id="{sandbox_id}"' in body
     bootstrap_url = f"/api/render/script-sandboxes/{sandbox_id}/bootstrap/page/physics/energy-conservation"
     asset_sha256 = manifest["references"][0]["valueSha256"]
     asset_url = f"/api/render/script-sandboxes/{sandbox_id}/assets/{asset_sha256}/page/physics/energy-conservation"
-    assert f'<script src="{bootstrap_url}" defer></script>' in body
+    assert f'<script src="{bootstrap_url}" nonce="{nonce}" defer></script>' in body
     assert f'<script src="{asset_url}" defer></script>' not in body
     assert "scriptSandbox" not in body
     assert "valueSha256" not in body
+
+    second_response = client.get(f"/api/render/script-sandboxes/{sandbox_id}/page/physics/energy-conservation")
+    second_nonce = _nonce_from_csp(second_response.headers["Content-Security-Policy"])
+    assert second_nonce is not None
+    assert second_nonce != nonce
+    assert f'nonce="{second_nonce}"' in second_response.text
 
     bootstrap = client.get(bootstrap_url)
     assert bootstrap.status_code == 200
@@ -107,6 +120,30 @@ def test_render_script_sandbox_document_serves_isolated_html(client):
     )
     assert missing_asset.status_code == 404
     assert missing_asset.json()["detail"] == "Script sandbox asset not found"
+
+
+def test_sandbox_csp_nonce_updates_script_src_without_mutating_public_manifest(client):
+    render = client.get("/api/render/page/physics/energy-conservation")
+    manifest = render.json()["sections"][2]["props"]["scriptManifest"]
+    public_csp = manifest["sandbox"]["csp"]
+    assert "script-src 'self'" in public_csp
+    assert "'nonce-" not in public_csp
+
+    csp = _harden_sandbox_csp(
+        "default-src 'none'; script-src 'self'; connect-src 'none'; script-src https://example.invalid; ",
+        nonce="fixed_nonce",
+    )
+
+    assert csp.count("script-src") == 1
+    assert "script-src 'nonce-fixed_nonce'" in csp
+    assert "script-src 'self'" not in csp
+    assert "'unsafe-inline'" not in csp
+    assert "connect-src 'none'" in csp
+    assert "frame-ancestors 'self'" in csp
+    assert "form-action 'none'" in csp
+
+    no_script_src = _harden_sandbox_csp("default-src 'none'; img-src 'self'", nonce="another_nonce")
+    assert "script-src 'nonce-another_nonce'" in no_script_src
 
 
 def test_render_script_sandbox_document_fails_closed_for_missing_or_blocked_manifest(client):
@@ -250,6 +287,13 @@ def test_content_schema_rejects_duplicate_stable_ids():
 
     with pytest.raises(ValueError, match="Duplicate content sectionId"):
         ContentPage.model_validate(payload)
+
+
+def _nonce_from_csp(csp: str) -> str | None:
+    match = re.search(r"script-src 'nonce-([A-Za-z0-9_-]+)'", csp)
+    if match is None:
+        return None
+    return match.group(1)
 
 
 def test_content_schema_rejects_duplicate_source_ids():
