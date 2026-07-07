@@ -54,6 +54,7 @@ class Assignment(TimestampMixin, Base):
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     max_score: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
+    point_rule_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class Submission(TimestampMixin, Base):

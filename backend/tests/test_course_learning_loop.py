@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import Assignment, ClassKnowledgeSnapshot, KnowledgeSnapshotRun, UserKnowledgeSnapshot
+from app.models import Assignment, ClassKnowledgeSnapshot, KnowledgeSnapshotRun, SchoolMembership, UserKnowledgeSnapshot
 from app.models.base import utc_now
 from app.services import knowledge_snapshot_runs
 
@@ -979,3 +979,165 @@ def test_same_assignment_can_be_submitted_once_per_class(client):
     )
     assert second_review.status_code == 200
     assert second_review.json()["submission"]["id"] == second_submission.json()["id"]
+
+
+def test_assignment_point_rule_controls_grading_points(client):
+    teacher_token = _register_and_login(client, "teacher_point_rule", "teacher")
+    peer_teacher_token = _register_and_login(client, "peer_point_rule", "teacher")
+    student_token = _register_and_login(client, "student_point_rule", "student")
+    admin_token = _bootstrap_admin(client, "admin_point_rule")
+    peer_me = client.get("/api/users/me", headers=_auth_header(peer_teacher_token))
+    assert peer_me.status_code == 200
+    peer_teacher_id = peer_me.json()["id"]
+
+    school = client.post(
+        "/api/schools",
+        headers=_auth_header(teacher_token),
+        json={"name": "Point Rule School"},
+    )
+    assert school.status_code == 201
+    school_id = school.json()["id"]
+
+    class_group = client.post(
+        "/api/classes",
+        headers=_auth_header(teacher_token),
+        json={"school_id": school_id, "name": "Point Rule Class"},
+    )
+    assert class_group.status_code == 201
+    class_id = class_group.json()["id"]
+
+    course = client.post(
+        "/api/courses",
+        headers=_auth_header(teacher_token),
+        json={"school_id": school_id, "title": "Point Rule Course", "status": "published"},
+    )
+    assert course.status_code == 201
+    course_id = course.json()["id"]
+    attach = client.post(
+        f"/api/courses/{course_id}/classes",
+        headers=_auth_header(teacher_token),
+        json={"class_id": class_id},
+    )
+    assert attach.status_code == 201
+    unit = client.post(
+        f"/api/courses/{course_id}/units",
+        headers=_auth_header(teacher_token),
+        json={"title": "Point Rule Unit", "position": 1, "status": "published"},
+    )
+    assert unit.status_code == 201
+    assignment = client.post(
+        f"/api/courses/{course_id}/units/{unit.json()['id']}/assignments",
+        headers=_auth_header(teacher_token),
+        json={"title": "Point Rule Assignment", "max_score": 20},
+    )
+    assert assignment.status_code == 201
+    assignment_id = assignment.json()["id"]
+
+    with get_session_factory(get_settings().database_url)() as db:
+        db.add(SchoolMembership(school_id=school_id, user_id=peer_teacher_id, role="teacher", status="active"))
+        db.commit()
+
+    peer_join = client.post(
+        f"/api/classes/{class_id}/join",
+        headers=_auth_header(peer_teacher_token),
+        json={"role": "teacher"},
+    )
+    assert peer_join.status_code == 201
+    student_join = client.post(
+        f"/api/classes/{class_id}/join",
+        headers=_auth_header(student_token),
+        json={"role": "student"},
+    )
+    assert student_join.status_code == 201
+
+    default_rule = client.get(f"/api/points/assignments/{assignment_id}/rule", headers=_auth_header(teacher_token))
+    assert default_rule.status_code == 200
+    assert default_rule.json() == {
+        "assignment_id": assignment_id,
+        "enabled": True,
+        "points_per_score": 1,
+        "max_points": None,
+        "source": "default",
+    }
+
+    student_rule = client.get(f"/api/points/assignments/{assignment_id}/rule", headers=_auth_header(student_token))
+    assert student_rule.status_code == 403
+    assert student_rule.json()["detail"] == "Assignment point rule requires school teacher scope"
+
+    peer_update = client.patch(
+        f"/api/points/assignments/{assignment_id}/rule",
+        headers=_auth_header(peer_teacher_token),
+        json={"enabled": True, "points_per_score": 2, "max_points": 25},
+    )
+    assert peer_update.status_code == 403
+    assert peer_update.json()["detail"] == "Assignment point rule requires course author role"
+
+    update = client.patch(
+        f"/api/points/assignments/{assignment_id}/rule",
+        headers=_auth_header(teacher_token),
+        json={"enabled": True, "points_per_score": 2, "max_points": 25},
+    )
+    assert update.status_code == 200
+    assert update.json()["source"] == "custom"
+    assert update.json()["points_per_score"] == 2
+    assert update.json()["max_points"] == 25
+
+    audit = client.get(
+        f"/api/admin/audit-logs?action=assignment.point_rule.update&resource_id={assignment_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    assert audit.json()["items"][0]["snapshot_json"]["after"]["points_per_score"] == 2
+
+    submission = client.post(
+        f"/api/assignments/{assignment_id}/submissions",
+        headers=_auth_header(student_token),
+        json={"class_id": class_id, "content": {"answer": "rule aware"}},
+    )
+    assert submission.status_code == 201
+    submission_id = submission.json()["id"]
+
+    grade = client.patch(
+        f"/api/submissions/{submission_id}/grade",
+        headers=_auth_header(peer_teacher_token),
+        json={"score": 12, "feedback": "scaled"},
+    )
+    assert grade.status_code == 200
+    ledger = client.get(f"/api/points/ledger?class_id={class_id}", headers=_auth_header(teacher_token))
+    assert ledger.status_code == 200
+    assert [item["delta"] for item in ledger.json()] == [24]
+
+    regrade = client.patch(
+        f"/api/submissions/{submission_id}/grade",
+        headers=_auth_header(teacher_token),
+        json={"score": 15, "feedback": "capped"},
+    )
+    assert regrade.status_code == 200
+    ledger_after_cap = client.get(f"/api/points/ledger?class_id={class_id}", headers=_auth_header(teacher_token))
+    assert ledger_after_cap.status_code == 200
+    assert [item["delta"] for item in ledger_after_cap.json()] == [24, 1]
+    progress = client.get(f"/api/progress/me?class_id={class_id}", headers=_auth_header(student_token))
+    assert progress.status_code == 200
+    assert progress.json()["total_points"] == 25
+
+    disable = client.patch(
+        f"/api/points/assignments/{assignment_id}/rule",
+        headers=_auth_header(admin_token),
+        json={"enabled": False, "points_per_score": 1, "max_points": None},
+    )
+    assert disable.status_code == 200
+    assert disable.json()["enabled"] is False
+
+    disabled_regrade = client.patch(
+        f"/api/submissions/{submission_id}/grade",
+        headers=_auth_header(peer_teacher_token),
+        json={"score": 16, "feedback": "disabled"},
+    )
+    assert disabled_regrade.status_code == 200
+    ledger_after_disable = client.get(f"/api/points/ledger?class_id={class_id}", headers=_auth_header(teacher_token))
+    assert ledger_after_disable.status_code == 200
+    assert [item["delta"] for item in ledger_after_disable.json()] == [24, 1, -25]
+    progress_after_disable = client.get(f"/api/progress/me?class_id={class_id}", headers=_auth_header(student_token))
+    assert progress_after_disable.status_code == 200
+    assert progress_after_disable.json()["total_points"] == 0

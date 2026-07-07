@@ -26,6 +26,11 @@ from app.services.access_control import (
     require_student_unit_published,
     teacher_class_ids,
 )
+from app.services.points import (
+    assignment_grade_point_total,
+    normalize_assignment_point_rule,
+    points_for_assignment_score,
+)
 
 
 router = APIRouter()
@@ -229,14 +234,18 @@ def grade_submission(
         "graded_by_user_id": submission.graded_by_user_id,
     }
     previous_score = submission.score or 0
+    previous_points = assignment_grade_point_total(db, submission.id)
+    point_rule = normalize_assignment_point_rule(assignment.point_rule_json)
     submission.score = payload.score
     submission.feedback = (payload.feedback or "").strip() or None
     submission.status = payload.status
     submission.graded_by_user_id = current_user.id
     submission.graded_at = utc_now()
 
-    delta = payload.score - previous_score
-    if delta:
+    score_delta = payload.score - previous_score
+    next_points = points_for_assignment_score(payload.score, point_rule)
+    point_delta = next_points - previous_points
+    if point_delta:
         db.add(
             PointLedger(
                 user_id=submission.student_id,
@@ -244,7 +253,7 @@ def grade_submission(
                 class_id=submission.class_id,
                 assignment_id=assignment.id,
                 submission_id=submission.id,
-                delta=delta,
+                delta=point_delta,
                 reason="assignment_grade",
                 note=submission.feedback,
                 created_by_user_id=current_user.id,
@@ -257,7 +266,9 @@ def grade_submission(
         "graded_by_user_id": submission.graded_by_user_id,
         "assignment_id": assignment.id,
         "student_id": submission.student_id,
-        "score_delta": delta,
+        "score_delta": score_delta,
+        "point_delta": point_delta,
+        "point_rule": point_rule,
     }
     record_audit_log(
         db,

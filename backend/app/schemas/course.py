@@ -10,6 +10,7 @@ AssignmentStatus = Literal["active", "closed", "archived"]
 SubmissionStatus = Literal["submitted", "graded", "returned"]
 SubmissionGradeStatus = Literal["graded", "returned"]
 LearningEventType = Literal["visit", "start", "submit", "complete"]
+AssignmentPointRuleSource = Literal["default", "custom"]
 
 
 class CourseCreate(BaseModel):
@@ -156,6 +157,20 @@ class PointLedgerRead(BaseModel):
     reason: str
     note: str | None = None
     created_by_user_id: int | None = None
+
+
+class AssignmentPointRuleUpdate(BaseModel):
+    enabled: bool = True
+    points_per_score: int = Field(default=1, ge=0, le=1000)
+    max_points: int | None = Field(default=None, ge=0, le=100000)
+
+
+class AssignmentPointRuleRead(BaseModel):
+    assignment_id: int
+    enabled: bool
+    points_per_score: int
+    max_points: int | None = None
+    source: AssignmentPointRuleSource
 
 
 class ProgressSummary(BaseModel):
