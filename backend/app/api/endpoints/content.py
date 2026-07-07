@@ -307,7 +307,7 @@ def publish_content_draft(
         raise HTTPException(status_code=404, detail="Content draft not found")
     if draft.status != CONTENT_DRAFT_STATUS_SUBMITTED:
         raise HTTPException(status_code=409, detail="Content draft must be submitted before publishing")
-    script_policy = _content_draft_script_policy(draft)
+    script_policy = _content_draft_script_policy(draft, verify_external_assets=True)
     if script_policy.has_blocking_findings:
         raise HTTPException(status_code=409, detail="Content draft script policy findings must be resolved before publishing")
     if script_policy.has_script_findings and not draft.allow_script:
@@ -399,11 +399,13 @@ def review_content_draft_script(
         raise HTTPException(status_code=409, detail="Content draft does not allow scripts")
     if draft.author_user_id == current_user.id:
         raise HTTPException(status_code=403, detail="Content draft authors cannot review their own scripts")
-    script_policy = _content_draft_script_policy(draft)
+    script_policy = _content_draft_script_policy(draft, verify_external_assets=payload.status == SCRIPT_REVIEW_APPROVED)
     if script_policy.has_blocking_findings:
         raise HTTPException(status_code=409, detail="Content draft script policy findings must be resolved before review")
 
     before = _content_draft_snapshot(draft)
+    draft.script_risk_level = script_policy.risk_level
+    draft.script_analysis_json = script_policy.to_json(schema_hash=draft.schema_hash)
     draft.script_review_status = payload.status
     draft.script_reviewed_by_user_id = current_user.id
     draft.script_reviewed_at = utc_now()
@@ -751,7 +753,7 @@ def _reject_stale_content_draft(db: Session, draft: ContentDraft) -> None:
         raise HTTPException(status_code=409, detail="Content draft is based on an older published version")
 
 
-def _content_draft_script_policy(draft: ContentDraft):
+def _content_draft_script_policy(draft: ContentDraft, *, verify_external_assets: bool = False):
     stored_analysis = draft.script_analysis_json if isinstance(draft.script_analysis_json, dict) else None
     stored_policy = script_policy_result_from_json(stored_analysis)
     stored_schema_hash = stored_analysis.get("schema_hash") if stored_analysis else None
@@ -762,15 +764,20 @@ def _content_draft_script_policy(draft: ContentDraft):
         and stored_schema_hash == draft.schema_hash
         and stored_policy_version == SCRIPT_POLICY_VERSION
         and stored_policy_context_hash == _content_script_policy_context_hash()
+        and not verify_external_assets
     ):
         return stored_policy
-    return _analyze_content_script_policy(ContentPage.model_validate(draft.schema_json))
+    return _analyze_content_script_policy(
+        ContentPage.model_validate(draft.schema_json),
+        verify_external_assets=verify_external_assets,
+    )
 
 
-def _analyze_content_script_policy(page_schema: ContentPage):
+def _analyze_content_script_policy(page_schema: ContentPage, *, verify_external_assets: bool = False):
     return analyze_content_script_policy(
         page_schema,
         allowed_external_hosts=get_settings().content_script_allowed_host_list,
+        verify_external_assets=verify_external_assets,
     )
 
 

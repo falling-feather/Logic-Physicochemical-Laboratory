@@ -1,3 +1,7 @@
+import base64
+import hashlib
+
+from app.services import content_script_policy
 from app.services.content_script_policy import analyze_content_script_policy, public_content_page_schema
 
 
@@ -93,6 +97,129 @@ def test_script_policy_allows_reviewed_external_script_asset_with_sri_contract()
     assert "script_integrity_invalid" not in codes
     assert "script_crossorigin_missing" not in codes
     assert "script_crossorigin_invalid" not in codes
+
+
+def test_script_policy_verifies_external_script_asset_sri_with_fetcher():
+    asset_bytes = b"console.log('verified asset');\n"
+    payload = _page_payload(
+        {
+            "scriptUrl": "https://cdn.example.test/tool.js",
+            "scriptIntegrity": _sri_sha384(asset_bytes),
+            "scriptCrossorigin": "anonymous",
+            "scriptSandbox": {"mode": "isolated-iframe", "network": "none", "storage": "none"},
+        }
+    )
+    fetched_urls = []
+
+    def fetcher(url: str) -> bytes:
+        fetched_urls.append(url)
+        return asset_bytes
+
+    result = analyze_content_script_policy(
+        payload,
+        allowed_external_hosts={"cdn.example.test"},
+        verify_external_assets=True,
+        external_script_fetcher=fetcher,
+    )
+
+    codes = {finding.code for finding in result.findings}
+    assert fetched_urls == ["https://cdn.example.test/tool.js"]
+    assert result.status == "review_required"
+    assert result.risk_level == "high"
+    assert result.has_blocking_findings is False
+    assert "external_script_url" in codes
+    assert "script_integrity_verified" in codes
+    assert "script_integrity_mismatch" not in codes
+    assert "external_script_asset_unavailable" not in codes
+
+
+def test_script_policy_blocks_external_script_asset_sri_mismatch():
+    original_bytes = b"console.log('original asset');\n"
+    payload = _page_payload(
+        {
+            "scriptUrl": "https://cdn.example.test/tool.js",
+            "scriptIntegrity": _sri_sha384(original_bytes),
+            "scriptCrossorigin": "anonymous",
+            "scriptSandbox": {"mode": "isolated-iframe", "network": "none", "storage": "none"},
+        }
+    )
+
+    result = analyze_content_script_policy(
+        payload,
+        allowed_external_hosts={"cdn.example.test"},
+        verify_external_assets=True,
+        external_script_fetcher=lambda url: b"console.log('changed asset');\n",
+    )
+
+    codes = {finding.code for finding in result.findings}
+    assert result.status == "blocked"
+    assert result.risk_level == "blocked"
+    assert result.has_blocking_findings is True
+    assert "script_integrity_mismatch" in codes
+    assert "script_integrity_verified" not in codes
+
+
+def test_script_policy_blocks_external_script_asset_download_failure():
+    asset_bytes = b"console.log('unreachable asset');\n"
+    payload = _page_payload(
+        {
+            "scriptUrl": "https://cdn.example.test/tool.js",
+            "scriptIntegrity": _sri_sha384(asset_bytes),
+            "scriptCrossorigin": "anonymous",
+            "scriptSandbox": {"mode": "isolated-iframe", "network": "none", "storage": "none"},
+        }
+    )
+
+    def fetcher(url: str) -> bytes:
+        raise OSError("cdn unavailable")
+
+    result = analyze_content_script_policy(
+        payload,
+        allowed_external_hosts={"cdn.example.test"},
+        verify_external_assets=True,
+        external_script_fetcher=fetcher,
+    )
+
+    codes = {finding.code for finding in result.findings}
+    assert result.status == "blocked"
+    assert result.risk_level == "blocked"
+    assert result.has_blocking_findings is True
+    assert "external_script_asset_unavailable" in codes
+    assert "script_integrity_verified" not in codes
+
+
+def test_default_external_script_fetcher_uses_no_redirect_opener(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self, size: int) -> bytes:
+            captured["read_size"] = size
+            return b"console.log('ok');"
+
+    class FakeOpener:
+        def open(self, request, timeout: int):
+            captured["request"] = request
+            captured["timeout"] = timeout
+            return FakeResponse()
+
+    def fake_build_opener(handler):
+        captured["handler"] = handler
+        return FakeOpener()
+
+    monkeypatch.setattr(content_script_policy, "build_opener", fake_build_opener)
+
+    payload = content_script_policy._default_external_script_fetcher("https://cdn.example.test/tool.js")
+
+    assert payload == b"console.log('ok');"
+    assert captured["handler"]().redirect_request(None, None, 302, "Found", {}, "https://other.example.test") is None
+    assert captured["timeout"] == content_script_policy.EXTERNAL_SCRIPT_FETCH_TIMEOUT_SECONDS
+    assert captured["read_size"] == content_script_policy.MAX_EXTERNAL_SCRIPT_BYTES + 1
 
 
 def test_script_policy_blocks_external_script_asset_without_sri_contract_details():
@@ -239,3 +366,7 @@ def _page_payload(props: dict | None = None) -> dict:
         ],
         "sources": [],
     }
+
+
+def _sri_sha384(payload: bytes) -> str:
+    return "sha384-" + base64.b64encode(hashlib.sha384(payload).digest()).decode("ascii")

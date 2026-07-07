@@ -1,18 +1,23 @@
 from __future__ import annotations
 
+import base64
 from copy import deepcopy
 from dataclasses import dataclass
 import hashlib
+import hmac
 import json
 import re
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import unquote, urlsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from app.schemas.content import ContentPage
 
 
-SCRIPT_POLICY_VERSION = "2026-07-07.2"
+SCRIPT_POLICY_VERSION = "2026-07-07.3"
 MAX_FINDINGS = 50
+MAX_EXTERNAL_SCRIPT_BYTES = 1_000_000
+EXTERNAL_SCRIPT_FETCH_TIMEOUT_SECONDS = 10
 SCRIPT_REFERENCE_KEYS = {"script", "scriptpath", "scripturl", "scriptsrc", "inlinescript"}
 INLINE_SCRIPT_KEYS = {"inlinescript"}
 SCRIPT_LOCATION_KEYS = {"script", "scriptpath", "scripturl", "scriptsrc"}
@@ -31,6 +36,7 @@ BLOCKED_SANDBOX_CAPABILITIES = {
     "allowPopups": "Script sandboxes cannot open popups in the first content protocol phase.",
     "allowDownloads": "Script sandboxes cannot trigger downloads in the first content protocol phase.",
 }
+ExternalScriptFetcher = Callable[[str], bytes]
 
 _SEVERITY_ORDER = {"info": 0, "medium": 1, "high": 2, "blocked": 3}
 _RISK_BY_SEVERITY = {
@@ -107,6 +113,8 @@ def analyze_content_script_policy(
     page_schema: ContentPage | dict[str, Any],
     *,
     allowed_external_hosts: list[str] | tuple[str, ...] | set[str] | None = None,
+    verify_external_assets: bool = False,
+    external_script_fetcher: ExternalScriptFetcher | None = None,
 ) -> ScriptPolicyResult:
     if isinstance(page_schema, ContentPage):
         payload = page_schema.model_dump(mode="json")
@@ -114,7 +122,14 @@ def analyze_content_script_policy(
         payload = page_schema
     findings: list[ScriptPolicyFinding] = []
     allowed_hosts = {host.strip().lower() for host in allowed_external_hosts or [] if host.strip()}
-    _scan_value(payload, "$", findings, allowed_external_hosts=allowed_hosts)
+    _scan_value(
+        payload,
+        "$",
+        findings,
+        allowed_external_hosts=allowed_hosts,
+        verify_external_assets=verify_external_assets,
+        external_script_fetcher=external_script_fetcher or _default_external_script_fetcher,
+    )
     risk_level = _risk_level(findings)
     status = "blocked" if risk_level == "blocked" else "review_required" if findings else "clean"
     sandbox = _sandbox_summary(findings)
@@ -182,6 +197,8 @@ def _scan_value(
     key: str | None = None,
     *,
     allowed_external_hosts: set[str],
+    verify_external_assets: bool,
+    external_script_fetcher: ExternalScriptFetcher,
 ) -> None:
     if len(findings) >= MAX_FINDINGS:
         return
@@ -203,6 +220,8 @@ def _scan_value(
                     container=value,
                     container_path=path,
                     allowed_external_hosts=allowed_external_hosts,
+                    verify_external_assets=verify_external_assets,
+                    external_script_fetcher=external_script_fetcher,
                 )
                 if normalized_key in SCRIPT_LOCATION_KEYS:
                     _scan_script_sandbox_contract(value, path, child_path, findings)
@@ -217,13 +236,29 @@ def _scan_value(
                         message="Inline event handler props require review and are not part of the stable schema.",
                     )
                 )
-            _scan_value(nested_value, child_path, findings, child_key, allowed_external_hosts=allowed_external_hosts)
+            _scan_value(
+                nested_value,
+                child_path,
+                findings,
+                child_key,
+                allowed_external_hosts=allowed_external_hosts,
+                verify_external_assets=verify_external_assets,
+                external_script_fetcher=external_script_fetcher,
+            )
         return
     if isinstance(value, list):
         for index, nested_value in enumerate(value):
             if len(findings) >= MAX_FINDINGS:
                 return
-            _scan_value(nested_value, f"{path}[{index}]", findings, key, allowed_external_hosts=allowed_external_hosts)
+            _scan_value(
+                nested_value,
+                f"{path}[{index}]",
+                findings,
+                key,
+                allowed_external_hosts=allowed_external_hosts,
+                verify_external_assets=verify_external_assets,
+                external_script_fetcher=external_script_fetcher,
+            )
         return
     if isinstance(value, str):
         _scan_string(value, path, key, findings)
@@ -239,6 +274,8 @@ def _scan_script_reference_value(
     container: dict[str, Any],
     container_path: str,
     allowed_external_hosts: set[str],
+    verify_external_assets: bool,
+    external_script_fetcher: ExternalScriptFetcher,
 ) -> None:
     if normalized_key in INLINE_SCRIPT_KEYS:
         findings.append(
@@ -298,6 +335,8 @@ def _scan_script_reference_value(
             container=container,
             container_path=container_path,
             allowed_external_hosts=allowed_external_hosts,
+            verify_external_assets=verify_external_assets,
+            external_script_fetcher=external_script_fetcher,
         )
 
 
@@ -310,9 +349,13 @@ def _scan_external_script_asset(
     container: dict[str, Any],
     container_path: str,
     allowed_external_hosts: set[str],
+    verify_external_assets: bool,
+    external_script_fetcher: ExternalScriptFetcher,
 ) -> None:
     parsed = _parse_external_url(url)
+    contract_is_verifiable = True
     if parsed is None or parsed.scheme != "https":
+        contract_is_verifiable = False
         findings.append(
             _finding(
                 code="external_script_insecure_scheme",
@@ -324,6 +367,7 @@ def _scan_external_script_asset(
             )
         )
     if parsed is not None and (parsed.query or parsed.fragment):
+        contract_is_verifiable = False
         findings.append(
             _finding(
                 code="external_script_query_or_fragment",
@@ -336,6 +380,7 @@ def _scan_external_script_asset(
         )
     host = parsed.hostname.lower() if parsed is not None and parsed.hostname else ""
     if not host or not _host_allowed(host, allowed_external_hosts):
+        contract_is_verifiable = False
         findings.append(
             _finding(
                 code="external_script_host_not_allowed",
@@ -350,6 +395,7 @@ def _scan_external_script_asset(
     integrity_key, integrity = _container_value_by_normalized_key(container, SCRIPT_INTEGRITY_KEYS)
     integrity_path = f"{container_path}.{integrity_key}" if integrity_key is not None else path
     if integrity_key is None:
+        contract_is_verifiable = False
         findings.append(
             _finding(
                 code="script_integrity_missing",
@@ -361,6 +407,7 @@ def _scan_external_script_asset(
             )
         )
     elif not isinstance(integrity, str) or not _valid_sri(integrity):
+        contract_is_verifiable = False
         findings.append(
             _finding(
                 code="script_integrity_invalid",
@@ -375,6 +422,7 @@ def _scan_external_script_asset(
     crossorigin_key, crossorigin = _container_value_by_normalized_key(container, SCRIPT_CROSSORIGIN_KEYS)
     crossorigin_path = f"{container_path}.{crossorigin_key}" if crossorigin_key is not None else path
     if crossorigin_key is None:
+        contract_is_verifiable = False
         findings.append(
             _finding(
                 code="script_crossorigin_missing",
@@ -386,6 +434,7 @@ def _scan_external_script_asset(
             )
         )
     elif not isinstance(crossorigin, str) or crossorigin.strip().lower() != "anonymous":
+        contract_is_verifiable = False
         findings.append(
             _finding(
                 code="script_crossorigin_invalid",
@@ -396,6 +445,55 @@ def _scan_external_script_asset(
                 message="External script crossorigin must be anonymous.",
             )
         )
+
+    if verify_external_assets and contract_is_verifiable and isinstance(integrity, str):
+        _verify_external_script_asset(url, integrity, path, key, findings, external_script_fetcher)
+
+
+def _verify_external_script_asset(
+    url: str,
+    integrity: str,
+    path: str,
+    key: str,
+    findings: list[ScriptPolicyFinding],
+    external_script_fetcher: ExternalScriptFetcher,
+) -> None:
+    try:
+        asset_bytes = external_script_fetcher(url)
+    except Exception:
+        findings.append(
+            _finding(
+                code="external_script_asset_unavailable",
+                severity="blocked",
+                path=path,
+                key=key,
+                value=url,
+                message="External script asset could not be downloaded for SRI verification.",
+            )
+        )
+        return
+    if not _sri_matches_asset(integrity, asset_bytes):
+        findings.append(
+            _finding(
+                code="script_integrity_mismatch",
+                severity="blocked",
+                path=path,
+                key=key,
+                value=url,
+                message="External script asset bytes do not match the declared SRI hash.",
+            )
+        )
+        return
+    findings.append(
+        _finding(
+            code="script_integrity_verified",
+            severity="info",
+            path=path,
+            key=key,
+            value=url,
+            message="External script asset was downloaded and matched the declared SRI hash.",
+        )
+    )
 
 
 def _scan_string(value: str, path: str, key: str | None, findings: list[ScriptPolicyFinding]) -> None:
@@ -703,6 +801,39 @@ def _container_value_by_normalized_key(container: dict[str, Any], normalized_key
 def _valid_sri(value: str) -> bool:
     tokens = [token.strip() for token in value.split() if token.strip()]
     return bool(tokens) and all(SRI_PATTERN.match(token) for token in tokens)
+
+
+def _sri_matches_asset(integrity: str, asset_bytes: bytes) -> bool:
+    for token in [item.strip() for item in integrity.split() if item.strip()]:
+        if _sri_token_matches_asset(token, asset_bytes):
+            return True
+    return False
+
+
+def _sri_token_matches_asset(token: str, asset_bytes: bytes) -> bool:
+    algorithm, encoded_digest = token.split("-", 1)
+    padding = "=" * ((4 - len(encoded_digest) % 4) % 4)
+    try:
+        expected_digest = base64.b64decode(encoded_digest + padding, validate=True)
+    except Exception:
+        return False
+    actual_digest = hashlib.new(algorithm, asset_bytes).digest()
+    return hmac.compare_digest(actual_digest, expected_digest)
+
+
+def _default_external_script_fetcher(url: str) -> bytes:
+    request = Request(url, headers={"User-Agent": "Astra-content-script-verifier/1.0"})
+    opener = build_opener(_NoRedirectHandler)
+    with opener.open(request, timeout=EXTERNAL_SCRIPT_FETCH_TIMEOUT_SECONDS) as response:
+        payload = response.read(MAX_EXTERNAL_SCRIPT_BYTES + 1)
+    if len(payload) > MAX_EXTERNAL_SCRIPT_BYTES:
+        raise ValueError("external script asset exceeds maximum verification size")
+    return payload
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 def _preview(value: str | None) -> str | None:

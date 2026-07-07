@@ -1,3 +1,5 @@
+import base64
+import hashlib
 import json
 from urllib.parse import quote
 
@@ -10,6 +12,7 @@ from app.core.config import get_settings
 from app.db.session import get_session_factory
 from app.models import ContentDraft, ContentPageRecord, ContentPageVersion
 from app.models.base import utc_now
+from app.services import content_script_policy
 
 
 def _auth_header(token: str) -> dict:
@@ -578,17 +581,19 @@ def test_allowlisted_external_script_asset_requires_review_before_publish(client
     assert promote_second_admin.status_code == 200
     _, teacher_token = _register_and_login(client, "teacher_external_script_publish", "teacher")
     slug = "physics/external-script-publish"
+    asset_bytes = b"console.log('external script publish');\n"
     payload = _draft_payload(slug, title="External Script Asset", allow_script=True)
     props = payload["schema"]["sections"][0]["props"]
     props.update(
         {
             "scriptUrl": "https://cdn.example.test/tool.js",
-            "scriptIntegrity": "sha384-AbCdEf0123456789+/=",
+            "scriptIntegrity": _sri_sha384(asset_bytes),
             "scriptCrossorigin": "anonymous",
         }
     )
     props.pop("scriptPath", None)
     monkeypatch.setenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", "cdn.example.test")
+    monkeypatch.setattr(content_script_policy, "_default_external_script_fetcher", lambda url: asset_bytes)
     get_settings.cache_clear()
     try:
         create = client.post("/api/content/drafts", headers=_auth_header(teacher_token), json=payload)
@@ -611,6 +616,8 @@ def test_allowlisted_external_script_asset_requires_review_before_publish(client
             json={"status": "approved", "note": "External script host, SRI and crossorigin reviewed"},
         )
         assert approve.status_code == 200
+        approve_codes = {finding["code"] for finding in approve.json()["script_analysis"]["findings"]}
+        assert "script_integrity_verified" in approve_codes
 
         publish_after_review = client.post(
             f"/api/content/drafts/{draft_id}/publish",
@@ -632,6 +639,63 @@ def test_allowlisted_external_script_asset_requires_review_before_publish(client
         get_settings.cache_clear()
 
 
+def test_external_script_asset_publish_rechecks_current_sri_bytes(client, monkeypatch):
+    first_admin_token = _bootstrap_admin(client, username="admin_external_script_drift_first")
+    second_admin_id, second_admin_token = _register_and_login(client, "admin_external_script_drift_second", "teacher")
+    promote_second_admin = client.patch(
+        f"/api/admin/users/{second_admin_id}",
+        headers=_auth_header(first_admin_token),
+        json={"role": "admin"},
+    )
+    assert promote_second_admin.status_code == 200
+    _, teacher_token = _register_and_login(client, "teacher_external_script_drift", "teacher")
+    slug = "physics/external-script-drift"
+    asset_bytes = b"console.log('approved asset');\n"
+    payload = _draft_payload(slug, title="External Script Drift", allow_script=True)
+    props = payload["schema"]["sections"][0]["props"]
+    props.update(
+        {
+            "scriptUrl": "https://cdn.example.test/tool.js",
+            "scriptIntegrity": _sri_sha384(asset_bytes),
+            "scriptCrossorigin": "anonymous",
+        }
+    )
+    props.pop("scriptPath", None)
+    monkeypatch.setenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", "cdn.example.test")
+    monkeypatch.setattr(content_script_policy, "_default_external_script_fetcher", lambda url: asset_bytes)
+    get_settings.cache_clear()
+    try:
+        create = client.post("/api/content/drafts", headers=_auth_header(teacher_token), json=payload)
+        assert create.status_code == 201
+        draft_id = create.json()["id"]
+        _submit_draft(client, teacher_token, draft_id)
+
+        approve = client.patch(
+            f"/api/content/drafts/{draft_id}/script-review",
+            headers=_auth_header(second_admin_token),
+            json={"status": "approved", "note": "External script bytes verified"},
+        )
+        assert approve.status_code == 200
+        approve_codes = {finding["code"] for finding in approve.json()["script_analysis"]["findings"]}
+        assert "script_integrity_verified" in approve_codes
+
+        monkeypatch.setattr(
+            content_script_policy,
+            "_default_external_script_fetcher",
+            lambda url: b"console.log('changed asset');\n",
+        )
+        publish = client.post(
+            f"/api/content/drafts/{draft_id}/publish",
+            headers=_auth_header(first_admin_token),
+            json={"note": "publish changed external asset"},
+        )
+        assert publish.status_code == 409
+        assert publish.json()["detail"] == "Content draft script policy findings must be resolved before publishing"
+    finally:
+        monkeypatch.delenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", raising=False)
+        get_settings.cache_clear()
+
+
 def test_external_script_asset_policy_rechecks_current_allowlist_before_publish(client, monkeypatch):
     first_admin_token = _bootstrap_admin(client, username="admin_external_script_context_first")
     second_admin_id, second_admin_token = _register_and_login(client, "admin_external_script_context_second", "teacher")
@@ -643,17 +707,19 @@ def test_external_script_asset_policy_rechecks_current_allowlist_before_publish(
     assert promote_second_admin.status_code == 200
     _, teacher_token = _register_and_login(client, "teacher_external_script_context", "teacher")
     slug = "physics/external-script-context"
+    asset_bytes = b"console.log('external script context');\n"
     payload = _draft_payload(slug, title="External Script Context", allow_script=True)
     props = payload["schema"]["sections"][0]["props"]
     props.update(
         {
             "scriptUrl": "https://cdn.example.test/tool.js",
-            "scriptIntegrity": "sha384-AbCdEf0123456789+/=",
+            "scriptIntegrity": _sri_sha384(asset_bytes),
             "scriptCrossorigin": "anonymous",
         }
     )
     props.pop("scriptPath", None)
     monkeypatch.setenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", "cdn.example.test")
+    monkeypatch.setattr(content_script_policy, "_default_external_script_fetcher", lambda url: asset_bytes)
     get_settings.cache_clear()
     try:
         create = client.post("/api/content/drafts", headers=_auth_header(teacher_token), json=payload)
@@ -1245,3 +1311,7 @@ def _table_count(model) -> int:
     session_factory = get_session_factory(get_settings().database_url)
     with session_factory() as db:
         return int(db.scalar(select(func.count()).select_from(model)) or 0)
+
+
+def _sri_sha384(payload: bytes) -> str:
+    return "sha384-" + base64.b64encode(hashlib.sha384(payload).digest()).decode("ascii")
