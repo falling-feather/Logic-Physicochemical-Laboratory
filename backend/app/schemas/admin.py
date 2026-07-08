@@ -851,6 +851,72 @@ class AdminKnowledgeSnapshotRunAlertReport(BaseModel):
     candidates: list[AdminKnowledgeSnapshotRunAlertCandidate]
 
 
+AdminAlertOutboxStatus = Literal["pending_review", "planned", "queued", "suppressed", "cancelled"]
+
+
+class AdminKnowledgeSnapshotRunAlertOutboxRequest(BaseModel):
+    granularity: str | None = Field(default=None, max_length=16)
+    trigger_source: str | None = Field(default=None, max_length=32)
+    from_at: datetime | None = None
+    to_at: datetime | None = None
+    now_at: datetime | None = None
+    lease_expiring_seconds: int = Field(default=900, ge=0, le=24 * 60 * 60)
+    candidate_limit: int = Field(default=20, ge=0, le=100)
+    status: AdminAlertOutboxStatus = "pending_review"
+    confirm_observe_only: bool = False
+
+
+class AdminAlertOutboxEntryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    source_type: str
+    source_id: int | None = None
+    source_key: str
+    event_code: str
+    severity: str
+    action_hint: str
+    status: str
+    dispatch_mode: str
+    delivery_target: str
+    external_delivery: bool
+    dedupe_key: str
+    payload_hash: str
+    payload_json: dict[str, Any]
+    first_seen_at: datetime
+    last_seen_at: datetime
+    available_at: datetime | None = None
+    expires_at: datetime | None = None
+    seen_count: int
+    attempt_count: int
+    last_error_code: str | None = None
+    created_by_user_id: int | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminAlertOutboxPage(BaseModel):
+    items: list[AdminAlertOutboxEntryRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class AdminAlertOutboxWriteResponse(BaseModel):
+    generated_at: datetime
+    source_type: str
+    status: str
+    dispatch_mode: str
+    delivery_target: str
+    external_delivery: bool
+    candidate_count: int
+    created_count: int
+    refreshed_count: int
+    skipped_count: int
+    items: list[AdminAlertOutboxEntryRead]
+
+
 class AuditLogRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

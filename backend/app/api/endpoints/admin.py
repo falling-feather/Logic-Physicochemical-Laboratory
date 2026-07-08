@@ -16,6 +16,7 @@ from app.core.config import get_settings
 from app.core.security import hash_password, password_strength_errors
 from app.db.session import get_db
 from app.models import (
+    AdminAlertOutboxEntry,
     AuthSession,
     AuditLog,
     Assignment,
@@ -80,6 +81,7 @@ from app.schemas.admin import (
     AdminKnowledgeSnapshotRunHealthItem,
     AdminKnowledgeSnapshotRunAlertCandidate,
     AdminKnowledgeSnapshotRunAlertReport,
+    AdminKnowledgeSnapshotRunAlertOutboxRequest,
     AdminKnowledgeSnapshotRunPage,
     AdminKnowledgeSnapshotRunQueueItem,
     AdminKnowledgeSnapshotRunQueueReport,
@@ -98,6 +100,8 @@ from app.schemas.admin import (
     AdminUserPasswordResetResponse,
     AdminUserRead,
     AdminUserUpdate,
+    AdminAlertOutboxPage,
+    AdminAlertOutboxWriteResponse,
     AuditLogExport,
     AuditLogExportItem,
     AuditLogChainVerification,
@@ -117,6 +121,10 @@ from app.schemas.admin import (
     BugRecordUpdate,
 )
 from app.services.audit import record_audit_log
+from app.services.admin_alert_outbox import (
+    admin_alert_outbox_write_snapshot,
+    enqueue_knowledge_snapshot_alert_outbox,
+)
 from app.services.access_control import (
     require_class_teacher_or_admin_by_id,
     require_school_teacher_or_admin,
@@ -1585,6 +1593,86 @@ def read_knowledge_snapshot_run_alerts(
     return report
 
 
+@router.post("/knowledge-snapshot-runs/alerts/outbox", response_model=AdminAlertOutboxWriteResponse)
+def enqueue_knowledge_snapshot_run_alert_outbox(
+    request_body: AdminKnowledgeSnapshotRunAlertOutboxRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminAlertOutboxWriteResponse:
+    _require_admin(current_user)
+    if not request_body.confirm_observe_only:
+        raise HTTPException(status_code=422, detail="confirm_observe_only must be true")
+    if (
+        request_body.from_at is not None
+        and request_body.to_at is not None
+        and request_body.from_at > request_body.to_at
+    ):
+        raise HTTPException(status_code=422, detail="from_at must be earlier than to_at")
+    settings = get_settings()
+    generated_at = request_body.now_at or datetime.now(UTC)
+    statement = _knowledge_snapshot_run_statement(
+        granularity=request_body.granularity,
+        trigger_source=request_body.trigger_source,
+        from_at=request_body.from_at,
+        to_at=request_body.to_at,
+    )
+    filters = _knowledge_snapshot_run_filters(
+        granularity=request_body.granularity,
+        trigger_source=request_body.trigger_source,
+        from_at=request_body.from_at,
+        to_at=request_body.to_at,
+    )
+    filters["now"] = request_body.now_at.isoformat() if request_body.now_at is not None else None
+    health_report = _knowledge_snapshot_run_health_report(
+        db,
+        statement=statement,
+        filters=filters,
+        retry_attempts=settings.knowledge_snapshot_retry_attempts,
+        lease_seconds=settings.knowledge_snapshot_scheduler_lease_seconds,
+        lease_expiring_seconds=request_body.lease_expiring_seconds,
+        problem_limit=100,
+        generated_at=generated_at,
+    )
+    queue_report = _knowledge_snapshot_run_queue_report(
+        db,
+        statement=statement,
+        filters=filters,
+        schedule_config=_knowledge_snapshot_schedule_config(settings),
+        retry_attempts=settings.knowledge_snapshot_retry_attempts,
+        lease_seconds=settings.knowledge_snapshot_scheduler_lease_seconds,
+        item_limit=100,
+        generated_at=generated_at,
+    )
+    alert_report = _knowledge_snapshot_run_alert_report(
+        health_report=health_report,
+        queue_report=queue_report,
+        candidate_limit=request_body.candidate_limit,
+        generated_at=generated_at,
+        filters=filters,
+        lease_expiring_seconds=request_body.lease_expiring_seconds,
+    )
+    write_result = enqueue_knowledge_snapshot_alert_outbox(
+        db,
+        report=alert_report,
+        actor=current_user,
+        status=request_body.status,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.alert_outbox.knowledge_snapshot_run.enqueue",
+        resource_type="admin_alert_outbox",
+        event_result="success",
+        request=request,
+        snapshot=admin_alert_outbox_write_snapshot(write_result),
+    )
+    db.commit()
+    for entry in write_result.entries:
+        db.refresh(entry)
+    return _admin_alert_outbox_write_response(write_result)
+
+
 @router.post("/knowledge-snapshot-runs/{run_id}/cancel", response_model=AdminKnowledgeSnapshotRunRead)
 def cancel_admin_knowledge_snapshot_run(
     run_id: int,
@@ -1678,6 +1766,76 @@ def requeue_admin_knowledge_snapshot_run(
     db.commit()
     db.refresh(run)
     return _admin_knowledge_snapshot_run_read(run)
+
+
+@router.get("/alert-outbox", response_model=AdminAlertOutboxPage)
+def list_admin_alert_outbox(
+    request: Request,
+    source_type: str | None = Query(default=None, max_length=80),
+    status: str | None = Query(default=None, max_length=32),
+    severity: str | None = Query(default=None, max_length=24),
+    action_hint: str | None = Query(default=None, max_length=40),
+    event_code: str | None = Query(default=None, max_length=80),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminAlertOutboxPage:
+    _require_admin(current_user)
+    if from_at is not None and to_at is not None and from_at > to_at:
+        raise HTTPException(status_code=422, detail="from must be earlier than to")
+    statement = select(AdminAlertOutboxEntry)
+    filters = {
+        "source_type": source_type.strip() if source_type is not None and source_type.strip() else None,
+        "status": status.strip() if status is not None and status.strip() else None,
+        "severity": severity.strip() if severity is not None and severity.strip() else None,
+        "action_hint": action_hint.strip() if action_hint is not None and action_hint.strip() else None,
+        "event_code": event_code.strip() if event_code is not None and event_code.strip() else None,
+        "from": from_at,
+        "to": to_at,
+    }
+    if filters["source_type"] is not None:
+        statement = statement.where(AdminAlertOutboxEntry.source_type == filters["source_type"])
+    if filters["status"] is not None:
+        statement = statement.where(AdminAlertOutboxEntry.status == filters["status"])
+    if filters["severity"] is not None:
+        statement = statement.where(AdminAlertOutboxEntry.severity == filters["severity"])
+    if filters["action_hint"] is not None:
+        statement = statement.where(AdminAlertOutboxEntry.action_hint == filters["action_hint"])
+    if filters["event_code"] is not None:
+        statement = statement.where(AdminAlertOutboxEntry.event_code == filters["event_code"])
+    if from_at is not None:
+        statement = statement.where(AdminAlertOutboxEntry.last_seen_at >= from_at)
+    if to_at is not None:
+        statement = statement.where(AdminAlertOutboxEntry.last_seen_at <= to_at)
+    statement = statement.order_by(AdminAlertOutboxEntry.last_seen_at.desc(), AdminAlertOutboxEntry.id.desc())
+    total = _statement_count(db, statement)
+    items = list(db.scalars(statement.offset(offset).limit(limit)).all())
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.alert_outbox.list",
+        resource_type="admin_alert_outbox",
+        event_result="success",
+        request=request,
+        snapshot={
+            "format": "admin_alert_outbox_list",
+            "filters": {key: value for key, value in filters.items() if value is not None},
+            "total": total,
+            "item_count": len(items),
+            "external_delivery": False,
+        },
+    )
+    db.commit()
+    return AdminAlertOutboxPage(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        next_offset=_next_offset(total, offset, len(items)),
+    )
 
 
 @router.get("/audit-logs", response_model=AuditLogPage)
@@ -3651,6 +3809,22 @@ def _admin_content_script_asset_scan_alert_candidate(
         remote_asset_sha256=item.remote_asset_sha256,
         remote_asset_size_bytes=item.remote_asset_size_bytes,
         published_at=item.published_at,
+    )
+
+
+def _admin_alert_outbox_write_response(write_result: Any) -> AdminAlertOutboxWriteResponse:
+    return AdminAlertOutboxWriteResponse(
+        generated_at=write_result.generated_at,
+        source_type=write_result.source_type,
+        status=write_result.status,
+        dispatch_mode=write_result.dispatch_mode,
+        delivery_target=write_result.delivery_target,
+        external_delivery=write_result.external_delivery,
+        candidate_count=write_result.candidate_count,
+        created_count=write_result.created_count,
+        refreshed_count=write_result.refreshed_count,
+        skipped_count=write_result.skipped_count,
+        items=write_result.entries,
     )
 
 

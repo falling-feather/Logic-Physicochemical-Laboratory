@@ -1,4 +1,6 @@
-from sqlalchemy import JSON, ForeignKey, Integer, String, Text
+from datetime import datetime
+
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -42,3 +44,31 @@ class AuditLog(TimestampMixin, Base):
     prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     current_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     snapshot_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+
+
+class AdminAlertOutboxEntry(TimestampMixin, Base):
+    __tablename__ = "admin_alert_outbox_entries"
+    __table_args__ = (UniqueConstraint("dedupe_key", name="uq_admin_alert_outbox_entries_dedupe_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    source_type: Mapped[str] = mapped_column(String(80), index=True, nullable=False)
+    source_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
+    source_key: Mapped[str] = mapped_column(String(180), index=True, nullable=False)
+    event_code: Mapped[str] = mapped_column(String(80), index=True, nullable=False)
+    severity: Mapped[str] = mapped_column(String(24), index=True, nullable=False)
+    action_hint: Mapped[str] = mapped_column(String(40), index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="pending_review", index=True, nullable=False)
+    dispatch_mode: Mapped[str] = mapped_column(String(40), default="manual_review", nullable=False)
+    delivery_target: Mapped[str] = mapped_column(String(80), default="admin_outbox", nullable=False)
+    external_delivery: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    dedupe_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    available_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
+    seen_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)

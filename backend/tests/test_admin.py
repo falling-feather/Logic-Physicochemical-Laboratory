@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from app.core.config import get_settings
 from app.db.session import get_session_factory
 from app.models import (
+    AdminAlertOutboxEntry,
     AuditLog,
     AuthSession,
     ContentPageRecord,
@@ -1903,6 +1904,119 @@ def test_admin_can_read_knowledge_snapshot_run_alert_candidates(client):
     assert audit_snapshot["candidate_codes"]["stale_running"] >= 1
     assert "candidates" not in audit_snapshot
     assert "secret-" not in json.dumps(audit_snapshot, ensure_ascii=False)
+
+
+def test_admin_enqueues_knowledge_snapshot_alert_outbox_with_idempotent_redacted_payload(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "snapshot_outbox_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    now = datetime(2026, 7, 22, 9, 0, tzinfo=UTC)
+    with session_factory() as db:
+        db.add_all(
+            [
+                KnowledgeSnapshotRun(
+                    run_key="knowledge:outbox:pending",
+                    granularity="day",
+                    period_start=datetime(2026, 7, 20, tzinfo=UTC),
+                    period_end=datetime(2026, 7, 20, 23, 59, tzinfo=UTC),
+                    trigger_source="scheduler",
+                    status="pending",
+                    started_at=now - timedelta(hours=3),
+                    attempt_count=0,
+                    metadata_json={"requeue_reason": "secret-outbox-reason"},
+                ),
+                KnowledgeSnapshotRun(
+                    run_key="knowledge:outbox:stale",
+                    granularity="day",
+                    period_start=datetime(2026, 7, 19, tzinfo=UTC),
+                    period_end=datetime(2026, 7, 19, 23, 59, tzinfo=UTC),
+                    trigger_source="scheduler",
+                    status="running",
+                    started_at=now - timedelta(hours=5),
+                    scheduler_lease_owner="worker-outbox-secret-owner",
+                    scheduler_lease_token="secret-outbox-token",
+                    scheduler_lease_expires_at=now - timedelta(hours=2),
+                    scheduler_heartbeat_at=now - timedelta(hours=4),
+                    attempt_count=1,
+                    error_message="secret-outbox-exception",
+                    metadata_json={"trigger_source": "scheduler", "token": "secret-outbox-metadata"},
+                ),
+            ]
+        )
+        db.commit()
+
+    forbidden = client.post(
+        "/api/admin/knowledge-snapshot-runs/alerts/outbox",
+        headers=_auth_header(teacher_token),
+        json={"confirm_observe_only": True, "now_at": now.isoformat()},
+    )
+    assert forbidden.status_code == 403
+
+    missing_confirmation = client.post(
+        "/api/admin/knowledge-snapshot-runs/alerts/outbox",
+        headers=_auth_header(admin_token),
+        json={"now_at": now.isoformat()},
+    )
+    assert missing_confirmation.status_code == 422
+
+    response = client.post(
+        "/api/admin/knowledge-snapshot-runs/alerts/outbox",
+        headers={**_auth_header(admin_token), "X-Request-ID": "snapshot-outbox-enqueue"},
+        json={"confirm_observe_only": True, "now_at": now.isoformat(), "candidate_limit": 100},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source_type"] == "knowledge_snapshot_run_alert"
+    assert body["external_delivery"] is False
+    assert body["dispatch_mode"] == "manual_review"
+    assert body["delivery_target"] == "admin_outbox"
+    assert body["created_count"] >= 2
+    assert body["refreshed_count"] == 0
+    assert len(body["items"]) == body["created_count"]
+    serialized = json.dumps(body, ensure_ascii=False)
+    assert "scheduler_lease_token" not in serialized
+    assert "scheduler_lease_owner" not in serialized
+    assert "metadata_json" not in serialized
+    assert "secret-outbox" not in serialized
+    assert '"sent"' not in serialized
+
+    repeated = client.post(
+        "/api/admin/knowledge-snapshot-runs/alerts/outbox",
+        headers=_auth_header(admin_token),
+        json={"confirm_observe_only": True, "now_at": now.isoformat(), "candidate_limit": 100},
+    )
+    assert repeated.status_code == 200
+    repeated_body = repeated.json()
+    assert repeated_body["created_count"] == 0
+    assert repeated_body["refreshed_count"] == body["created_count"]
+    assert all(item["seen_count"] == 2 for item in repeated_body["items"])
+
+    outbox = client.get(
+        "/api/admin/alert-outbox?source_type=knowledge_snapshot_run_alert&status=pending_review",
+        headers=_auth_header(admin_token),
+    )
+    assert outbox.status_code == 200
+    outbox_body = outbox.json()
+    assert outbox_body["total"] == body["created_count"]
+    assert all(item["external_delivery"] is False for item in outbox_body["items"])
+
+    with session_factory() as db:
+        assert db.scalar(select(func.count()).select_from(AdminAlertOutboxEntry)) == body["created_count"]
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.knowledge_snapshot_run.enqueue"
+        "&resource_type=admin_alert_outbox&request_id=snapshot-outbox-enqueue",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    audit_snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert audit_snapshot["format"] == "admin_alert_outbox_write"
+    assert audit_snapshot["source_type"] == "knowledge_snapshot_run_alert"
+    assert audit_snapshot["external_delivery"] is False
+    assert audit_snapshot["created_count"] == body["created_count"]
+    assert "entries" not in audit_snapshot
+    assert "payload_json" not in audit_snapshot
+    assert "secret-outbox" not in json.dumps(audit_snapshot, ensure_ascii=False)
 
 
 def test_admin_can_requeue_knowledge_snapshot_runs(client):
