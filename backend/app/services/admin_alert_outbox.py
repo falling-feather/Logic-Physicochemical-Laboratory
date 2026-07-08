@@ -92,7 +92,7 @@ def enqueue_knowledge_snapshot_alert_outbox(
         existing.last_seen_at = generated_at
         existing.available_at = existing.available_at or generated_at
         existing.seen_count += 1
-        if existing.status in {"planned", "queued", ALERT_OUTBOX_STATUS_PENDING_REVIEW}:
+        if existing.status == ALERT_OUTBOX_STATUS_PENDING_REVIEW:
             existing.status = status
         entries.append(existing)
         refreshed_count += 1
@@ -178,7 +178,7 @@ def enqueue_content_script_remote_drift_alert_outbox(
         existing.last_seen_at = generated_at
         existing.available_at = existing.available_at or generated_at
         existing.seen_count += 1
-        if existing.status in {"planned", "queued", ALERT_OUTBOX_STATUS_PENDING_REVIEW}:
+        if existing.status == ALERT_OUTBOX_STATUS_PENDING_REVIEW:
             existing.status = status
         entries.append(existing)
         refreshed_count += 1

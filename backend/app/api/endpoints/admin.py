@@ -101,7 +101,9 @@ from app.schemas.admin import (
     AdminUserPasswordResetResponse,
     AdminUserRead,
     AdminUserUpdate,
+    AdminAlertOutboxEntryRead,
     AdminAlertOutboxPage,
+    AdminAlertOutboxReviewRequest,
     AdminAlertOutboxWriteResponse,
     AuditLogExport,
     AuditLogExportItem,
@@ -1878,6 +1880,60 @@ def list_admin_alert_outbox(
         offset=offset,
         next_offset=_next_offset(total, offset, len(items)),
     )
+
+
+@router.patch("/alert-outbox/{entry_id}", response_model=AdminAlertOutboxEntryRead)
+def review_admin_alert_outbox_entry(
+    entry_id: int,
+    request_body: AdminAlertOutboxReviewRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminAlertOutboxEntryRead:
+    _require_admin(current_user)
+    if not request_body.confirm_manual_review:
+        raise HTTPException(status_code=422, detail="confirm_manual_review must be true")
+    entry = db.get(AdminAlertOutboxEntry, entry_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Alert outbox entry not found")
+    previous_status = entry.status
+    reviewed_at = datetime.now(UTC)
+    note = request_body.note.strip() if request_body.note is not None and request_body.note.strip() else None
+    entry.status = request_body.status
+    entry.reviewed_by_user_id = current_user.id
+    entry.reviewed_at = reviewed_at
+    entry.review_note = note
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.alert_outbox.review",
+        resource_type="admin_alert_outbox",
+        resource_id=str(entry.id),
+        event_result="success",
+        request=request,
+        snapshot={
+            "format": "admin_alert_outbox_review",
+            "entry_id": entry.id,
+            "source_type": entry.source_type,
+            "source_id": entry.source_id,
+            "source_key": entry.source_key,
+            "event_code": entry.event_code,
+            "severity": entry.severity,
+            "action_hint": entry.action_hint,
+            "previous_status": previous_status,
+            "status": entry.status,
+            "dispatch_mode": entry.dispatch_mode,
+            "delivery_target": entry.delivery_target,
+            "external_delivery": entry.external_delivery,
+            "reviewed_by_user_id": current_user.id,
+            "reviewed_at": reviewed_at.isoformat(),
+            "note_provided": note is not None,
+            "automatic_actions": False,
+        },
+    )
+    db.commit()
+    db.refresh(entry)
+    return entry
 
 
 @router.get("/audit-logs", response_model=AuditLogPage)

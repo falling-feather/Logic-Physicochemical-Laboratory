@@ -876,6 +876,12 @@ class AdminKnowledgeSnapshotRunAlertOutboxRequest(BaseModel):
     confirm_observe_only: bool = False
 
 
+class AdminAlertOutboxReviewRequest(BaseModel):
+    status: AdminAlertOutboxStatus
+    note: str | None = Field(default=None, max_length=500)
+    confirm_manual_review: bool = False
+
+
 class AdminAlertOutboxEntryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -901,6 +907,9 @@ class AdminAlertOutboxEntryRead(BaseModel):
     attempt_count: int
     last_error_code: str | None = None
     created_by_user_id: int | None = None
+    reviewed_by_user_id: int | None = None
+    reviewed_at: datetime | None = None
+    review_note: str | None = None
     created_at: datetime
     updated_at: datetime
 

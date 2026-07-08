@@ -1999,6 +1999,73 @@ def test_admin_enqueues_knowledge_snapshot_alert_outbox_with_idempotent_redacted
     outbox_body = outbox.json()
     assert outbox_body["total"] == body["created_count"]
     assert all(item["external_delivery"] is False for item in outbox_body["items"])
+    reviewed_entry_id = outbox_body["items"][0]["id"]
+
+    forbidden_review = client.patch(
+        f"/api/admin/alert-outbox/{reviewed_entry_id}",
+        headers=_auth_header(teacher_token),
+        json={"status": "suppressed", "confirm_manual_review": True},
+    )
+    assert forbidden_review.status_code == 403
+
+    missing_review_confirmation = client.patch(
+        f"/api/admin/alert-outbox/{reviewed_entry_id}",
+        headers=_auth_header(admin_token),
+        json={"status": "suppressed"},
+    )
+    assert missing_review_confirmation.status_code == 422
+
+    missing_review_entry = client.patch(
+        "/api/admin/alert-outbox/999999",
+        headers=_auth_header(admin_token),
+        json={"status": "suppressed", "confirm_manual_review": True},
+    )
+    assert missing_review_entry.status_code == 404
+
+    invalid_review_status = client.patch(
+        f"/api/admin/alert-outbox/{reviewed_entry_id}",
+        headers=_auth_header(admin_token),
+        json={"status": "sent", "confirm_manual_review": True},
+    )
+    assert invalid_review_status.status_code == 422
+
+    reviewed = client.patch(
+        f"/api/admin/alert-outbox/{reviewed_entry_id}",
+        headers={**_auth_header(admin_token), "X-Request-ID": "snapshot-outbox-review"},
+        json={
+            "status": "suppressed",
+            "note": "manual review secret-review-note",
+            "confirm_manual_review": True,
+        },
+    )
+    assert reviewed.status_code == 200
+    reviewed_body = reviewed.json()
+    assert reviewed_body["status"] == "suppressed"
+    assert reviewed_body["reviewed_by_user_id"] is not None
+    assert reviewed_body["reviewed_at"] is not None
+    assert reviewed_body["review_note"] == "manual review secret-review-note"
+    assert reviewed_body["external_delivery"] is False
+
+    suppressed_outbox = client.get(
+        "/api/admin/alert-outbox?source_type=knowledge_snapshot_run_alert&status=suppressed",
+        headers=_auth_header(admin_token),
+    )
+    assert suppressed_outbox.status_code == 200
+    suppressed_body = suppressed_outbox.json()
+    assert suppressed_body["total"] == 1
+    assert suppressed_body["items"][0]["id"] == reviewed_entry_id
+
+    repeated_after_review = client.post(
+        "/api/admin/knowledge-snapshot-runs/alerts/outbox",
+        headers=_auth_header(admin_token),
+        json={"confirm_observe_only": True, "now_at": now.isoformat(), "candidate_limit": 100},
+    )
+    assert repeated_after_review.status_code == 200
+    reviewed_after_reenqueue = next(
+        item for item in repeated_after_review.json()["items"] if item["id"] == reviewed_entry_id
+    )
+    assert reviewed_after_reenqueue["status"] == "suppressed"
+    assert reviewed_after_reenqueue["seen_count"] == 3
 
     with session_factory() as db:
         assert db.scalar(select(func.count()).select_from(AdminAlertOutboxEntry)) == body["created_count"]
@@ -2017,6 +2084,28 @@ def test_admin_enqueues_knowledge_snapshot_alert_outbox_with_idempotent_redacted
     assert "entries" not in audit_snapshot
     assert "payload_json" not in audit_snapshot
     assert "secret-outbox" not in json.dumps(audit_snapshot, ensure_ascii=False)
+
+    review_audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.review"
+        "&resource_type=admin_alert_outbox&request_id=snapshot-outbox-review",
+        headers=_auth_header(admin_token),
+    )
+    assert review_audit.status_code == 200
+    assert review_audit.json()["total"] == 1
+    review_snapshot = review_audit.json()["items"][0]["snapshot_json"]
+    assert review_snapshot["format"] == "admin_alert_outbox_review"
+    assert review_snapshot["entry_id"] == reviewed_entry_id
+    assert review_snapshot["source_type"] == "knowledge_snapshot_run_alert"
+    assert review_snapshot["previous_status"] == "pending_review"
+    assert review_snapshot["status"] == "suppressed"
+    assert review_snapshot["external_delivery"] is False
+    assert review_snapshot["automatic_actions"] is False
+    assert review_snapshot["note_provided"] is True
+    review_snapshot_text = json.dumps(review_snapshot, ensure_ascii=False)
+    assert "payload_json" not in review_snapshot
+    assert "secret-review-note" not in review_snapshot_text
+    assert "secret-outbox" not in review_snapshot_text
+    assert "scheduler_lease_token" not in review_snapshot_text
 
 
 def test_admin_can_requeue_knowledge_snapshot_runs(client):
@@ -3291,6 +3380,24 @@ def test_admin_scans_content_script_asset_remote_drift_with_redaction(client, mo
     listed_outbox_body = listed_outbox.json()
     assert listed_outbox_body["total"] == alerts_body["candidate_count"]
     assert all(item["external_delivery"] is False for item in listed_outbox_body["items"])
+    content_outbox_entry_id = listed_outbox_body["items"][0]["id"]
+
+    reviewed_content_outbox = client.patch(
+        f"/api/admin/alert-outbox/{content_outbox_entry_id}",
+        headers={**_auth_header(admin_token), "X-Request-ID": "remote-drift-outbox-review"},
+        json={
+            "status": "planned",
+            "note": "reviewed content script drift secret-drift-review",
+            "confirm_manual_review": True,
+        },
+    )
+    assert reviewed_content_outbox.status_code == 200
+    reviewed_content_body = reviewed_content_outbox.json()
+    assert reviewed_content_body["status"] == "planned"
+    assert reviewed_content_body["source_type"] == "content_script_asset_scan_run_alert"
+    assert reviewed_content_body["reviewed_at"] is not None
+    assert reviewed_content_body["review_note"] == "reviewed content script drift secret-drift-review"
+    assert reviewed_content_body["external_delivery"] is False
 
     with session_factory() as db:
         assert (
@@ -3388,6 +3495,26 @@ def test_admin_scans_content_script_asset_remote_drift_with_redaction(client, mo
     assert "integrity" not in outbox_audit_text
     assert "content_bytes" not in outbox_audit_text
     assert "secret-drift-token" not in outbox_audit_text
+
+    content_review_audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.review"
+        "&resource_type=admin_alert_outbox&request_id=remote-drift-outbox-review",
+        headers=_auth_header(admin_token),
+    )
+    assert content_review_audit.status_code == 200
+    assert content_review_audit.json()["total"] == 1
+    content_review_snapshot = content_review_audit.json()["items"][0]["snapshot_json"]
+    assert content_review_snapshot["format"] == "admin_alert_outbox_review"
+    assert content_review_snapshot["source_type"] == "content_script_asset_scan_run_alert"
+    assert content_review_snapshot["previous_status"] == "pending_review"
+    assert content_review_snapshot["status"] == "planned"
+    assert content_review_snapshot["external_delivery"] is False
+    assert content_review_snapshot["automatic_actions"] is False
+    content_review_text = json.dumps(content_review_snapshot, ensure_ascii=False)
+    assert "payload_json" not in content_review_snapshot
+    assert "secret-drift-review" not in content_review_text
+    assert "secret-drift-token" not in content_review_text
+    assert '"source_url"' not in content_review_text
 
     def fake_large_fetch(url: str) -> bytes:
         assert url == "https://cdn-remote.example.test/ok.js"

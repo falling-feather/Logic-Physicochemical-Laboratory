@@ -72,3 +72,6 @@ class AdminAlertOutboxEntry(TimestampMixin, Base):
     attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
     created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+    reviewed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
