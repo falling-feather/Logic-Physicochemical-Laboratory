@@ -305,7 +305,7 @@ cd backend
 python -m scripts.deploy_preflight --require-mysql
 ```
 
-预检会检查 `ASTRA_DATABASE_URL` 可连通，并确认数据库 Alembic 当前 revision 已到 head；失败时返回非零退出码和 JSON 报告。正式部署应先执行 `python -m alembic upgrade head`，再执行预检。生产环境建议追加 `--require-mysql`，此时预检会要求当前连接为 MySQL，并报告 `dialect`、`driver`、数据库/连接字符集、排序规则和 `time_zone`；若数据库或连接字符集不是 `utf8mb4`，或排序规则不是 `utf8mb4_` 前缀，会返回非零退出码。
+预检会检查 `ASTRA_DATABASE_URL` 可连通，并确认数据库 Alembic 当前 revision 已到 head；失败时返回非零退出码和 JSON 报告。正式部署应先执行 `python -m alembic upgrade head`，再执行预检。生产环境建议追加 `--require-mysql`，此时预检会要求当前连接为 MySQL、`ASTRA_AUTO_CREATE_TABLES=false`，并报告 `configuration.auto_create_tables`、`dialect`、`driver`、数据库/连接字符集、排序规则、`time_zone`、`system_time_zone`、`server_version`、`sql_mode`、`max_connections`、当前库和当前用户；若仍开启自动建表、数据库或连接字符集不是 `utf8mb4`，或排序规则不是 `utf8mb4_` 前缀，会返回非零退出码。时区、`sql_mode` 与连接数当前只报告不强制，真实 MySQL 试运行报告需记录异常值和处置状态。
 
 部署 smoke：
 
@@ -314,7 +314,7 @@ cd backend
 python -m scripts.deploy_smoke --require-mysql
 ```
 
-smoke 会复用部署预检，再检查当前模型期望表是否全部存在，并用同一配置启动 FastAPI TestClient 访问 `/api/health`。脚本运行时会临时关闭自动建表、知识快照调度器和内容脚本远端漂移调度器，只验证迁移后的现有状态。`--require-mysql` 用作生产门禁：会把 MySQL 方言、`utf8mb4` 字符集/排序规则检查传递给预检层，并继续在 schema 层阻断非 MySQL 方言；本地或 CI 需要覆盖临时库时可追加 `--database-url` 且不传 `--require-mysql`。
+smoke 会复用部署预检，再检查当前模型期望表是否全部存在、关键模型列是否缺失，并用同一配置启动 FastAPI TestClient 访问 `/api/health`。脚本运行时会临时关闭自动建表、知识快照调度器和内容脚本远端漂移调度器，只验证迁移后的现有状态。`--require-mysql` 用作生产门禁：会把 MySQL 方言、`utf8mb4` 字符集/排序规则检查传递给预检层，并继续在 schema 层阻断非 MySQL 方言；本地或 CI 需要覆盖临时库时可追加 `--database-url` 且不传 `--require-mysql`。
 
 正式内容初始化：
 

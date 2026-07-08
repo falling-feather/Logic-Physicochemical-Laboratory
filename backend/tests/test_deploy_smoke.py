@@ -4,10 +4,11 @@ from uuid import uuid4
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import text
+from sqlalchemy import Column, Integer, MetaData, String, Table, text
 
 from app.core.config import get_settings
 from app.db.session import make_engine, reset_database_state
+import scripts.deploy_smoke as deploy_smoke
 from scripts.deploy_smoke import run_smoke
 
 
@@ -20,6 +21,8 @@ def test_deploy_smoke_reports_ready_database_and_api(monkeypatch):
 
         assert report["ok"] is True
         assert report["preflight"]["ok"] is True
+        assert report["preflight"]["configuration"]["status"] == "ready"
+        assert report["preflight"]["configuration"]["auto_create_tables"] is False
         assert report["preflight"]["compatibility"]["status"] == "skipped_non_mysql"
         assert report["schema"]["status"] == "ready"
         assert report["schema"]["dialect"] == "sqlite"
@@ -44,6 +47,8 @@ def test_deploy_smoke_can_require_mysql(monkeypatch):
 
         assert report["ok"] is False
         assert report["preflight"]["ok"] is False
+        assert report["preflight"]["configuration"]["status"] == "ready"
+        assert report["preflight"]["configuration"]["auto_create_tables"] is False
         assert report["preflight"]["compatibility"]["status"] == "unexpected_dialect"
         assert report["preflight"]["compatibility"]["dialect"] == "sqlite"
         assert report["schema"]["status"] == "unexpected_dialect"
@@ -67,6 +72,8 @@ def test_deploy_smoke_disables_mutating_runtime_defaults(monkeypatch):
         report = run_smoke(database_url=database_url, backend_root=backend_root)
 
         assert report["ok"] is True
+        assert report["preflight"]["configuration"]["status"] == "ready"
+        assert report["preflight"]["configuration"]["auto_create_tables"] is False
         assert _table_count(database_url, "content_pages") == 0
         assert os.environ["ASTRA_AUTO_CREATE_TABLES"] == "true"
         assert os.environ["ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_ENABLED"] == "true"
@@ -75,6 +82,23 @@ def test_deploy_smoke_disables_mutating_runtime_defaults(monkeypatch):
         assert os.environ["ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_RUN_ON_START"] == "true"
     finally:
         _dispose_and_remove(database_url, database_path)
+
+
+def test_deploy_smoke_schema_report_detects_missing_columns(monkeypatch):
+    metadata = MetaData()
+    Table("users", metadata, Column("id", Integer), Column("username", String))
+    fake_base = type("FakeBase", (), {"metadata": metadata})
+    monkeypatch.setattr(deploy_smoke, "Base", fake_base)
+    monkeypatch.setattr(deploy_smoke, "make_engine", lambda database_url: _FakeSchemaEngine())
+    monkeypatch.setattr(deploy_smoke, "inspect", lambda engine: _FakeSchemaInspector())
+
+    report = deploy_smoke._schema_report("sqlite+pysqlite:///:memory:", require_mysql=False)
+
+    assert report["ok"] is False
+    assert report["status"] == "missing_columns"
+    assert report["missing_tables"] == []
+    assert report["checked_column_tables"] == 1
+    assert report["missing_columns"] == {"users": ["username"]}
 
 
 def _migrated_sqlite_database(monkeypatch, backend_root: Path) -> Path:
@@ -108,3 +132,25 @@ def _dispose_and_remove(database_url: str, database_path: Path) -> None:
     reset_database_state()
     if database_path.exists():
         database_path.unlink()
+
+
+class _FakeSchemaDialect:
+    name = "sqlite"
+    driver = "pysqlite"
+
+
+class _FakeSchemaEngine:
+    dialect = _FakeSchemaDialect()
+
+    def dispose(self) -> None:
+        pass
+
+
+class _FakeSchemaInspector:
+    def get_table_names(self) -> list[str]:
+        return ["alembic_version", "users"]
+
+    def get_columns(self, table_name: str) -> list[dict[str, str]]:
+        if table_name == "users":
+            return [{"name": "id"}]
+        return [{"name": "version_num"}]

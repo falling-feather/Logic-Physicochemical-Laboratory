@@ -31,6 +31,10 @@ def test_deploy_preflight_reports_migrated_database(monkeypatch):
         report = run_preflight(database_url=database_url, backend_root=backend_root)
 
         assert report["ok"] is True
+        assert report["configuration"]["ok"] is True
+        assert report["configuration"]["status"] == "ready"
+        assert report["configuration"]["auto_create_tables"] is False
+        assert report["configuration"]["expected_auto_create_tables"] is False
         assert report["database"]["ok"] is True
         assert report["migrations"]["status"] == "up_to_date"
         assert report["migrations"]["current"] == report["migrations"]["heads"]
@@ -64,6 +68,10 @@ def test_deploy_preflight_can_require_mysql(monkeypatch):
         report = run_preflight(database_url=database_url, backend_root=backend_root, require_mysql=True)
 
         assert report["ok"] is False
+        assert report["configuration"]["ok"] is True
+        assert report["configuration"]["status"] == "ready"
+        assert report["configuration"]["auto_create_tables"] is False
+        assert report["configuration"]["require_mysql"] is True
         assert report["database"]["ok"] is True
         assert report["migrations"]["status"] == "up_to_date"
         assert report["compatibility"]["ok"] is False
@@ -78,6 +86,42 @@ def test_deploy_preflight_can_require_mysql(monkeypatch):
             database_path.unlink()
 
 
+def test_deploy_preflight_allows_development_auto_create_without_mysql_requirement(monkeypatch):
+    monkeypatch.setenv("ASTRA_AUTO_CREATE_TABLES", "true")
+    get_settings.cache_clear()
+
+    report = deploy_preflight._configuration_report(get_settings(), require_mysql=False)
+
+    assert report["ok"] is True
+    assert report["status"] == "allowed_development_auto_create"
+    assert report["auto_create_tables"] is True
+    assert report["expected_auto_create_tables"] is False
+
+
+def test_deploy_preflight_require_mysql_rejects_auto_create_tables(monkeypatch):
+    monkeypatch.setenv("ASTRA_AUTO_CREATE_TABLES", "true")
+    get_settings.cache_clear()
+
+    report = deploy_preflight._configuration_report(get_settings(), require_mysql=True)
+
+    assert report["ok"] is False
+    assert report["status"] == "auto_create_tables_enabled"
+    assert report["auto_create_tables"] is True
+    assert report["expected_auto_create_tables"] is False
+
+
+def test_deploy_preflight_require_mysql_accepts_disabled_auto_create(monkeypatch):
+    monkeypatch.setenv("ASTRA_AUTO_CREATE_TABLES", "false")
+    get_settings.cache_clear()
+
+    report = deploy_preflight._configuration_report(get_settings(), require_mysql=True)
+
+    assert report["ok"] is True
+    assert report["status"] == "ready"
+    assert report["auto_create_tables"] is False
+    assert report["expected_auto_create_tables"] is False
+
+
 def test_deploy_preflight_mysql_compatibility_accepts_utf8mb4(monkeypatch):
     report = _mysql_compatibility_report(
         monkeypatch,
@@ -87,6 +131,13 @@ def test_deploy_preflight_mysql_compatibility_accepts_utf8mb4(monkeypatch):
             "character_set_connection": "utf8mb4",
             "collation_connection": "utf8mb4_unicode_ci",
             "time_zone": "+00:00",
+            "system_time_zone": "UTC",
+            "server_version": "8.0.36",
+            "server_version_comment": "MySQL Community Server",
+            "sql_mode": "STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION",
+            "max_connections": "151",
+            "database_name": "astra_staging",
+            "current_user": "astra@localhost",
         },
     )
 
@@ -96,6 +147,17 @@ def test_deploy_preflight_mysql_compatibility_accepts_utf8mb4(monkeypatch):
     assert report["driver"] == "pymysql"
     assert report["expected_character_set"] == "utf8mb4"
     assert report["expected_collation_prefix"] == "utf8mb4_"
+    assert report["time_zone"] == "+00:00"
+    assert report["system_time_zone"] == "UTC"
+    assert report["server_version"] == "8.0.36"
+    assert report["server_version_comment"] == "MySQL Community Server"
+    assert report["sql_mode"] == "STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION"
+    assert report["max_connections"] == 151
+    assert report["database_name"] == "astra_staging"
+    assert report["current_user"] == "astra@localhost"
+    assert report["time_zone_policy"] == "reported_only"
+    assert report["max_connections_policy"] == "reported_only"
+    assert report["sql_mode_policy"] == "reported_only"
 
 
 def test_deploy_preflight_mysql_compatibility_rejects_charset_mismatch(monkeypatch):

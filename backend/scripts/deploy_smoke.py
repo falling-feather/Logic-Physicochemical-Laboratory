@@ -85,6 +85,10 @@ def _restore_env(previous_env: dict[str, str | None]) -> None:
 
 def _schema_report(database_url: str, *, require_mysql: bool) -> dict[str, Any]:
     expected_tables = sorted({table.name for table in Base.metadata.sorted_tables} | {"alembic_version"})
+    expected_columns = {
+        table.name: sorted(column.name for column in table.columns)
+        for table in Base.metadata.sorted_tables
+    }
     engine = None
     try:
         engine = make_engine(database_url)
@@ -92,6 +96,16 @@ def _schema_report(database_url: str, *, require_mysql: bool) -> dict[str, Any]:
         actual_tables = sorted(inspector.get_table_names())
         missing_tables = sorted(set(expected_tables).difference(actual_tables))
         extra_tables = sorted(set(actual_tables).difference(expected_tables))
+        missing_columns: dict[str, list[str]] = {}
+        checked_column_tables = 0
+        for table_name, table_columns in expected_columns.items():
+            if table_name in missing_tables:
+                continue
+            checked_column_tables += 1
+            actual_columns = {column["name"] for column in inspector.get_columns(table_name)}
+            missing = sorted(set(table_columns).difference(actual_columns))
+            if missing:
+                missing_columns[table_name] = missing
         dialect = engine.dialect.name
         driver = engine.dialect.driver
     except SQLAlchemyError as exc:
@@ -102,6 +116,8 @@ def _schema_report(database_url: str, *, require_mysql: bool) -> dict[str, Any]:
             "actual_tables": [],
             "missing_tables": expected_tables,
             "extra_tables": [],
+            "checked_column_tables": 0,
+            "missing_columns": {},
             "error": exc.__class__.__name__,
         }
     finally:
@@ -110,13 +126,16 @@ def _schema_report(database_url: str, *, require_mysql: bool) -> dict[str, Any]:
 
     dialect_ok = not require_mysql or dialect == "mysql"
     tables_ok = not missing_tables
+    columns_ok = not missing_columns
     status = "ready"
     if not dialect_ok:
         status = "unexpected_dialect"
     elif not tables_ok:
         status = "missing_tables"
+    elif not columns_ok:
+        status = "missing_columns"
     return {
-        "ok": dialect_ok and tables_ok,
+        "ok": dialect_ok and tables_ok and columns_ok,
         "status": status,
         "dialect": dialect,
         "driver": driver,
@@ -125,6 +144,8 @@ def _schema_report(database_url: str, *, require_mysql: bool) -> dict[str, Any]:
         "actual_tables": actual_tables,
         "missing_tables": missing_tables,
         "extra_tables": extra_tables,
+        "checked_column_tables": checked_column_tables,
+        "missing_columns": missing_columns,
     }
 
 

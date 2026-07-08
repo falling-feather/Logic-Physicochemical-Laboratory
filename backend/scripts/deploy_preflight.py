@@ -28,6 +28,7 @@ def run_preflight(
     root = backend_root or BACKEND_ROOT
     settings = get_settings()
     url = database_url or settings.database_url
+    configuration = _configuration_report(settings, require_mysql=require_mysql)
     database = check_database(url)
     migrations = _migration_report(url, root) if database["ok"] else _skipped_migration_report()
     compatibility = (
@@ -36,10 +37,33 @@ def run_preflight(
         else _skipped_compatibility_report(require_mysql)
     )
     return {
-        "ok": bool(database["ok"] and migrations["ok"] and compatibility["ok"]),
+        "ok": bool(configuration["ok"] and database["ok"] and migrations["ok"] and compatibility["ok"]),
+        "configuration": configuration,
         "database": database,
         "migrations": migrations,
         "compatibility": compatibility,
+    }
+
+
+def _configuration_report(settings: Any, *, require_mysql: bool) -> dict[str, Any]:
+    auto_create_tables = bool(settings.auto_create_tables)
+    if require_mysql and auto_create_tables:
+        status = "auto_create_tables_enabled"
+        ok = False
+    elif auto_create_tables:
+        status = "allowed_development_auto_create"
+        ok = True
+    else:
+        status = "ready"
+        ok = True
+    return {
+        "ok": ok,
+        "status": status,
+        "require_mysql": require_mysql,
+        "environment": settings.environment,
+        "auto_create_tables": auto_create_tables,
+        "expected_auto_create_tables": False,
+        "auto_create_tables_policy": "must_be_false_when_require_mysql",
     }
 
 
@@ -66,7 +90,14 @@ def _database_compatibility_report(database_url: str, *, require_mysql: bool) ->
                         @@collation_database AS collation_database,
                         @@character_set_connection AS character_set_connection,
                         @@collation_connection AS collation_connection,
-                        @@time_zone AS time_zone
+                        @@time_zone AS time_zone,
+                        @@system_time_zone AS system_time_zone,
+                        @@version AS server_version,
+                        @@version_comment AS server_version_comment,
+                        @@sql_mode AS sql_mode,
+                        @@max_connections AS max_connections,
+                        DATABASE() AS database_name,
+                        CURRENT_USER() AS current_user
                     """
                 )
             ).mappings().one()
@@ -81,10 +112,10 @@ def _database_compatibility_report(database_url: str, *, require_mysql: bool) ->
         if engine is not None:
             engine.dispose()
 
-    charset_database = str(variables["character_set_database"] or "").lower()
-    charset_connection = str(variables["character_set_connection"] or "").lower()
-    collation_database = str(variables["collation_database"] or "").lower()
-    collation_connection = str(variables["collation_connection"] or "").lower()
+    charset_database = _variable_text(variables, "character_set_database").lower()
+    charset_connection = _variable_text(variables, "character_set_connection").lower()
+    collation_database = _variable_text(variables, "collation_database").lower()
+    collation_connection = _variable_text(variables, "collation_connection").lower()
     charset_ok = charset_database == "utf8mb4" and charset_connection == "utf8mb4"
     collation_ok = collation_database.startswith("utf8mb4_") and collation_connection.startswith("utf8mb4_")
     ok = charset_ok and collation_ok
@@ -98,10 +129,40 @@ def _database_compatibility_report(database_url: str, *, require_mysql: bool) ->
         "collation_database": collation_database,
         "character_set_connection": charset_connection,
         "collation_connection": collation_connection,
-        "time_zone": variables["time_zone"],
+        "time_zone": _variable_text(variables, "time_zone"),
+        "system_time_zone": _variable_text(variables, "system_time_zone"),
+        "server_version": _variable_text(variables, "server_version"),
+        "server_version_comment": _variable_text(variables, "server_version_comment"),
+        "sql_mode": _variable_text(variables, "sql_mode"),
+        "max_connections": _variable_int(variables, "max_connections"),
+        "database_name": _variable_text(variables, "database_name"),
+        "current_user": _variable_text(variables, "current_user"),
         "expected_character_set": "utf8mb4",
         "expected_collation_prefix": "utf8mb4_",
+        "time_zone_policy": "reported_only",
+        "max_connections_policy": "reported_only",
+        "sql_mode_policy": "reported_only",
     }
+
+
+def _variable_text(variables: Any, key: str) -> str:
+    try:
+        value = variables[key]
+    except KeyError:
+        return ""
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _variable_int(variables: Any, key: str) -> int | None:
+    value = _variable_text(variables, key)
+    if not value:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
 
 
 def _migration_report(database_url: str, backend_root: Path) -> dict[str, Any]:
