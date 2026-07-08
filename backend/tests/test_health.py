@@ -12,6 +12,16 @@ def test_health_reports_sqlite_test_database(client):
     assert payload["database"]["status"] == "connected"
 
 
+def test_health_generates_request_id_when_header_missing(client):
+    response = client.get("/api/health")
+
+    assert response.status_code == 200
+    request_id = response.headers["X-Request-ID"]
+    assert request_id
+    assert len(request_id) <= 64
+    assert response.headers["Cache-Control"] == "no-store"
+
+
 def test_cors_allows_local_preview_origin(client):
     response = client.options(
         "/api/render/page/physics/energy-conservation",

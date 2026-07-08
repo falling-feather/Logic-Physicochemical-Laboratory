@@ -316,6 +316,21 @@ python -m scripts.deploy_smoke --require-mysql
 
 smoke 会复用部署预检，再检查当前模型期望表是否全部存在、关键模型列是否缺失，并用同一配置启动 FastAPI TestClient 访问 `/api/health`。脚本运行时会临时关闭自动建表、知识快照调度器和内容脚本远端漂移调度器，只验证迁移后的现有状态。`--require-mysql` 用作生产门禁：会把 MySQL 方言、`utf8mb4` 字符集/排序规则检查传递给预检层，并继续在 schema 层阻断非 MySQL 方言；本地或 CI 需要覆盖临时库时可追加 `--database-url` 且不传 `--require-mysql`。
 
+反向代理/服务注册拓扑演练报告：
+
+```bash
+cd backend
+python -m scripts.deploy_topology_drill \
+  --static-url https://your-domain.example/ \
+  --proxied-api-url https://your-domain.example/api/health \
+  --direct-api-url http://127.0.0.1:8000/api/health \
+  --public-direct-api-url http://your-public-ip:8000/api/health \
+  --origin https://your-domain.example \
+  --api-bind-host 127.0.0.1
+```
+
+该脚本输出 JSON 报告，检查静态主站 HTML、经反向代理的 FastAPI `/api/health`、`Cache-Control: no-store`、`X-Request-ID`、CORS Origin、直连 FastAPI 主机是否为本机/内网、可选公网直连端口是否不可达，以及 `EngLab` / `AstraApi` 服务名、日志路径和重启命令计划。它不会配置真实反向代理或注册 Windows 服务；真实公网域名、安全组、服务重启恢复和回滚演练仍需在部署环境留证。
+
 正式内容初始化：
 
 ```bash
