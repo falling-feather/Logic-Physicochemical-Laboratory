@@ -468,6 +468,91 @@ def test_snapshot_rebuild_stops_when_automatic_heartbeat_loses_lease(client):
         assert stored_run.error_message is None
 
 
+def test_snapshot_rebuild_with_cancelled_lease_cannot_restart_run(client):
+    job = SnapshotScheduleJob(granularity="day", reference_date=date(2026, 7, 19))
+    period_start, period_end = snapshot_window(job.granularity, job.reference_date)
+    run_key = snapshot_run_key(job.granularity, period_start, period_end)
+    session_factory = get_session_factory(get_settings().database_url)
+
+    with session_factory() as db:
+        lease = acquire_snapshot_job_lease(
+            db,
+            job,
+            retry_attempts=3,
+            lease_owner="worker-cancelled-before-start",
+            lease_seconds=3600,
+            now=datetime(2026, 7, 20, 3, 0),
+        )
+        assert lease is not None
+        run = db.scalar(select(KnowledgeSnapshotRun).where(KnowledgeSnapshotRun.run_key == run_key))
+        assert run is not None
+        cancel_knowledge_snapshot_run(
+            run,
+            cancelled_by_user_id=1,
+            clock=lambda: datetime(2026, 7, 20, 3, 5),
+        )
+        db.commit()
+
+    with session_factory() as db:
+        with pytest.raises(SnapshotRunLeaseLost):
+            rebuild_periodic_knowledge_snapshots(
+                db,
+                granularity=job.granularity,
+                reference_date=job.reference_date,
+                trigger_source="scheduler",
+                scheduler_lease_owner=lease.lease_owner,
+                scheduler_lease_token=lease.lease_token,
+                clock=lambda: datetime(2026, 7, 20, 3, 10),
+            )
+
+    with session_factory() as db:
+        stored_run = db.scalar(select(KnowledgeSnapshotRun).where(KnowledgeSnapshotRun.run_key == run_key))
+        assert stored_run is not None
+        assert stored_run.status == "cancelled"
+        assert stored_run.finished_at == datetime(2026, 7, 20, 3, 5)
+        assert stored_run.scheduler_lease_owner is None
+        assert stored_run.scheduler_lease_token is None
+        assert stored_run.scheduler_lease_expires_at is None
+        assert stored_run.scheduler_heartbeat_at is None
+
+
+def test_snapshot_rebuild_scheduler_owned_run_requires_lease_token(client):
+    job = SnapshotScheduleJob(granularity="day", reference_date=date(2026, 7, 21))
+    period_start, period_end = snapshot_window(job.granularity, job.reference_date)
+    run_key = snapshot_run_key(job.granularity, period_start, period_end)
+    session_factory = get_session_factory(get_settings().database_url)
+
+    with session_factory() as db:
+        db.add(
+            KnowledgeSnapshotRun(
+                run_key=run_key,
+                granularity=job.granularity,
+                period_start=period_start,
+                period_end=period_end,
+                trigger_source="scheduler",
+                status="running",
+                started_at=datetime(2026, 7, 22, 3, 0),
+                scheduler_lease_owner="worker-missing-token",
+                scheduler_lease_expires_at=datetime(2026, 7, 22, 4, 0),
+                scheduler_heartbeat_at=datetime(2026, 7, 22, 3, 30),
+                attempt_count=0,
+                metadata_json={"trigger_source": "scheduler"},
+            )
+        )
+        db.commit()
+
+    with session_factory() as db:
+        with pytest.raises(SnapshotRunLeaseLost, match="token"):
+            rebuild_periodic_knowledge_snapshots(
+                db,
+                granularity=job.granularity,
+                reference_date=job.reference_date,
+                trigger_source="scheduler",
+                scheduler_lease_owner="worker-missing-token",
+                scheduler_lease_token=None,
+            )
+
+
 def test_snapshot_rebuild_with_stale_token_cannot_finish_run(client):
     job = SnapshotScheduleJob(granularity="day", reference_date=date(2026, 7, 3))
     period_start, period_end = snapshot_window(job.granularity, job.reference_date)

@@ -149,17 +149,15 @@ def rebuild_periodic_knowledge_snapshots(
     run_key = _run_key(granularity, period_start, period_end)
     run = _get_or_create_run(db, run_key, granularity, period_start, period_end, trigger_source)
     attempt_count = (run.attempt_count or 0) + 1
-    run.status = "running"
-    run.trigger_source = trigger_source
-    run.started_at = utc_now()
-    run.finished_at = None
-    run.error_message = None
-    run.attempt_count = attempt_count
-    run.user_snapshot_count = 0
-    run.class_snapshot_count = 0
-    run.metadata_json = {"trigger_source": trigger_source}
-    db.commit()
-    db.refresh(run)
+    run = _start_run(
+        db,
+        run,
+        trigger_source=trigger_source,
+        attempt_count=attempt_count,
+        scheduler_lease_owner=scheduler_lease_owner,
+        scheduler_lease_token=scheduler_lease_token,
+        clock=clock,
+    )
     try:
         heartbeat = _SnapshotRunHeartbeat(
             heartbeat=scheduler_lease_heartbeat,
@@ -349,6 +347,60 @@ def _get_or_create_run(
         started_at=utc_now(),
     )
     db.add(run)
+    return run
+
+
+def _start_run(
+    db: Session,
+    run: KnowledgeSnapshotRun,
+    *,
+    trigger_source: str,
+    attempt_count: int,
+    scheduler_lease_owner: str | None,
+    scheduler_lease_token: str | None,
+    clock: Callable[[], datetime],
+) -> KnowledgeSnapshotRun:
+    started_at = clock()
+    if scheduler_lease_owner is None:
+        run.status = "running"
+        run.trigger_source = trigger_source
+        run.started_at = started_at
+        run.finished_at = None
+        run.error_message = None
+        run.attempt_count = attempt_count
+        run.user_snapshot_count = 0
+        run.class_snapshot_count = 0
+        run.metadata_json = {"trigger_source": trigger_source}
+        db.commit()
+        db.refresh(run)
+        return run
+    if not scheduler_lease_token:
+        db.rollback()
+        raise SnapshotRunLeaseLost("knowledge snapshot run lease token was missing before start")
+    result = db.execute(
+        update(KnowledgeSnapshotRun)
+        .where(
+            KnowledgeSnapshotRun.id == run.id,
+            KnowledgeSnapshotRun.status == "running",
+            KnowledgeSnapshotRun.scheduler_lease_owner == scheduler_lease_owner,
+            KnowledgeSnapshotRun.scheduler_lease_token == scheduler_lease_token,
+        )
+        .values(
+            trigger_source=trigger_source,
+            started_at=started_at,
+            finished_at=None,
+            error_message=None,
+            attempt_count=attempt_count,
+            user_snapshot_count=0,
+            class_snapshot_count=0,
+            metadata_json={"trigger_source": trigger_source, "scheduler_lease_owner": scheduler_lease_owner},
+        )
+    )
+    if result.rowcount != 1:
+        db.rollback()
+        raise SnapshotRunLeaseLost("knowledge snapshot run lease was lost before start")
+    db.commit()
+    db.refresh(run)
     return run
 
 
