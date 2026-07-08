@@ -14,6 +14,56 @@ from app.services.request_metadata import request_metadata
 
 _AUDIT_CHAIN_VERSION = 1
 _AUDIT_CHAIN_SESSION_KEY = "audit_chain_tail"
+_AUDIT_REDACTION = {"redacted": True, "reason": "audit_snapshot_policy"}
+_SENSITIVE_AUDIT_FIELD_NAMES = {
+    "authorization",
+    "bootstrap_token",
+    "change_request_note",
+    "content_bytes",
+    "cookie",
+    "dedupe_key",
+    "error_message",
+    "evidence",
+    "exception",
+    "external_issue_url",
+    "feedback",
+    "integrity",
+    "metadata_json",
+    "notes",
+    "password",
+    "password_hash",
+    "payload_hash",
+    "payload_json",
+    "raw",
+    "raw_content",
+    "reset_token",
+    "review_note",
+    "scheduler_lease_owner",
+    "scheduler_lease_token",
+    "script_integrity",
+    "script_review_note",
+    "script_src",
+    "script_url",
+    "scriptsrc",
+    "scripturl",
+    "secret",
+    "session_token",
+    "source_url",
+    "token",
+    "token_hash",
+    "value_preview",
+}
+_SENSITIVE_AUDIT_FIELD_SUFFIXES = (
+    "_password",
+    "_secret",
+    "_token",
+    "_token_hash",
+)
+_SENSITIVE_AUDIT_FIELD_PREFIXES = (
+    "password_",
+    "secret_",
+    "token_",
+)
 
 
 def record_audit_log(
@@ -34,7 +84,7 @@ def record_audit_log(
     resource = f"{resource_type}:{resource_id_value}" if resource_id_value is not None else resource_type
     metadata = request_metadata(request)
     timestamp = utc_now()
-    snapshot_json = snapshot or {}
+    snapshot_json = redact_audit_snapshot(snapshot)
     previous_hash = _previous_hash(db)
     audit_log = AuditLog(
         actor_user_id=actor.id if actor is not None else None,
@@ -61,6 +111,33 @@ def record_audit_log(
     db.info[_AUDIT_CHAIN_SESSION_KEY] = audit_log.current_hash
     db.add(audit_log)
     return audit_log
+
+
+def redact_audit_snapshot(snapshot: dict[str, Any] | None) -> dict[str, Any]:
+    if not snapshot:
+        return {}
+    redacted = _redact_audit_value(snapshot)
+    return redacted if isinstance(redacted, dict) else {"value": redacted}
+
+
+def _redact_audit_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: dict(_AUDIT_REDACTION) if _audit_field_is_sensitive(str(key)) else _redact_audit_value(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_audit_value(item) for item in value]
+    return value
+
+
+def _audit_field_is_sensitive(key: str) -> bool:
+    normalized = key.strip().lower().replace("-", "_").replace(" ", "_")
+    if normalized in _SENSITIVE_AUDIT_FIELD_NAMES:
+        return True
+    if normalized.startswith(_SENSITIVE_AUDIT_FIELD_PREFIXES):
+        return True
+    return normalized.endswith(_SENSITIVE_AUDIT_FIELD_SUFFIXES)
 
 
 def audit_log_chain_hash(audit_log: AuditLog) -> str:

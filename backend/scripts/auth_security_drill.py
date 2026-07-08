@@ -58,6 +58,8 @@ def run_auth_security_drill(
     )
     audit_redaction = _audit_redaction_report(
         audit_ip_hash_salt=resolved_settings.audit_ip_hash_salt,
+        audit_trust_forwarded_for=getattr(resolved_settings, "audit_trust_forwarded_for", False),
+        audit_trusted_proxy_hosts=getattr(resolved_settings, "audit_trusted_proxy_hosts", ""),
         production_like=production_like,
     )
     cleanup_operations = _cleanup_operations_report()
@@ -181,20 +183,36 @@ def _login_lockout_report(*, max_attempts: int, lockout_seconds: int, window_sec
     }
 
 
-def _audit_redaction_report(*, audit_ip_hash_salt: str, production_like: bool) -> dict[str, Any]:
+def _audit_redaction_report(
+    *,
+    audit_ip_hash_salt: str,
+    audit_trust_forwarded_for: bool,
+    audit_trusted_proxy_hosts: str,
+    production_like: bool,
+) -> dict[str, Any]:
     salt_configured = bool(audit_ip_hash_salt.strip())
     default_salt = audit_ip_hash_salt == DEFAULT_AUDIT_IP_HASH_SALT
     salt_ok = salt_configured and ((not production_like) or (not default_salt))
+    trusted_proxy_hosts = [host.strip() for host in audit_trusted_proxy_hosts.split(",") if host.strip()]
+    forwarded_for_ok = (not audit_trust_forwarded_for) or bool(trusted_proxy_hosts)
+    ok = salt_ok and forwarded_for_ok
     return {
-        "ok": salt_ok,
-        "status": "ready" if salt_ok else "needs_secret_rotation",
+        "ok": ok,
+        "status": "ready" if ok else ("unsafe_forwarded_for" if salt_ok else "needs_secret_rotation"),
         "audit_ip_hash_salt_configured": salt_configured,
         "audit_ip_hash_salt_is_default": default_salt,
+        "audit_trust_forwarded_for": audit_trust_forwarded_for,
+        "audit_trusted_proxy_hosts_configured": bool(trusted_proxy_hosts),
+        "audit_trusted_proxy_host_count": len(trusted_proxy_hosts),
         "sensitive_fields_returned": False,
         "redacted_fields": [
             "password",
             "password_hash",
+            "payload_json",
+            "review_note",
+            "scheduler_lease_token",
             "session_token",
+            "source_url",
             "token_hash",
             "reset_token",
             "bootstrap_token",

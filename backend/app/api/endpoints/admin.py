@@ -1889,7 +1889,7 @@ def list_admin_alert_outbox(
     )
     db.commit()
     return AdminAlertOutboxPage(
-        items=items,
+        items=[_admin_alert_outbox_entry_read(entry) for entry in items],
         total=total,
         limit=limit,
         offset=offset,
@@ -2382,7 +2382,7 @@ def review_admin_alert_outbox_entry(
     )
     db.commit()
     db.refresh(entry)
-    return entry
+    return _admin_alert_outbox_entry_read(entry)
 
 
 @router.get("/audit-logs", response_model=AuditLogPage)
@@ -4371,7 +4371,38 @@ def _admin_alert_outbox_write_response(write_result: Any) -> AdminAlertOutboxWri
         created_count=write_result.created_count,
         refreshed_count=write_result.refreshed_count,
         skipped_count=write_result.skipped_count,
-        items=write_result.entries,
+        items=[_admin_alert_outbox_entry_read(entry) for entry in write_result.entries],
+    )
+
+
+def _admin_alert_outbox_entry_read(entry: AdminAlertOutboxEntry) -> AdminAlertOutboxEntryRead:
+    return AdminAlertOutboxEntryRead(
+        id=entry.id,
+        source_type=entry.source_type,
+        source_id=entry.source_id,
+        source_key=entry.source_key,
+        event_code=entry.event_code,
+        severity=entry.severity,
+        action_hint=entry.action_hint,
+        status=entry.status,
+        dispatch_mode=entry.dispatch_mode,
+        delivery_target=entry.delivery_target,
+        external_delivery=entry.external_delivery,
+        payload_hash_prefix=entry.payload_hash[:12],
+        payload_redacted=True,
+        first_seen_at=entry.first_seen_at,
+        last_seen_at=entry.last_seen_at,
+        available_at=entry.available_at,
+        expires_at=entry.expires_at,
+        seen_count=entry.seen_count,
+        attempt_count=entry.attempt_count,
+        last_error_code=entry.last_error_code,
+        created_by_user_id=entry.created_by_user_id,
+        reviewed_by_user_id=entry.reviewed_by_user_id,
+        reviewed_at=entry.reviewed_at,
+        review_note_present=bool(entry.review_note),
+        created_at=entry.created_at,
+        updated_at=entry.updated_at,
     )
 
 

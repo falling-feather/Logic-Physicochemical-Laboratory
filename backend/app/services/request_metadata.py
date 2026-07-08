@@ -62,11 +62,24 @@ def trim_metadata_value(value: str | None, max_length: int) -> str | None:
 
 
 def _client_ip(request: Request) -> str | None:
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        first_ip = forwarded_for.split(",", 1)[0].strip()
-        if first_ip:
-            return first_ip
     if request.client is None:
         return None
+    if _should_trust_forwarded_for(request):
+        forwarded_for = request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            first_ip = forwarded_for.split(",", 1)[0].strip()
+            if first_ip:
+                return first_ip
     return request.client.host
+
+
+def _should_trust_forwarded_for(request: Request) -> bool:
+    settings = get_settings()
+    if not settings.audit_trust_forwarded_for:
+        return False
+    trusted_proxy_hosts = set(settings.audit_trusted_proxy_host_list)
+    if not trusted_proxy_hosts:
+        return False
+    if request.client is None:
+        return False
+    return request.client.host in trusted_proxy_hosts

@@ -284,7 +284,10 @@ def test_session_last_seen_refreshes_when_missing(client):
         assert refreshed_session.last_seen_ip_hash is not None
 
 
-def test_session_last_seen_refreshes_when_ip_hash_changes_inside_window(client):
+def test_session_last_seen_refreshes_when_ip_hash_changes_inside_window(client, monkeypatch):
+    monkeypatch.setenv("ASTRA_AUDIT_TRUST_FORWARDED_FOR", "true")
+    monkeypatch.setenv("ASTRA_AUDIT_TRUSTED_PROXY_HOSTS", "testclient")
+    get_settings.cache_clear()
     register = client.post(
         "/api/auth/register",
         json={

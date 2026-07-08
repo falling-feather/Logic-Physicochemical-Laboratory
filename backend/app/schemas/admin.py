@@ -1097,9 +1097,8 @@ class AdminAlertOutboxEntryRead(BaseModel):
     dispatch_mode: str
     delivery_target: str
     external_delivery: bool
-    dedupe_key: str
-    payload_hash: str
-    payload_json: dict[str, Any]
+    payload_hash_prefix: str
+    payload_redacted: bool = True
     first_seen_at: datetime
     last_seen_at: datetime
     available_at: datetime | None = None
@@ -1110,7 +1109,7 @@ class AdminAlertOutboxEntryRead(BaseModel):
     created_by_user_id: int | None = None
     reviewed_by_user_id: int | None = None
     reviewed_at: datetime | None = None
-    review_note: str | None = None
+    review_note_present: bool
     created_at: datetime
     updated_at: datetime
 

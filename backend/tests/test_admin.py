@@ -2053,6 +2053,14 @@ def test_admin_enqueues_knowledge_snapshot_alert_outbox_with_idempotent_redacted
     outbox_body = outbox.json()
     assert outbox_body["total"] == body["created_count"]
     assert all(item["external_delivery"] is False for item in outbox_body["items"])
+    outbox_text = json.dumps(outbox_body, ensure_ascii=False)
+    assert "dedupe_key" not in outbox_text
+    assert "payload_hash\"" not in outbox_text
+    assert "payload_json" not in outbox_text
+    assert '"review_note":' not in outbox_text
+    assert "secret-outbox" not in outbox_text
+    assert all(item["payload_redacted"] is True for item in outbox_body["items"])
+    assert all(len(item["payload_hash_prefix"]) <= 12 for item in outbox_body["items"])
     reviewed_entry_id = outbox_body["items"][0]["id"]
 
     forbidden_review = client.patch(
@@ -2097,7 +2105,9 @@ def test_admin_enqueues_knowledge_snapshot_alert_outbox_with_idempotent_redacted
     assert reviewed_body["status"] == "suppressed"
     assert reviewed_body["reviewed_by_user_id"] is not None
     assert reviewed_body["reviewed_at"] is not None
-    assert reviewed_body["review_note"] == "manual review secret-review-note"
+    assert reviewed_body["review_note_present"] is True
+    assert '"review_note":' not in json.dumps(reviewed_body, ensure_ascii=False)
+    assert "secret-review-note" not in json.dumps(reviewed_body, ensure_ascii=False)
     assert reviewed_body["external_delivery"] is False
 
     suppressed_outbox = client.get(
@@ -4620,11 +4630,13 @@ def test_admin_scans_content_script_asset_remote_drift_with_redaction(client, mo
     assert len(outbox_body["items"]) == alerts_body["candidate_count"]
     outbox_text = json.dumps(outbox_body, ensure_ascii=False)
     assert '"source_url"' not in outbox_text
-    assert "source_url_sha256" in outbox_text
-    assert "source_host" in outbox_text
-    assert "asset_sha256" in outbox_text
-    assert "remote_asset_sha256" in outbox_text
-    assert "remote_asset_size_bytes" in outbox_text
+    assert "source_url_sha256" not in outbox_text
+    assert "asset_sha256" not in outbox_text
+    assert "remote_asset_sha256" not in outbox_text
+    assert "remote_asset_size_bytes" not in outbox_text
+    assert "payload_json" not in outbox_text
+    assert "payload_hash\"" not in outbox_text
+    assert all(item["payload_redacted"] is True for item in outbox_body["items"])
     assert "integrity" not in outbox_text
     assert "content_bytes" not in outbox_text
     assert "scheduler_lease_token" not in outbox_text
@@ -4632,6 +4644,19 @@ def test_admin_scans_content_script_asset_remote_drift_with_redaction(client, mo
     assert "remote drift now changed" not in outbox_text
     assert "remote secret unavailable" not in outbox_text
     assert '"sent"' not in outbox_text
+    with session_factory() as db:
+        stored_outbox_entry = db.scalar(
+            select(AdminAlertOutboxEntry).where(
+                AdminAlertOutboxEntry.source_type == "content_script_asset_scan_run_alert"
+            )
+        )
+        assert stored_outbox_entry is not None
+        stored_payload_text = json.dumps(stored_outbox_entry.payload_json, ensure_ascii=False)
+        assert "source_url_sha256" in stored_payload_text
+        assert "asset_sha256" in stored_payload_text
+        assert "remote_asset_sha256" in stored_payload_text
+        assert '"source_url"' not in stored_payload_text
+        assert "secret-drift-token" not in stored_payload_text
 
     repeated_outbox = client.post(
         "/api/admin/content/script-assets/remote-drift-alerts/outbox",
@@ -4657,6 +4682,12 @@ def test_admin_scans_content_script_asset_remote_drift_with_redaction(client, mo
     listed_outbox_body = listed_outbox.json()
     assert listed_outbox_body["total"] == alerts_body["candidate_count"]
     assert all(item["external_delivery"] is False for item in listed_outbox_body["items"])
+    listed_outbox_text = json.dumps(listed_outbox_body, ensure_ascii=False)
+    assert "dedupe_key" not in listed_outbox_text
+    assert "payload_hash\"" not in listed_outbox_text
+    assert "payload_json" not in listed_outbox_text
+    assert '"review_note":' not in listed_outbox_text
+    assert "secret-drift-token" not in listed_outbox_text
     content_outbox_entry_id = listed_outbox_body["items"][0]["id"]
 
     reviewed_content_outbox = client.patch(
@@ -4673,7 +4704,9 @@ def test_admin_scans_content_script_asset_remote_drift_with_redaction(client, mo
     assert reviewed_content_body["status"] == "planned"
     assert reviewed_content_body["source_type"] == "content_script_asset_scan_run_alert"
     assert reviewed_content_body["reviewed_at"] is not None
-    assert reviewed_content_body["review_note"] == "reviewed content script drift secret-drift-review"
+    assert reviewed_content_body["review_note_present"] is True
+    assert '"review_note":' not in json.dumps(reviewed_content_body, ensure_ascii=False)
+    assert "secret-drift-review" not in json.dumps(reviewed_content_body, ensure_ascii=False)
     assert reviewed_content_body["external_delivery"] is False
 
     with session_factory() as db:

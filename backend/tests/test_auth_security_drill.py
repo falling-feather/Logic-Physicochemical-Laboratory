@@ -15,6 +15,8 @@ def test_auth_security_drill_reports_ready_production_posture_without_secret_val
     assert report["session_cookie"]["frontend_local_storage_allowed"] is False
     assert report["password_reset"]["return_token_blocked_in_production"] is True
     assert report["audit_redaction"]["audit_ip_hash_salt_is_default"] is False
+    assert report["audit_redaction"]["audit_trust_forwarded_for"] is True
+    assert report["audit_redaction"]["audit_trusted_proxy_hosts_configured"] is True
     assert report["sensitive_fields_returned"] is False
     report_text = str(report)
     assert _settings().admin_bootstrap_token not in report_text
@@ -35,6 +37,21 @@ def test_auth_security_drill_flags_unsafe_production_token_and_reset_settings():
     assert report["admin_bootstrap"]["token_looks_weak_or_placeholder"] is True
     assert report["password_reset"]["return_token_blocked_in_production"] is False
     assert report["audit_redaction"]["audit_ip_hash_salt_is_default"] is True
+
+
+def test_auth_security_drill_flags_forwarded_for_without_trusted_proxy_hosts():
+    report = run_auth_security_drill(
+        settings=_settings(
+            audit_trust_forwarded_for=True,
+            audit_trusted_proxy_hosts="",
+        )
+    )
+
+    assert report["ok"] is False
+    assert report["audit_redaction"]["ok"] is False
+    assert report["audit_redaction"]["status"] == "unsafe_forwarded_for"
+    assert report["audit_redaction"]["audit_trust_forwarded_for"] is True
+    assert report["audit_redaction"]["audit_trusted_proxy_hosts_configured"] is False
 
 
 def test_auth_security_drill_can_require_production_and_bootstrap_token():
@@ -74,6 +91,8 @@ def _settings(**overrides):
         "login_lockout_seconds": 900,
         "login_attempt_window_seconds": 900,
         "audit_ip_hash_salt": "audit-prod-salt-12345678901234567890",
+        "audit_trust_forwarded_for": True,
+        "audit_trusted_proxy_hosts": "127.0.0.1,10.0.0.10",
     }
     values.update(overrides)
     return SimpleNamespace(**values)
