@@ -103,6 +103,9 @@ from app.schemas.admin import (
     AdminUserUpdate,
     AdminAlertOutboxEntryRead,
     AdminAlertOutboxPage,
+    AdminAlertOutboxQueueItem,
+    AdminAlertOutboxQueueReport,
+    AdminAlertOutboxStatusBucket,
     AdminAlertOutboxReviewRequest,
     AdminAlertOutboxWriteResponse,
     AuditLogExport,
@@ -1880,6 +1883,60 @@ def list_admin_alert_outbox(
         offset=offset,
         next_offset=_next_offset(total, offset, len(items)),
     )
+
+
+@router.get("/alert-outbox/queue", response_model=AdminAlertOutboxQueueReport)
+def get_admin_alert_outbox_queue(
+    request: Request,
+    source_type: str | None = Query(default=None, max_length=80),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    now_at: datetime | None = Query(default=None),
+    stale_after_hours: int = Query(default=24, ge=1, le=720),
+    item_limit: int = Query(default=20, ge=0, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminAlertOutboxQueueReport:
+    _require_admin(current_user)
+    if from_at is not None and to_at is not None and from_at > to_at:
+        raise HTTPException(status_code=422, detail="from must be earlier than to")
+    generated_at = now_at or datetime.now(UTC)
+    filters = {
+        "source_type": source_type.strip() if source_type is not None and source_type.strip() else None,
+        "from": from_at,
+        "to": to_at,
+        "now_at": generated_at,
+        "stale_after_hours": stale_after_hours,
+        "item_limit": item_limit,
+    }
+    statement = select(AdminAlertOutboxEntry)
+    if filters["source_type"] is not None:
+        statement = statement.where(AdminAlertOutboxEntry.source_type == filters["source_type"])
+    if from_at is not None:
+        statement = statement.where(AdminAlertOutboxEntry.last_seen_at >= from_at)
+    if to_at is not None:
+        statement = statement.where(AdminAlertOutboxEntry.last_seen_at <= to_at)
+    entries = list(
+        db.scalars(statement.order_by(AdminAlertOutboxEntry.last_seen_at.desc(), AdminAlertOutboxEntry.id.desc())).all()
+    )
+    report = _admin_alert_outbox_queue_report(
+        entries,
+        generated_at=generated_at,
+        filters=filters,
+        stale_after_hours=stale_after_hours,
+        item_limit=item_limit,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.alert_outbox.queue_report",
+        resource_type="admin_alert_outbox",
+        event_result="success",
+        request=request,
+        snapshot=_admin_alert_outbox_queue_snapshot(report),
+    )
+    db.commit()
+    return report
 
 
 @router.patch("/alert-outbox/{entry_id}", response_model=AdminAlertOutboxEntryRead)
@@ -3924,6 +3981,184 @@ def _admin_alert_outbox_write_response(write_result: Any) -> AdminAlertOutboxWri
         skipped_count=write_result.skipped_count,
         items=write_result.entries,
     )
+
+
+def _admin_alert_outbox_queue_report(
+    entries: list[AdminAlertOutboxEntry],
+    *,
+    generated_at: datetime,
+    filters: dict[str, Any],
+    stale_after_hours: int,
+    item_limit: int,
+) -> AdminAlertOutboxQueueReport:
+    stale_before = generated_at - timedelta(hours=stale_after_hours)
+    pending_review = [entry for entry in entries if entry.status == "pending_review"]
+    planned = [entry for entry in entries if entry.status == "planned"]
+    queued = [entry for entry in entries if entry.status == "queued"]
+    suppressed = [entry for entry in entries if entry.status == "suppressed"]
+    cancelled = [entry for entry in entries if entry.status == "cancelled"]
+    stale_pending_review = [
+        entry for entry in pending_review if _naive_utc(entry.last_seen_at) <= _naive_utc(stale_before)
+    ]
+    due_planned = [entry for entry in planned if _admin_alert_outbox_entry_due(entry, generated_at)]
+    due_queued = [entry for entry in queued if _admin_alert_outbox_entry_due(entry, generated_at)]
+    ready_entries = _sort_admin_alert_outbox_queue_items(due_queued + due_planned)
+    active_count = len(pending_review) + len(planned) + len(queued)
+    terminal_count = len(suppressed) + len(cancelled)
+    if ready_entries:
+        queue_status: Literal["empty", "review_required", "ready", "cleared"] = "ready"
+    elif pending_review:
+        queue_status = "review_required"
+    elif entries:
+        queue_status = "cleared"
+    else:
+        queue_status = "empty"
+    status_order = ["pending_review", "planned", "queued", "suppressed", "cancelled"]
+    buckets = [
+        _admin_alert_outbox_status_bucket(status, [entry for entry in entries if entry.status == status])
+        for status in status_order
+    ]
+    filtered_snapshot_filters = {key: value for key, value in filters.items() if value is not None}
+    return AdminAlertOutboxQueueReport(
+        generated_at=generated_at,
+        filters=filtered_snapshot_filters,
+        policy={
+            "external_delivery": False,
+            "automatic_actions": False,
+            "dispatch_mode": "manual_review",
+            "delivery_target": "admin_outbox",
+            "stale_after_hours": stale_after_hours,
+        },
+        queue_status=queue_status,
+        total_count=len(entries),
+        active_count=active_count,
+        pending_review_count=len(pending_review),
+        planned_count=len(planned),
+        queued_count=len(queued),
+        suppressed_count=len(suppressed),
+        cancelled_count=len(cancelled),
+        terminal_count=terminal_count,
+        stale_pending_review_count=len(stale_pending_review),
+        due_planned_count=len(due_planned),
+        due_queued_count=len(due_queued),
+        external_delivery_count=sum(1 for entry in entries if entry.external_delivery),
+        oldest_pending_review_at=_oldest_datetime(entry.last_seen_at for entry in pending_review),
+        oldest_due_at=_oldest_datetime(
+            (entry.available_at or entry.last_seen_at) for entry in due_planned + due_queued
+        ),
+        status_buckets=buckets,
+        pending_review_items=[
+            _admin_alert_outbox_queue_item(entry)
+            for entry in _sort_admin_alert_outbox_queue_items(pending_review)[:item_limit]
+        ],
+        ready_items=[_admin_alert_outbox_queue_item(entry) for entry in ready_entries[:item_limit]],
+        terminal_items=[
+            _admin_alert_outbox_queue_item(entry)
+            for entry in _sort_admin_alert_outbox_queue_items(suppressed + cancelled)[:item_limit]
+        ],
+    )
+
+
+def _admin_alert_outbox_queue_snapshot(report: AdminAlertOutboxQueueReport) -> dict[str, Any]:
+    return {
+        "format": "admin_alert_outbox_queue",
+        "queue_status": report.queue_status,
+        "filters": {key: _admin_alert_outbox_snapshot_value(value) for key, value in report.filters.items()},
+        "policy": report.policy,
+        "total_count": report.total_count,
+        "active_count": report.active_count,
+        "pending_review_count": report.pending_review_count,
+        "planned_count": report.planned_count,
+        "queued_count": report.queued_count,
+        "suppressed_count": report.suppressed_count,
+        "cancelled_count": report.cancelled_count,
+        "terminal_count": report.terminal_count,
+        "stale_pending_review_count": report.stale_pending_review_count,
+        "due_planned_count": report.due_planned_count,
+        "due_queued_count": report.due_queued_count,
+        "external_delivery_count": report.external_delivery_count,
+        "oldest_pending_review_at": report.oldest_pending_review_at.isoformat()
+        if report.oldest_pending_review_at is not None
+        else None,
+        "oldest_due_at": report.oldest_due_at.isoformat() if report.oldest_due_at is not None else None,
+        "status_buckets": {bucket.status: bucket.total for bucket in report.status_buckets},
+        "automatic_actions": False,
+        "external_delivery": False,
+    }
+
+
+def _admin_alert_outbox_snapshot_value(value: Any) -> Any:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {key: _admin_alert_outbox_snapshot_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_admin_alert_outbox_snapshot_value(item) for item in value]
+    return value
+
+
+def _admin_alert_outbox_entry_due(entry: AdminAlertOutboxEntry, now_at: datetime) -> bool:
+    return entry.available_at is None or _naive_utc(entry.available_at) <= _naive_utc(now_at)
+
+
+def _admin_alert_outbox_status_bucket(
+    status: str,
+    entries: list[AdminAlertOutboxEntry],
+) -> AdminAlertOutboxStatusBucket:
+    return AdminAlertOutboxStatusBucket(
+        status=status,  # type: ignore[arg-type]
+        total=len(entries),
+        critical_count=sum(1 for entry in entries if entry.severity == "critical"),
+        warning_count=sum(1 for entry in entries if entry.severity == "warning"),
+        info_count=sum(1 for entry in entries if entry.severity == "info"),
+        oldest_last_seen_at=_oldest_datetime(entry.last_seen_at for entry in entries),
+        latest_last_seen_at=_latest_datetime(entry.last_seen_at for entry in entries),
+        oldest_available_at=_oldest_datetime(entry.available_at for entry in entries if entry.available_at is not None),
+        latest_reviewed_at=_latest_datetime(entry.reviewed_at for entry in entries if entry.reviewed_at is not None),
+    )
+
+
+def _admin_alert_outbox_queue_item(entry: AdminAlertOutboxEntry) -> AdminAlertOutboxQueueItem:
+    return AdminAlertOutboxQueueItem(
+        id=entry.id,
+        source_type=entry.source_type,
+        source_id=entry.source_id,
+        source_key=entry.source_key,
+        event_code=entry.event_code,
+        severity=entry.severity,
+        action_hint=entry.action_hint,
+        status=entry.status,  # type: ignore[arg-type]
+        external_delivery=entry.external_delivery,
+        last_seen_at=entry.last_seen_at,
+        available_at=entry.available_at,
+        reviewed_at=entry.reviewed_at,
+        seen_count=entry.seen_count,
+    )
+
+
+def _sort_admin_alert_outbox_queue_items(entries: list[AdminAlertOutboxEntry]) -> list[AdminAlertOutboxEntry]:
+    severity_order = {"critical": 0, "warning": 1, "info": 2}
+    status_order = {"queued": 0, "planned": 1, "pending_review": 2, "suppressed": 3, "cancelled": 4}
+    return sorted(
+        entries,
+        key=lambda entry: (
+            status_order.get(entry.status, 99),
+            severity_order.get(entry.severity, 99),
+            _naive_utc(entry.available_at or entry.last_seen_at),
+            _naive_utc(entry.last_seen_at),
+            entry.id,
+        ),
+    )
+
+
+def _oldest_datetime(values: Any) -> datetime | None:
+    items = [value for value in values if value is not None]
+    return min(items, key=_naive_utc) if items else None
+
+
+def _latest_datetime(values: Any) -> datetime | None:
+    items = [value for value in values if value is not None]
+    return max(items, key=_naive_utc) if items else None
 
 
 def _content_script_asset_filters(

@@ -882,6 +882,59 @@ class AdminAlertOutboxReviewRequest(BaseModel):
     confirm_manual_review: bool = False
 
 
+class AdminAlertOutboxStatusBucket(BaseModel):
+    status: AdminAlertOutboxStatus
+    total: int
+    critical_count: int
+    warning_count: int
+    info_count: int
+    oldest_last_seen_at: datetime | None = None
+    latest_last_seen_at: datetime | None = None
+    oldest_available_at: datetime | None = None
+    latest_reviewed_at: datetime | None = None
+
+
+class AdminAlertOutboxQueueItem(BaseModel):
+    id: int
+    source_type: str
+    source_id: int | None = None
+    source_key: str
+    event_code: str
+    severity: str
+    action_hint: str
+    status: AdminAlertOutboxStatus
+    external_delivery: bool
+    last_seen_at: datetime
+    available_at: datetime | None = None
+    reviewed_at: datetime | None = None
+    seen_count: int
+
+
+class AdminAlertOutboxQueueReport(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    queue_status: Literal["empty", "review_required", "ready", "cleared"]
+    total_count: int
+    active_count: int
+    pending_review_count: int
+    planned_count: int
+    queued_count: int
+    suppressed_count: int
+    cancelled_count: int
+    terminal_count: int
+    stale_pending_review_count: int
+    due_planned_count: int
+    due_queued_count: int
+    external_delivery_count: int
+    oldest_pending_review_at: datetime | None = None
+    oldest_due_at: datetime | None = None
+    status_buckets: list[AdminAlertOutboxStatusBucket]
+    pending_review_items: list[AdminAlertOutboxQueueItem]
+    ready_items: list[AdminAlertOutboxQueueItem]
+    terminal_items: list[AdminAlertOutboxQueueItem]
+
+
 class AdminAlertOutboxEntryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

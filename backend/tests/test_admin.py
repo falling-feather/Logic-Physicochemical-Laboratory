@@ -2108,6 +2108,240 @@ def test_admin_enqueues_knowledge_snapshot_alert_outbox_with_idempotent_redacted
     assert "scheduler_lease_token" not in review_snapshot_text
 
 
+def test_admin_reads_alert_outbox_queue_report_without_leaking_payload_or_mutating(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "alert_outbox_queue_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    now = datetime(2026, 7, 23, 9, 0, tzinfo=UTC)
+    entries = [
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=101,
+            source_key="knowledge:queue-report:pending-old",
+            event_code="stale_running",
+            severity="critical",
+            action_hint="investigate",
+            status="pending_review",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="queue-report-pending-old",
+            payload_hash="hash-pending-old",
+            payload_json={"secret": "secret-queue-payload", "scheduler_lease_token": "secret-queue-token"},
+            first_seen_at=now - timedelta(hours=30),
+            last_seen_at=now - timedelta(hours=30),
+            available_at=now - timedelta(hours=30),
+            seen_count=2,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="content_script_asset_scan_run_alert",
+            source_id=102,
+            source_key="content:queue-report:pending-recent",
+            event_code="remote_drift_detected",
+            severity="warning",
+            action_hint="monitor",
+            status="pending_review",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="queue-report-pending-recent",
+            payload_hash="hash-pending-recent",
+            payload_json={"source_url": "https://cdn.example.test/secret-queue.js"},
+            first_seen_at=now - timedelta(hours=1),
+            last_seen_at=now - timedelta(hours=1),
+            available_at=now - timedelta(hours=1),
+            seen_count=1,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=103,
+            source_key="knowledge:queue-report:planned-due",
+            event_code="retryable_failed",
+            severity="warning",
+            action_hint="requeue",
+            status="planned",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="queue-report-planned-due",
+            payload_hash="hash-planned-due",
+            payload_json={"secret": "secret-planned-payload"},
+            first_seen_at=now - timedelta(hours=5),
+            last_seen_at=now - timedelta(hours=4),
+            available_at=now - timedelta(hours=2),
+            reviewed_at=now - timedelta(hours=3),
+            review_note="secret-planned-review-note",
+            seen_count=3,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=104,
+            source_key="knowledge:queue-report:planned-future",
+            event_code="pending_backlog",
+            severity="info",
+            action_hint="dispatch",
+            status="planned",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="queue-report-planned-future",
+            payload_hash="hash-planned-future",
+            payload_json={"secret": "secret-future-payload"},
+            first_seen_at=now - timedelta(hours=2),
+            last_seen_at=now - timedelta(hours=2),
+            available_at=now + timedelta(hours=2),
+            reviewed_at=now - timedelta(hours=1),
+            review_note="future plan secret note",
+            seen_count=1,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="content_script_asset_scan_run_alert",
+            source_id=105,
+            source_key="content:queue-report:queued",
+            event_code="scan_failed",
+            severity="critical",
+            action_hint="investigate",
+            status="queued",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="queue-report-queued",
+            payload_hash="hash-queued",
+            payload_json={"content_bytes": "secret-bytes"},
+            first_seen_at=now - timedelta(hours=4),
+            last_seen_at=now - timedelta(hours=3),
+            available_at=now - timedelta(minutes=10),
+            reviewed_at=now - timedelta(hours=2),
+            review_note="queued secret note",
+            seen_count=4,
+            attempt_count=7,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=106,
+            source_key="knowledge:queue-report:suppressed",
+            event_code="manual_cancelled",
+            severity="info",
+            action_hint="monitor",
+            status="suppressed",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="queue-report-suppressed",
+            payload_hash="hash-suppressed",
+            payload_json={"secret": "secret-suppressed-payload"},
+            first_seen_at=now - timedelta(days=2),
+            last_seen_at=now - timedelta(days=2),
+            reviewed_at=now - timedelta(days=1),
+            review_note="suppressed secret note",
+            seen_count=1,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="content_script_asset_scan_run_alert",
+            source_id=107,
+            source_key="content:queue-report:cancelled",
+            event_code="blocked_run",
+            severity="warning",
+            action_hint="monitor",
+            status="cancelled",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="queue-report-cancelled",
+            payload_hash="hash-cancelled",
+            payload_json={"exception": "secret-cancelled-exception"},
+            first_seen_at=now - timedelta(days=1, hours=3),
+            last_seen_at=now - timedelta(days=1, hours=3),
+            reviewed_at=now - timedelta(days=1),
+            review_note="cancelled secret note",
+            seen_count=1,
+        ),
+    ]
+    with session_factory() as db:
+        db.add_all(entries)
+        db.commit()
+        queued_entry_id = entries[4].id
+
+    forbidden = client.get(
+        "/api/admin/alert-outbox/queue",
+        params={"now_at": now.isoformat()},
+        headers=_auth_header(teacher_token),
+    )
+    assert forbidden.status_code == 403
+
+    invalid_window = client.get(
+        "/api/admin/alert-outbox/queue",
+        params={"from": (now + timedelta(hours=1)).isoformat(), "to": now.isoformat()},
+        headers=_auth_header(admin_token),
+    )
+    assert invalid_window.status_code == 422
+
+    response = client.get(
+        "/api/admin/alert-outbox/queue",
+        params={"now_at": now.isoformat(), "stale_after_hours": 24, "item_limit": 1},
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-queue-report"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["queue_status"] == "ready"
+    assert body["policy"]["external_delivery"] is False
+    assert body["policy"]["automatic_actions"] is False
+    assert body["policy"]["dispatch_mode"] == "manual_review"
+    assert body["total_count"] == 7
+    assert body["active_count"] == 5
+    assert body["pending_review_count"] == 2
+    assert body["planned_count"] == 2
+    assert body["queued_count"] == 1
+    assert body["suppressed_count"] == 1
+    assert body["cancelled_count"] == 1
+    assert body["terminal_count"] == 2
+    assert body["stale_pending_review_count"] == 1
+    assert body["due_planned_count"] == 1
+    assert body["due_queued_count"] == 1
+    assert body["external_delivery_count"] == 0
+    assert len(body["pending_review_items"]) == 1
+    assert len(body["ready_items"]) == 1
+    assert len(body["terminal_items"]) == 1
+    buckets = {item["status"]: item for item in body["status_buckets"]}
+    assert buckets["pending_review"]["total"] == 2
+    assert buckets["planned"]["total"] == 2
+    assert buckets["queued"]["critical_count"] == 1
+    response_text = json.dumps(body, ensure_ascii=False)
+    assert "payload_json" not in response_text
+    assert "review_note" not in response_text
+    assert "secret-queue" not in response_text
+    assert "secret-planned" not in response_text
+    assert "content_bytes" not in response_text
+    assert "scheduler_lease_token" not in response_text
+
+    with session_factory() as db:
+        queued_entry = db.get(AdminAlertOutboxEntry, queued_entry_id)
+        assert queued_entry is not None
+        assert queued_entry.status == "queued"
+        assert queued_entry.attempt_count == 7
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.queue_report"
+        "&resource_type=admin_alert_outbox&request_id=alert-outbox-queue-report",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert snapshot["format"] == "admin_alert_outbox_queue"
+    assert snapshot["queue_status"] == "ready"
+    assert snapshot["total_count"] == 7
+    assert snapshot["status_buckets"]["queued"] == 1
+    assert snapshot["automatic_actions"] is False
+    assert snapshot["external_delivery"] is False
+    audit_text = json.dumps(snapshot, ensure_ascii=False)
+    assert "payload_json" not in audit_text
+    assert "review_note" not in audit_text
+    assert "secret-queue" not in audit_text
+    assert "content_bytes" not in audit_text
+    assert "scheduler_lease_token" not in audit_text
+
+
 def test_admin_can_requeue_knowledge_snapshot_runs(client):
     admin_token = _bootstrap_admin(client)
     teacher_token = _register_and_login(client, "snapshot_requeue_teacher", "teacher")
