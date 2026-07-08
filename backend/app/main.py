@@ -9,6 +9,7 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.db.session import get_session_factory, init_db
 from app.services.content_catalog import ensure_seed_pages
+from app.services.content_script_asset_scan_scheduler import scheduler_from_settings as content_script_scheduler_from_settings
 from app.services.knowledge_snapshot_scheduler import scheduler_from_settings
 
 
@@ -62,13 +63,20 @@ def create_app() -> FastAPI:
 async def lifespan(app: FastAPI):
     settings = get_settings()
     scheduler = None
+    content_script_scheduler = None
     if settings.knowledge_snapshot_scheduler_enabled:
         scheduler = scheduler_from_settings(settings)
         app.state.knowledge_snapshot_scheduler = scheduler
         scheduler.start()
+    if settings.content_script_remote_drift_scheduler_enabled:
+        content_script_scheduler = content_script_scheduler_from_settings(settings)
+        app.state.content_script_remote_drift_scheduler = content_script_scheduler
+        content_script_scheduler.start()
     try:
         yield
     finally:
+        if content_script_scheduler is not None:
+            await content_script_scheduler.stop()
         if scheduler is not None:
             await scheduler.stop()
 

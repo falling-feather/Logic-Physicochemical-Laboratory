@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     knowledge_snapshot_weekly_weekday: int = Field(default=0, ge=0, le=6)
     knowledge_snapshot_weekly_hour: int = Field(default=4, ge=0, le=23)
     knowledge_snapshot_retry_attempts: int = Field(default=3, ge=0, le=20)
+    content_script_remote_drift_scheduler_enabled: bool = False
+    content_script_remote_drift_scheduler_run_on_start: bool = False
+    content_script_remote_drift_scheduler_interval_seconds: int = Field(default=3600, ge=60)
+    content_script_remote_drift_scheduler_lease_seconds: int = Field(default=3600, ge=60)
+    content_script_remote_drift_scheduler_actor_user_id: int | None = Field(default=None, ge=1)
+    content_script_remote_drift_scheduler_scan_limit: int = Field(default=25, ge=1, le=200)
+    content_script_remote_drift_scheduler_source_host: str | None = None
+    content_script_remote_drift_scheduler_slug: str | None = None
     database_url: str = Field(
         default="mysql+pymysql://astra:astra@127.0.0.1:3306/astra?charset=utf8mb4",
         description="SQLAlchemy database URL. MySQL is the production target.",

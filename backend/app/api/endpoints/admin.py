@@ -143,7 +143,6 @@ from app.services.content_script_assets import (
     ContentScriptAssetRemoteDriftIssue,
     ContentScriptAssetRemoteDriftReport,
     audit_current_content_script_asset_mirrors,
-    scan_current_content_script_asset_remote_drift,
 )
 from app.services.content_script_asset_scan_runs import (
     ContentScriptAssetScanAlertCandidate as ContentScriptAssetScanAlertCandidateRow,
@@ -151,8 +150,8 @@ from app.services.content_script_asset_scan_runs import (
     build_content_script_asset_scan_alert_report,
     content_script_asset_scan_alert_snapshot,
     content_script_asset_scan_run_snapshot,
-    create_content_script_asset_remote_drift_scan_run,
     list_content_script_asset_scan_runs,
+    run_content_script_asset_remote_drift_scan,
 )
 from app.services.content_script_host_policies import (
     ContentScriptHostPolicyRow,
@@ -1119,6 +1118,7 @@ def read_admin_content_script_asset_remote_drift_alerts(
         generated_at=now_at,
         trigger_source=trigger_source,
         alert_status=alert_status,
+        lease_seconds=get_settings().content_script_remote_drift_scheduler_lease_seconds,
     )
     record_audit_log(
         db,
@@ -1143,8 +1143,10 @@ def scan_admin_content_script_asset_remote_drift(
     _require_admin(current_user)
     if not request_body.confirm_external_network:
         raise HTTPException(status_code=422, detail="confirm_external_network must be true")
-    report = scan_current_content_script_asset_remote_drift(
-        db,
+    execution = run_content_script_asset_remote_drift_scan(
+        creator=current_user,
+        db=db,
+        trigger_source="manual",
         slug=request_body.slug,
         source_host=request_body.source_host,
         issue_code=request_body.issue_code,
@@ -1152,13 +1154,8 @@ def scan_admin_content_script_asset_remote_drift(
         scan_limit=request_body.limit,
         scan_offset=request_body.offset,
     )
-    scan_run = create_content_script_asset_remote_drift_scan_run(
-        db,
-        report=report,
-        request_filters=_content_script_asset_remote_drift_scan_request_filters(request_body),
-        creator=current_user,
-    )
-    db.flush()
+    report = execution.report
+    scan_run = execution.run
     audit_snapshot = _content_script_asset_remote_drift_scan_snapshot(
         report,
         request_body=request_body,
@@ -3381,6 +3378,10 @@ def _admin_content_script_asset_scan_run_read(run: ContentScriptAssetScanRun) ->
         started_at=run.started_at,
         finished_at=run.finished_at,
         created_by_user_id=run.created_by_user_id,
+        attempt_count=run.attempt_count,
+        scheduler_lease_owner=run.scheduler_lease_owner,
+        scheduler_lease_expires_at=run.scheduler_lease_expires_at,
+        scheduler_heartbeat_at=run.scheduler_heartbeat_at,
         filters_json=run.filters_json,
         totals_json=run.totals_json,
         issue_counts_json=run.issue_counts_json,

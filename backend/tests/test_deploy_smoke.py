@@ -61,6 +61,8 @@ def test_deploy_smoke_disables_mutating_runtime_defaults(monkeypatch):
     monkeypatch.setenv("ASTRA_AUTO_CREATE_TABLES", "true")
     monkeypatch.setenv("ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_ENABLED", "true")
     monkeypatch.setenv("ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_RUN_ON_START", "true")
+    monkeypatch.setenv("ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_RUN_ON_START", "true")
     try:
         report = run_smoke(database_url=database_url, backend_root=backend_root)
 
@@ -69,6 +71,8 @@ def test_deploy_smoke_disables_mutating_runtime_defaults(monkeypatch):
         assert os.environ["ASTRA_AUTO_CREATE_TABLES"] == "true"
         assert os.environ["ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_ENABLED"] == "true"
         assert os.environ["ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_RUN_ON_START"] == "true"
+        assert os.environ["ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_ENABLED"] == "true"
+        assert os.environ["ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_RUN_ON_START"] == "true"
     finally:
         _dispose_and_remove(database_url, database_path)
 

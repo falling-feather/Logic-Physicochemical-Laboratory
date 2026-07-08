@@ -291,8 +291,12 @@ class AdminContentScriptAssetScanRunRead(BaseModel):
     trigger_source: str
     status: str
     started_at: datetime
-    finished_at: datetime
-    created_by_user_id: int
+    finished_at: datetime | None = None
+    created_by_user_id: int | None = None
+    attempt_count: int
+    scheduler_lease_owner: str | None = None
+    scheduler_lease_expires_at: datetime | None = None
+    scheduler_heartbeat_at: datetime | None = None
     filters_json: dict[str, Any]
     totals_json: dict[str, Any]
     issue_counts_json: dict[str, Any]
@@ -322,7 +326,7 @@ class AdminContentScriptAssetScanAlertCandidate(BaseModel):
     status: str
     alert_status: str
     started_at: datetime
-    finished_at: datetime
+    finished_at: datetime | None = None
     slug: str | None = None
     page_id: int | None = None
     page_version_id: int | None = None

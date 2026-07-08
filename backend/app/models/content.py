@@ -157,6 +157,7 @@ class ContentScriptHostPolicy(TimestampMixin, Base):
 
 class ContentScriptAssetScanRun(TimestampMixin, Base):
     __tablename__ = "content_script_asset_scan_runs"
+    __table_args__ = (UniqueConstraint("run_key", name="uq_content_script_asset_scan_runs_run_key"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     run_key: Mapped[str] = mapped_column(String(160), index=True, nullable=False)
@@ -164,8 +165,13 @@ class ContentScriptAssetScanRun(TimestampMixin, Base):
     trigger_source: Mapped[str] = mapped_column(String(32), default="manual", index=True, nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="success", index=True, nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
-    finished_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
-    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    scheduler_lease_owner: Mapped[str | None] = mapped_column(String(96), nullable=True)
+    scheduler_lease_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    scheduler_lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
+    scheduler_heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     filters_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     totals_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     issue_counts_json: Mapped[dict] = mapped_column(JSON, nullable=False)
