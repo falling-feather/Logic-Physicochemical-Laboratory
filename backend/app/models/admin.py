@@ -46,6 +46,31 @@ class AuditLog(TimestampMixin, Base):
     snapshot_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
 
 
+class AdminAlertOutboxDispatchPlan(TimestampMixin, Base):
+    __tablename__ = "admin_alert_outbox_dispatch_plans"
+    __table_args__ = (UniqueConstraint("plan_key", name="uq_admin_alert_outbox_dispatch_plans_plan_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    plan_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    plan_status: Mapped[str] = mapped_column(String(32), default="created", index=True, nullable=False)
+    dry_run_status: Mapped[str] = mapped_column(String(32), default="ready", index=True, nullable=False)
+    source_type: Mapped[str | None] = mapped_column(String(80), index=True, nullable=True)
+    filters_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    policy_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    ready_entry_ids_json: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    blocked_reason_counts_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    total_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    active_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    ready_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    blocked_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    expired_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    not_due_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    terminal_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    external_delivery_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+
+
 class AdminAlertOutboxEntry(TimestampMixin, Base):
     __tablename__ = "admin_alert_outbox_entries"
     __table_args__ = (UniqueConstraint("dedupe_key", name="uq_admin_alert_outbox_entries_dedupe_key"),)

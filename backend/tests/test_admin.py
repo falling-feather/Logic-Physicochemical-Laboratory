@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from app.core.config import get_settings
 from app.db.session import get_session_factory
 from app.models import (
+    AdminAlertOutboxDispatchPlan,
     AdminAlertOutboxEntry,
     AuditLog,
     AuthSession,
@@ -2654,6 +2655,294 @@ def test_admin_dry_runs_alert_outbox_dispatch_without_delivery_or_mutation(clien
     assert "payload_json" not in audit_text
     assert "review_note" not in audit_text
     assert "secret-dispatch" not in audit_text
+    assert "scheduler_lease_token" not in audit_text
+    assert "metadata_json" not in audit_text
+    assert "content_bytes" not in audit_text
+    assert "source_url" not in audit_text
+
+
+def test_admin_creates_alert_outbox_dispatch_plan_ledger_without_mutating_entries_or_leaking_payload(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "alert_outbox_plan_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    now = datetime(2026, 7, 24, 12, 0, tzinfo=UTC)
+    entries = [
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=501,
+            source_key="plan-ready",
+            event_code="lease_expiring",
+            severity="critical",
+            action_hint="inspect",
+            status="queued",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-plan-ready",
+            payload_hash="plan-ready-payload-hash",
+            payload_json={"secret": "secret-plan-ready", "scheduler_lease_token": "secret-plan-token"},
+            first_seen_at=now - timedelta(hours=3),
+            last_seen_at=now - timedelta(hours=3),
+            available_at=now - timedelta(minutes=5),
+            seen_count=2,
+            attempt_count=4,
+            last_error_code="previous-error",
+            review_note="secret-plan-review-note",
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=502,
+            source_key="plan-not-due",
+            event_code="pending_backlog",
+            severity="warning",
+            action_hint="monitor",
+            status="queued",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-plan-not-due",
+            payload_hash="plan-not-due-payload-hash",
+            payload_json={"secret": "secret-plan-not-due"},
+            first_seen_at=now - timedelta(hours=2),
+            last_seen_at=now - timedelta(hours=2),
+            available_at=now + timedelta(hours=1),
+            seen_count=1,
+            review_note="secret-plan-not-due-note",
+        ),
+        AdminAlertOutboxEntry(
+            source_type="content_script_asset_scan_run_alert",
+            source_id=503,
+            source_key="plan-planned",
+            event_code="remote_drift",
+            severity="critical",
+            action_hint="review",
+            status="planned",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-plan-planned",
+            payload_hash="plan-planned-payload-hash",
+            payload_json={"source_url": "https://cdn.example.test/secret-plan.js", "content_bytes": "secret-bytes"},
+            first_seen_at=now - timedelta(hours=4),
+            last_seen_at=now - timedelta(hours=4),
+            available_at=now - timedelta(minutes=10),
+            seen_count=1,
+            review_note="secret-plan-planned-note",
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=504,
+            source_key="plan-expired",
+            event_code="stale_running",
+            severity="warning",
+            action_hint="inspect",
+            status="queued",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-plan-expired",
+            payload_hash="plan-expired-payload-hash",
+            payload_json={"secret": "secret-plan-expired"},
+            first_seen_at=now - timedelta(days=2),
+            last_seen_at=now - timedelta(days=2),
+            available_at=now - timedelta(days=1),
+            expires_at=now - timedelta(minutes=1),
+            seen_count=1,
+            review_note="secret-plan-expired-note",
+        ),
+        AdminAlertOutboxEntry(
+            source_type="content_script_asset_scan_run_alert",
+            source_id=505,
+            source_key="plan-external",
+            event_code="webhook_ready",
+            severity="info",
+            action_hint="notify",
+            status="queued",
+            dispatch_mode="webhook",
+            delivery_target="external_webhook",
+            external_delivery=True,
+            dedupe_key="dispatch-plan-external",
+            payload_hash="plan-external-payload-hash",
+            payload_json={"secret": "secret-plan-external"},
+            first_seen_at=now - timedelta(hours=5),
+            last_seen_at=now - timedelta(hours=5),
+            available_at=now - timedelta(minutes=20),
+            seen_count=1,
+            review_note="secret-plan-external-note",
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=506,
+            source_key="plan-suppressed",
+            event_code="manual_close",
+            severity="info",
+            action_hint="ignore",
+            status="suppressed",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-plan-suppressed",
+            payload_hash="plan-suppressed-payload-hash",
+            payload_json={"secret": "secret-plan-suppressed"},
+            first_seen_at=now - timedelta(days=1),
+            last_seen_at=now - timedelta(days=1),
+            available_at=now - timedelta(days=1),
+            seen_count=1,
+            review_note="secret-plan-suppressed-note",
+        ),
+    ]
+    with session_factory() as db:
+        db.add_all(entries)
+        db.commit()
+        ids = [entry.id for entry in entries]
+        ready_id, not_due_id = ids[0], ids[1]
+        before = {
+            entry.id: {
+                "status": entry.status,
+                "attempt_count": entry.attempt_count,
+                "last_error_code": entry.last_error_code,
+                "available_at": entry.available_at,
+                "review_note": entry.review_note,
+                "reviewed_at": entry.reviewed_at,
+                "reviewed_by_user_id": entry.reviewed_by_user_id,
+            }
+            for entry in entries
+        }
+
+    forbidden = client.post(
+        "/api/admin/alert-outbox/dispatch-plans",
+        headers=_auth_header(teacher_token),
+        json={"entry_ids": ids, "confirm_create_plan": True},
+    )
+    assert forbidden.status_code == 403
+
+    missing_confirmation = client.post(
+        "/api/admin/alert-outbox/dispatch-plans",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": ids},
+    )
+    assert missing_confirmation.status_code == 422
+
+    duplicate_ids = client.post(
+        "/api/admin/alert-outbox/dispatch-plans",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [ready_id, ready_id], "confirm_create_plan": True},
+    )
+    assert duplicate_ids.status_code == 422
+
+    missing_id = client.post(
+        "/api/admin/alert-outbox/dispatch-plans",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [ready_id, 999999], "confirm_create_plan": True},
+    )
+    assert missing_id.status_code == 404
+
+    empty_plan = client.post(
+        "/api/admin/alert-outbox/dispatch-plans",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [not_due_id], "now_at": now.isoformat(), "confirm_create_plan": True},
+    )
+    assert empty_plan.status_code == 409
+    with session_factory() as db:
+        assert db.scalar(select(func.count()).select_from(AdminAlertOutboxDispatchPlan)) == 0
+
+    created = client.post(
+        "/api/admin/alert-outbox/dispatch-plans",
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-dispatch-plan-create"},
+        json={"entry_ids": ids, "now_at": now.isoformat(), "entry_limit": 100, "confirm_create_plan": True},
+    )
+    assert created.status_code == 200
+    body = created.json()
+    assert body["plan_status"] == "created"
+    assert body["dry_run_status"] == "ready"
+    assert body["ready_entry_ids"] == [ready_id]
+    assert body["ready_entry_count"] == 1
+    assert body["truncated_ready_entry_ids"] is False
+    assert body["ready_count"] == 1
+    assert body["blocked_count"] == 2
+    assert body["expired_count"] == 1
+    assert body["not_due_count"] == 1
+    assert body["terminal_count"] == 1
+    assert body["external_delivery_count"] == 1
+    assert body["blocked_reason_counts"] == {
+        "external_delivery_disabled": 1,
+        "planned_not_queued": 1,
+    }
+    assert body["policy"]["writes_dispatch_plan"] is True
+    assert body["policy"]["writes_outbox_state"] is False
+    assert body["policy"]["external_delivery"] is False
+    assert body["policy"]["broker_delivery"] is False
+    assert body["policy"]["automatic_actions"] is False
+    assert body["filters"]["entry_ids"] == ids
+    created_text = json.dumps(body, ensure_ascii=False)
+    assert "payload_json" not in created_text
+    assert "review_note" not in created_text
+    assert "secret-plan" not in created_text
+    assert "scheduler_lease_token" not in created_text
+    assert "content_bytes" not in created_text
+    assert "source_url" not in created_text
+
+    listed = client.get(
+        "/api/admin/alert-outbox/dispatch-plans?dry_run_status=ready",
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-dispatch-plan-list"},
+    )
+    assert listed.status_code == 200
+    listed_body = listed.json()
+    assert listed_body["total"] == 1
+    assert listed_body["items"][0]["id"] == body["id"]
+    listed_text = json.dumps(listed_body, ensure_ascii=False)
+    assert "payload_json" not in listed_text
+    assert "secret-plan" not in listed_text
+
+    read = client.get(
+        f"/api/admin/alert-outbox/dispatch-plans/{body['id']}",
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-dispatch-plan-read"},
+    )
+    assert read.status_code == 200
+    assert read.json()["ready_entry_ids"] == [ready_id]
+    read_text = json.dumps(read.json(), ensure_ascii=False)
+    assert "payload_json" not in read_text
+    assert "review_note" not in read_text
+    assert "secret-plan" not in read_text
+
+    with session_factory() as db:
+        plan = db.get(AdminAlertOutboxDispatchPlan, body["id"])
+        assert plan is not None
+        assert plan.ready_entry_ids_json == [ready_id]
+        assert plan.blocked_reason_counts_json == {
+            "external_delivery_disabled": 1,
+            "planned_not_queued": 1,
+        }
+        assert "payload_json" not in json.dumps(plan.filters_json, ensure_ascii=False)
+        for entry_id, snapshot in before.items():
+            stored = db.get(AdminAlertOutboxEntry, entry_id)
+            assert stored.status == snapshot["status"]
+            assert stored.attempt_count == snapshot["attempt_count"]
+            assert stored.last_error_code == snapshot["last_error_code"]
+            assert stored.available_at == snapshot["available_at"]
+            assert stored.review_note == snapshot["review_note"]
+            assert stored.reviewed_at == snapshot["reviewed_at"]
+            assert stored.reviewed_by_user_id == snapshot["reviewed_by_user_id"]
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.dispatch_plan.create"
+        "&resource_type=admin_alert_outbox_dispatch_plan&request_id=alert-outbox-dispatch-plan-create",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert snapshot["format"] == "admin_alert_outbox_dispatch_plan"
+    assert snapshot["plan_id"] == body["id"]
+    assert snapshot["ready_entry_ids"] == [ready_id]
+    assert snapshot["ready_count"] == 1
+    assert snapshot["blocked_count"] == 2
+    assert snapshot["policy"]["writes_dispatch_plan"] is True
+    assert snapshot["policy"]["writes_outbox_state"] is False
+    audit_text = json.dumps(snapshot, ensure_ascii=False)
+    assert "payload_json" not in audit_text
+    assert "review_note" not in audit_text
+    assert "secret-plan" not in audit_text
     assert "scheduler_lease_token" not in audit_text
     assert "metadata_json" not in audit_text
     assert "content_bytes" not in audit_text

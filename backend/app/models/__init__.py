@@ -1,5 +1,5 @@
 from app.models.base import Base
-from app.models.admin import AdminAlertOutboxEntry, AuditLog, BugRecord
+from app.models.admin import AdminAlertOutboxDispatchPlan, AdminAlertOutboxEntry, AuditLog, BugRecord
 from app.models.content import (
     ContentDraft,
     ContentPageRecord,
@@ -26,6 +26,7 @@ from app.models.user import AuthSession, LoginAttempt, PasswordResetToken, User
 
 __all__ = [
     "Assignment",
+    "AdminAlertOutboxDispatchPlan",
     "AdminAlertOutboxEntry",
     "AuditLog",
     "AuthSession",

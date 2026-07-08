@@ -1007,6 +1007,51 @@ class AdminAlertOutboxDispatchDryRunReport(BaseModel):
     not_due_items: list[AdminAlertOutboxDispatchDryRunItem]
 
 
+class AdminAlertOutboxDispatchPlanCreateRequest(BaseModel):
+    entry_ids: list[int] = Field(min_length=1, max_length=100)
+    source_type: str | None = Field(default=None, max_length=80)
+    from_at: datetime | None = None
+    to_at: datetime | None = None
+    now_at: datetime | None = None
+    entry_limit: int = Field(default=100, ge=1, le=100)
+    allow_empty_plan: bool = False
+    confirm_create_plan: bool = False
+
+
+class AdminAlertOutboxDispatchPlanRead(BaseModel):
+    id: int
+    plan_key: str
+    plan_status: Literal["created"]
+    generated_at: datetime
+    created_at: datetime
+    updated_at: datetime
+    created_by_user_id: int | None = None
+    source_type: str | None = None
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    dry_run_status: Literal["empty", "blocked", "expired", "ready", "cleared"]
+    total_count: int
+    active_count: int
+    ready_count: int
+    blocked_count: int
+    expired_count: int
+    not_due_count: int
+    terminal_count: int
+    external_delivery_count: int
+    ready_entry_ids: list[int]
+    ready_entry_count: int
+    truncated_ready_entry_ids: bool
+    blocked_reason_counts: dict[str, int]
+
+
+class AdminAlertOutboxDispatchPlanPage(BaseModel):
+    items: list[AdminAlertOutboxDispatchPlanRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
 class AdminAlertOutboxEntryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

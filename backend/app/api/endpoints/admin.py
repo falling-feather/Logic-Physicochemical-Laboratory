@@ -5,6 +5,7 @@ import re
 from datetime import UTC, date, datetime, timedelta
 from hashlib import sha256
 from typing import Any, Literal
+from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, Response, status
 from sqlalchemy import case, func, or_, select
@@ -16,6 +17,7 @@ from app.core.config import get_settings
 from app.core.security import hash_password, password_strength_errors
 from app.db.session import get_db
 from app.models import (
+    AdminAlertOutboxDispatchPlan,
     AdminAlertOutboxEntry,
     AuthSession,
     AuditLog,
@@ -106,6 +108,9 @@ from app.schemas.admin import (
     AdminAlertOutboxDispatchDryRunItem,
     AdminAlertOutboxDispatchDryRunReport,
     AdminAlertOutboxDispatchDryRunRequest,
+    AdminAlertOutboxDispatchPlanCreateRequest,
+    AdminAlertOutboxDispatchPlanPage,
+    AdminAlertOutboxDispatchPlanRead,
     AdminAlertOutboxEntryRead,
     AdminAlertOutboxPage,
     AdminAlertOutboxQueueItem,
@@ -2011,6 +2016,199 @@ def dry_run_admin_alert_outbox_dispatch(
     )
     db.commit()
     return report
+
+
+@router.post("/alert-outbox/dispatch-plans", response_model=AdminAlertOutboxDispatchPlanRead)
+def create_admin_alert_outbox_dispatch_plan(
+    request_body: AdminAlertOutboxDispatchPlanCreateRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminAlertOutboxDispatchPlanRead:
+    _require_admin(current_user)
+    if not request_body.confirm_create_plan:
+        raise HTTPException(status_code=422, detail="confirm_create_plan must be true")
+    entries, filters, generated_at = _admin_alert_outbox_dispatch_entries_for_request(
+        db,
+        entry_ids=request_body.entry_ids,
+        source_type=request_body.source_type,
+        from_at=request_body.from_at,
+        to_at=request_body.to_at,
+        now_at=request_body.now_at,
+        entry_limit=request_body.entry_limit,
+    )
+    report = _admin_alert_outbox_dispatch_dry_run_report(
+        entries,
+        generated_at=generated_at,
+        filters=filters,
+        item_limit=request_body.entry_limit,
+    )
+    if report.ready_count == 0 and not request_body.allow_empty_plan:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "No ready alert outbox entries to plan",
+                "dry_run_status": report.dry_run_status,
+                "blocked_reason_counts": report.blocked_reason_counts,
+            },
+        )
+    ready_entry_ids = [
+        entry.id
+        for entry in _sort_admin_alert_outbox_queue_items(
+            [entry for entry in entries if _admin_alert_outbox_entry_dispatch_ready(entry, generated_at)]
+        )[: request_body.entry_limit]
+    ]
+    plan = AdminAlertOutboxDispatchPlan(
+        plan_key=_admin_alert_outbox_dispatch_plan_key(generated_at),
+        plan_status="created",
+        dry_run_status=report.dry_run_status,
+        source_type=filters.get("source_type"),
+        filters_json={
+            key: _admin_alert_outbox_snapshot_value(value)
+            for key, value in {**report.filters, "entry_limit": request_body.entry_limit}.items()
+        },
+        policy_json={
+            **report.policy,
+            "writes_dispatch_plan": True,
+            "writes_outbox_state": False,
+            "ready_entry_id_limit": request_body.entry_limit,
+            "allow_empty_plan": request_body.allow_empty_plan,
+        },
+        ready_entry_ids_json=ready_entry_ids,
+        blocked_reason_counts_json=report.blocked_reason_counts,
+        total_count=report.total_count,
+        active_count=report.active_count,
+        ready_count=report.ready_count,
+        blocked_count=report.blocked_count,
+        expired_count=report.expired_count,
+        not_due_count=report.not_due_count,
+        terminal_count=report.terminal_count,
+        external_delivery_count=report.external_delivery_count,
+        generated_at=generated_at,
+        created_by_user_id=current_user.id,
+    )
+    db.add(plan)
+    db.flush()
+    response = _admin_alert_outbox_dispatch_plan_read(plan)
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.alert_outbox.dispatch_plan.create",
+        resource_type="admin_alert_outbox_dispatch_plan",
+        resource_id=plan.id,
+        event_result="success",
+        request=request,
+        snapshot=_admin_alert_outbox_dispatch_plan_snapshot(response),
+    )
+    db.commit()
+    return response
+
+
+@router.get("/alert-outbox/dispatch-plans", response_model=AdminAlertOutboxDispatchPlanPage)
+def list_admin_alert_outbox_dispatch_plans(
+    request: Request,
+    plan_status: str | None = Query(default=None, max_length=32),
+    dry_run_status: str | None = Query(default=None, max_length=32),
+    source_type: str | None = Query(default=None, max_length=80),
+    from_at: datetime | None = Query(default=None),
+    to_at: datetime | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminAlertOutboxDispatchPlanPage:
+    _require_admin(current_user)
+    if from_at is not None and to_at is not None and from_at > to_at:
+        raise HTTPException(status_code=422, detail="from_at must be earlier than to_at")
+    statement = select(AdminAlertOutboxDispatchPlan).order_by(
+        AdminAlertOutboxDispatchPlan.generated_at.desc(),
+        AdminAlertOutboxDispatchPlan.id.desc(),
+    )
+    filters = {
+        "plan_status": plan_status.strip() if plan_status is not None and plan_status.strip() else None,
+        "dry_run_status": dry_run_status.strip() if dry_run_status is not None and dry_run_status.strip() else None,
+        "source_type": source_type.strip() if source_type is not None and source_type.strip() else None,
+        "from_at": from_at,
+        "to_at": to_at,
+        "limit": limit,
+        "offset": offset,
+    }
+    if filters["plan_status"] is not None:
+        statement = statement.where(AdminAlertOutboxDispatchPlan.plan_status == filters["plan_status"])
+    if filters["dry_run_status"] is not None:
+        statement = statement.where(AdminAlertOutboxDispatchPlan.dry_run_status == filters["dry_run_status"])
+    if filters["source_type"] is not None:
+        statement = statement.where(AdminAlertOutboxDispatchPlan.source_type == filters["source_type"])
+    if from_at is not None:
+        statement = statement.where(AdminAlertOutboxDispatchPlan.generated_at >= from_at)
+    if to_at is not None:
+        statement = statement.where(AdminAlertOutboxDispatchPlan.generated_at <= to_at)
+    total = _statement_count(db, statement)
+    plans = list(db.scalars(statement.offset(offset).limit(limit)).all())
+    items = [_admin_alert_outbox_dispatch_plan_read(plan) for plan in plans]
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.alert_outbox.dispatch_plan.list",
+        resource_type="admin_alert_outbox_dispatch_plan",
+        event_result="success",
+        request=request,
+        snapshot={
+            "format": "admin_alert_outbox_dispatch_plan_list",
+            "filters": {
+                key: _admin_alert_outbox_snapshot_value(value)
+                for key, value in filters.items()
+                if value is not None
+            },
+            "total": total,
+            "returned_count": len(items),
+        },
+    )
+    db.commit()
+    return AdminAlertOutboxDispatchPlanPage(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        next_offset=_next_offset(total, offset, len(items)),
+    )
+
+
+@router.get("/alert-outbox/dispatch-plans/{plan_id}", response_model=AdminAlertOutboxDispatchPlanRead)
+def get_admin_alert_outbox_dispatch_plan(
+    plan_id: int,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminAlertOutboxDispatchPlanRead:
+    _require_admin(current_user)
+    plan = db.get(AdminAlertOutboxDispatchPlan, plan_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Alert outbox dispatch plan not found")
+    response = _admin_alert_outbox_dispatch_plan_read(plan)
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.alert_outbox.dispatch_plan.read",
+        resource_type="admin_alert_outbox_dispatch_plan",
+        resource_id=plan.id,
+        event_result="success",
+        request=request,
+        snapshot={
+            "format": "admin_alert_outbox_dispatch_plan_read",
+            "plan_id": plan.id,
+            "plan_key": plan.plan_key,
+            "plan_status": plan.plan_status,
+            "dry_run_status": plan.dry_run_status,
+            "ready_count": plan.ready_count,
+            "blocked_count": plan.blocked_count,
+            "expired_count": plan.expired_count,
+            "not_due_count": plan.not_due_count,
+            "terminal_count": plan.terminal_count,
+        },
+    )
+    db.commit()
+    return response
 
 
 @router.patch("/alert-outbox/reviews", response_model=AdminAlertOutboxBulkReviewResponse)
@@ -4264,23 +4462,13 @@ def _admin_alert_outbox_dispatch_dry_run_report(
     ready_entries = [
         entry
         for entry in active_entries
-        if entry.status == "queued"
-        and _admin_alert_outbox_entry_due(entry, generated_at)
-        and not _admin_alert_outbox_entry_expired(entry, generated_at)
-        and not entry.external_delivery
-        and entry.dispatch_mode == "manual_review"
-        and entry.delivery_target == "admin_outbox"
+        if _admin_alert_outbox_entry_dispatch_ready(entry, generated_at)
     ]
     ready_entry_ids = {entry.id for entry in ready_entries}
     not_due_entries = [
         entry
         for entry in active_entries
-        if entry.status == "queued"
-        and not _admin_alert_outbox_entry_due(entry, generated_at)
-        and not _admin_alert_outbox_entry_expired(entry, generated_at)
-        and not entry.external_delivery
-        and entry.dispatch_mode == "manual_review"
-        and entry.delivery_target == "admin_outbox"
+        if _admin_alert_outbox_entry_dispatch_not_due(entry, generated_at)
     ]
     not_due_entry_ids = {entry.id for entry in not_due_entries}
     expired_entry_ids = {entry.id for entry in expired_entries}
@@ -4371,6 +4559,114 @@ def _admin_alert_outbox_dispatch_dry_run_snapshot(report: AdminAlertOutboxDispat
     }
 
 
+def _admin_alert_outbox_dispatch_entries_for_request(
+    db: Session,
+    *,
+    entry_ids: list[int] | None,
+    source_type: str | None,
+    from_at: datetime | None,
+    to_at: datetime | None,
+    now_at: datetime | None,
+    entry_limit: int,
+) -> tuple[list[AdminAlertOutboxEntry], dict[str, Any], datetime]:
+    if from_at is not None and to_at is not None and from_at > to_at:
+        raise HTTPException(status_code=422, detail="from_at must be earlier than to_at")
+    unique_entry_ids: list[int] | None = None
+    if entry_ids is not None:
+        unique_entry_ids = list(dict.fromkeys(entry_ids))
+        if len(unique_entry_ids) != len(entry_ids):
+            raise HTTPException(status_code=422, detail="entry_ids must be unique")
+    generated_at = now_at or datetime.now(UTC)
+    filters = {
+        "entry_ids": unique_entry_ids,
+        "source_type": source_type.strip() if source_type is not None and source_type.strip() else None,
+        "from_at": from_at,
+        "to_at": to_at,
+        "now_at": generated_at,
+        "entry_limit": entry_limit,
+    }
+    statement = select(AdminAlertOutboxEntry)
+    if unique_entry_ids is not None:
+        statement = statement.where(AdminAlertOutboxEntry.id.in_(unique_entry_ids))
+    if filters["source_type"] is not None:
+        statement = statement.where(AdminAlertOutboxEntry.source_type == filters["source_type"])
+    if from_at is not None:
+        statement = statement.where(AdminAlertOutboxEntry.last_seen_at >= from_at)
+    if to_at is not None:
+        statement = statement.where(AdminAlertOutboxEntry.last_seen_at <= to_at)
+    entries = list(
+        db.scalars(statement.order_by(AdminAlertOutboxEntry.last_seen_at.desc(), AdminAlertOutboxEntry.id.desc())).all()
+    )
+    if unique_entry_ids is not None:
+        found_ids = {entry.id for entry in entries}
+        missing_ids = [entry_id for entry_id in unique_entry_ids if entry_id not in found_ids]
+        if missing_ids:
+            raise HTTPException(
+                status_code=404,
+                detail={"message": "Alert outbox entries not found", "missing_ids": missing_ids},
+            )
+    return entries, filters, generated_at
+
+
+def _admin_alert_outbox_dispatch_plan_key(generated_at: datetime) -> str:
+    return sha256(f"{uuid4().hex}:{generated_at.isoformat()}".encode("utf-8")).hexdigest()
+
+
+def _admin_alert_outbox_dispatch_plan_read(
+    plan: AdminAlertOutboxDispatchPlan,
+) -> AdminAlertOutboxDispatchPlanRead:
+    ready_entry_ids = [int(entry_id) for entry_id in list(plan.ready_entry_ids_json or [])]
+    return AdminAlertOutboxDispatchPlanRead(
+        id=plan.id,
+        plan_key=plan.plan_key,
+        plan_status=plan.plan_status,  # type: ignore[arg-type]
+        generated_at=plan.generated_at,
+        created_at=plan.created_at,
+        updated_at=plan.updated_at,
+        created_by_user_id=plan.created_by_user_id,
+        source_type=plan.source_type,
+        filters=plan.filters_json or {},
+        policy=plan.policy_json or {},
+        dry_run_status=plan.dry_run_status,  # type: ignore[arg-type]
+        total_count=plan.total_count,
+        active_count=plan.active_count,
+        ready_count=plan.ready_count,
+        blocked_count=plan.blocked_count,
+        expired_count=plan.expired_count,
+        not_due_count=plan.not_due_count,
+        terminal_count=plan.terminal_count,
+        external_delivery_count=plan.external_delivery_count,
+        ready_entry_ids=ready_entry_ids,
+        ready_entry_count=len(ready_entry_ids),
+        truncated_ready_entry_ids=plan.ready_count > len(ready_entry_ids),
+        blocked_reason_counts=plan.blocked_reason_counts_json or {},
+    )
+
+
+def _admin_alert_outbox_dispatch_plan_snapshot(plan: AdminAlertOutboxDispatchPlanRead) -> dict[str, Any]:
+    return {
+        "format": "admin_alert_outbox_dispatch_plan",
+        "plan_id": plan.id,
+        "plan_key": plan.plan_key,
+        "plan_status": plan.plan_status,
+        "dry_run_status": plan.dry_run_status,
+        "filters": plan.filters,
+        "policy": plan.policy,
+        "total_count": plan.total_count,
+        "active_count": plan.active_count,
+        "ready_count": plan.ready_count,
+        "blocked_count": plan.blocked_count,
+        "expired_count": plan.expired_count,
+        "not_due_count": plan.not_due_count,
+        "terminal_count": plan.terminal_count,
+        "external_delivery_count": plan.external_delivery_count,
+        "ready_entry_ids": plan.ready_entry_ids,
+        "ready_entry_count": plan.ready_entry_count,
+        "truncated_ready_entry_ids": plan.truncated_ready_entry_ids,
+        "blocked_reason_counts": plan.blocked_reason_counts,
+    }
+
+
 def _admin_alert_outbox_snapshot_value(value: Any) -> Any:
     if isinstance(value, datetime):
         return value.isoformat()
@@ -4387,6 +4683,28 @@ def _admin_alert_outbox_entry_due(entry: AdminAlertOutboxEntry, now_at: datetime
 
 def _admin_alert_outbox_entry_expired(entry: AdminAlertOutboxEntry, now_at: datetime) -> bool:
     return entry.expires_at is not None and _naive_utc(entry.expires_at) <= _naive_utc(now_at)
+
+
+def _admin_alert_outbox_entry_dispatch_ready(entry: AdminAlertOutboxEntry, now_at: datetime) -> bool:
+    return (
+        entry.status == "queued"
+        and _admin_alert_outbox_entry_due(entry, now_at)
+        and not _admin_alert_outbox_entry_expired(entry, now_at)
+        and not entry.external_delivery
+        and entry.dispatch_mode == "manual_review"
+        and entry.delivery_target == "admin_outbox"
+    )
+
+
+def _admin_alert_outbox_entry_dispatch_not_due(entry: AdminAlertOutboxEntry, now_at: datetime) -> bool:
+    return (
+        entry.status == "queued"
+        and not _admin_alert_outbox_entry_due(entry, now_at)
+        and not _admin_alert_outbox_entry_expired(entry, now_at)
+        and not entry.external_delivery
+        and entry.dispatch_mode == "manual_review"
+        and entry.delivery_target == "admin_outbox"
+    )
 
 
 def _admin_alert_outbox_status_bucket(
