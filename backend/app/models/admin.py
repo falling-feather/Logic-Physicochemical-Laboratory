@@ -58,6 +58,7 @@ class AdminAlertOutboxDispatchPlan(TimestampMixin, Base):
     filters_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     policy_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     ready_entry_ids_json: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    ready_entry_payload_hashes_json: Mapped[dict | None] = mapped_column(JSON, default=dict, nullable=True)
     blocked_reason_counts_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     total_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     active_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

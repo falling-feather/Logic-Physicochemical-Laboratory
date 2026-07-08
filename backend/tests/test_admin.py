@@ -2909,6 +2909,7 @@ def test_admin_creates_alert_outbox_dispatch_plan_ledger_without_mutating_entrie
         plan = db.get(AdminAlertOutboxDispatchPlan, body["id"])
         assert plan is not None
         assert plan.ready_entry_ids_json == [ready_id]
+        assert plan.ready_entry_payload_hashes_json == {str(ready_id): "plan-ready-payload-hash"}
         assert plan.blocked_reason_counts_json == {
             "external_delivery_disabled": 1,
             "planned_not_queued": 1,
@@ -2947,6 +2948,196 @@ def test_admin_creates_alert_outbox_dispatch_plan_ledger_without_mutating_entrie
     assert "metadata_json" not in audit_text
     assert "content_bytes" not in audit_text
     assert "source_url" not in audit_text
+
+
+def test_admin_validates_alert_outbox_dispatch_plan_against_current_entries_without_mutation(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "alert_outbox_plan_validate_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    now = datetime(2026, 7, 24, 14, 0, tzinfo=UTC)
+    entries = [
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=601 + index,
+            source_key=f"validate-ready-{index}",
+            event_code="lease_expiring",
+            severity="critical",
+            action_hint="inspect",
+            status="queued",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key=f"dispatch-plan-validate-ready-{index}",
+            payload_hash=f"validate-ready-payload-hash-{index}",
+            payload_json={"secret": f"secret-validate-{index}", "metadata_json": {"token": "secret-token"}},
+            first_seen_at=now - timedelta(hours=index + 1),
+            last_seen_at=now - timedelta(hours=index + 1),
+            available_at=now - timedelta(minutes=index + 1),
+            seen_count=1,
+            attempt_count=index,
+            review_note=f"secret-validate-note-{index}",
+        )
+        for index in range(5)
+    ]
+    with session_factory() as db:
+        db.add_all(entries)
+        db.commit()
+        ids = [entry.id for entry in entries]
+
+    created = client.post(
+        "/api/admin/alert-outbox/dispatch-plans",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": ids, "now_at": now.isoformat(), "confirm_create_plan": True},
+    )
+    assert created.status_code == 200
+    plan_id = created.json()["id"]
+    planned_ids = created.json()["ready_entry_ids"]
+
+    forbidden = client.post(
+        f"/api/admin/alert-outbox/dispatch-plans/{plan_id}/validate",
+        headers=_auth_header(teacher_token),
+        json={"confirm_validate_plan": True},
+    )
+    assert forbidden.status_code == 403
+
+    missing_confirmation = client.post(
+        f"/api/admin/alert-outbox/dispatch-plans/{plan_id}/validate",
+        headers=_auth_header(admin_token),
+        json={},
+    )
+    assert missing_confirmation.status_code == 422
+
+    missing_plan = client.post(
+        "/api/admin/alert-outbox/dispatch-plans/999999/validate",
+        headers=_auth_header(admin_token),
+        json={"confirm_validate_plan": True},
+    )
+    assert missing_plan.status_code == 404
+
+    valid = client.post(
+        f"/api/admin/alert-outbox/dispatch-plans/{plan_id}/validate",
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-dispatch-plan-validate-valid"},
+        json={"now_at": now.isoformat(), "confirm_validate_plan": True},
+    )
+    assert valid.status_code == 200
+    valid_body = valid.json()
+    assert valid_body["validation_status"] == "valid"
+    assert valid_body["planned_ready_count"] == 5
+    assert valid_body["current_ready_count"] == 5
+    assert valid_body["missing_count"] == 0
+    assert valid_body["payload_hash_mismatch_count"] == 0
+    assert valid_body["payload_hash_snapshot_missing_count"] == 0
+    assert valid_body["blocked_count"] == 0
+    assert valid_body["expired_count"] == 0
+    assert valid_body["not_due_count"] == 0
+    assert valid_body["payload_hash_snapshot_available"] is True
+    assert valid_body["ready_entry_ids"] == planned_ids
+    assert valid_body["policy"]["validates_payload_hashes"] is True
+    assert valid_body["policy"]["writes_outbox_state"] is False
+    assert valid_body["policy"]["external_delivery"] is False
+    assert valid_body["policy"]["broker_delivery"] is False
+
+    original_hashes = {str(entry_id): f"validate-ready-payload-hash-{index}" for index, entry_id in enumerate(ids)}
+    with session_factory() as db:
+        plan = db.get(AdminAlertOutboxDispatchPlan, plan_id)
+        plan.ready_entry_payload_hashes_json = {}
+        db.commit()
+
+    legacy = client.post(
+        f"/api/admin/alert-outbox/dispatch-plans/{plan_id}/validate",
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-dispatch-plan-validate-legacy"},
+        json={"now_at": now.isoformat(), "confirm_validate_plan": True},
+    )
+    assert legacy.status_code == 200
+    legacy_body = legacy.json()
+    assert legacy_body["validation_status"] == "changed"
+    assert legacy_body["payload_hash_snapshot_available"] is False
+    assert legacy_body["payload_hash_snapshot_missing_count"] == 5
+    assert legacy_body["payload_hash_snapshot_missing_entry_ids"] == planned_ids
+    assert legacy_body["blocked_entry_ids"] == planned_ids
+    assert legacy_body["blocked_reason_counts"] == {"payload_hash_snapshot_missing": 5}
+
+    with session_factory() as db:
+        plan = db.get(AdminAlertOutboxDispatchPlan, plan_id)
+        plan.ready_entry_payload_hashes_json = original_hashes
+        db.commit()
+
+    with session_factory() as db:
+        changed_hash = db.get(AdminAlertOutboxEntry, ids[0])
+        changed_status = db.get(AdminAlertOutboxEntry, ids[1])
+        expired = db.get(AdminAlertOutboxEntry, ids[2])
+        not_due = db.get(AdminAlertOutboxEntry, ids[3])
+        missing = db.get(AdminAlertOutboxEntry, ids[4])
+        changed_hash.payload_hash = "validate-ready-payload-hash-changed"
+        changed_status.status = "planned"
+        expired.expires_at = now - timedelta(minutes=1)
+        not_due.available_at = now + timedelta(hours=1)
+        db.delete(missing)
+        db.commit()
+
+    changed = client.post(
+        f"/api/admin/alert-outbox/dispatch-plans/{plan_id}/validate",
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-dispatch-plan-validate-changed"},
+        json={"now_at": now.isoformat(), "confirm_validate_plan": True},
+    )
+    assert changed.status_code == 200
+    changed_body = changed.json()
+    assert changed_body["validation_status"] == "changed"
+    assert changed_body["planned_ready_count"] == 5
+    assert changed_body["current_ready_count"] == 0
+    assert changed_body["missing_count"] == 1
+    assert changed_body["payload_hash_mismatch_count"] == 1
+    assert changed_body["blocked_count"] == 2
+    assert changed_body["expired_count"] == 1
+    assert changed_body["not_due_count"] == 1
+    assert changed_body["missing_entry_ids"] == [ids[4]]
+    assert changed_body["payload_hash_mismatch_entry_ids"] == [ids[0]]
+    assert changed_body["blocked_entry_ids"] == [ids[1], ids[0]]
+    assert changed_body["expired_entry_ids"] == [ids[2]]
+    assert changed_body["not_due_entry_ids"] == [ids[3]]
+    assert changed_body["blocked_reason_counts"] == {
+        "payload_hash_mismatch": 1,
+        "planned_not_queued": 1,
+        "expired": 1,
+        "queued_not_due": 1,
+        "missing_entry": 1,
+    }
+    changed_text = json.dumps(changed_body, ensure_ascii=False)
+    assert "payload_json" not in changed_text
+    assert "review_note" not in changed_text
+    assert "secret-validate" not in changed_text
+    assert "metadata_json" not in changed_text
+    assert "validate-ready-payload-hash" not in changed_text
+
+    with session_factory() as db:
+        plan = db.get(AdminAlertOutboxDispatchPlan, plan_id)
+        assert plan.plan_status == "created"
+        assert plan.ready_entry_payload_hashes_json == original_hashes
+        stored_changed_hash = db.get(AdminAlertOutboxEntry, ids[0])
+        assert stored_changed_hash.status == "queued"
+        assert stored_changed_hash.attempt_count == 0
+        assert stored_changed_hash.review_note == "secret-validate-note-0"
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.dispatch_plan.validate"
+        "&resource_type=admin_alert_outbox_dispatch_plan&request_id=alert-outbox-dispatch-plan-validate-changed",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert snapshot["format"] == "admin_alert_outbox_dispatch_plan_validation"
+    assert snapshot["validation_status"] == "changed"
+    assert snapshot["payload_hash_mismatch_entry_ids"] == [ids[0]]
+    assert snapshot["missing_entry_ids"] == [ids[4]]
+    assert snapshot["policy"]["validates_payload_hashes"] is True
+    assert snapshot["policy"]["writes_outbox_state"] is False
+    audit_text = json.dumps(snapshot, ensure_ascii=False)
+    assert "payload_json" not in audit_text
+    assert "review_note" not in audit_text
+    assert "secret-validate" not in audit_text
+    assert "metadata_json" not in audit_text
+    assert "validate-ready-payload-hash" not in audit_text
 
 
 def test_admin_bulk_reviews_alert_outbox_entries_without_leaking_payload_or_partial_updates(client):

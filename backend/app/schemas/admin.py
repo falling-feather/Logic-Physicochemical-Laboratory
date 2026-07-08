@@ -1052,6 +1052,37 @@ class AdminAlertOutboxDispatchPlanPage(BaseModel):
     next_offset: int | None = None
 
 
+class AdminAlertOutboxDispatchPlanValidateRequest(BaseModel):
+    now_at: datetime | None = None
+    confirm_validate_plan: bool = False
+
+
+class AdminAlertOutboxDispatchPlanValidationReport(BaseModel):
+    generated_at: datetime
+    plan_id: int
+    plan_key: str
+    plan_status: Literal["created"]
+    validation_status: Literal["valid", "changed", "empty"]
+    policy: dict[str, Any]
+    planned_ready_count: int
+    current_ready_count: int
+    missing_count: int
+    payload_hash_mismatch_count: int
+    payload_hash_snapshot_missing_count: int
+    blocked_count: int
+    expired_count: int
+    not_due_count: int
+    payload_hash_snapshot_available: bool
+    ready_entry_ids: list[int]
+    missing_entry_ids: list[int]
+    payload_hash_mismatch_entry_ids: list[int]
+    payload_hash_snapshot_missing_entry_ids: list[int]
+    blocked_entry_ids: list[int]
+    expired_entry_ids: list[int]
+    not_due_entry_ids: list[int]
+    blocked_reason_counts: dict[str, int]
+
+
 class AdminAlertOutboxEntryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -111,6 +111,8 @@ from app.schemas.admin import (
     AdminAlertOutboxDispatchPlanCreateRequest,
     AdminAlertOutboxDispatchPlanPage,
     AdminAlertOutboxDispatchPlanRead,
+    AdminAlertOutboxDispatchPlanValidateRequest,
+    AdminAlertOutboxDispatchPlanValidationReport,
     AdminAlertOutboxEntryRead,
     AdminAlertOutboxPage,
     AdminAlertOutboxQueueItem,
@@ -2052,12 +2054,10 @@ def create_admin_alert_outbox_dispatch_plan(
                 "blocked_reason_counts": report.blocked_reason_counts,
             },
         )
-    ready_entry_ids = [
-        entry.id
-        for entry in _sort_admin_alert_outbox_queue_items(
-            [entry for entry in entries if _admin_alert_outbox_entry_dispatch_ready(entry, generated_at)]
-        )[: request_body.entry_limit]
-    ]
+    ready_entries = _sort_admin_alert_outbox_queue_items(
+        [entry for entry in entries if _admin_alert_outbox_entry_dispatch_ready(entry, generated_at)]
+    )[: request_body.entry_limit]
+    ready_entry_ids = [entry.id for entry in ready_entries]
     plan = AdminAlertOutboxDispatchPlan(
         plan_key=_admin_alert_outbox_dispatch_plan_key(generated_at),
         plan_status="created",
@@ -2075,6 +2075,7 @@ def create_admin_alert_outbox_dispatch_plan(
             "allow_empty_plan": request_body.allow_empty_plan,
         },
         ready_entry_ids_json=ready_entry_ids,
+        ready_entry_payload_hashes_json={str(entry.id): entry.payload_hash for entry in ready_entries},
         blocked_reason_counts_json=report.blocked_reason_counts,
         total_count=report.total_count,
         active_count=report.active_count,
@@ -2209,6 +2210,39 @@ def get_admin_alert_outbox_dispatch_plan(
     )
     db.commit()
     return response
+
+
+@router.post(
+    "/alert-outbox/dispatch-plans/{plan_id}/validate",
+    response_model=AdminAlertOutboxDispatchPlanValidationReport,
+)
+def validate_admin_alert_outbox_dispatch_plan(
+    plan_id: int,
+    request_body: AdminAlertOutboxDispatchPlanValidateRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminAlertOutboxDispatchPlanValidationReport:
+    _require_admin(current_user)
+    if not request_body.confirm_validate_plan:
+        raise HTTPException(status_code=422, detail="confirm_validate_plan must be true")
+    plan = db.get(AdminAlertOutboxDispatchPlan, plan_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Alert outbox dispatch plan not found")
+    generated_at = request_body.now_at or datetime.now(UTC)
+    report = _admin_alert_outbox_dispatch_plan_validation_report(plan, db, generated_at)
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.alert_outbox.dispatch_plan.validate",
+        resource_type="admin_alert_outbox_dispatch_plan",
+        resource_id=plan.id,
+        event_result="success",
+        request=request,
+        snapshot=_admin_alert_outbox_dispatch_plan_validation_snapshot(report),
+    )
+    db.commit()
+    return report
 
 
 @router.patch("/alert-outbox/reviews", response_model=AdminAlertOutboxBulkReviewResponse)
@@ -4664,6 +4698,168 @@ def _admin_alert_outbox_dispatch_plan_snapshot(plan: AdminAlertOutboxDispatchPla
         "ready_entry_count": plan.ready_entry_count,
         "truncated_ready_entry_ids": plan.truncated_ready_entry_ids,
         "blocked_reason_counts": plan.blocked_reason_counts,
+    }
+
+
+def _admin_alert_outbox_dispatch_plan_validation_report(
+    plan: AdminAlertOutboxDispatchPlan,
+    db: Session,
+    generated_at: datetime,
+) -> AdminAlertOutboxDispatchPlanValidationReport:
+    planned_entry_ids = [int(entry_id) for entry_id in list(plan.ready_entry_ids_json or [])]
+    planned_hashes = {str(key): str(value) for key, value in (plan.ready_entry_payload_hashes_json or {}).items()}
+    if not planned_entry_ids:
+        return AdminAlertOutboxDispatchPlanValidationReport(
+            generated_at=generated_at,
+            plan_id=plan.id,
+            plan_key=plan.plan_key,
+            plan_status=plan.plan_status,  # type: ignore[arg-type]
+            validation_status="empty",
+            policy=_admin_alert_outbox_dispatch_plan_validation_policy(plan),
+            planned_ready_count=0,
+            current_ready_count=0,
+            missing_count=0,
+            payload_hash_mismatch_count=0,
+            payload_hash_snapshot_missing_count=0,
+            blocked_count=0,
+            expired_count=0,
+            not_due_count=0,
+            payload_hash_snapshot_available=True,
+            ready_entry_ids=[],
+            missing_entry_ids=[],
+            payload_hash_mismatch_entry_ids=[],
+            payload_hash_snapshot_missing_entry_ids=[],
+            blocked_entry_ids=[],
+            expired_entry_ids=[],
+            not_due_entry_ids=[],
+            blocked_reason_counts={},
+        )
+    entries = list(
+        db.scalars(select(AdminAlertOutboxEntry).where(AdminAlertOutboxEntry.id.in_(planned_entry_ids))).all()
+    )
+    entry_by_id = {entry.id: entry for entry in entries}
+    ready_entry_ids: list[int] = []
+    missing_entry_ids: list[int] = []
+    mismatch_entry_ids: list[int] = []
+    snapshot_missing_entry_ids: list[int] = []
+    blocked_entry_ids: list[int] = []
+    expired_entry_ids: list[int] = []
+    not_due_entry_ids: list[int] = []
+    blocked_reason_counts: dict[str, int] = {}
+    for entry_id in planned_entry_ids:
+        entry = entry_by_id.get(entry_id)
+        if entry is None:
+            missing_entry_ids.append(entry_id)
+            blocked_reason_counts["missing_entry"] = blocked_reason_counts.get("missing_entry", 0) + 1
+            continue
+        planned_hash = planned_hashes.get(str(entry_id))
+        if planned_hash is None:
+            snapshot_missing_entry_ids.append(entry_id)
+            blocked_entry_ids.append(entry_id)
+            reason = "payload_hash_snapshot_missing"
+            blocked_reason_counts[reason] = blocked_reason_counts.get(reason, 0) + 1
+            continue
+        if entry.payload_hash != planned_hash:
+            mismatch_entry_ids.append(entry_id)
+            blocked_entry_ids.append(entry_id)
+            blocked_reason_counts["payload_hash_mismatch"] = blocked_reason_counts.get("payload_hash_mismatch", 0) + 1
+            continue
+        if _admin_alert_outbox_entry_dispatch_ready(entry, generated_at):
+            ready_entry_ids.append(entry_id)
+            continue
+        if _admin_alert_outbox_entry_expired(entry, generated_at):
+            expired_entry_ids.append(entry_id)
+            blocked_reason_counts["expired"] = blocked_reason_counts.get("expired", 0) + 1
+            continue
+        if _admin_alert_outbox_entry_dispatch_not_due(entry, generated_at):
+            not_due_entry_ids.append(entry_id)
+            blocked_reason_counts["queued_not_due"] = blocked_reason_counts.get("queued_not_due", 0) + 1
+            continue
+        reason = _admin_alert_outbox_dispatch_reason(entry, generated_at)
+        blocked_entry_ids.append(entry_id)
+        blocked_reason_counts[reason] = blocked_reason_counts.get(reason, 0) + 1
+    validation_status: Literal["valid", "changed", "empty"] = (
+        "valid"
+        if len(ready_entry_ids) == len(planned_entry_ids)
+        and not missing_entry_ids
+        and not mismatch_entry_ids
+        and not snapshot_missing_entry_ids
+        and not blocked_entry_ids
+        and not expired_entry_ids
+        and not not_due_entry_ids
+        else "changed"
+    )
+    return AdminAlertOutboxDispatchPlanValidationReport(
+        generated_at=generated_at,
+        plan_id=plan.id,
+        plan_key=plan.plan_key,
+        plan_status=plan.plan_status,  # type: ignore[arg-type]
+        validation_status=validation_status,
+        policy=_admin_alert_outbox_dispatch_plan_validation_policy(plan),
+        planned_ready_count=len(planned_entry_ids),
+        current_ready_count=len(ready_entry_ids),
+        missing_count=len(missing_entry_ids),
+        payload_hash_mismatch_count=len(mismatch_entry_ids),
+        payload_hash_snapshot_missing_count=len(snapshot_missing_entry_ids),
+        blocked_count=len(blocked_entry_ids),
+        expired_count=len(expired_entry_ids),
+        not_due_count=len(not_due_entry_ids),
+        payload_hash_snapshot_available=not snapshot_missing_entry_ids,
+        ready_entry_ids=ready_entry_ids,
+        missing_entry_ids=missing_entry_ids,
+        payload_hash_mismatch_entry_ids=mismatch_entry_ids,
+        payload_hash_snapshot_missing_entry_ids=snapshot_missing_entry_ids,
+        blocked_entry_ids=blocked_entry_ids,
+        expired_entry_ids=expired_entry_ids,
+        not_due_entry_ids=not_due_entry_ids,
+        blocked_reason_counts=blocked_reason_counts,
+    )
+
+
+def _admin_alert_outbox_dispatch_plan_validation_policy(plan: AdminAlertOutboxDispatchPlan) -> dict[str, Any]:
+    return {
+        "dry_run": True,
+        "validates_plan": True,
+        "validates_payload_hashes": True,
+        "writes_outbox_state": False,
+        "increments_attempts": False,
+        "external_delivery": False,
+        "broker_delivery": False,
+        "automatic_actions": False,
+        "dispatch_mode": "manual_review",
+        "delivery_target": "admin_outbox",
+        "plan_id": plan.id,
+        "plan_key": plan.plan_key,
+    }
+
+
+def _admin_alert_outbox_dispatch_plan_validation_snapshot(
+    report: AdminAlertOutboxDispatchPlanValidationReport,
+) -> dict[str, Any]:
+    return {
+        "format": "admin_alert_outbox_dispatch_plan_validation",
+        "plan_id": report.plan_id,
+        "plan_key": report.plan_key,
+        "plan_status": report.plan_status,
+        "validation_status": report.validation_status,
+        "policy": report.policy,
+        "planned_ready_count": report.planned_ready_count,
+        "current_ready_count": report.current_ready_count,
+        "missing_count": report.missing_count,
+        "payload_hash_mismatch_count": report.payload_hash_mismatch_count,
+        "payload_hash_snapshot_missing_count": report.payload_hash_snapshot_missing_count,
+        "blocked_count": report.blocked_count,
+        "expired_count": report.expired_count,
+        "not_due_count": report.not_due_count,
+        "payload_hash_snapshot_available": report.payload_hash_snapshot_available,
+        "ready_entry_ids": report.ready_entry_ids,
+        "missing_entry_ids": report.missing_entry_ids,
+        "payload_hash_mismatch_entry_ids": report.payload_hash_mismatch_entry_ids,
+        "payload_hash_snapshot_missing_entry_ids": report.payload_hash_snapshot_missing_entry_ids,
+        "blocked_entry_ids": report.blocked_entry_ids,
+        "expired_entry_ids": report.expired_entry_ids,
+        "not_due_entry_ids": report.not_due_entry_ids,
+        "blocked_reason_counts": report.blocked_reason_counts,
     }
 
 
