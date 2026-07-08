@@ -2342,6 +2342,198 @@ def test_admin_reads_alert_outbox_queue_report_without_leaking_payload_or_mutati
     assert "scheduler_lease_token" not in audit_text
 
 
+def test_admin_bulk_reviews_alert_outbox_entries_without_leaking_payload_or_partial_updates(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "alert_outbox_bulk_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    now = datetime(2026, 7, 24, 10, 0, tzinfo=UTC)
+    entries = [
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=201,
+            source_key="knowledge:bulk-review:pending",
+            event_code="stale_running",
+            severity="critical",
+            action_hint="investigate",
+            status="pending_review",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="bulk-review-pending",
+            payload_hash="bulk-hash-pending",
+            payload_json={"secret": "secret-bulk-payload", "scheduler_lease_token": "secret-bulk-token"},
+            first_seen_at=now - timedelta(hours=8),
+            last_seen_at=now - timedelta(hours=8),
+            available_at=now - timedelta(hours=8),
+            seen_count=1,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="content_script_asset_scan_run_alert",
+            source_id=202,
+            source_key="content:bulk-review:planned",
+            event_code="remote_drift_detected",
+            severity="warning",
+            action_hint="monitor",
+            status="planned",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="bulk-review-planned",
+            payload_hash="bulk-hash-planned",
+            payload_json={"source_url": "https://cdn.example.test/secret-bulk.js", "content_bytes": "secret-bytes"},
+            first_seen_at=now - timedelta(hours=6),
+            last_seen_at=now - timedelta(hours=6),
+            available_at=now - timedelta(hours=2),
+            reviewed_at=now - timedelta(hours=5),
+            review_note="old secret bulk note",
+            seen_count=2,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=203,
+            source_key="knowledge:bulk-review:suppressed",
+            event_code="manual_cancelled",
+            severity="info",
+            action_hint="monitor",
+            status="suppressed",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="bulk-review-suppressed",
+            payload_hash="bulk-hash-suppressed",
+            payload_json={"exception": "secret-bulk-exception"},
+            first_seen_at=now - timedelta(days=1),
+            last_seen_at=now - timedelta(days=1),
+            reviewed_at=now - timedelta(hours=12),
+            review_note="keep suppressed secret note",
+            seen_count=1,
+        ),
+    ]
+    with session_factory() as db:
+        db.add_all(entries)
+        db.commit()
+        first_id, second_id, third_id = [entry.id for entry in entries]
+
+    forbidden = client.patch(
+        "/api/admin/alert-outbox/reviews",
+        headers=_auth_header(teacher_token),
+        json={"entry_ids": [first_id, second_id], "status": "queued", "confirm_manual_review": True},
+    )
+    assert forbidden.status_code == 403
+
+    missing_confirmation = client.patch(
+        "/api/admin/alert-outbox/reviews",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [first_id, second_id], "status": "queued"},
+    )
+    assert missing_confirmation.status_code == 422
+
+    duplicate_ids = client.patch(
+        "/api/admin/alert-outbox/reviews",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [first_id, first_id], "status": "queued", "confirm_manual_review": True},
+    )
+    assert duplicate_ids.status_code == 422
+
+    invalid_status = client.patch(
+        "/api/admin/alert-outbox/reviews",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [first_id, second_id], "status": "sent", "confirm_manual_review": True},
+    )
+    assert invalid_status.status_code == 422
+
+    missing_entry = client.patch(
+        "/api/admin/alert-outbox/reviews",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [first_id, 999999], "status": "suppressed", "confirm_manual_review": True},
+    )
+    assert missing_entry.status_code == 404
+    assert missing_entry.json()["detail"]["missing_ids"] == [999999]
+    with session_factory() as db:
+        unchanged = db.get(AdminAlertOutboxEntry, first_id)
+        assert unchanged is not None
+        assert unchanged.status == "pending_review"
+        assert unchanged.reviewed_by_user_id is None
+
+    response = client.patch(
+        "/api/admin/alert-outbox/reviews",
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-bulk-review"},
+        json={
+            "entry_ids": [first_id, second_id],
+            "status": "queued",
+            "note": "bulk manual secret-review-note",
+            "confirm_manual_review": True,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "queued"
+    assert body["updated_count"] == 2
+    assert body["requested_count"] == 2
+    assert body["previous_status_counts"] == {"pending_review": 1, "planned": 1}
+    assert body["policy"]["external_delivery"] is False
+    assert body["policy"]["automatic_actions"] is False
+    assert {item["id"] for item in body["items"]} == {first_id, second_id}
+    assert all(item["status"] == "queued" for item in body["items"])
+    response_text = json.dumps(body, ensure_ascii=False)
+    assert "payload_json" not in response_text
+    assert "review_note" not in response_text
+    assert "secret-bulk" not in response_text
+    assert "secret-review-note" not in response_text
+    assert "content_bytes" not in response_text
+    assert "scheduler_lease_token" not in response_text
+
+    with session_factory() as db:
+        first = db.get(AdminAlertOutboxEntry, first_id)
+        second = db.get(AdminAlertOutboxEntry, second_id)
+        third = db.get(AdminAlertOutboxEntry, third_id)
+        assert first is not None and first.status == "queued"
+        assert first.reviewed_by_user_id is not None
+        assert first.reviewed_at is not None
+        assert first.review_note == "bulk manual secret-review-note"
+        assert second is not None and second.status == "queued"
+        assert second.review_note == "bulk manual secret-review-note"
+        assert third is not None and third.status == "suppressed"
+        assert third.review_note == "keep suppressed secret note"
+
+    queue = client.get(
+        "/api/admin/alert-outbox/queue",
+        params={"now_at": now.isoformat(), "item_limit": 10},
+        headers=_auth_header(admin_token),
+    )
+    assert queue.status_code == 200
+    queue_body = queue.json()
+    assert queue_body["queued_count"] == 2
+    assert queue_body["pending_review_count"] == 0
+    assert queue_body["planned_count"] == 0
+    assert queue_body["suppressed_count"] == 1
+    assert queue_body["due_queued_count"] == 2
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.bulk_review"
+        "&resource_type=admin_alert_outbox&request_id=alert-outbox-bulk-review",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert snapshot["format"] == "admin_alert_outbox_bulk_review"
+    assert snapshot["entry_count"] == 2
+    assert snapshot["entry_ids"] == [first_id, second_id]
+    assert snapshot["previous_status_counts"] == {"pending_review": 1, "planned": 1}
+    assert snapshot["status"] == "queued"
+    assert snapshot["note_provided"] is True
+    assert snapshot["external_delivery"] is False
+    assert snapshot["automatic_actions"] is False
+    audit_text = json.dumps(snapshot, ensure_ascii=False)
+    assert "payload_json" not in audit_text
+    assert "review_note" not in audit_text
+    assert "secret-bulk" not in audit_text
+    assert "secret-review-note" not in audit_text
+    assert "content_bytes" not in audit_text
+    assert "scheduler_lease_token" not in audit_text
+
+
 def test_admin_can_requeue_knowledge_snapshot_runs(client):
     admin_token = _bootstrap_admin(client)
     teacher_token = _register_and_login(client, "snapshot_requeue_teacher", "teacher")

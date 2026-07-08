@@ -882,6 +882,13 @@ class AdminAlertOutboxReviewRequest(BaseModel):
     confirm_manual_review: bool = False
 
 
+class AdminAlertOutboxBulkReviewRequest(BaseModel):
+    entry_ids: list[int] = Field(min_length=1, max_length=100)
+    status: AdminAlertOutboxStatus
+    note: str | None = Field(default=None, max_length=500)
+    confirm_manual_review: bool = False
+
+
 class AdminAlertOutboxStatusBucket(BaseModel):
     status: AdminAlertOutboxStatus
     total: int
@@ -933,6 +940,16 @@ class AdminAlertOutboxQueueReport(BaseModel):
     pending_review_items: list[AdminAlertOutboxQueueItem]
     ready_items: list[AdminAlertOutboxQueueItem]
     terminal_items: list[AdminAlertOutboxQueueItem]
+
+
+class AdminAlertOutboxBulkReviewResponse(BaseModel):
+    generated_at: datetime
+    status: AdminAlertOutboxStatus
+    updated_count: int
+    requested_count: int
+    previous_status_counts: dict[str, int]
+    policy: dict[str, Any]
+    items: list[AdminAlertOutboxQueueItem]
 
 
 class AdminAlertOutboxEntryRead(BaseModel):

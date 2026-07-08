@@ -101,6 +101,8 @@ from app.schemas.admin import (
     AdminUserPasswordResetResponse,
     AdminUserRead,
     AdminUserUpdate,
+    AdminAlertOutboxBulkReviewRequest,
+    AdminAlertOutboxBulkReviewResponse,
     AdminAlertOutboxEntryRead,
     AdminAlertOutboxPage,
     AdminAlertOutboxQueueItem,
@@ -1937,6 +1939,92 @@ def get_admin_alert_outbox_queue(
     )
     db.commit()
     return report
+
+
+@router.patch("/alert-outbox/reviews", response_model=AdminAlertOutboxBulkReviewResponse)
+def review_admin_alert_outbox_entries(
+    request_body: AdminAlertOutboxBulkReviewRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminAlertOutboxBulkReviewResponse:
+    _require_admin(current_user)
+    if not request_body.confirm_manual_review:
+        raise HTTPException(status_code=422, detail="confirm_manual_review must be true")
+    unique_entry_ids = list(dict.fromkeys(request_body.entry_ids))
+    if len(unique_entry_ids) != len(request_body.entry_ids):
+        raise HTTPException(status_code=422, detail="entry_ids must be unique")
+    entries = list(
+        db.scalars(
+            select(AdminAlertOutboxEntry)
+            .where(AdminAlertOutboxEntry.id.in_(unique_entry_ids))
+            .order_by(AdminAlertOutboxEntry.id.asc())
+        ).all()
+    )
+    found_ids = {entry.id for entry in entries}
+    missing_ids = [entry_id for entry_id in unique_entry_ids if entry_id not in found_ids]
+    if missing_ids:
+        raise HTTPException(
+            status_code=404,
+            detail={"message": "Alert outbox entries not found", "missing_ids": missing_ids},
+        )
+    reviewed_at = datetime.now(UTC)
+    note = request_body.note.strip() if request_body.note is not None and request_body.note.strip() else None
+    previous_status_counts: dict[str, int] = {}
+    source_type_counts: dict[str, int] = {}
+    severity_counts: dict[str, int] = {}
+    event_code_counts: dict[str, int] = {}
+    for entry in entries:
+        previous_status_counts[entry.status] = previous_status_counts.get(entry.status, 0) + 1
+        source_type_counts[entry.source_type] = source_type_counts.get(entry.source_type, 0) + 1
+        severity_counts[entry.severity] = severity_counts.get(entry.severity, 0) + 1
+        event_code_counts[entry.event_code] = event_code_counts.get(entry.event_code, 0) + 1
+        entry.status = request_body.status
+        entry.reviewed_by_user_id = current_user.id
+        entry.reviewed_at = reviewed_at
+        entry.review_note = note
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.alert_outbox.bulk_review",
+        resource_type="admin_alert_outbox",
+        event_result="success",
+        request=request,
+        snapshot={
+            "format": "admin_alert_outbox_bulk_review",
+            "entry_count": len(entries),
+            "entry_ids": unique_entry_ids,
+            "source_types": source_type_counts,
+            "event_codes": event_code_counts,
+            "severity_counts": severity_counts,
+            "previous_status_counts": previous_status_counts,
+            "status": request_body.status,
+            "reviewed_by_user_id": current_user.id,
+            "reviewed_at": reviewed_at.isoformat(),
+            "note_provided": note is not None,
+            "dispatch_mode": "manual_review",
+            "delivery_target": "admin_outbox",
+            "external_delivery": False,
+            "automatic_actions": False,
+        },
+    )
+    db.commit()
+    for entry in entries:
+        db.refresh(entry)
+    return AdminAlertOutboxBulkReviewResponse(
+        generated_at=reviewed_at,
+        status=request_body.status,
+        updated_count=len(entries),
+        requested_count=len(unique_entry_ids),
+        previous_status_counts=previous_status_counts,
+        policy={
+            "external_delivery": False,
+            "automatic_actions": False,
+            "dispatch_mode": "manual_review",
+            "delivery_target": "admin_outbox",
+        },
+        items=[_admin_alert_outbox_queue_item(entry) for entry in entries],
+    )
 
 
 @router.patch("/alert-outbox/{entry_id}", response_model=AdminAlertOutboxEntryRead)
