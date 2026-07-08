@@ -1,4 +1,5 @@
 import csv
+import hashlib
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -127,11 +128,102 @@ def test_audit_archive_writes_manifest_and_verifies_without_deleting(client, arc
     assert verified["ok"] is True
     assert verified["status"] == "verified"
     assert verified["exported_count"] == 2
+    assert verified["archive_chain"]["status"] == "partial"
+    assert verified["archive_chain"]["current_hash_recomputed"] is False
+    assert verified["archive_chain"]["current_hash_recompute_reason"] == "snapshot_json_not_exported"
+    assert verified["archive_chain"]["prev_hash_mismatch_count"] == 0
 
     with session_factory() as db:
         assert db.get(AuditLog, first_id) is not None
         assert db.get(AuditLog, second_id) is not None
         assert db.scalar(select(func.count()).select_from(AuditLog).where(AuditLog.action == "archive.audit")) == 3
+
+
+def test_audit_archive_verify_recomputes_jsonl_hash_with_snapshot(client, archive_output_dir):
+    now = datetime.now(UTC)
+    created_at = now - timedelta(days=75)
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        log = _valid_audit_log(
+            action="archive.recompute",
+            resource="archive:recompute",
+            created_at=created_at,
+            snapshot_json={"kept": "for-hash-proof"},
+        )
+        db.add(log)
+        db.commit()
+
+    report = run_archive(
+        output_dir=archive_output_dir,
+        archive_format="jsonl",
+        before_at=now - timedelta(days=30),
+        action="archive.recompute",
+        include_snapshot=True,
+    )
+    manifest_path = archive_output_dir / report["manifest"]["manifest_file"]
+
+    verified = verify_archive_manifest(manifest_path)
+
+    assert verified["ok"] is True
+    assert verified["status"] == "verified"
+    assert verified["archive_chain"]["status"] == "valid"
+    assert verified["archive_chain"]["valid"] is True
+    assert verified["archive_chain"]["current_hash_recomputed"] is True
+    assert verified["archive_chain"]["current_hash_mismatch_count"] == 0
+    assert verified["archive_chain"]["prev_hash_mismatch_count"] == 0
+
+
+def test_audit_archive_verify_detects_internal_chain_tamper_after_rehash(client, archive_output_dir):
+    now = datetime.now(UTC)
+    first_created_at = now - timedelta(days=80)
+    second_created_at = now - timedelta(days=70)
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        first = _valid_audit_log(
+            action="archive.chain_tamper",
+            resource="archive:chain-first",
+            created_at=first_created_at,
+        )
+        second = _valid_audit_log(
+            action="archive.chain_tamper",
+            resource="archive:chain-second",
+            created_at=second_created_at,
+            prev_hash=first.current_hash,
+        )
+        db.add_all([first, second])
+        db.commit()
+
+    report = run_archive(
+        output_dir=archive_output_dir,
+        archive_format="jsonl",
+        before_at=now - timedelta(days=30),
+        action="archive.chain_tamper",
+        include_snapshot=False,
+    )
+    manifest_path = archive_output_dir / report["manifest"]["manifest_file"]
+    archive_path = archive_output_dir / report["manifest"]["archive_file"]
+
+    records = [json.loads(line) for line in archive_path.read_text(encoding="utf-8").splitlines()]
+    records[1]["prev_hash"] = "manually-broken-prev-hash"
+    archive_path.write_text(
+        "".join(
+            json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
+            for record in records
+        ),
+        encoding="utf-8",
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["archive_sha256"] = _sha256_file_for_test(archive_path)
+    manifest["archive_bytes"] = archive_path.stat().st_size
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    verified = verify_archive_manifest(manifest_path)
+
+    assert verified["ok"] is False
+    assert verified["reason"] == "archive_chain_invalid"
+    assert verified["archive_chain"]["status"] == "invalid"
+    assert verified["archive_chain"]["prev_hash_mismatch_count"] == 1
+    assert verified["archive_chain"]["current_hash_recomputed"] is False
 
 
 def test_audit_archive_csv_snapshot_and_tamper_detection(client, archive_output_dir):
@@ -217,3 +309,11 @@ def test_audit_archive_dry_run_and_parameter_validation(client, archive_output_d
         )
         == 1
     )
+
+
+def _sha256_file_for_test(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()

@@ -11,10 +11,13 @@ import sys
 from typing import Any, Literal
 
 from sqlalchemy import func, select
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
 from app.models import AuditLog
+from app.services.audit import audit_log_chain_hash
 from app.services.audit_chain import verify_audit_log_chain
 
 
@@ -65,6 +68,7 @@ def run_archive(
     request_id: str | None = None,
     from_at: datetime | None = None,
     to_at: datetime | None = None,
+    require_mysql: bool = False,
 ) -> dict[str, Any]:
     if archive_format not in {"jsonl", "csv"}:
         raise ValueError("archive_format must be jsonl or csv")
@@ -80,6 +84,18 @@ def run_archive(
         raise ValueError("from_at must be earlier than to_at")
 
     settings = get_settings()
+    target_database_url = database_url or settings.database_url
+    dialect = _database_dialect(target_database_url)
+    if require_mysql and dialect != "mysql":
+        return {
+            "ok": False,
+            "status": "mysql_required",
+            "database": {
+                "dialect": dialect,
+                "require_mysql": True,
+                "safe_database_url": _safe_database_url(target_database_url),
+            },
+        }
     generated_at = _utc_now()
     cutoff_at, cutoff_source, effective_retention_days = _resolve_cutoff(
         before_at=before_at,
@@ -101,7 +117,7 @@ def run_archive(
         to_at=normalized_to_at,
     )
 
-    session_factory = get_session_factory(database_url or settings.database_url)
+    session_factory = get_session_factory(target_database_url)
     with session_factory() as db:
         statement = _archive_statement(
             cutoff_at=cutoff_at,
@@ -201,6 +217,30 @@ def verify_archive_manifest(manifest_path: Path) -> dict[str, Any]:
             "expected_count": expected_count,
             "actual_count": actual_count,
         }
+    try:
+        records = _read_archive_records(archive_path, archive_format=archive_format)
+        archive_chain = _archive_chain_report(
+            records,
+            archive_format=archive_format,
+            include_snapshot=bool(manifest.get("include_snapshot")),
+        )
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        return {
+            "ok": False,
+            "status": "failed",
+            "reason": "archive_records_unreadable",
+            "error": exc.__class__.__name__,
+        }
+    if archive_chain["status"] == "invalid":
+        return {
+            "ok": False,
+            "status": "failed",
+            "reason": "archive_chain_invalid",
+            "archive_file": str(archive_path),
+            "archive_sha256": actual_hash,
+            "exported_count": actual_count,
+            "archive_chain": archive_chain,
+        }
 
     return {
         "ok": True,
@@ -208,6 +248,7 @@ def verify_archive_manifest(manifest_path: Path) -> dict[str, Any]:
         "archive_file": str(archive_path),
         "archive_sha256": actual_hash,
         "exported_count": actual_count,
+        "archive_chain": archive_chain,
     }
 
 
@@ -405,6 +446,150 @@ def _count_archive_records(path: Path, *, archive_format: str) -> int:
         return sum(1 for _ in csv.DictReader(handle))
 
 
+def _read_archive_records(path: Path, *, archive_format: str) -> list[dict[str, Any]]:
+    if archive_format == "jsonl":
+        records: list[dict[str, Any]] = []
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if line.strip():
+                    records.append(json.loads(line))
+        return records
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        return [dict(row) for row in csv.DictReader(handle)]
+
+
+def _archive_chain_report(
+    records: list[dict[str, Any]],
+    *,
+    archive_format: str,
+    include_snapshot: bool,
+) -> dict[str, Any]:
+    issues: list[dict[str, Any]] = []
+    null_current_hash_count = 0
+    current_hash_mismatch_count = 0
+    prev_hash_mismatch_count = 0
+    previous: dict[str, Any] | None = None
+    can_recompute_current_hash = archive_format == "jsonl" and include_snapshot
+    for index, record in enumerate(records):
+        current_hash = _archive_record_value(record, "current_hash")
+        prev_hash = _archive_record_value(record, "prev_hash")
+        if not current_hash:
+            null_current_hash_count += 1
+            _append_archive_chain_issue(issues, "null_current_hash", index=index, log_id=record.get("id"))
+        if previous is not None:
+            previous_current_hash = _archive_record_value(previous, "current_hash")
+            if previous_current_hash and current_hash and prev_hash != previous_current_hash:
+                prev_hash_mismatch_count += 1
+                _append_archive_chain_issue(
+                    issues,
+                    "prev_hash_mismatch",
+                    index=index,
+                    log_id=record.get("id"),
+                    previous_log_id=previous.get("id"),
+                )
+        if can_recompute_current_hash and current_hash:
+            expected_hash = audit_log_chain_hash(_audit_log_from_archive_record(record))
+            if expected_hash != current_hash:
+                current_hash_mismatch_count += 1
+                _append_archive_chain_issue(
+                    issues,
+                    "current_hash_mismatch",
+                    index=index,
+                    log_id=record.get("id"),
+                )
+        previous = record
+    status = "valid"
+    if null_current_hash_count or not can_recompute_current_hash:
+        status = "partial"
+    if current_hash_mismatch_count or prev_hash_mismatch_count:
+        status = "invalid"
+    return {
+        "verification_scope": "archive_file_internal_order",
+        "archive_format": archive_format,
+        "include_snapshot": include_snapshot,
+        "current_hash_recomputed": can_recompute_current_hash,
+        "current_hash_recompute_reason": None
+        if can_recompute_current_hash
+        else (
+            "snapshot_json_not_exported"
+            if not include_snapshot
+            else "csv_formula_escaping_prevents_lossless_hash_recompute"
+        ),
+        "status": status,
+        "valid": status == "valid",
+        "scanned_count": len(records),
+        "null_current_hash_count": null_current_hash_count,
+        "current_hash_mismatch_count": current_hash_mismatch_count,
+        "prev_hash_mismatch_count": prev_hash_mismatch_count,
+        "issue_count": null_current_hash_count + current_hash_mismatch_count + prev_hash_mismatch_count,
+        "issues": issues[:50],
+        "issues_truncated": len(issues) > 50,
+    }
+
+
+def _archive_record_value(record: dict[str, Any], key: str) -> Any:
+    value = record.get(key)
+    if value == "":
+        return None
+    return value
+
+
+def _append_archive_chain_issue(
+    issues: list[dict[str, Any]],
+    issue_type: str,
+    *,
+    index: int,
+    log_id: Any,
+    previous_log_id: Any | None = None,
+) -> None:
+    issues.append(
+        {
+            "type": issue_type,
+            "index": index,
+            "log_id": _safe_int(log_id),
+            "previous_log_id": _safe_int(previous_log_id),
+        }
+    )
+
+
+def _audit_log_from_archive_record(record: dict[str, Any]) -> AuditLog:
+    return AuditLog(
+        actor_user_id=_safe_int(record.get("actor_user_id")),
+        actor_role=_archive_record_value(record, "actor_role"),
+        action=str(_archive_record_value(record, "action") or ""),
+        resource=str(_archive_record_value(record, "resource") or ""),
+        resource_type=str(_archive_record_value(record, "resource_type") or ""),
+        resource_id=_archive_record_value(record, "resource_id"),
+        school_id=_safe_int(record.get("school_id")),
+        class_id=_safe_int(record.get("class_id")),
+        event_result=_archive_record_value(record, "event_result"),
+        failure_reason=_archive_record_value(record, "failure_reason"),
+        request_id=_archive_record_value(record, "request_id"),
+        client_ip_hash=_archive_record_value(record, "client_ip_hash"),
+        user_agent=_archive_record_value(record, "user_agent"),
+        request_method=_archive_record_value(record, "request_method"),
+        request_path=_archive_record_value(record, "request_path"),
+        prev_hash=_archive_record_value(record, "prev_hash"),
+        snapshot_json=_snapshot_from_archive_record(record),
+        created_at=_parse_datetime(str(_archive_record_value(record, "created_at"))),
+    )
+
+
+def _snapshot_from_archive_record(record: dict[str, Any]) -> Any:
+    value = record.get("snapshot_json")
+    if value in (None, ""):
+        return {}
+    if isinstance(value, (dict, list)):
+        return value
+    return json.loads(str(value))
+
+
+def _safe_int(value: Any) -> int | None:
+    if value in (None, ""):
+        return None
+    return int(value)
+
+
 def _csv_value(value: Any) -> str:
     if value is None:
         return ""
@@ -449,6 +634,20 @@ def _parse_datetime(value: str) -> datetime:
     return _ensure_utc(parsed)
 
 
+def _database_dialect(database_url: str) -> str:
+    try:
+        return make_url(database_url).get_backend_name()
+    except ArgumentError:
+        return "invalid"
+
+
+def _safe_database_url(database_url: str) -> str:
+    try:
+        return str(make_url(database_url).render_as_string(hide_password=True))
+    except ArgumentError:
+        return "<invalid>"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Export audit-log archive candidates into a verifiable package.")
     parser.add_argument("--database-url", default=None, help="Override ASTRA_DATABASE_URL for this run.")
@@ -459,6 +658,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--retention-days", type=int, default=None, help="Override ASTRA_AUDIT_LOG_RETENTION_DAYS.")
     parser.add_argument("--limit", type=int, default=5000, help="Maximum records to export in one package.")
     parser.add_argument("--dry-run", action="store_true", help="Print the manifest preview without writing files.")
+    parser.add_argument("--require-mysql", action="store_true", help="Fail when the target database is not MySQL.")
     parser.add_argument("--verify", type=Path, default=None, help="Verify an existing manifest and archive file.")
     parser.add_argument("--actor-user-id", type=int, default=None)
     parser.add_argument("--action", default=None)
@@ -497,6 +697,7 @@ def main(argv: list[str] | None = None) -> int:
                 request_id=args.request_id,
                 from_at=_parse_datetime(args.from_at) if args.from_at else None,
                 to_at=_parse_datetime(args.to_at) if args.to_at else None,
+                require_mysql=args.require_mysql,
             )
         except (OSError, ValueError) as exc:
             report = {"ok": False, "status": "failed", "error": exc.__class__.__name__, "detail": str(exc)}

@@ -238,7 +238,8 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 - `app.services.points` 负责 assignment 级积分规则规范化与批改积分计算；默认规则为 `enabled=true`、`points_per_score=1`、`max_points=null`，批改时写入“规则目标积分 - 当前 submission 已入账 assignment_grade 积分”的差额流水，避免重复批改累计膨胀，并支持封顶或禁用规则后的反向校正。
 - `app.services.class_join_requests` 负责加入申请审批状态流转和成员关系补齐。
 - `POST /api/classes/{id}/join` 与 `POST /api/classes/{id}/join-requests` 长期并存：前者是保留给学生自助加入、admin 治理、受控导入/邀请码或旧 UI 的 direct join；teacher 角色的普通教师加入必须走后者，由教师/admin 审批后生成 teacher membership；前端不得把审批流表现为唯一加入路径，也不得让普通教师绕过审批自助成为班级 teacher。
-- `app.services.audit` 负责写入审计日志及 request_id、IP 哈希、user-agent 等请求元数据；新审计记录会以 `prev_hash/current_hash` 保存应用层 SHA-256 链式哈希，用于追踪篡改迹象，但不能替代备份、binlog、外部归档、WORM 或第三方时间戳；管理端 JSON/CSV 明细导出接口默认剥离 `snapshot_json`，需要审查内容快照时必须显式传入 `include_snapshot=true`，且导出完成后会以 `admin.audit.export` 记录筛选条件、导出格式、导出数量和截断状态，不记录导出条目明细；审计报表摘要以 `admin.audit.report` 留痕，只记录格式、筛选和 bucket 数量；审计留存预检以 `admin.audit.retention_plan` 留痕，只记录策略、候选数量、临期数量、bucket 数量和链边界，不记录候选明细或原始快照；`scripts.archive_audit_logs` 是离线只读归档包导出工具，会生成 JSONL/CSV 数据文件与 Manifest，并支持 SHA-256 和记录数复验，默认不删除源数据、不写新的审计日志、不提供 WORM 或外部锚定；高频候选摘要以 `admin.audit.high_frequency` 留痕，只记录筛选、时间窗、阈值、总量和维度命中数，不记录候选明细、原始日志 id 或完整 IP 哈希清单。
+- `app.services.audit` 负责写入审计日志及 request_id、IP 哈希、user-agent 等请求元数据；新审计记录会以 `prev_hash/current_hash` 保存应用层 SHA-256 链式哈希，用于追踪篡改迹象，但不能替代备份、binlog、外部归档、WORM 或第三方时间戳；管理端 JSON/CSV 明细导出接口默认剥离 `snapshot_json`，需要审查内容快照时必须显式传入 `include_snapshot=true`，且导出完成后会以 `admin.audit.export` 记录筛选条件、导出格式、导出数量和截断状态，不记录导出条目明细；审计报表摘要以 `admin.audit.report` 留痕，只记录格式、筛选和 bucket 数量；审计留存预检以 `admin.audit.retention_plan` 留痕，只记录策略、候选数量、临期数量、bucket 数量和链边界，不记录候选明细或原始快照；`scripts.archive_audit_logs` 是离线只读归档包导出工具，会生成 JSONL/CSV 数据文件与 Manifest，并支持 SHA-256、记录数和归档文件内部链复验，默认不删除源数据、不写新的审计日志、不提供 WORM 或外部锚定；高频候选摘要以 `admin.audit.high_frequency` 留痕，只记录筛选、时间窗、阈值、总量和维度命中数，不记录候选明细、原始日志 id 或完整 IP 哈希清单。
+- `app.services.audit_archive_drill` 与 `scripts.audit_archive_drill` 提供审计归档/留存生产演练前后的只读姿态报告；检查数据库方言、留存 cutoff、候选/保留/临期数量、归档预览、候选链完整性、敏感字段扫描、操作边界和真实 MySQL/WORM/外部锚定待留证项，不写文件、不写审计、不删除或移动 `audit_logs`，不返回密码、token、密钥、原始快照正文或复核备注。
 - `app.services.audit_chain` 负责复用型审计链校验：按传入顺序重算 `current_hash`、检查相邻记录 `prev_hash` 是否衔接上一条 `current_hash`，并把历史空 hash 作为 partial 状态暴露给 API 与归档 Manifest；它只报告 `current_hash_mismatch`、`prev_hash_mismatch` 和 `null_current_hash`，不执行修复、删除、回填或外部锚定。
 - `/api/admin/bugs` 负责缺陷与风险清单的最小维护；`external_issue_provider/external_issue_id/external_issue_url` 只是外部 issue 链接元数据，不代表已经实现外部平台自动创建或双向状态同步。
 - `app.services.request_metadata` 统一解析请求元数据；审计与会话治理共享 request_id、user-agent 和 IP 哈希口径。`AuthSession.device_label` 优先来自 `X-Device-Label` / `X-Device-Name`，缺省回退到登录 user-agent，因此只是 best-effort 设备摘要，不等同强设备绑定。
@@ -310,12 +311,13 @@ python -m scripts.rebuild_knowledge_snapshots --granularity week --date 2026-07-
 
 ```bash
 cd backend
-python -m scripts.archive_audit_logs --retention-days 365 --output-dir audit-archives
-python -m scripts.archive_audit_logs --before 2026-07-01T00:00:00Z --format csv --include-snapshot --output-dir audit-archives
+python -m scripts.audit_archive_drill --require-mysql --retention-days 365
+python -m scripts.archive_audit_logs --require-mysql --retention-days 365 --output-dir audit-archives
+python -m scripts.archive_audit_logs --require-mysql --before 2026-07-01T00:00:00Z --format csv --include-snapshot --output-dir audit-archives
 python -m scripts.archive_audit_logs --verify audit-archives/audit-logs-archive-<stamp>.manifest.json
 ```
 
-该脚本按 `created_at <= cutoff` 选择候选，支持 `--retention-days`、`--before`、`--action`、`--resource-type`、`--resource-id`、`--school-id`、`--class-id`、`--event-result`、`--failure-reason`、`--request-id`、`--from` 和 `--to` 过滤。输出 Manifest 记录策略、筛选、导出数量、截断状态、首尾候选、链边界、hash-chain 重算状态、归档文件 SHA-256 和字节数；`--dry-run` 只打印 Manifest 预览不写文件。脚本默认只读，不删除 `audit_logs`、不写 `admin.audit.*` 事件、不提供 WORM 或外部锚定。
+`audit_archive_drill` 默认只读，用于归档演练前后检查留存 cutoff、候选桶、归档预览、候选链完整性、敏感字段扫描和操作边界；它不写文件、不写审计、不删除或移动 `audit_logs`，报告不返回密码、token、密钥、原始快照正文或复核备注。`archive_audit_logs` 按 `created_at <= cutoff` 选择候选，支持 `--retention-days`、`--before`、`--action`、`--resource-type`、`--resource-id`、`--school-id`、`--class-id`、`--event-result`、`--failure-reason`、`--request-id`、`--from` 和 `--to` 过滤。输出 Manifest 记录策略、筛选、导出数量、截断状态、首尾候选、链边界、hash-chain 重算状态、归档文件 SHA-256 和字节数；`--verify` 会复验 SHA-256、记录数和归档文件内部相邻 hash 链，JSONL 且显式 `--include-snapshot` 时可重算 `current_hash`，未导出快照或 CSV 只声明 partial 复核能力。脚本默认不删除 `audit_logs`、不写 `admin.audit.*` 事件、不提供 WORM 或外部锚定。
 
 密码重置 token 留存清理：
 
