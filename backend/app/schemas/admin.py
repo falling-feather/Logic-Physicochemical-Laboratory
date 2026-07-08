@@ -451,6 +451,19 @@ class AdminContentScriptAssetScanAlertReport(BaseModel):
     candidates: list[AdminContentScriptAssetScanAlertCandidate]
 
 
+AdminAlertOutboxStatus = Literal["pending_review", "planned", "queued", "suppressed", "cancelled"]
+
+
+class AdminContentScriptAssetScanAlertOutboxRequest(BaseModel):
+    trigger_source: str | None = Field(default=None, max_length=32)
+    alert_status: Literal["ok", "warning", "critical"] | None = None
+    recent_run_limit: int = Field(default=20, ge=1, le=100)
+    candidate_limit: int = Field(default=20, ge=0, le=100)
+    now_at: datetime | None = None
+    status: AdminAlertOutboxStatus = "pending_review"
+    confirm_observe_only: bool = False
+
+
 class AdminContentPageVersionDiffItem(BaseModel):
     path: str
     before: Any = None
@@ -849,9 +862,6 @@ class AdminKnowledgeSnapshotRunAlertReport(BaseModel):
     manual_requeue_count: int
     blocked_count: int
     candidates: list[AdminKnowledgeSnapshotRunAlertCandidate]
-
-
-AdminAlertOutboxStatus = Literal["pending_review", "planned", "queued", "suppressed", "cancelled"]
 
 
 class AdminKnowledgeSnapshotRunAlertOutboxRequest(BaseModel):

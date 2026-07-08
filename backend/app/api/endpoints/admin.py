@@ -55,6 +55,7 @@ from app.schemas.admin import (
     AdminContentScriptAssetPage,
     AdminContentScriptAssetRead,
     AdminContentScriptAssetScanAlertCandidate,
+    AdminContentScriptAssetScanAlertOutboxRequest,
     AdminContentScriptAssetScanAlertReport,
     AdminContentScriptAssetScanHealthItem,
     AdminContentScriptAssetScanHealthReport,
@@ -123,6 +124,7 @@ from app.schemas.admin import (
 from app.services.audit import record_audit_log
 from app.services.admin_alert_outbox import (
     admin_alert_outbox_write_snapshot,
+    enqueue_content_script_remote_drift_alert_outbox,
     enqueue_knowledge_snapshot_alert_outbox,
 )
 from app.services.access_control import (
@@ -1243,6 +1245,46 @@ def read_admin_content_script_asset_remote_drift_alerts(
     )
     db.commit()
     return _admin_content_script_asset_scan_alert_report(report)
+
+
+@router.post("/content/script-assets/remote-drift-alerts/outbox", response_model=AdminAlertOutboxWriteResponse)
+def enqueue_admin_content_script_asset_remote_drift_alert_outbox(
+    request_body: AdminContentScriptAssetScanAlertOutboxRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminAlertOutboxWriteResponse:
+    _require_admin(current_user)
+    if not request_body.confirm_observe_only:
+        raise HTTPException(status_code=422, detail="confirm_observe_only must be true")
+    report = build_content_script_asset_scan_alert_report(
+        db,
+        recent_run_limit=request_body.recent_run_limit,
+        candidate_limit=request_body.candidate_limit,
+        generated_at=request_body.now_at,
+        trigger_source=request_body.trigger_source,
+        alert_status=request_body.alert_status,
+        lease_seconds=get_settings().content_script_remote_drift_scheduler_lease_seconds,
+    )
+    write_result = enqueue_content_script_remote_drift_alert_outbox(
+        db,
+        report=report,
+        actor=current_user,
+        status=request_body.status,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.alert_outbox.content_script_asset_remote_drift.enqueue",
+        resource_type="admin_alert_outbox",
+        event_result="success",
+        request=request,
+        snapshot=admin_alert_outbox_write_snapshot(write_result),
+    )
+    db.commit()
+    for entry in write_result.entries:
+        db.refresh(entry)
+    return _admin_alert_outbox_write_response(write_result)
 
 
 @router.post("/content/script-assets/remote-drift-scan", response_model=AdminContentScriptAssetRemoteDriftReport)

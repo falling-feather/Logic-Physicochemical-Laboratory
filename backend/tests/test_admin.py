@@ -3219,6 +3219,89 @@ def test_admin_scans_content_script_asset_remote_drift_with_redaction(client, mo
     assert "secret-drift-token" not in alerts_text
     assert "remote drift now changed" not in alerts_text
 
+    forbidden_outbox = client.post(
+        "/api/admin/content/script-assets/remote-drift-alerts/outbox",
+        headers=_auth_header(teacher_token),
+        json={"confirm_observe_only": True},
+    )
+    assert forbidden_outbox.status_code == 403
+
+    missing_outbox_confirmation = client.post(
+        "/api/admin/content/script-assets/remote-drift-alerts/outbox",
+        headers=_auth_header(admin_token),
+        json={"recent_run_limit": 10, "candidate_limit": 10},
+    )
+    assert missing_outbox_confirmation.status_code == 422
+
+    outbox = client.post(
+        "/api/admin/content/script-assets/remote-drift-alerts/outbox",
+        headers={**_auth_header(admin_token), "X-Request-ID": "remote-drift-outbox"},
+        json={
+            "confirm_observe_only": True,
+            "recent_run_limit": 10,
+            "candidate_limit": 10,
+            "now_at": "2026-07-08T15:00:00Z",
+        },
+    )
+    assert outbox.status_code == 200
+    outbox_body = outbox.json()
+    assert outbox_body["source_type"] == "content_script_asset_scan_run_alert"
+    assert outbox_body["external_delivery"] is False
+    assert outbox_body["dispatch_mode"] == "manual_review"
+    assert outbox_body["delivery_target"] == "admin_outbox"
+    assert outbox_body["created_count"] == alerts_body["candidate_count"]
+    assert outbox_body["refreshed_count"] == 0
+    assert len(outbox_body["items"]) == alerts_body["candidate_count"]
+    outbox_text = json.dumps(outbox_body, ensure_ascii=False)
+    assert '"source_url"' not in outbox_text
+    assert "source_url_sha256" in outbox_text
+    assert "source_host" in outbox_text
+    assert "asset_sha256" in outbox_text
+    assert "remote_asset_sha256" in outbox_text
+    assert "remote_asset_size_bytes" in outbox_text
+    assert "integrity" not in outbox_text
+    assert "content_bytes" not in outbox_text
+    assert "scheduler_lease_token" not in outbox_text
+    assert "secret-drift-token" not in outbox_text
+    assert "remote drift now changed" not in outbox_text
+    assert "remote secret unavailable" not in outbox_text
+    assert '"sent"' not in outbox_text
+
+    repeated_outbox = client.post(
+        "/api/admin/content/script-assets/remote-drift-alerts/outbox",
+        headers=_auth_header(admin_token),
+        json={
+            "confirm_observe_only": True,
+            "recent_run_limit": 10,
+            "candidate_limit": 10,
+            "now_at": "2026-07-08T15:00:00Z",
+        },
+    )
+    assert repeated_outbox.status_code == 200
+    repeated_outbox_body = repeated_outbox.json()
+    assert repeated_outbox_body["created_count"] == 0
+    assert repeated_outbox_body["refreshed_count"] == alerts_body["candidate_count"]
+    assert all(item["seen_count"] == 2 for item in repeated_outbox_body["items"])
+
+    listed_outbox = client.get(
+        "/api/admin/alert-outbox?source_type=content_script_asset_scan_run_alert&status=pending_review",
+        headers=_auth_header(admin_token),
+    )
+    assert listed_outbox.status_code == 200
+    listed_outbox_body = listed_outbox.json()
+    assert listed_outbox_body["total"] == alerts_body["candidate_count"]
+    assert all(item["external_delivery"] is False for item in listed_outbox_body["items"])
+
+    with session_factory() as db:
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(AdminAlertOutboxEntry)
+                .where(AdminAlertOutboxEntry.source_type == "content_script_asset_scan_run_alert")
+            )
+            == alerts_body["candidate_count"]
+        )
+
     audit = client.get(
         "/api/admin/audit-logs?action=admin.content_script_asset.remote_drift_scan"
         "&resource_type=content_script_asset&request_id=remote-drift-scan",
@@ -3285,6 +3368,26 @@ def test_admin_scans_content_script_asset_remote_drift_with_redaction(client, mo
     assert "integrity" not in alert_audit_text
     assert "content_bytes" not in alert_audit_text
     assert "secret-drift-token" not in alert_audit_text
+
+    outbox_audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.content_script_asset_remote_drift.enqueue"
+        "&resource_type=admin_alert_outbox&request_id=remote-drift-outbox",
+        headers=_auth_header(admin_token),
+    )
+    assert outbox_audit.status_code == 200
+    assert outbox_audit.json()["total"] == 1
+    outbox_snapshot = outbox_audit.json()["items"][0]["snapshot_json"]
+    assert outbox_snapshot["format"] == "admin_alert_outbox_write"
+    assert outbox_snapshot["source_type"] == "content_script_asset_scan_run_alert"
+    assert outbox_snapshot["external_delivery"] is False
+    assert outbox_snapshot["created_count"] == alerts_body["candidate_count"]
+    assert "entries" not in outbox_snapshot
+    assert "payload_json" not in outbox_snapshot
+    outbox_audit_text = json.dumps(outbox_snapshot, ensure_ascii=False)
+    assert '"source_url"' not in outbox_audit_text
+    assert "integrity" not in outbox_audit_text
+    assert "content_bytes" not in outbox_audit_text
+    assert "secret-drift-token" not in outbox_audit_text
 
     def fake_large_fetch(url: str) -> bytes:
         assert url == "https://cdn-remote.example.test/ok.js"
