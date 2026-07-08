@@ -48,6 +48,14 @@ python -m scripts.knowledge_snapshot_scheduler_drill --require-mysql --expect-sc
 
 该报告检查 scheduler 配置、run ledger、lease/heartbeat、due/pending 队列、快照输出计数和真实 MySQL 待留证项；默认不执行 rebuild、不抢租约、不取消、不重排，不返回 `scheduler_lease_token`、`metadata_json`、异常原文或 secret。真实 MySQL 多 worker/cancel/requeue/锁等待仍需实机留证。
 
+内容脚本远端漂移观察只读演练报告：
+
+```bash
+python -m scripts.content_script_remote_drift_drill --require-mysql --expect-scheduler-enabled
+```
+
+该报告检查数据库方言、调度配置、host policy 桶、mirror 记录、scan run ledger、queue/alerts/outbox 和真实观察待留证项；默认不联网、不写库、不入队、不修改 host policy，不返回原始 CDN URL、完整 SRI、远端/镜像字节、`content_bytes`、异常原文、`scheduler_lease_token`、payload 或复核备注。真实安全 CDN 样本、真实 MySQL、真实外网扫描和浏览器隔离证据仍需实机留证。
+
 本地账号与学校班级 API：
 
 | 方法 | 路径 | 说明 |
@@ -242,6 +250,7 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 - `app.services.content_identity` 负责内容协议稳定身份契约：历史 schema 读取仍允许缺失 `sectionId/sourceId`，但新建/编辑/发布草稿和内置内容初始化要求每个 section/source 带稳定 ID，并拒绝重复 ID 或与 `props.sectionId/props.id` 冲突的章节身份。
 - `app.services.content_script_policy` 负责内容草稿脚本静态分析、脚本资产 allowlist/SRI 静态门禁、后端下载校验、public manifest 与 sandbox 契约；当前识别脚本引用、外链脚本、事件处理器、阻断协议、路径穿越、内联 `<script>` 和不安全 sandbox 能力。外部 `scriptUrl/scriptSrc` 默认阻断，只有 host 出现在 `ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS` 且 URL 为显式 `https://`、无 query/fragment、声明合法 SRI 与 `crossorigin=anonymous` 时才可进入 high-risk 管理员审核；管理员批准外部脚本和发布已审核草稿时会下载资产并按声明 SRI 比对字节，下载失败、SRI mismatch、host policy blocked 或发布前 CDN 字节漂移会阻断流程，默认下载器不跟随重定向。下载校验 finding 会通过 metadata 保留资产 SHA-256、字节大小、SRI token 数量和匹配算法；公开 `scriptManifest.sandbox` 会按 `network=none/same-origin` 派生稳定 CSP、显式返回 enforcement/capabilities，并对 unsafe sandbox 防御性降级为 blocked；sandbox HTML 响应会按单次请求生成 nonce，把响应级 `script-src` 收紧为 nonce source，并强制 `Content-Security-Policy`、`X-Content-Type-Options: nosniff` 和 `Referrer-Policy: no-referrer`，本地 JS 资产必须位于受控根且通过 bootstrap + `asset_sha256` 端点加载；外部脚本发布成功后由 `app.services.content_script_assets` 写入 `content_script_assets`，render 阶段只读取当前 published version 绑定的镜像字节，不联网、不代理任意 CDN、不暴露原始 URL。管理端 `GET /api/admin/content/script-assets` 可分页审计这些镜像资产，`GET /api/admin/content/script-assets/mirror-audit` 可离线复核当前 published schema 与镜像表绑定、本地字节 hash/大小/SRI 和重复引用，`POST /api/admin/content/script-assets/remote-drift-scan` 可在 admin 显式确认后小批量触发远端漂移扫描并写入 run 台账，`GET /api/admin/content/script-assets/remote-drift-alerts` 可从 run 台账、failed run 与 stale running run 派生只读告警候选，`GET/PATCH /api/admin/content/script-host-policies` 可维护 host 评审状态并用 `blocked` 作为发布链路 fail-closed 门禁；响应与审计都不返回原始 CDN URL、完整 SRI、远端字节或 `content_bytes`。分析结果带 `policy_context_hash`，allowlist 配置变化会触发发布/审核前重分析。当前仍不承担前端实际 iframe 生命周期编排、实时监控、外部告警投递、自动信任/封禁策略或浏览器自动化隔离证明。
 - `app.services.content_script_asset_scan_runs` 与 `app.services.content_script_asset_scan_scheduler` 负责内容脚本远端漂移扫描 run 台账、数据库租约、健康摘要、调度队列摘要和进程内调度。`content_script_asset_scan_runs` 允许 `running/success/failed` 生命周期、可空触发人、`attempt_count`、scheduler lease owner/token/expires/heartbeat 元数据和唯一 `run_key`；管理端列表、health、queue 与 alerts 只暴露租约 owner/过期/心跳、计数、状态和脱敏候选，不返回 `scheduler_lease_token`。调度器默认关闭，启用后按配置筛选 slug/source host 并以 observe-only 模式调用远端漂移扫描；它不会修改 host policy、替换镜像、下线/重发布内容或投递外部告警。
+- `app.services.content_script_remote_drift_drill` 与 `scripts.content_script_remote_drift_drill` 提供内容脚本远端漂移生产观察前后的只读姿态报告；聚合数据库方言、调度配置、host policy 桶、mirror 记录、scan run ledger、queue/alerts/outbox 和真实观察待留证项，不触发外网、不写 outbox、不修改 host policy、不返回原始 CDN URL、完整 SRI、远端/镜像字节、`content_bytes`、异常原文、`scheduler_lease_token`、payload 或复核备注。公开 render 对 `blocked` host 运行时 fail closed，不注入可执行 `embed`，sandbox document/bootstrap/asset 返回 `content_script_host_blocked`。
 - `/api/admin/content/page-versions/{id}/diff` 负责版本对比：旧 `changes` 继续返回 JSON path 级差异，新 `semantic` 汇总 metadata、courseUnit、sections 与 sources 的增删改移；sections/sources 优先按 `sectionId/sourceId` 识别，保留旧标题、label、url 和 index fallback，并在每条 section/source 变更中显式返回 before/after 稳定 ID，便于后续管理端 UI 展示。diff 响应会对路径或字段名命中 token/key/secret/script/sandbox/integrity/crossorigin 等敏感语义的值返回 `{redacted, reason, value_type, length}` 预览对象；非敏感字段保持原值，避免破坏既有标题、summary、source URL 和普通 props 展示。
 - `PATCH /api/content/drafts/{id}` 负责草稿编辑闭环：仅允许作者或管理员编辑 `draft` / `changes_requested` 草稿，禁止 retarget 到其他 slug，保存时重算 `schema_hash/script_analysis/script_risk_level`，并清空旧脚本审核元数据；`base_version_id/base_schema_hash` 保持创建时基线，发布前仍由 stale guard 拦截过期草稿。
 - `/api/content/drafts/{id}/submit`、`/request-changes`、`/withdraw` 与 `/publish` 负责草稿状态流转；创建草稿时绑定当前 published base 版本和 hash，写入 `active_key='active'`，并由 `(author_user_id, target_slug, active_key)` 唯一约束防止同一作者同一目标页并发创建多个 active 草稿；撤回或发布会清空 active key。发布前校验 base 未过期并复核当前配置下的脚本 policy，脚本引用必须带 `scriptSandbox.mode=isolated-iframe` 且不能声明危险能力；外部脚本还必须满足 allowlist/SRI/crossorigin 契约、完成管理员审核，并在审核批准和发布时通过后端下载/SRI 字节校验；发布时会把外部脚本镜像字节与 `page_version_id + sandbox_id + reference_value_sha256` 同事务绑定。发布阶段由 `(slug, version)`、`source_draft_id` 和脚本资产唯一约束兜底，冲突统一返回 `409`，发布后回填 page/version/publisher 元数据，审计只记录状态和版本元数据，不记录完整 schema。
@@ -280,9 +289,10 @@ python -m alembic upgrade head
 cd backend
 python -m scripts.scan_content_script_asset_remote_drift --confirm-external-network --limit 25
 python -m scripts.scan_content_script_asset_remote_drift --confirm-external-network --source-host cdn.example.com --actor-user-id <admin_id>
+python -m scripts.content_script_remote_drift_drill --require-mysql --expect-scheduler-enabled
 ```
 
-CLI 必须显式传入 `--confirm-external-network` 才会访问远端脚本字节；运行结果写入 `content_script_asset_scan_runs`，`trigger_source=script`。输出只包含 run 定位、筛选、聚合 totals 和 issue counts，不返回原始 CDN URL、完整 SRI、远端字节、异常原文或 `scheduler_lease_token`。
+扫描 CLI 必须显式传入 `--confirm-external-network` 才会访问远端脚本字节；运行结果写入 `content_script_asset_scan_runs`，`trigger_source=script`。观察演练 CLI 默认只读，不访问外网也不写库，用于生产观察前后检查调度/host policy/mirror/run/outbox 姿态。两者输出均不返回原始 CDN URL、完整 SRI、远端字节、异常原文或 `scheduler_lease_token`。
 
 知识快照周期重算：
 

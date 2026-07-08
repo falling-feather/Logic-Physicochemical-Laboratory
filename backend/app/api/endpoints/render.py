@@ -12,11 +12,10 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.session import get_db
-from app.models import ContentPageRecord, ContentScriptAsset
+from app.models import ContentPageRecord, ContentScriptAsset, ContentScriptHostPolicy
 from app.schemas.content import ContentPage
-from app.services.content_catalog import get_page_schema
 from app.services.content_script_assets import get_bound_content_script_asset
-from app.services.content_script_policy import collect_content_script_manifests
+from app.services.content_script_policy import collect_content_script_manifests, public_content_page_schema
 
 
 router = APIRouter()
@@ -123,18 +122,26 @@ def render_script_sandbox_asset(
 
 @router.get("/page/{slug:path}", response_model=ContentPage)
 def render_page(slug: str, response: Response, db: Session = Depends(get_db)) -> ContentPage:
-    page = get_page_schema(db, slug)
-    if page is None:
+    page_record = _published_content_page_record(db, slug)
+    if page_record is None:
         raise HTTPException(status_code=404, detail="Renderable page not found")
-    _apply_script_sandbox_embed_descriptors(page)
+    private_page = ContentPage.model_validate(page_record.schema_json)
+    page = public_content_page_schema(private_page)
+    blocked_sandbox_ids = _blocked_script_sandbox_ids(db, private_page)
+    _apply_script_sandbox_embed_descriptors(page, blocked_sandbox_ids=blocked_sandbox_ids)
     _apply_script_contract_headers(response, page)
     return page
 
 
-def _apply_script_sandbox_embed_descriptors(page: ContentPage) -> None:
+def _apply_script_sandbox_embed_descriptors(page: ContentPage, *, blocked_sandbox_ids: set[str] | None = None) -> None:
     payload = page.model_dump(mode="json")
     sandbox_id_counts = _script_manifest_sandbox_id_counts(payload)
-    _inject_script_sandbox_embed_descriptors(payload, slug=page.slug, sandbox_id_counts=sandbox_id_counts)
+    _inject_script_sandbox_embed_descriptors(
+        payload,
+        slug=page.slug,
+        sandbox_id_counts=sandbox_id_counts,
+        blocked_sandbox_ids=blocked_sandbox_ids or set(),
+    )
     updated = ContentPage.model_validate(payload)
     page.sections = updated.sections
 
@@ -153,10 +160,16 @@ def _inject_script_sandbox_embed_descriptors(
     *,
     slug: str,
     sandbox_id_counts: dict[str, int],
+    blocked_sandbox_ids: set[str],
 ) -> None:
     if isinstance(value, list):
         for item in value:
-            _inject_script_sandbox_embed_descriptors(item, slug=slug, sandbox_id_counts=sandbox_id_counts)
+            _inject_script_sandbox_embed_descriptors(
+                item,
+                slug=slug,
+                sandbox_id_counts=sandbox_id_counts,
+                blocked_sandbox_ids=blocked_sandbox_ids,
+            )
         return
     if not isinstance(value, dict):
         return
@@ -166,11 +179,17 @@ def _inject_script_sandbox_embed_descriptors(
             slug=slug,
             manifest=manifest,
             sandbox_id_counts=sandbox_id_counts,
+            blocked_sandbox_ids=blocked_sandbox_ids,
         )
         if descriptor is not None:
             manifest["embed"] = descriptor
     for item in value.values():
-        _inject_script_sandbox_embed_descriptors(item, slug=slug, sandbox_id_counts=sandbox_id_counts)
+        _inject_script_sandbox_embed_descriptors(
+            item,
+            slug=slug,
+            sandbox_id_counts=sandbox_id_counts,
+            blocked_sandbox_ids=blocked_sandbox_ids,
+        )
 
 
 def _script_sandbox_iframe_descriptor(
@@ -178,6 +197,7 @@ def _script_sandbox_iframe_descriptor(
     slug: str,
     manifest: dict[str, Any],
     sandbox_id_counts: dict[str, int],
+    blocked_sandbox_ids: set[str],
 ) -> dict[str, Any] | None:
     sandbox_id = manifest.get("sandboxId")
     sandbox = manifest.get("sandbox")
@@ -192,6 +212,8 @@ def _script_sandbox_iframe_descriptor(
         or not isinstance(references, list)
         or not references
     ):
+        return None
+    if sandbox_id in blocked_sandbox_ids:
         return None
     if not all(isinstance(reference, dict) and _is_valid_sha256(reference.get("valueSha256")) for reference in references):
         return None
@@ -409,7 +431,56 @@ def _external_script_asset(
         raise HTTPException(status_code=409, detail="External script sandbox asset is not mirrored")
     if asset.slug != page.slug or asset.source_url != value.strip() or asset.integrity != integrity.strip():
         raise HTTPException(status_code=409, detail="External script sandbox asset binding is stale")
+    if _content_script_source_host_blocked(db, asset.source_host):
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "content_script_host_blocked", "source_hosts": [asset.source_host]},
+        )
     return asset
+
+
+def _blocked_script_sandbox_ids(db: Session, page: ContentPage) -> set[str]:
+    blocked: set[str] = set()
+    for manifest in collect_content_script_manifests(page, include_private_values=True):
+        sandbox_id = manifest.get("sandboxId")
+        references = manifest.get("references")
+        if not isinstance(sandbox_id, str) or not isinstance(references, list):
+            continue
+        for reference in references:
+            if not isinstance(reference, dict):
+                continue
+            value = reference.get("value")
+            if not isinstance(value, str):
+                continue
+            source = value.strip()
+            if not source.lower().startswith(("http://", "https://", "//")):
+                continue
+            source_host = _external_reference_host(source)
+            if source_host and _content_script_source_host_blocked(db, source_host):
+                blocked.add(sandbox_id)
+                break
+    return blocked
+
+
+def _content_script_source_host_blocked(db: Session, source_host: str | None) -> bool:
+    if not source_host:
+        return False
+    return (
+        db.scalar(
+            select(ContentScriptHostPolicy).where(
+                ContentScriptHostPolicy.source_host == source_host.strip().lower(),
+                ContentScriptHostPolicy.status == "blocked",
+            )
+        )
+        is not None
+    )
+
+
+def _external_reference_host(source: str) -> str | None:
+    from urllib.parse import urlsplit
+
+    parsed = urlsplit(source if not source.startswith("//") else f"https:{source}")
+    return parsed.hostname.lower() if parsed.hostname else None
 
 
 def _local_script_asset_path(reference: dict[str, Any]) -> Path:
