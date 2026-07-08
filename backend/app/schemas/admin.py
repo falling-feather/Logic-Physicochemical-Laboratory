@@ -952,6 +952,61 @@ class AdminAlertOutboxBulkReviewResponse(BaseModel):
     items: list[AdminAlertOutboxQueueItem]
 
 
+class AdminAlertOutboxDispatchDryRunRequest(BaseModel):
+    entry_ids: list[int] | None = Field(default=None, min_length=1, max_length=100)
+    source_type: str | None = Field(default=None, max_length=80)
+    from_at: datetime | None = None
+    to_at: datetime | None = None
+    now_at: datetime | None = None
+    item_limit: int = Field(default=20, ge=0, le=100)
+    confirm_dry_run: bool = False
+
+
+class AdminAlertOutboxDispatchDryRunItem(BaseModel):
+    id: int
+    source_type: str
+    source_id: int | None = None
+    source_key: str
+    event_code: str
+    severity: str
+    action_hint: str
+    status: AdminAlertOutboxStatus
+    reason: str
+    dispatch_mode: str
+    delivery_target: str
+    external_delivery: bool
+    payload_hash_prefix: str
+    delivery_key: str
+    last_seen_at: datetime
+    available_at: datetime | None = None
+    expires_at: datetime | None = None
+    reviewed_at: datetime | None = None
+    attempt_count: int
+
+
+class AdminAlertOutboxDispatchDryRunReport(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    dry_run_status: Literal["empty", "blocked", "expired", "ready", "cleared"]
+    total_count: int
+    active_count: int
+    pending_review_count: int
+    planned_count: int
+    queued_count: int
+    ready_count: int
+    blocked_count: int
+    expired_count: int
+    not_due_count: int
+    terminal_count: int
+    external_delivery_count: int
+    blocked_reason_counts: dict[str, int]
+    ready_items: list[AdminAlertOutboxDispatchDryRunItem]
+    blocked_items: list[AdminAlertOutboxDispatchDryRunItem]
+    expired_items: list[AdminAlertOutboxDispatchDryRunItem]
+    not_due_items: list[AdminAlertOutboxDispatchDryRunItem]
+
+
 class AdminAlertOutboxEntryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -2342,6 +2342,324 @@ def test_admin_reads_alert_outbox_queue_report_without_leaking_payload_or_mutati
     assert "scheduler_lease_token" not in audit_text
 
 
+def test_admin_dry_runs_alert_outbox_dispatch_without_delivery_or_mutation(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "alert_outbox_dispatch_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    now = datetime(2026, 7, 25, 9, 0, tzinfo=UTC)
+    entries = [
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=301,
+            source_key="knowledge:dispatch:ready",
+            event_code="stale_running",
+            severity="critical",
+            action_hint="investigate",
+            status="queued",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-ready",
+            payload_hash="dispatch-ready-payload-hash",
+            payload_json={"secret": "secret-dispatch-ready", "scheduler_lease_token": "secret-dispatch-token"},
+            first_seen_at=now - timedelta(hours=6),
+            last_seen_at=now - timedelta(hours=6),
+            available_at=now - timedelta(hours=2),
+            reviewed_at=now - timedelta(hours=3),
+            review_note="secret dispatch review note",
+            seen_count=2,
+            attempt_count=7,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=302,
+            source_key="knowledge:dispatch:not-due",
+            event_code="pending_backlog",
+            severity="warning",
+            action_hint="monitor",
+            status="queued",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-not-due",
+            payload_hash="dispatch-not-due-payload-hash",
+            payload_json={"secret": "secret-dispatch-not-due"},
+            first_seen_at=now - timedelta(hours=1),
+            last_seen_at=now - timedelta(hours=1),
+            available_at=now + timedelta(hours=2),
+            seen_count=1,
+            attempt_count=3,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="content_script_asset_scan_run_alert",
+            source_id=303,
+            source_key="content:dispatch:planned",
+            event_code="remote_drift_detected",
+            severity="warning",
+            action_hint="monitor",
+            status="planned",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-planned",
+            payload_hash="dispatch-planned-payload-hash",
+            payload_json={"source_url": "https://cdn.example.test/secret-dispatch.js", "content_bytes": "secret-bytes"},
+            first_seen_at=now - timedelta(hours=5),
+            last_seen_at=now - timedelta(hours=5),
+            available_at=now - timedelta(hours=1),
+            seen_count=1,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=304,
+            source_key="knowledge:dispatch:pending",
+            event_code="lease_expiring",
+            severity="info",
+            action_hint="review",
+            status="pending_review",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-pending",
+            payload_hash="dispatch-pending-payload-hash",
+            payload_json={"metadata_json": {"secret": "secret-dispatch-metadata"}},
+            first_seen_at=now - timedelta(hours=4),
+            last_seen_at=now - timedelta(hours=4),
+            available_at=now - timedelta(hours=4),
+            seen_count=1,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=305,
+            source_key="knowledge:dispatch:expired",
+            event_code="retry_exhausted",
+            severity="critical",
+            action_hint="investigate",
+            status="queued",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-expired",
+            payload_hash="dispatch-expired-payload-hash",
+            payload_json={"exception": "secret-dispatch-exception"},
+            first_seen_at=now - timedelta(days=2),
+            last_seen_at=now - timedelta(days=2),
+            available_at=now - timedelta(days=1),
+            expires_at=now - timedelta(minutes=1),
+            seen_count=1,
+            attempt_count=1,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=306,
+            source_key="knowledge:dispatch:external",
+            event_code="manual_requeue",
+            severity="warning",
+            action_hint="monitor",
+            status="queued",
+            dispatch_mode="webhook",
+            delivery_target="external_webhook",
+            external_delivery=True,
+            dedupe_key="dispatch-external",
+            payload_hash="dispatch-external-payload-hash",
+            payload_json={"secret": "secret-dispatch-external"},
+            first_seen_at=now - timedelta(hours=3),
+            last_seen_at=now - timedelta(hours=3),
+            available_at=now - timedelta(hours=3),
+            seen_count=1,
+            attempt_count=5,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=307,
+            source_key="knowledge:dispatch:suppressed",
+            event_code="manual_cancelled",
+            severity="info",
+            action_hint="monitor",
+            status="suppressed",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-suppressed",
+            payload_hash="dispatch-suppressed-payload-hash",
+            payload_json={"secret": "secret-dispatch-suppressed"},
+            first_seen_at=now - timedelta(hours=7),
+            last_seen_at=now - timedelta(hours=7),
+            reviewed_at=now - timedelta(hours=6),
+            review_note="secret suppressed note",
+            seen_count=1,
+        ),
+    ]
+    with session_factory() as db:
+        db.add_all(entries)
+        db.commit()
+        ids = [entry.id for entry in entries]
+        before = {
+            entry.id: {
+                "status": entry.status,
+                "attempt_count": entry.attempt_count,
+                "last_error_code": entry.last_error_code,
+                "available_at": entry.available_at,
+                "review_note": entry.review_note,
+            }
+            for entry in entries
+        }
+    ready_id, not_due_id, planned_id, pending_id, expired_id, external_id, suppressed_id = ids
+
+    forbidden = client.post(
+        "/api/admin/alert-outbox/dispatch-dry-run",
+        headers=_auth_header(teacher_token),
+        json={"confirm_dry_run": True},
+    )
+    assert forbidden.status_code == 403
+
+    missing_confirmation = client.post(
+        "/api/admin/alert-outbox/dispatch-dry-run",
+        headers=_auth_header(admin_token),
+        json={},
+    )
+    assert missing_confirmation.status_code == 422
+
+    invalid_window = client.post(
+        "/api/admin/alert-outbox/dispatch-dry-run",
+        headers=_auth_header(admin_token),
+        json={
+            "from_at": (now + timedelta(hours=1)).isoformat(),
+            "to_at": now.isoformat(),
+            "confirm_dry_run": True,
+        },
+    )
+    assert invalid_window.status_code == 422
+
+    duplicate_ids = client.post(
+        "/api/admin/alert-outbox/dispatch-dry-run",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [ready_id, ready_id], "now_at": now.isoformat(), "confirm_dry_run": True},
+    )
+    assert duplicate_ids.status_code == 422
+
+    missing_id = client.post(
+        "/api/admin/alert-outbox/dispatch-dry-run",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [ready_id, 999999], "now_at": now.isoformat(), "confirm_dry_run": True},
+    )
+    assert missing_id.status_code == 404
+    assert missing_id.json()["detail"]["missing_ids"] == [999999]
+
+    selected = client.post(
+        "/api/admin/alert-outbox/dispatch-dry-run",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [ready_id, not_due_id], "now_at": now.isoformat(), "confirm_dry_run": True},
+    )
+    assert selected.status_code == 200
+    selected_body = selected.json()
+    assert selected_body["total_count"] == 2
+    assert selected_body["ready_count"] == 1
+    assert selected_body["not_due_count"] == 1
+    assert selected_body["blocked_count"] == 0
+
+    response = client.post(
+        "/api/admin/alert-outbox/dispatch-dry-run",
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-dispatch-dry-run"},
+        json={"now_at": now.isoformat(), "item_limit": 10, "confirm_dry_run": True},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["dry_run_status"] == "ready"
+    assert body["policy"]["dry_run"] is True
+    assert body["policy"]["writes_outbox_state"] is False
+    assert body["policy"]["increments_attempts"] is False
+    assert body["policy"]["external_delivery"] is False
+    assert body["policy"]["broker_delivery"] is False
+    assert body["policy"]["automatic_actions"] is False
+    assert body["ready_count"] == 1
+    assert body["blocked_count"] == 3
+    assert body["expired_count"] == 1
+    assert body["not_due_count"] == 1
+    assert body["terminal_count"] == 1
+    assert body["external_delivery_count"] == 1
+    assert [item["id"] for item in body["ready_items"]] == [ready_id]
+    assert body["ready_items"][0]["reason"] == "queued_due"
+    assert body["ready_items"][0]["payload_hash_prefix"] == "dispatch-rea"
+    assert {item["id"] for item in body["blocked_items"]} == {planned_id, pending_id, external_id}
+    assert body["blocked_reason_counts"] == {
+        "external_delivery_disabled": 1,
+        "pending_review": 1,
+        "planned_not_queued": 1,
+    }
+    assert [item["id"] for item in body["expired_items"]] == [expired_id]
+    assert [item["id"] for item in body["not_due_items"]] == [not_due_id]
+    assert suppressed_id not in {item["id"] for item in body["ready_items"]}
+    response_text = json.dumps(body, ensure_ascii=False)
+    assert "payload_json" not in response_text
+    assert "review_note" not in response_text
+    assert "secret-dispatch" not in response_text
+    assert "scheduler_lease_token" not in response_text
+    assert "metadata_json" not in response_text
+    assert "content_bytes" not in response_text
+    assert "source_url" not in response_text
+
+    count_only = client.post(
+        "/api/admin/alert-outbox/dispatch-dry-run",
+        headers=_auth_header(admin_token),
+        json={"now_at": now.isoformat(), "item_limit": 0, "confirm_dry_run": True},
+    )
+    assert count_only.status_code == 200
+    count_only_body = count_only.json()
+    assert count_only_body["ready_count"] == 1
+    assert count_only_body["blocked_count"] == 3
+    assert count_only_body["ready_items"] == []
+    assert count_only_body["blocked_items"] == []
+    assert count_only_body["blocked_reason_counts"] == {
+        "external_delivery_disabled": 1,
+        "pending_review": 1,
+        "planned_not_queued": 1,
+    }
+
+    with session_factory() as db:
+        for entry_id, expected in before.items():
+            stored = db.get(AdminAlertOutboxEntry, entry_id)
+            assert stored is not None
+            assert stored.status == expected["status"]
+            assert stored.attempt_count == expected["attempt_count"]
+            assert stored.last_error_code == expected["last_error_code"]
+            assert stored.available_at == expected["available_at"]
+            assert stored.review_note == expected["review_note"]
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.dispatch_dry_run"
+        "&resource_type=admin_alert_outbox&request_id=alert-outbox-dispatch-dry-run",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert snapshot["format"] == "admin_alert_outbox_dispatch_dry_run"
+    assert snapshot["dry_run_status"] == "ready"
+    assert snapshot["ready_count"] == 1
+    assert snapshot["blocked_count"] == 3
+    assert snapshot["expired_count"] == 1
+    assert snapshot["not_due_count"] == 1
+    assert snapshot["external_delivery_count"] == 1
+    assert snapshot["ready_entry_ids"] == [ready_id]
+    assert snapshot["blocked_reason_counts"] == {
+        "external_delivery_disabled": 1,
+        "pending_review": 1,
+        "planned_not_queued": 1,
+    }
+    assert snapshot["policy"]["dry_run"] is True
+    assert snapshot["policy"]["external_delivery"] is False
+    assert snapshot["policy"]["automatic_actions"] is False
+    audit_text = json.dumps(snapshot, ensure_ascii=False)
+    assert "payload_json" not in audit_text
+    assert "review_note" not in audit_text
+    assert "secret-dispatch" not in audit_text
+    assert "scheduler_lease_token" not in audit_text
+    assert "metadata_json" not in audit_text
+    assert "content_bytes" not in audit_text
+    assert "source_url" not in audit_text
+
+
 def test_admin_bulk_reviews_alert_outbox_entries_without_leaking_payload_or_partial_updates(client):
     admin_token = _bootstrap_admin(client)
     teacher_token = _register_and_login(client, "alert_outbox_bulk_teacher", "teacher")

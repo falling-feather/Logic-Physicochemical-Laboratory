@@ -103,6 +103,9 @@ from app.schemas.admin import (
     AdminUserUpdate,
     AdminAlertOutboxBulkReviewRequest,
     AdminAlertOutboxBulkReviewResponse,
+    AdminAlertOutboxDispatchDryRunItem,
+    AdminAlertOutboxDispatchDryRunReport,
+    AdminAlertOutboxDispatchDryRunRequest,
     AdminAlertOutboxEntryRead,
     AdminAlertOutboxPage,
     AdminAlertOutboxQueueItem,
@@ -1936,6 +1939,75 @@ def get_admin_alert_outbox_queue(
         event_result="success",
         request=request,
         snapshot=_admin_alert_outbox_queue_snapshot(report),
+    )
+    db.commit()
+    return report
+
+
+@router.post("/alert-outbox/dispatch-dry-run", response_model=AdminAlertOutboxDispatchDryRunReport)
+def dry_run_admin_alert_outbox_dispatch(
+    request_body: AdminAlertOutboxDispatchDryRunRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminAlertOutboxDispatchDryRunReport:
+    _require_admin(current_user)
+    if not request_body.confirm_dry_run:
+        raise HTTPException(status_code=422, detail="confirm_dry_run must be true")
+    if request_body.from_at is not None and request_body.to_at is not None and request_body.from_at > request_body.to_at:
+        raise HTTPException(status_code=422, detail="from_at must be earlier than to_at")
+    unique_entry_ids: list[int] | None = None
+    if request_body.entry_ids is not None:
+        unique_entry_ids = list(dict.fromkeys(request_body.entry_ids))
+        if len(unique_entry_ids) != len(request_body.entry_ids):
+            raise HTTPException(status_code=422, detail="entry_ids must be unique")
+    generated_at = request_body.now_at or datetime.now(UTC)
+    filters = {
+        "entry_ids": unique_entry_ids,
+        "source_type": (
+            request_body.source_type.strip()
+            if request_body.source_type is not None and request_body.source_type.strip()
+            else None
+        ),
+        "from_at": request_body.from_at,
+        "to_at": request_body.to_at,
+        "now_at": generated_at,
+        "item_limit": request_body.item_limit,
+    }
+    statement = select(AdminAlertOutboxEntry)
+    if unique_entry_ids is not None:
+        statement = statement.where(AdminAlertOutboxEntry.id.in_(unique_entry_ids))
+    if filters["source_type"] is not None:
+        statement = statement.where(AdminAlertOutboxEntry.source_type == filters["source_type"])
+    if request_body.from_at is not None:
+        statement = statement.where(AdminAlertOutboxEntry.last_seen_at >= request_body.from_at)
+    if request_body.to_at is not None:
+        statement = statement.where(AdminAlertOutboxEntry.last_seen_at <= request_body.to_at)
+    entries = list(
+        db.scalars(statement.order_by(AdminAlertOutboxEntry.last_seen_at.desc(), AdminAlertOutboxEntry.id.desc())).all()
+    )
+    if unique_entry_ids is not None:
+        found_ids = {entry.id for entry in entries}
+        missing_ids = [entry_id for entry_id in unique_entry_ids if entry_id not in found_ids]
+        if missing_ids:
+            raise HTTPException(
+                status_code=404,
+                detail={"message": "Alert outbox entries not found", "missing_ids": missing_ids},
+            )
+    report = _admin_alert_outbox_dispatch_dry_run_report(
+        entries,
+        generated_at=generated_at,
+        filters=filters,
+        item_limit=request_body.item_limit,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.alert_outbox.dispatch_dry_run",
+        resource_type="admin_alert_outbox",
+        event_result="success",
+        request=request,
+        snapshot=_admin_alert_outbox_dispatch_dry_run_snapshot(report),
     )
     db.commit()
     return report
@@ -4175,6 +4247,130 @@ def _admin_alert_outbox_queue_snapshot(report: AdminAlertOutboxQueueReport) -> d
     }
 
 
+def _admin_alert_outbox_dispatch_dry_run_report(
+    entries: list[AdminAlertOutboxEntry],
+    *,
+    generated_at: datetime,
+    filters: dict[str, Any],
+    item_limit: int,
+) -> AdminAlertOutboxDispatchDryRunReport:
+    active_entries = [
+        entry for entry in entries if entry.status in {"pending_review", "planned", "queued"}
+    ]
+    terminal_entries = [entry for entry in entries if entry.status in {"suppressed", "cancelled"}]
+    expired_entries = [
+        entry for entry in active_entries if _admin_alert_outbox_entry_expired(entry, generated_at)
+    ]
+    ready_entries = [
+        entry
+        for entry in active_entries
+        if entry.status == "queued"
+        and _admin_alert_outbox_entry_due(entry, generated_at)
+        and not _admin_alert_outbox_entry_expired(entry, generated_at)
+        and not entry.external_delivery
+        and entry.dispatch_mode == "manual_review"
+        and entry.delivery_target == "admin_outbox"
+    ]
+    ready_entry_ids = {entry.id for entry in ready_entries}
+    not_due_entries = [
+        entry
+        for entry in active_entries
+        if entry.status == "queued"
+        and not _admin_alert_outbox_entry_due(entry, generated_at)
+        and not _admin_alert_outbox_entry_expired(entry, generated_at)
+        and not entry.external_delivery
+        and entry.dispatch_mode == "manual_review"
+        and entry.delivery_target == "admin_outbox"
+    ]
+    not_due_entry_ids = {entry.id for entry in not_due_entries}
+    expired_entry_ids = {entry.id for entry in expired_entries}
+    blocked_entries = [
+        entry
+        for entry in active_entries
+        if entry.id not in ready_entry_ids
+        and entry.id not in not_due_entry_ids
+        and entry.id not in expired_entry_ids
+    ]
+    if ready_entries:
+        dry_run_status: Literal["empty", "blocked", "expired", "ready", "cleared"] = "ready"
+    elif blocked_entries or not_due_entries:
+        dry_run_status = "blocked"
+    elif expired_entries:
+        dry_run_status = "expired"
+    elif entries:
+        dry_run_status = "cleared"
+    else:
+        dry_run_status = "empty"
+    filtered_snapshot_filters = {key: value for key, value in filters.items() if value is not None}
+    return AdminAlertOutboxDispatchDryRunReport(
+        generated_at=generated_at,
+        filters=filtered_snapshot_filters,
+        policy={
+            "dry_run": True,
+            "writes_outbox_state": False,
+            "increments_attempts": False,
+            "external_delivery": False,
+            "broker_delivery": False,
+            "automatic_actions": False,
+            "dispatch_mode": "manual_review",
+            "delivery_target": "admin_outbox",
+        },
+        dry_run_status=dry_run_status,
+        total_count=len(entries),
+        active_count=len(active_entries),
+        pending_review_count=sum(1 for entry in active_entries if entry.status == "pending_review"),
+        planned_count=sum(1 for entry in active_entries if entry.status == "planned"),
+        queued_count=sum(1 for entry in active_entries if entry.status == "queued"),
+        ready_count=len(ready_entries),
+        blocked_count=len(blocked_entries),
+        expired_count=len(expired_entries),
+        not_due_count=len(not_due_entries),
+        terminal_count=len(terminal_entries),
+        external_delivery_count=sum(1 for entry in entries if entry.external_delivery),
+        blocked_reason_counts=_admin_alert_outbox_dispatch_entry_reason_counts(blocked_entries, generated_at),
+        ready_items=[
+            _admin_alert_outbox_dispatch_dry_run_item(entry, generated_at)
+            for entry in _sort_admin_alert_outbox_queue_items(ready_entries)[:item_limit]
+        ],
+        blocked_items=[
+            _admin_alert_outbox_dispatch_dry_run_item(entry, generated_at)
+            for entry in _sort_admin_alert_outbox_queue_items(blocked_entries)[:item_limit]
+        ],
+        expired_items=[
+            _admin_alert_outbox_dispatch_dry_run_item(entry, generated_at)
+            for entry in _sort_admin_alert_outbox_queue_items(expired_entries)[:item_limit]
+        ],
+        not_due_items=[
+            _admin_alert_outbox_dispatch_dry_run_item(entry, generated_at)
+            for entry in _sort_admin_alert_outbox_queue_items(not_due_entries)[:item_limit]
+        ],
+    )
+
+
+def _admin_alert_outbox_dispatch_dry_run_snapshot(report: AdminAlertOutboxDispatchDryRunReport) -> dict[str, Any]:
+    return {
+        "format": "admin_alert_outbox_dispatch_dry_run",
+        "dry_run_status": report.dry_run_status,
+        "filters": {key: _admin_alert_outbox_snapshot_value(value) for key, value in report.filters.items()},
+        "policy": report.policy,
+        "total_count": report.total_count,
+        "active_count": report.active_count,
+        "pending_review_count": report.pending_review_count,
+        "planned_count": report.planned_count,
+        "queued_count": report.queued_count,
+        "ready_count": report.ready_count,
+        "blocked_count": report.blocked_count,
+        "expired_count": report.expired_count,
+        "not_due_count": report.not_due_count,
+        "terminal_count": report.terminal_count,
+        "external_delivery_count": report.external_delivery_count,
+        "ready_entry_ids": [item.id for item in report.ready_items],
+        "blocked_reason_counts": report.blocked_reason_counts,
+        "expired_entry_ids": [item.id for item in report.expired_items],
+        "not_due_entry_ids": [item.id for item in report.not_due_items],
+    }
+
+
 def _admin_alert_outbox_snapshot_value(value: Any) -> Any:
     if isinstance(value, datetime):
         return value.isoformat()
@@ -4187,6 +4383,10 @@ def _admin_alert_outbox_snapshot_value(value: Any) -> Any:
 
 def _admin_alert_outbox_entry_due(entry: AdminAlertOutboxEntry, now_at: datetime) -> bool:
     return entry.available_at is None or _naive_utc(entry.available_at) <= _naive_utc(now_at)
+
+
+def _admin_alert_outbox_entry_expired(entry: AdminAlertOutboxEntry, now_at: datetime) -> bool:
+    return entry.expires_at is not None and _naive_utc(entry.expires_at) <= _naive_utc(now_at)
 
 
 def _admin_alert_outbox_status_bucket(
@@ -4204,6 +4404,70 @@ def _admin_alert_outbox_status_bucket(
         oldest_available_at=_oldest_datetime(entry.available_at for entry in entries if entry.available_at is not None),
         latest_reviewed_at=_latest_datetime(entry.reviewed_at for entry in entries if entry.reviewed_at is not None),
     )
+
+
+def _admin_alert_outbox_dispatch_dry_run_item(
+    entry: AdminAlertOutboxEntry,
+    now_at: datetime,
+) -> AdminAlertOutboxDispatchDryRunItem:
+    return AdminAlertOutboxDispatchDryRunItem(
+        id=entry.id,
+        source_type=entry.source_type,
+        source_id=entry.source_id,
+        source_key=entry.source_key,
+        event_code=entry.event_code,
+        severity=entry.severity,
+        action_hint=entry.action_hint,
+        status=entry.status,  # type: ignore[arg-type]
+        reason=_admin_alert_outbox_dispatch_reason(entry, now_at),
+        dispatch_mode=entry.dispatch_mode,
+        delivery_target=entry.delivery_target,
+        external_delivery=entry.external_delivery,
+        payload_hash_prefix=entry.payload_hash[:12],
+        delivery_key=_admin_alert_outbox_delivery_key(entry),
+        last_seen_at=entry.last_seen_at,
+        available_at=entry.available_at,
+        expires_at=entry.expires_at,
+        reviewed_at=entry.reviewed_at,
+        attempt_count=entry.attempt_count,
+    )
+
+
+def _admin_alert_outbox_dispatch_reason(entry: AdminAlertOutboxEntry, now_at: datetime) -> str:
+    if _admin_alert_outbox_entry_expired(entry, now_at):
+        return "expired"
+    if entry.external_delivery:
+        return "external_delivery_disabled"
+    if entry.dispatch_mode != "manual_review":
+        return "unsupported_dispatch_mode"
+    if entry.delivery_target != "admin_outbox":
+        return "unsupported_delivery_target"
+    if entry.status == "pending_review":
+        return "pending_review"
+    if entry.status == "planned":
+        return "planned_not_queued"
+    if entry.status == "queued" and not _admin_alert_outbox_entry_due(entry, now_at):
+        return "queued_not_due"
+    if entry.status == "queued":
+        return "queued_due"
+    return "terminal"
+
+
+def _admin_alert_outbox_delivery_key(entry: AdminAlertOutboxEntry) -> str:
+    return sha256(f"{entry.id}:{entry.source_type}:{entry.event_code}:{entry.payload_hash}".encode("utf-8")).hexdigest()[
+        :16
+    ]
+
+
+def _admin_alert_outbox_dispatch_entry_reason_counts(
+    entries: list[AdminAlertOutboxEntry],
+    now_at: datetime,
+) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for entry in entries:
+        reason = _admin_alert_outbox_dispatch_reason(entry, now_at)
+        counts[reason] = counts.get(reason, 0) + 1
+    return counts
 
 
 def _admin_alert_outbox_queue_item(entry: AdminAlertOutboxEntry) -> AdminAlertOutboxQueueItem:
