@@ -56,6 +56,30 @@ python -m scripts.content_script_remote_drift_drill --require-mysql --expect-sch
 
 该报告检查数据库方言、调度配置、host policy 桶、mirror 记录、scan run ledger、queue/alerts/outbox 和真实观察待留证项；默认不联网、不写库、不入队、不修改 host policy，不返回原始 CDN URL、完整 SRI、远端/镜像字节、`content_bytes`、异常原文、`scheduler_lease_token`、payload 或复核备注。真实安全 CDN 样本、真实 MySQL、真实外网扫描和浏览器隔离证据仍需实机留证。
 
+后端阶段门禁总账：
+
+```bash
+python -m scripts.backend_stage_gate --require-mysql \
+  --database-url "mysql+pymysql://astra:******@127.0.0.1:3306/astra?charset=utf8mb4" \
+  --require-production \
+  --require-admin-bootstrap-token \
+  --expect-knowledge-scheduler-enabled \
+  --expect-content-script-scheduler-enabled \
+  --run-topology-live \
+  --static-url https://your-domain.example/ \
+  --render-url https://your-domain.example/api/render/page/physics/energy-conservation \
+  --proxied-api-url https://your-domain.example/api/health \
+  --direct-api-url http://127.0.0.1:8000/api/health \
+  --public-direct-api-url http://your-public-ip:8000/api/health \
+  --confirm-backend-tests-passed \
+  --confirm-core-manual-paths \
+  --confirm-deploy-docs-reviewed \
+  --confirm-admin-bootstrap-reviewed \
+  --confirm-rollback-reviewed
+```
+
+该总账聚合部署预检、smoke、拓扑、认证、内容、调度、脚本和审计演练报告，并输出 V6.6.44 的“通过 / 延期 / 带风险通过”建议。`--confirm-*` 只表示已有外部证据；未使用真实 MySQL、未跑真实拓扑或缺少人工确认时，报告会保持缺证延期。
+
 本地账号与学校班级 API：
 
 | 方法 | 路径 | 说明 |
