@@ -2,10 +2,13 @@ import json
 from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 
+import pytest
+
 from app.db.session import get_session_factory, init_db, reset_database_state
 from app.models import ClassKnowledgeSnapshot, KnowledgeSnapshotRun, UserKnowledgeSnapshot
 from app.services.knowledge_snapshot_runs import snapshot_run_key, snapshot_window
 from app.services.knowledge_snapshot_scheduler_drill import run_knowledge_snapshot_scheduler_drill
+from scripts.knowledge_snapshot_scheduler_drill import main as drill_main
 from scripts.knowledge_snapshot_scheduler_drill import run_knowledge_snapshot_scheduler_drill_report
 
 
@@ -77,6 +80,7 @@ def test_knowledge_snapshot_scheduler_drill_detects_bad_run_ledger_states():
     database_url = _database_url()
     _init_database(database_url)
     stale_start, stale_end = snapshot_window("day", date(2026, 7, 10))
+    partial_start, partial_end = snapshot_window("day", date(2026, 7, 9))
     terminal_start, terminal_end = snapshot_window("day", date(2026, 7, 11))
     failed_start, failed_end = snapshot_window("week", date(2026, 7, 6))
     with get_session_factory(database_url)() as db:
@@ -90,6 +94,19 @@ def test_knowledge_snapshot_scheduler_drill_detects_bad_run_ledger_states():
                     trigger_source="scheduler",
                     status="running",
                     started_at=datetime(2026, 7, 11, 3, 0),
+                    attempt_count=1,
+                    metadata_json={"trigger_source": "scheduler"},
+                ),
+                KnowledgeSnapshotRun(
+                    run_key=snapshot_run_key("day", partial_start, partial_end),
+                    granularity="day",
+                    period_start=partial_start,
+                    period_end=partial_end,
+                    trigger_source="scheduler",
+                    status="running",
+                    started_at=datetime(2026, 7, 13, 4, 30),
+                    scheduler_lease_token="secret-partial-token",
+                    scheduler_lease_expires_at=datetime(2026, 7, 13, 6, 0),
                     attempt_count=1,
                     metadata_json={"trigger_source": "scheduler"},
                 ),
@@ -137,11 +154,16 @@ def test_knowledge_snapshot_scheduler_drill_detects_bad_run_ledger_states():
     assert report["ok"] is False
     codes = report["run_ledger"]["issue_counts_by_code"]
     assert "running_missing_scheduler_lease" in codes
+    assert "running_partial_scheduler_lease" in codes
+    assert "running_missing_lease_owner" in codes
+    assert "running_missing_heartbeat" in codes
     assert "terminal_run_still_has_scheduler_lease" in codes
     assert "run_key_window_mismatch" in codes
     assert "exhausted_failed_run" in codes
     report_text = json.dumps(report, ensure_ascii=False)
     assert "secret-terminal-token" not in report_text
+    assert "secret-partial-token" not in report_text
+    assert "scheduler_lease_token" not in report_text
 
 
 def test_knowledge_snapshot_scheduler_drill_flags_stale_running_without_failing():
@@ -243,6 +265,26 @@ def test_knowledge_snapshot_scheduler_drill_reports_snapshot_count_mismatch_as_w
     assert report["ok"] is True
     assert "user_snapshot_count_mismatch" in report["run_ledger"]["issue_counts_by_code"]
     assert "latest_success_user_snapshot_count_mismatch" in report["snapshot_outputs"]["issue_counts_by_code"]
+
+
+def test_knowledge_snapshot_scheduler_drill_cli_reports_invalid_arguments_as_json(capsys):
+    status = drill_main(["--now", "not-a-date"])
+
+    assert status == 2
+    report = json.loads(capsys.readouterr().out)
+    assert report["ok"] is False
+    assert report["status"] == "invalid_argument"
+    assert report["error"] == "ValueError"
+    assert report["sensitive_fields_returned"] is False
+
+    with pytest.raises(SystemExit) as exc_info:
+        drill_main(["--max-runs", "nope"])
+
+    assert exc_info.value.code == 2
+    report = json.loads(capsys.readouterr().out)
+    assert report["ok"] is False
+    assert report["status"] == "invalid_argument"
+    assert report["error"] == "ArgumentError"
 
 
 def _init_database(database_url: str) -> None:

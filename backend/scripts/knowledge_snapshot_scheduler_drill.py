@@ -13,6 +13,19 @@ from app.db.session import get_session_factory
 from app.services.knowledge_snapshot_scheduler_drill import run_knowledge_snapshot_scheduler_drill
 
 
+class _JsonArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        print(
+            json.dumps(
+                _invalid_argument_report("ArgumentError", message),
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        raise SystemExit(2)
+
+
 def run_knowledge_snapshot_scheduler_drill_report(
     *,
     database_url: str | None = None,
@@ -56,7 +69,7 @@ def run_knowledge_snapshot_scheduler_drill_report(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Read-only knowledge snapshot scheduler drill report.")
+    parser = _JsonArgumentParser(description="Read-only knowledge snapshot scheduler drill report.")
     parser.add_argument("--database-url", default=None, help="Override ASTRA_DATABASE_URL for this run.")
     parser.add_argument("--require-mysql", action="store_true", help="Fail the report unless the target DB dialect is MySQL.")
     parser.add_argument(
@@ -74,7 +87,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-issues", type=int, default=100, help="Maximum issue rows to include per report section.")
     parser.add_argument("--max-runs", type=int, default=500, help="Maximum recent run ledger rows to scan.")
     args = parser.parse_args(argv)
-    now = datetime.fromisoformat(args.now) if args.now else None
+    try:
+        now = datetime.fromisoformat(args.now) if args.now else None
+    except ValueError as exc:
+        report = _invalid_argument_report("ValueError", f"invalid --now: {exc}")
+        print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+        return 2
     report = run_knowledge_snapshot_scheduler_drill_report(
         database_url=args.database_url,
         require_mysql=args.require_mysql,
@@ -86,6 +104,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
     return 0 if report["ok"] else 1
+
+
+def _invalid_argument_report(error: str, message: str) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "status": "invalid_argument",
+        "error": error,
+        "message": message,
+        "sensitive_fields_returned": False,
+    }
 
 
 def _safe_database_url(database_url: str) -> str:

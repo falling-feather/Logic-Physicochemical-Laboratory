@@ -163,6 +163,12 @@ from app.services.knowledge_snapshot_runs import (
     snapshot_run_key,
     snapshot_window,
 )
+from app.services.knowledge_snapshot_leases import (
+    knowledge_snapshot_lease_has_any_field,
+    knowledge_snapshot_lease_is_complete,
+    knowledge_snapshot_lease_is_expired,
+    knowledge_snapshot_lease_missing_fields,
+)
 from app.services.knowledge_snapshot_scheduler import (
     SnapshotScheduleConfig,
     SnapshotScheduleJob,
@@ -3255,6 +3261,7 @@ def _knowledge_snapshot_run_health_report(
     stale_running_count = 0
     lease_expiring_count = 0
     legacy_running_without_lease_count = 0
+    partial_running_lease_count = 0
     pending_count = 0
     success_count = 0
     failed_count = 0
@@ -3282,9 +3289,15 @@ def _knowledge_snapshot_run_health_report(
             running_count += 1
             if oldest_running_started_at is None or _naive_utc(run.started_at) < _naive_utc(oldest_running_started_at):
                 oldest_running_started_at = run.started_at
-            if run.scheduler_lease_token is None:
+            has_any_lease = knowledge_snapshot_lease_has_any_field(run)
+            has_complete_lease = knowledge_snapshot_lease_is_complete(run)
+            if not has_any_lease:
                 legacy_running_without_lease_count += 1
                 health_flags.append("legacy_running_without_lease")
+            elif not has_complete_lease:
+                partial_running_lease_count += 1
+                health_flags.append("partial_scheduler_lease")
+                health_flags.extend(_knowledge_snapshot_missing_lease_flags(knowledge_snapshot_lease_missing_fields(run)))
             lease_expires_at = _naive_utc(run.scheduler_lease_expires_at) if run.scheduler_lease_expires_at else None
             if lease_expires_at is not None and lease_expires_at > generated_at_naive:
                 lease_seconds_remaining = int((lease_expires_at - generated_at_naive).total_seconds())
@@ -3298,7 +3311,7 @@ def _knowledge_snapshot_run_health_report(
                 claimable = True
                 claimable_count += 1
                 health_flags.append("stale_running")
-            else:
+            elif has_complete_lease:
                 active_running_count += 1
         elif run.status == "pending":
             pending_count += 1
@@ -3352,7 +3365,7 @@ def _knowledge_snapshot_run_health_report(
                 )
             )
 
-    needs_attention_count = stale_running_count + pending_count + failed_count
+    needs_attention_count = stale_running_count + pending_count + failed_count + partial_running_lease_count
     if needs_attention_count > 0:
         health_status: Literal["ok", "warning", "attention"] = "attention"
     elif lease_expiring_count > 0:
@@ -3379,6 +3392,7 @@ def _knowledge_snapshot_run_health_report(
         stale_running_count=stale_running_count,
         lease_expiring_count=lease_expiring_count,
         legacy_running_without_lease_count=legacy_running_without_lease_count,
+        partial_running_lease_count=partial_running_lease_count,
         claimable_count=claimable_count,
         pending_count=pending_count,
         success_count=success_count,
@@ -3408,6 +3422,7 @@ def _knowledge_snapshot_run_health_snapshot(report: AdminKnowledgeSnapshotRunHea
         "stale_running_count": report.stale_running_count,
         "lease_expiring_count": report.lease_expiring_count,
         "legacy_running_without_lease_count": report.legacy_running_without_lease_count,
+        "partial_running_lease_count": report.partial_running_lease_count,
         "claimable_count": report.claimable_count,
         "pending_count": report.pending_count,
         "failed_count": report.failed_count,
@@ -3863,6 +3878,15 @@ def _knowledge_snapshot_health_alert_candidates(
             action_hint: Literal["requeue", "dispatch", "investigate", "monitor"] = (
                 "requeue" if item.claimable else "investigate"
             )
+        elif flag in {
+            "partial_scheduler_lease",
+            "running_missing_lease_owner",
+            "running_missing_lease_token",
+            "running_missing_lease_expiry",
+            "running_missing_heartbeat",
+        }:
+            severity = "critical"
+            action_hint = "investigate"
         elif flag in {"retryable_failed", "pending"}:
             severity = "warning"
             action_hint = "requeue" if flag == "retryable_failed" else "dispatch"
@@ -3991,11 +4015,16 @@ def _sort_knowledge_snapshot_problem_runs(
 ) -> list[AdminKnowledgeSnapshotRunHealthItem]:
     severity_order = {
         "stale_running": 0,
-        "retryable_failed": 1,
-        "exhausted_failed": 2,
-        "pending": 3,
-        "lease_expiring": 4,
-        "legacy_running_without_lease": 5,
+        "partial_scheduler_lease": 1,
+        "running_missing_lease_owner": 2,
+        "running_missing_lease_token": 3,
+        "running_missing_lease_expiry": 4,
+        "running_missing_heartbeat": 5,
+        "retryable_failed": 6,
+        "exhausted_failed": 7,
+        "pending": 8,
+        "lease_expiring": 9,
+        "legacy_running_without_lease": 10,
     }
 
     def sort_key(run: AdminKnowledgeSnapshotRunHealthItem) -> tuple[int, datetime, int]:
@@ -4006,9 +4035,40 @@ def _sort_knowledge_snapshot_problem_runs(
 
 
 def _knowledge_snapshot_run_lease_expired(run: KnowledgeSnapshotRun, now: datetime, lease_seconds: int) -> bool:
-    if run.scheduler_lease_expires_at is not None:
-        return _naive_utc(run.scheduler_lease_expires_at) <= now
-    return _naive_utc(run.started_at) <= now - timedelta(seconds=lease_seconds)
+    return knowledge_snapshot_lease_is_expired(run, now, lease_seconds)
+
+
+def _knowledge_snapshot_run_metadata_summary(metadata: dict[str, Any] | None) -> tuple[dict[str, Any], bool]:
+    if not metadata:
+        return {}, False
+    summary: dict[str, Any] = {}
+    directly_allowed = {
+        "trigger_source",
+        "previous_status",
+        "previous_attempt_count",
+        "cleared_lease",
+        "cancelled_at",
+        "requeued_at",
+    }
+    for key in directly_allowed:
+        if key in metadata:
+            summary[key] = metadata[key]
+    if "requeue_reason" in metadata:
+        summary["requeue_reason_present"] = bool(str(metadata.get("requeue_reason") or "").strip())
+    if "cancelled_by_user_id" in metadata or "requeued_by_user_id" in metadata:
+        summary["admin_actor_present"] = True
+    redacted_keys = set(metadata) - directly_allowed
+    return summary, bool(redacted_keys)
+
+
+def _knowledge_snapshot_missing_lease_flags(missing_fields: list[str]) -> list[str]:
+    flag_by_field = {
+        "scheduler_lease_owner": "running_missing_lease_owner",
+        "scheduler_lease_token": "running_missing_lease_token",
+        "scheduler_lease_expires_at": "running_missing_lease_expiry",
+        "scheduler_heartbeat_at": "running_missing_heartbeat",
+    }
+    return [flag_by_field[field] for field in missing_fields if field in flag_by_field]
 
 
 def _naive_utc(value: datetime) -> datetime:
@@ -4018,6 +4078,7 @@ def _naive_utc(value: datetime) -> datetime:
 
 
 def _admin_knowledge_snapshot_run_read(run: KnowledgeSnapshotRun) -> AdminKnowledgeSnapshotRunRead:
+    metadata_summary, metadata_redacted = _knowledge_snapshot_run_metadata_summary(run.metadata_json)
     return AdminKnowledgeSnapshotRunRead(
         id=run.id,
         run_key=run.run_key,
@@ -4035,7 +4096,8 @@ def _admin_knowledge_snapshot_run_read(run: KnowledgeSnapshotRun) -> AdminKnowle
         user_snapshot_count=run.user_snapshot_count,
         class_snapshot_count=run.class_snapshot_count,
         error_message=run.error_message,
-        metadata_json=run.metadata_json,
+        metadata_summary=metadata_summary,
+        metadata_redacted=metadata_redacted,
         created_at=run.created_at,
         updated_at=run.updated_at,
     )

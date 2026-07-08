@@ -8,13 +8,14 @@ import socket
 from typing import Callable
 import uuid
 
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, not_, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.session import get_session_factory
 from app.models import KnowledgeSnapshotRun
 from app.models.base import utc_now
+from app.services.knowledge_snapshot_leases import knowledge_snapshot_lease_is_expired
 from app.services.knowledge_snapshot_runs import (
     SnapshotGranularity,
     rebuild_periodic_knowledge_snapshots,
@@ -56,6 +57,7 @@ class KnowledgeSnapshotScheduler:
         interval_seconds: int,
         lease_seconds: int,
         heartbeat_seconds: int,
+        pending_limit: int = 50,
         run_on_start: bool = False,
         clock: Callable[[], datetime] = utc_now,
         instance_id: str | None = None,
@@ -66,6 +68,7 @@ class KnowledgeSnapshotScheduler:
         self.interval_seconds = interval_seconds
         self.lease_seconds = lease_seconds
         self.heartbeat_seconds = heartbeat_seconds
+        self.pending_limit = pending_limit
         self.run_on_start = run_on_start
         self.clock = clock
         self.instance_id = instance_id or _default_scheduler_instance_id()
@@ -146,6 +149,7 @@ class KnowledgeSnapshotScheduler:
                     scheduler_lease_token=lease.lease_token,
                     scheduler_lease_heartbeat=lease_heartbeat,
                     scheduler_heartbeat_seconds=self.heartbeat_seconds,
+                    clock=self.clock,
                 )
             except Exception as exc:
                 return {
@@ -165,7 +169,7 @@ class KnowledgeSnapshotScheduler:
     def _pending_jobs(self) -> list[SnapshotScheduleJob]:
         session_factory = get_session_factory(self.database_url)
         with session_factory() as db:
-            return pending_snapshot_jobs(db)
+            return pending_snapshot_jobs(db, limit=self.pending_limit)
 
 
 def due_snapshot_jobs(now: datetime, config: SnapshotScheduleConfig) -> list[SnapshotScheduleJob]:
@@ -182,12 +186,15 @@ def due_snapshot_jobs(now: datetime, config: SnapshotScheduleConfig) -> list[Sna
     return jobs
 
 
-def pending_snapshot_jobs(db: Session) -> list[SnapshotScheduleJob]:
-    runs = db.scalars(
+def pending_snapshot_jobs(db: Session, *, limit: int | None = None) -> list[SnapshotScheduleJob]:
+    statement = (
         select(KnowledgeSnapshotRun)
         .where(KnowledgeSnapshotRun.status == "pending")
         .order_by(KnowledgeSnapshotRun.started_at.asc(), KnowledgeSnapshotRun.id.asc())
     )
+    if limit is not None:
+        statement = statement.limit(limit)
+    runs = db.scalars(statement)
     return [
         SnapshotScheduleJob(granularity=run.granularity, reference_date=run.period_start.date())
         for run in runs
@@ -301,6 +308,29 @@ def _claim_existing_snapshot_job_lease(
     trigger_source: str,
 ) -> SnapshotJobLease | None:
     legacy_running_cutoff = now - timedelta(seconds=lease_seconds)
+    lease_owner_present = KnowledgeSnapshotRun.scheduler_lease_owner.is_not(None)
+    lease_token_present = KnowledgeSnapshotRun.scheduler_lease_token.is_not(None)
+    lease_expires_present = KnowledgeSnapshotRun.scheduler_lease_expires_at.is_not(None)
+    lease_heartbeat_present = KnowledgeSnapshotRun.scheduler_heartbeat_at.is_not(None)
+    complete_lease = and_(
+        lease_owner_present,
+        lease_token_present,
+        lease_expires_present,
+        lease_heartbeat_present,
+    )
+    any_lease = or_(
+        lease_owner_present,
+        lease_token_present,
+        lease_expires_present,
+        lease_heartbeat_present,
+    )
+    no_lease = and_(
+        KnowledgeSnapshotRun.scheduler_lease_owner.is_(None),
+        KnowledgeSnapshotRun.scheduler_lease_token.is_(None),
+        KnowledgeSnapshotRun.scheduler_lease_expires_at.is_(None),
+        KnowledgeSnapshotRun.scheduler_heartbeat_at.is_(None),
+    )
+    partial_lease = and_(any_lease, not_(complete_lease))
     claimable = or_(
         KnowledgeSnapshotRun.status == "pending",
         and_(
@@ -310,9 +340,17 @@ def _claim_existing_snapshot_job_lease(
         and_(
             KnowledgeSnapshotRun.status == "running",
             or_(
-                KnowledgeSnapshotRun.scheduler_lease_expires_at <= now,
+                and_(complete_lease, KnowledgeSnapshotRun.scheduler_lease_expires_at <= now),
                 and_(
-                    KnowledgeSnapshotRun.scheduler_lease_expires_at.is_(None),
+                    partial_lease,
+                    or_(
+                        KnowledgeSnapshotRun.scheduler_lease_expires_at <= now,
+                        KnowledgeSnapshotRun.scheduler_lease_expires_at.is_(None),
+                        KnowledgeSnapshotRun.started_at <= legacy_running_cutoff,
+                    ),
+                ),
+                and_(
+                    no_lease,
                     KnowledgeSnapshotRun.started_at <= legacy_running_cutoff,
                 ),
             ),
@@ -361,6 +399,9 @@ def heartbeat_snapshot_job_lease(
             KnowledgeSnapshotRun.status == "running",
             KnowledgeSnapshotRun.scheduler_lease_owner == lease.lease_owner,
             KnowledgeSnapshotRun.scheduler_lease_token == lease.lease_token,
+            KnowledgeSnapshotRun.scheduler_lease_expires_at.is_not(None),
+            KnowledgeSnapshotRun.scheduler_lease_expires_at > now_value,
+            KnowledgeSnapshotRun.scheduler_heartbeat_at.is_not(None),
         )
         .values(
             scheduler_lease_expires_at=lease_expires_at,
@@ -385,6 +426,7 @@ def scheduler_from_settings(settings) -> KnowledgeSnapshotScheduler:
         interval_seconds=settings.knowledge_snapshot_scheduler_interval_seconds,
         lease_seconds=settings.knowledge_snapshot_scheduler_lease_seconds,
         heartbeat_seconds=settings.knowledge_snapshot_scheduler_heartbeat_seconds,
+        pending_limit=settings.knowledge_snapshot_scheduler_pending_limit,
         run_on_start=settings.knowledge_snapshot_scheduler_run_on_start,
     )
 
@@ -394,10 +436,7 @@ def _hour_reached(now: datetime, hour: int) -> bool:
 
 
 def _run_lease_expired(run: KnowledgeSnapshotRun, now: datetime, lease_seconds: int) -> bool:
-    now_value = _as_naive_utc(now)
-    if run.scheduler_lease_expires_at is not None:
-        return _as_naive_utc(run.scheduler_lease_expires_at) <= now_value
-    return _as_naive_utc(run.started_at) <= now_value - timedelta(seconds=lease_seconds)
+    return knowledge_snapshot_lease_is_expired(run, now, lease_seconds)
 
 
 def _as_naive_utc(value: datetime) -> datetime:

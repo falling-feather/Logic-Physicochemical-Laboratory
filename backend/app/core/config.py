@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     knowledge_snapshot_scheduler_interval_seconds: int = Field(default=300, ge=30)
     knowledge_snapshot_scheduler_lease_seconds: int = Field(default=3600, ge=60)
     knowledge_snapshot_scheduler_heartbeat_seconds: int = Field(default=120, ge=30)
+    knowledge_snapshot_scheduler_pending_limit: int = Field(default=50, ge=1, le=1000)
     knowledge_snapshot_daily_enabled: bool = True
     knowledge_snapshot_daily_hour: int = Field(default=3, ge=0, le=23)
     knowledge_snapshot_weekly_enabled: bool = True

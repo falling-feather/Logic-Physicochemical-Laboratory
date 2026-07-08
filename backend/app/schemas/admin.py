@@ -688,7 +688,8 @@ class AdminKnowledgeSnapshotRunRead(BaseModel):
     user_snapshot_count: int
     class_snapshot_count: int
     error_message: str | None = None
-    metadata_json: dict[str, Any]
+    metadata_summary: dict[str, Any]
+    metadata_redacted: bool = True
     created_at: datetime
     updated_at: datetime
 
@@ -746,6 +747,7 @@ class AdminKnowledgeSnapshotRunHealthReport(BaseModel):
     stale_running_count: int
     lease_expiring_count: int
     legacy_running_without_lease_count: int
+    partial_running_lease_count: int
     claimable_count: int
     pending_count: int
     success_count: int

@@ -12,6 +12,12 @@ from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import Session
 
 from app.models import ClassKnowledgeSnapshot, KnowledgeSnapshotRun, UserKnowledgeSnapshot
+from app.services.knowledge_snapshot_leases import (
+    knowledge_snapshot_lease_has_any_field,
+    knowledge_snapshot_lease_is_complete,
+    knowledge_snapshot_lease_is_expired,
+    knowledge_snapshot_lease_missing_fields,
+)
 from app.services.knowledge_snapshot_runs import snapshot_run_key
 from app.services.knowledge_snapshot_scheduler import SnapshotScheduleConfig, due_snapshot_jobs, pending_snapshot_jobs
 
@@ -243,10 +249,18 @@ def _run_ledger_issues(
         if not has_lease:
             issues.append(_issue("running_missing_scheduler_lease", "critical", run=run))
         else:
-            if run.scheduler_lease_expires_at is None:
-                issues.append(_issue("running_missing_lease_expiry", "critical", run=run))
-            if run.scheduler_heartbeat_at is None:
-                issues.append(_issue("running_missing_heartbeat", "critical", run=run))
+            missing_fields = knowledge_snapshot_lease_missing_fields(run)
+            if missing_fields:
+                issues.append(
+                    _issue(
+                        "running_partial_scheduler_lease",
+                        "critical",
+                        run=run,
+                        missing_lease_fields=_public_missing_lease_fields(missing_fields),
+                    )
+                )
+                for field in missing_fields:
+                    issues.append(_issue(_run_missing_lease_issue_code(field), "critical", run=run))
             if _run_lease_expired(run, now, lease_seconds):
                 issues.append(_issue("stale_running_lease_expired", "warning", run=run))
             elif _run_lease_expiring(run, now, lease_expiring_seconds):
@@ -555,6 +569,8 @@ def _run_summary(run: KnowledgeSnapshotRun, *, now: datetime, lease_seconds: int
         "finished_at": _datetime_value(run.finished_at),
         "scheduler_lease_owner_present": bool(run.scheduler_lease_owner),
         "lease_token_present": bool(run.scheduler_lease_token),
+        "scheduler_lease_complete": knowledge_snapshot_lease_is_complete(run),
+        "missing_lease_fields": _public_missing_lease_fields(knowledge_snapshot_lease_missing_fields(run)),
         "scheduler_lease_expires_at": _datetime_value(run.scheduler_lease_expires_at),
         "scheduler_heartbeat_at": _datetime_value(run.scheduler_heartbeat_at),
         "lease_expired": run.status == "running" and _run_lease_expired(run, now, lease_seconds),
@@ -564,20 +580,30 @@ def _run_summary(run: KnowledgeSnapshotRun, *, now: datetime, lease_seconds: int
 
 
 def _run_has_lease(run: KnowledgeSnapshotRun) -> bool:
-    return any(
-        (
-            run.scheduler_lease_owner,
-            run.scheduler_lease_token,
-            run.scheduler_lease_expires_at,
-            run.scheduler_heartbeat_at,
-        )
-    )
+    return knowledge_snapshot_lease_has_any_field(run)
+
+
+def _run_missing_lease_issue_code(field: str) -> str:
+    return {
+        "scheduler_lease_owner": "running_missing_lease_owner",
+        "scheduler_lease_token": "running_missing_lease_token",
+        "scheduler_lease_expires_at": "running_missing_lease_expiry",
+        "scheduler_heartbeat_at": "running_missing_heartbeat",
+    }.get(field, "running_missing_lease_field")
+
+
+def _public_missing_lease_fields(fields: list[str]) -> list[str]:
+    public_name_by_field = {
+        "scheduler_lease_owner": "lease_owner",
+        "scheduler_lease_token": "lease_token",
+        "scheduler_lease_expires_at": "lease_expiry",
+        "scheduler_heartbeat_at": "heartbeat",
+    }
+    return [public_name_by_field.get(field, "lease_field") for field in fields]
 
 
 def _run_lease_expired(run: KnowledgeSnapshotRun, now: datetime, lease_seconds: int) -> bool:
-    if run.scheduler_lease_expires_at is not None:
-        return _as_naive_utc(run.scheduler_lease_expires_at) <= now
-    return _as_naive_utc(run.started_at) <= now - timedelta(seconds=lease_seconds)
+    return knowledge_snapshot_lease_is_expired(run, now, lease_seconds)
 
 
 def _run_lease_expiring(run: KnowledgeSnapshotRun, now: datetime, lease_expiring_seconds: int) -> bool:

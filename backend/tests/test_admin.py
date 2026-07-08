@@ -1320,7 +1320,7 @@ def test_admin_can_list_and_cancel_knowledge_snapshot_runs(client):
             attempt_count=1,
             user_snapshot_count=0,
             class_snapshot_count=0,
-            metadata_json={"trigger_source": "scheduler"},
+            metadata_json={"trigger_source": "scheduler", "token": "secret-run-metadata-token"},
         )
         success_run = KnowledgeSnapshotRun(
             run_key="knowledge:day:2026-07-02",
@@ -1383,8 +1383,13 @@ def test_admin_can_list_and_cancel_knowledge_snapshot_runs(client):
     assert body["total"] == 1
     assert body["items"][0]["id"] == run_id
     assert body["items"][0]["scheduler_lease_owner"] == "worker-admin-cancel"
+    assert body["items"][0]["metadata_summary"]["trigger_source"] == "scheduler"
+    assert body["items"][0]["metadata_redacted"] is True
     assert "scheduler_lease_token" not in body["items"][0]
-    assert "secret-lease-token" not in json.dumps(body, ensure_ascii=False)
+    page_text = json.dumps(body, ensure_ascii=False)
+    assert "metadata_json" not in page_text
+    assert "secret-lease-token" not in page_text
+    assert "secret-run-metadata-token" not in page_text
 
     cancelled = client.post(
         f"/api/admin/knowledge-snapshot-runs/{run_id}/cancel",
@@ -1398,8 +1403,13 @@ def test_admin_can_list_and_cancel_knowledge_snapshot_runs(client):
     assert cancelled_body["scheduler_lease_owner"] is None
     assert cancelled_body["scheduler_lease_expires_at"] is None
     assert cancelled_body["scheduler_heartbeat_at"] is None
-    assert cancelled_body["metadata_json"]["previous_status"] == "running"
+    assert cancelled_body["metadata_summary"]["previous_status"] == "running"
+    assert cancelled_body["metadata_summary"]["admin_actor_present"] is True
+    assert cancelled_body["metadata_redacted"] is True
     assert "scheduler_lease_token" not in cancelled_body
+    cancelled_text = json.dumps(cancelled_body, ensure_ascii=False)
+    assert "metadata_json" not in cancelled_text
+    assert "secret-run-metadata-token" not in cancelled_text
 
     second_cancel = client.post(
         f"/api/admin/knowledge-snapshot-runs/{run_id}/cancel",
@@ -1499,6 +1509,19 @@ def test_admin_can_read_knowledge_snapshot_run_health(client):
                 metadata_json={"trigger_source": "scheduler"},
             ),
             KnowledgeSnapshotRun(
+                run_key="knowledge:health:partial",
+                granularity="day",
+                period_start=now - timedelta(days=9),
+                period_end=now - timedelta(days=9) + timedelta(hours=23, minutes=59),
+                trigger_source="scheduler",
+                status="running",
+                started_at=now - timedelta(minutes=30),
+                scheduler_lease_token="secret-partial-token",
+                scheduler_lease_expires_at=now + timedelta(minutes=30),
+                attempt_count=1,
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
                 run_key="knowledge:health:legacy",
                 granularity="day",
                 period_start=now - timedelta(days=5),
@@ -1585,37 +1608,42 @@ def test_admin_can_read_knowledge_snapshot_run_health(client):
     assert response.status_code == 200
     body = response.json()
     assert body["health_status"] == "attention"
-    assert body["total"] == 9
+    assert body["total"] == 10
     by_status = {item["status"]: item["total"] for item in body["by_status"]}
     assert by_status == {
         "cancelled": 1,
         "failed": 2,
         "pending": 1,
-        "running": 4,
+        "running": 5,
         "success": 1,
     }
-    assert body["running_count"] == 4
+    assert body["running_count"] == 5
     assert body["active_running_count"] == 2
     assert body["stale_running_count"] == 2
     assert body["lease_expiring_count"] == 1
     assert body["legacy_running_without_lease_count"] == 1
+    assert body["partial_running_lease_count"] == 1
     assert body["failed_count"] == 2
     assert body["retryable_failed_count"] == 1
     assert body["exhausted_failed_count"] == 1
     assert body["claimable_count"] == 4
     assert body["pending_count"] == 1
     assert body["cancelled_count"] == 1
-    assert body["needs_attention_count"] == 5
-    assert body["problem_count"] == 6
+    assert body["needs_attention_count"] == 6
+    assert body["problem_count"] == 7
     assert len(body["problem_runs"]) == 3
     assert body["latest_success_by_granularity"]["day"] is not None
     problem_flags = {flag for item in body["problem_runs"] for flag in item["health_flags"]}
     assert "stale_running" in problem_flags
+    assert "partial_scheduler_lease" in problem_flags
+    assert "running_missing_lease_owner" in problem_flags
+    assert "running_missing_heartbeat" in problem_flags
     serialized = json.dumps(body, ensure_ascii=False)
     assert "scheduler_lease_token" not in serialized
     assert "secret-active-token" not in serialized
     assert "secret-expiring-token" not in serialized
     assert "secret-stale-token" not in serialized
+    assert "secret-partial-token" not in serialized
 
     invalid_window = client.get(
         "/api/admin/knowledge-snapshot-runs/health?from=2026-07-06T10:00:00Z&to=2026-07-05T10:00:00Z",
@@ -1631,7 +1659,7 @@ def test_admin_can_read_knowledge_snapshot_run_health(client):
     assert audit.status_code == 200
     audit_item = audit.json()["items"][0]
     assert audit_item["snapshot_json"]["health_status"] == "attention"
-    assert audit_item["snapshot_json"]["problem_count"] == 6
+    assert audit_item["snapshot_json"]["problem_count"] == 7
     assert audit_item["snapshot_json"]["claimable_count"] == 4
     assert "secret-" not in json.dumps(audit_item["snapshot_json"], ensure_ascii=False)
     assert "problem_runs" not in audit_item["snapshot_json"]
@@ -3540,13 +3568,18 @@ def test_admin_can_requeue_knowledge_snapshot_runs(client):
     assert requeued_body["scheduler_lease_owner"] is None
     assert requeued_body["scheduler_lease_expires_at"] is None
     assert requeued_body["scheduler_heartbeat_at"] is None
-    assert requeued_body["metadata_json"]["trigger_source"] == "admin_requeue"
-    assert requeued_body["metadata_json"]["previous_status"] == "failed"
-    assert requeued_body["metadata_json"]["previous_attempt_count"] == settings.knowledge_snapshot_retry_attempts
-    assert requeued_body["metadata_json"]["cleared_lease"] is True
-    assert requeued_body["metadata_json"]["requeue_reason"] == "retry after data fix"
+    assert requeued_body["metadata_summary"]["trigger_source"] == "admin_requeue"
+    assert requeued_body["metadata_summary"]["previous_status"] == "failed"
+    assert requeued_body["metadata_summary"]["previous_attempt_count"] == settings.knowledge_snapshot_retry_attempts
+    assert requeued_body["metadata_summary"]["cleared_lease"] is True
+    assert requeued_body["metadata_summary"]["requeue_reason_present"] is True
+    assert requeued_body["metadata_summary"]["admin_actor_present"] is True
+    assert requeued_body["metadata_redacted"] is True
     assert "scheduler_lease_token" not in requeued_body
-    assert "secret-requeue-token" not in json.dumps(requeued_body, ensure_ascii=False)
+    requeued_text = json.dumps(requeued_body, ensure_ascii=False)
+    assert "metadata_json" not in requeued_text
+    assert "retry after data fix" not in requeued_text
+    assert "secret-requeue-token" not in requeued_text
 
     pending_requeue = client.post(
         f"/api/admin/knowledge-snapshot-runs/{pending_run_id}/requeue",
@@ -3557,7 +3590,8 @@ def test_admin_can_requeue_knowledge_snapshot_runs(client):
     pending_body = pending_requeue.json()
     assert pending_body["status"] == "pending"
     assert pending_body["trigger_source"] == "admin"
-    assert pending_body["metadata_json"] == {"trigger_source": "admin"}
+    assert pending_body["metadata_summary"]["trigger_source"] == "admin"
+    assert pending_body["metadata_redacted"] is False
 
     cancelled_requeue = client.post(
         f"/api/admin/knowledge-snapshot-runs/{cancelled_run_id}/requeue",
@@ -3568,8 +3602,9 @@ def test_admin_can_requeue_knowledge_snapshot_runs(client):
     cancelled_body = cancelled_requeue.json()
     assert cancelled_body["status"] == "pending"
     assert cancelled_body["trigger_source"] == "admin_requeue"
-    assert cancelled_body["metadata_json"]["previous_status"] == "cancelled"
-    assert cancelled_body["metadata_json"]["cleared_lease"] is False
+    assert cancelled_body["metadata_summary"]["previous_status"] == "cancelled"
+    assert cancelled_body["metadata_summary"]["cleared_lease"] is False
+    assert cancelled_body["metadata_redacted"] is True
 
     active_requeue = client.post(
         f"/api/admin/knowledge-snapshot-runs/{active_running_run_id}/requeue",
@@ -3600,8 +3635,10 @@ def test_admin_can_requeue_knowledge_snapshot_runs(client):
     assert stale_requeue.status_code == 200
     stale_body = stale_requeue.json()
     assert stale_body["status"] == "pending"
-    assert stale_body["metadata_json"]["previous_status"] == "running"
-    assert "secret-stale-requeue-token" not in json.dumps(stale_body, ensure_ascii=False)
+    assert stale_body["metadata_summary"]["previous_status"] == "running"
+    stale_text = json.dumps(stale_body, ensure_ascii=False)
+    assert "metadata_json" not in stale_text
+    assert "secret-stale-requeue-token" not in stale_text
 
     audit = client.get(
         "/api/admin/audit-logs?action=admin.knowledge_snapshot_run.requeue"

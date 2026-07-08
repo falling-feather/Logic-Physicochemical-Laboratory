@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Callable, Literal
 
 from sqlalchemy import select, update
@@ -9,6 +9,10 @@ from sqlalchemy.orm import Session
 from app.api.endpoints import knowledge as knowledge_endpoint
 from app.models import ClassGroup, ClassMembership, Course, CourseClass, KnowledgeSnapshotRun, User
 from app.models.base import utc_now
+from app.services.knowledge_snapshot_leases import (
+    knowledge_snapshot_lease_has_any_field,
+    knowledge_snapshot_lease_is_expired,
+)
 
 
 SnapshotGranularity = Literal["day", "week"]
@@ -66,14 +70,7 @@ def requeue_knowledge_snapshot_run(
         raise ValueError("running knowledge snapshot run cannot be requeued before its scheduler lease expires")
     previous_status = run.status
     previous_attempt_count = run.attempt_count
-    had_scheduler_lease = any(
-        (
-            run.scheduler_lease_owner,
-            run.scheduler_lease_token,
-            run.scheduler_lease_expires_at,
-            run.scheduler_heartbeat_at,
-        )
-    )
+    had_scheduler_lease = knowledge_snapshot_lease_has_any_field(run)
     metadata = {
         "trigger_source": "admin_requeue",
         "requeued_by_user_id": requeued_by_user_id,
@@ -121,16 +118,7 @@ def snapshot_window(
 
 
 def _snapshot_run_lease_expired(run: KnowledgeSnapshotRun, now: datetime, lease_seconds: int) -> bool:
-    now_value = _as_naive_utc(now)
-    if run.scheduler_lease_expires_at is not None:
-        return _as_naive_utc(run.scheduler_lease_expires_at) <= now_value
-    return _as_naive_utc(run.started_at) <= now_value - timedelta(seconds=lease_seconds)
-
-
-def _as_naive_utc(value: datetime) -> datetime:
-    if value.tzinfo is None:
-        return value
-    return value.astimezone(UTC).replace(tzinfo=None)
+    return knowledge_snapshot_lease_is_expired(run, now, lease_seconds)
 
 
 def rebuild_periodic_knowledge_snapshots(
@@ -177,6 +165,7 @@ def rebuild_periodic_knowledge_snapshots(
             metadata_json=success_metadata,
             scheduler_lease_owner=scheduler_lease_owner,
             scheduler_lease_token=scheduler_lease_token,
+            clock=clock,
         )
         db.commit()
         db.refresh(run)
@@ -193,6 +182,7 @@ def rebuild_periodic_knowledge_snapshots(
             error_message=exc.__class__.__name__,
             scheduler_lease_owner=scheduler_lease_owner,
             scheduler_lease_token=scheduler_lease_token,
+            clock=clock,
         )
         db.commit()
         raise
@@ -213,7 +203,9 @@ def snapshot_run_report(run: KnowledgeSnapshotRun) -> dict:
         "user_snapshot_count": run.user_snapshot_count,
         "class_snapshot_count": run.class_snapshot_count,
         "error_message": run.error_message,
-        "metadata": run.metadata_json,
+        "metadata_present": bool(run.metadata_json),
+        "metadata_redacted": bool(run.metadata_json),
+        "sensitive_fields_returned": False,
     }
 
 
@@ -384,6 +376,9 @@ def _start_run(
             KnowledgeSnapshotRun.status == "running",
             KnowledgeSnapshotRun.scheduler_lease_owner == scheduler_lease_owner,
             KnowledgeSnapshotRun.scheduler_lease_token == scheduler_lease_token,
+            KnowledgeSnapshotRun.scheduler_lease_expires_at.is_not(None),
+            KnowledgeSnapshotRun.scheduler_lease_expires_at > started_at,
+            KnowledgeSnapshotRun.scheduler_heartbeat_at.is_not(None),
         )
         .values(
             trigger_source=trigger_source,
@@ -413,12 +408,14 @@ def _finish_run_success(
     metadata_json: dict,
     scheduler_lease_owner: str | None,
     scheduler_lease_token: str | None,
+    clock: Callable[[], datetime],
 ) -> None:
+    finished_at = clock()
     if scheduler_lease_owner is None:
         run.status = "success"
         run.user_snapshot_count = user_snapshot_count
         run.class_snapshot_count = class_snapshot_count
-        run.finished_at = utc_now()
+        run.finished_at = finished_at
         run.metadata_json = metadata_json
         return
     result = db.execute(
@@ -428,12 +425,15 @@ def _finish_run_success(
             KnowledgeSnapshotRun.status == "running",
             KnowledgeSnapshotRun.scheduler_lease_owner == scheduler_lease_owner,
             KnowledgeSnapshotRun.scheduler_lease_token == scheduler_lease_token,
+            KnowledgeSnapshotRun.scheduler_lease_expires_at.is_not(None),
+            KnowledgeSnapshotRun.scheduler_lease_expires_at > finished_at,
+            KnowledgeSnapshotRun.scheduler_heartbeat_at.is_not(None),
         )
         .values(
             status="success",
             user_snapshot_count=user_snapshot_count,
             class_snapshot_count=class_snapshot_count,
-            finished_at=utc_now(),
+            finished_at=finished_at,
             error_message=None,
             scheduler_lease_owner=None,
             scheduler_lease_token=None,
@@ -443,7 +443,7 @@ def _finish_run_success(
         )
     )
     if result.rowcount != 1:
-        raise SnapshotRunLeaseLost("knowledge snapshot run lease was lost before success")
+        raise SnapshotRunLeaseLost("knowledge snapshot run lease was lost or expired before success")
 
 
 def _finish_run_failure(
@@ -455,12 +455,14 @@ def _finish_run_failure(
     error_message: str,
     scheduler_lease_owner: str | None,
     scheduler_lease_token: str | None,
+    clock: Callable[[], datetime],
 ) -> None:
+    finished_at = clock()
     if scheduler_lease_owner is None:
         run.status = "failed"
         run.trigger_source = trigger_source
-        run.started_at = run.started_at or utc_now()
-        run.finished_at = utc_now()
+        run.started_at = run.started_at or finished_at
+        run.finished_at = finished_at
         run.attempt_count = attempt_count
         run.error_message = error_message
         run.metadata_json = {"trigger_source": trigger_source}
@@ -472,11 +474,14 @@ def _finish_run_failure(
             KnowledgeSnapshotRun.status == "running",
             KnowledgeSnapshotRun.scheduler_lease_owner == scheduler_lease_owner,
             KnowledgeSnapshotRun.scheduler_lease_token == scheduler_lease_token,
+            KnowledgeSnapshotRun.scheduler_lease_expires_at.is_not(None),
+            KnowledgeSnapshotRun.scheduler_lease_expires_at > finished_at,
+            KnowledgeSnapshotRun.scheduler_heartbeat_at.is_not(None),
         )
         .values(
             status="failed",
             trigger_source=trigger_source,
-            finished_at=utc_now(),
+            finished_at=finished_at,
             attempt_count=attempt_count,
             error_message=error_message,
             scheduler_lease_owner=None,
@@ -487,7 +492,7 @@ def _finish_run_failure(
         )
     )
     if result.rowcount != 1:
-        raise SnapshotRunLeaseLost("knowledge snapshot run lease was lost before failure")
+        raise SnapshotRunLeaseLost("knowledge snapshot run lease was lost or expired before failure")
 
 
 class _SnapshotRunHeartbeat:

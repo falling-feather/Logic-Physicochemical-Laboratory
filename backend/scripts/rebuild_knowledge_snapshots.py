@@ -17,6 +17,19 @@ from app.services.knowledge_snapshot_scheduler import (
 )
 
 
+class _JsonArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        print(
+            json.dumps(
+                _invalid_argument_report("ArgumentError", message),
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        raise SystemExit(2)
+
+
 def run_rebuild(
     *,
     granularity: str,
@@ -70,12 +83,17 @@ def run_rebuild(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Rebuild day/week knowledge snapshots.")
+    parser = _JsonArgumentParser(description="Rebuild day/week knowledge snapshots.")
     parser.add_argument("--granularity", choices=["day", "week"], required=True)
     parser.add_argument("--date", default=None, help="Reference date in YYYY-MM-DD format. Defaults to today UTC.")
     parser.add_argument("--database-url", default=None, help="Override ASTRA_DATABASE_URL for this run.")
     args = parser.parse_args(argv)
-    reference_date = date.fromisoformat(args.date) if args.date else None
+    try:
+        reference_date = date.fromisoformat(args.date) if args.date else None
+    except ValueError as exc:
+        report = _invalid_argument_report("ValueError", f"invalid --date: {exc}")
+        print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+        return 2
     try:
         report = run_rebuild(
             granularity=args.granularity,
@@ -83,9 +101,24 @@ def main(argv: list[str] | None = None) -> int:
             database_url=args.database_url,
         )
     except Exception as exc:
-        report = {"ok": False, "status": "failed", "error": exc.__class__.__name__}
+        report = {
+            "ok": False,
+            "status": "failed",
+            "error": exc.__class__.__name__,
+            "sensitive_fields_returned": False,
+        }
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
     return 0 if report.get("ok") else 1
+
+
+def _invalid_argument_report(error: str, message: str) -> dict:
+    return {
+        "ok": False,
+        "status": "invalid_argument",
+        "error": error,
+        "message": message,
+        "sensitive_fields_returned": False,
+    }
 
 
 if __name__ == "__main__":
