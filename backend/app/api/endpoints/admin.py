@@ -55,8 +55,13 @@ from app.schemas.admin import (
     AdminContentScriptAssetRead,
     AdminContentScriptAssetScanAlertCandidate,
     AdminContentScriptAssetScanAlertReport,
+    AdminContentScriptAssetScanHealthItem,
+    AdminContentScriptAssetScanHealthReport,
+    AdminContentScriptAssetScanQueueItem,
+    AdminContentScriptAssetScanQueueReport,
     AdminContentScriptAssetScanRunPage,
     AdminContentScriptAssetScanRunRead,
+    AdminContentScriptAssetScanRunStatusBucket,
     AdminContentScriptAssetRemoteDriftIssueRead,
     AdminContentScriptAssetRemoteDriftReport,
     AdminContentScriptAssetRemoteDriftScanRequest,
@@ -147,8 +152,16 @@ from app.services.content_script_assets import (
 from app.services.content_script_asset_scan_runs import (
     ContentScriptAssetScanAlertCandidate as ContentScriptAssetScanAlertCandidateRow,
     ContentScriptAssetScanAlertReport as ContentScriptAssetScanAlertReportRow,
+    ContentScriptAssetScanHealthItem as ContentScriptAssetScanHealthItemRow,
+    ContentScriptAssetScanHealthReport as ContentScriptAssetScanHealthReportRow,
+    ContentScriptAssetScanQueueItem as ContentScriptAssetScanQueueItemRow,
+    ContentScriptAssetScanQueueReport as ContentScriptAssetScanQueueReportRow,
     build_content_script_asset_scan_alert_report,
+    build_content_script_asset_scan_health_report,
+    build_content_script_asset_scan_queue_report,
     content_script_asset_scan_alert_snapshot,
+    content_script_asset_scan_health_snapshot,
+    content_script_asset_scan_queue_snapshot,
     content_script_asset_scan_run_snapshot,
     list_content_script_asset_scan_runs,
     run_content_script_asset_remote_drift_scan,
@@ -1097,6 +1110,97 @@ def list_admin_content_script_asset_remote_drift_scan_runs(
         offset=offset,
         next_offset=_next_offset(page.total, offset, len(items)),
     )
+
+
+@router.get(
+    "/content/script-assets/remote-drift-scan-runs/health",
+    response_model=AdminContentScriptAssetScanHealthReport,
+)
+def read_admin_content_script_asset_remote_drift_scan_run_health(
+    request: Request,
+    trigger_source: str | None = Query(default=None, max_length=32),
+    alert_status: Literal["ok", "warning", "critical"] | None = Query(default=None),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    now_at: datetime | None = Query(default=None, alias="now"),
+    lease_expiring_seconds: int = Query(default=900, ge=0, le=24 * 60 * 60),
+    problem_limit: int = Query(default=20, ge=0, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminContentScriptAssetScanHealthReport:
+    _require_admin(current_user)
+    if from_at is not None and to_at is not None and from_at > to_at:
+        raise HTTPException(status_code=422, detail="from must be earlier than to")
+    report = build_content_script_asset_scan_health_report(
+        db,
+        trigger_source=trigger_source,
+        alert_status=alert_status,
+        from_at=from_at,
+        to_at=to_at,
+        lease_seconds=get_settings().content_script_remote_drift_scheduler_lease_seconds,
+        lease_expiring_seconds=lease_expiring_seconds,
+        problem_limit=problem_limit,
+        generated_at=now_at,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.content_script_asset.remote_drift_scan_run.health_report",
+        resource_type="content_script_asset_scan_run",
+        event_result="success",
+        request=request,
+        snapshot=content_script_asset_scan_health_snapshot(report),
+    )
+    db.commit()
+    return _admin_content_script_asset_scan_health_report(report)
+
+
+@router.get(
+    "/content/script-assets/remote-drift-scan-runs/queue",
+    response_model=AdminContentScriptAssetScanQueueReport,
+)
+def read_admin_content_script_asset_remote_drift_scan_run_queue(
+    request: Request,
+    trigger_source: str | None = Query(default=None, max_length=32),
+    alert_status: Literal["ok", "warning", "critical"] | None = Query(default=None),
+    from_at: datetime | None = Query(default=None, alias="from"),
+    to_at: datetime | None = Query(default=None, alias="to"),
+    now_at: datetime | None = Query(default=None, alias="now"),
+    item_limit: int = Query(default=20, ge=0, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminContentScriptAssetScanQueueReport:
+    _require_admin(current_user)
+    if from_at is not None and to_at is not None and from_at > to_at:
+        raise HTTPException(status_code=422, detail="from must be earlier than to")
+    settings = get_settings()
+    report = build_content_script_asset_scan_queue_report(
+        db,
+        trigger_source=trigger_source,
+        alert_status=alert_status,
+        from_at=from_at,
+        to_at=to_at,
+        generated_at=now_at,
+        scheduler_enabled=settings.content_script_remote_drift_scheduler_enabled,
+        scheduler_interval_seconds=settings.content_script_remote_drift_scheduler_interval_seconds,
+        scheduler_lease_seconds=settings.content_script_remote_drift_scheduler_lease_seconds,
+        scheduler_scan_limit=settings.content_script_remote_drift_scheduler_scan_limit,
+        scheduler_source_host=settings.content_script_remote_drift_scheduler_source_host,
+        scheduler_slug=settings.content_script_remote_drift_scheduler_slug,
+        scheduler_actor_user_id=settings.content_script_remote_drift_scheduler_actor_user_id,
+        item_limit=item_limit,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.content_script_asset.remote_drift_scan_run.queue_report",
+        resource_type="content_script_asset_scan_run",
+        event_result="success",
+        request=request,
+        snapshot=content_script_asset_scan_queue_snapshot(report),
+    )
+    db.commit()
+    return _admin_content_script_asset_scan_queue_report(report)
 
 
 @router.get("/content/script-assets/remote-drift-alerts", response_model=AdminContentScriptAssetScanAlertReport)
@@ -3389,6 +3493,114 @@ def _admin_content_script_asset_scan_run_read(run: ContentScriptAssetScanRun) ->
         error_message=run.error_message,
         created_at=run.created_at,
         updated_at=run.updated_at,
+    )
+
+
+def _admin_content_script_asset_scan_health_report(
+    report: ContentScriptAssetScanHealthReportRow,
+) -> AdminContentScriptAssetScanHealthReport:
+    return AdminContentScriptAssetScanHealthReport(
+        generated_at=report.generated_at,
+        filters=report.filters,
+        policy=report.policy,
+        health_status=report.health_status,
+        total=report.total,
+        by_status=[
+            AdminContentScriptAssetScanRunStatusBucket(status=item.status, total=item.total) for item in report.by_status
+        ],
+        running_count=report.running_count,
+        active_running_count=report.active_running_count,
+        stale_running_count=report.stale_running_count,
+        lease_expiring_count=report.lease_expiring_count,
+        legacy_running_without_lease_count=report.legacy_running_without_lease_count,
+        claimable_count=report.claimable_count,
+        success_count=report.success_count,
+        failed_count=report.failed_count,
+        warning_run_count=report.warning_run_count,
+        critical_run_count=report.critical_run_count,
+        issue_run_count=report.issue_run_count,
+        needs_attention_count=report.needs_attention_count,
+        problem_count=report.problem_count,
+        problem_runs=[_admin_content_script_asset_scan_health_item(item) for item in report.problem_runs],
+        newest_finished_at=report.newest_finished_at,
+        oldest_running_started_at=report.oldest_running_started_at,
+        next_lease_expires_at=report.next_lease_expires_at,
+    )
+
+
+def _admin_content_script_asset_scan_health_item(
+    item: ContentScriptAssetScanHealthItemRow,
+) -> AdminContentScriptAssetScanHealthItem:
+    return AdminContentScriptAssetScanHealthItem(
+        id=item.id,
+        run_key=item.run_key,
+        scan_type=item.scan_type,
+        trigger_source=item.trigger_source,
+        status=item.status,
+        alert_status=item.alert_status,
+        started_at=item.started_at,
+        finished_at=item.finished_at,
+        scheduler_lease_owner=item.scheduler_lease_owner,
+        scheduler_lease_expires_at=item.scheduler_lease_expires_at,
+        scheduler_heartbeat_at=item.scheduler_heartbeat_at,
+        attempt_count=item.attempt_count,
+        error_message=item.error_message,
+        health_flags=item.health_flags,
+        retryable=item.retryable,
+        claimable=item.claimable,
+        lease_seconds_remaining=item.lease_seconds_remaining,
+    )
+
+
+def _admin_content_script_asset_scan_queue_report(
+    report: ContentScriptAssetScanQueueReportRow,
+) -> AdminContentScriptAssetScanQueueReport:
+    return AdminContentScriptAssetScanQueueReport(
+        generated_at=report.generated_at,
+        filters=report.filters,
+        policy=report.policy,
+        queue_status=report.queue_status,
+        backlog_count=report.backlog_count,
+        ready_count=report.ready_count,
+        dispatchable_now_count=report.dispatchable_now_count,
+        claimable_by_lease_rule_count=report.claimable_by_lease_rule_count,
+        manual_review_count=report.manual_review_count,
+        blocked_count=report.blocked_count,
+        failed_count=report.failed_count,
+        stale_running_count=report.stale_running_count,
+        active_running_count=report.active_running_count,
+        legacy_running_without_lease_count=report.legacy_running_without_lease_count,
+        by_trigger_source=report.by_trigger_source,
+        ready_jobs=[_admin_content_script_asset_scan_queue_item(item) for item in report.ready_jobs],
+        manual_review_runs=[_admin_content_script_asset_scan_queue_item(item) for item in report.manual_review_runs],
+        blocked_runs=[_admin_content_script_asset_scan_queue_item(item) for item in report.blocked_runs],
+        current_window=[_admin_content_script_asset_scan_queue_item(item) for item in report.current_window],
+        oldest_ready_at=report.oldest_ready_at,
+        oldest_manual_review_at=report.oldest_manual_review_at,
+        next_lease_expires_at=report.next_lease_expires_at,
+    )
+
+
+def _admin_content_script_asset_scan_queue_item(
+    item: ContentScriptAssetScanQueueItemRow,
+) -> AdminContentScriptAssetScanQueueItem:
+    return AdminContentScriptAssetScanQueueItem(
+        source=item.source,
+        reason=item.reason,
+        ready=item.ready,
+        claimable=item.claimable,
+        run_id=item.run_id,
+        run_key=item.run_key,
+        scan_type=item.scan_type,
+        status=item.status,
+        trigger_source=item.trigger_source,
+        alert_status=item.alert_status,
+        started_at=item.started_at,
+        finished_at=item.finished_at,
+        scheduler_lease_owner=item.scheduler_lease_owner,
+        scheduler_lease_expires_at=item.scheduler_lease_expires_at,
+        scheduler_heartbeat_at=item.scheduler_heartbeat_at,
+        attempt_count=item.attempt_count,
     )
 
 

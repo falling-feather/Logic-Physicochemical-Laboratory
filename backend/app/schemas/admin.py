@@ -314,6 +314,101 @@ class AdminContentScriptAssetScanRunPage(BaseModel):
     next_offset: int | None = None
 
 
+class AdminContentScriptAssetScanRunStatusBucket(BaseModel):
+    status: str | None = None
+    total: int
+
+
+class AdminContentScriptAssetScanHealthItem(BaseModel):
+    id: int
+    run_key: str
+    scan_type: str
+    trigger_source: str
+    status: str
+    alert_status: str
+    started_at: datetime
+    finished_at: datetime | None = None
+    scheduler_lease_owner: str | None = None
+    scheduler_lease_expires_at: datetime | None = None
+    scheduler_heartbeat_at: datetime | None = None
+    attempt_count: int
+    error_message: str | None = None
+    health_flags: list[str]
+    retryable: bool
+    claimable: bool
+    lease_seconds_remaining: int | None = None
+
+
+class AdminContentScriptAssetScanHealthReport(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    health_status: Literal["ok", "warning", "attention"]
+    total: int
+    by_status: list[AdminContentScriptAssetScanRunStatusBucket]
+    running_count: int
+    active_running_count: int
+    stale_running_count: int
+    lease_expiring_count: int
+    legacy_running_without_lease_count: int
+    claimable_count: int
+    success_count: int
+    failed_count: int
+    warning_run_count: int
+    critical_run_count: int
+    issue_run_count: int
+    needs_attention_count: int
+    problem_count: int
+    problem_runs: list[AdminContentScriptAssetScanHealthItem]
+    newest_finished_at: datetime | None = None
+    oldest_running_started_at: datetime | None = None
+    next_lease_expires_at: datetime | None = None
+
+
+class AdminContentScriptAssetScanQueueItem(BaseModel):
+    source: Literal["due", "stale_running", "failed", "active_running", "legacy_running", "current_window"]
+    reason: str
+    ready: bool
+    claimable: bool
+    run_key: str
+    scan_type: str
+    status: str
+    trigger_source: str | None = None
+    run_id: int | None = None
+    alert_status: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    scheduler_lease_owner: str | None = None
+    scheduler_lease_expires_at: datetime | None = None
+    scheduler_heartbeat_at: datetime | None = None
+    attempt_count: int | None = None
+
+
+class AdminContentScriptAssetScanQueueReport(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    queue_status: Literal["disabled", "empty", "ready", "backlog"]
+    backlog_count: int
+    ready_count: int
+    dispatchable_now_count: int
+    claimable_by_lease_rule_count: int
+    manual_review_count: int
+    blocked_count: int
+    failed_count: int
+    stale_running_count: int
+    active_running_count: int
+    legacy_running_without_lease_count: int
+    by_trigger_source: dict[str, int]
+    ready_jobs: list[AdminContentScriptAssetScanQueueItem]
+    manual_review_runs: list[AdminContentScriptAssetScanQueueItem]
+    blocked_runs: list[AdminContentScriptAssetScanQueueItem]
+    current_window: list[AdminContentScriptAssetScanQueueItem]
+    oldest_ready_at: datetime | None = None
+    oldest_manual_review_at: datetime | None = None
+    next_lease_expires_at: datetime | None = None
+
+
 class AdminContentScriptAssetScanAlertCandidate(BaseModel):
     severity: str
     code: str

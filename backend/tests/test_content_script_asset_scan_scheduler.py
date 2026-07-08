@@ -104,6 +104,163 @@ def test_admin_remote_drift_alerts_include_failed_and_stale_scheduler_runs(clien
     assert "integrity" not in alerts_text
 
 
+def test_admin_remote_drift_scan_run_health_and_queue_reports_are_redacted(client, monkeypatch):
+    admin_token = _bootstrap_admin(client)
+    now = datetime(2026, 7, 8, 16, 0, tzinfo=UTC)
+    with get_session_factory(get_settings().database_url)() as db:
+        db.add_all(
+            [
+                ContentScriptAssetScanRun(
+                    run_key="content-script-remote-drift:scheduler:health-failed",
+                    scan_type="remote_drift",
+                    trigger_source="scheduler",
+                    status="failed",
+                    started_at=now - timedelta(hours=5),
+                    finished_at=now - timedelta(hours=4, minutes=55),
+                    attempt_count=2,
+                    filters_json={"source_host": "cdn-health.example.test"},
+                    totals_json={},
+                    issue_counts_json={"by_code": {}, "by_severity": {}},
+                    issue_summary_json=[],
+                    alert_status="critical",
+                    error_message="RuntimeError",
+                ),
+                ContentScriptAssetScanRun(
+                    run_key="content-script-remote-drift:scheduler:health-stale",
+                    scan_type="remote_drift",
+                    trigger_source="scheduler",
+                    status="running",
+                    started_at=now - timedelta(hours=4),
+                    finished_at=None,
+                    attempt_count=1,
+                    scheduler_lease_owner="scheduler-health-stale",
+                    scheduler_lease_token="secret-health-stale-token",
+                    scheduler_lease_expires_at=now - timedelta(hours=2),
+                    scheduler_heartbeat_at=now - timedelta(hours=3),
+                    filters_json={"source_host": "cdn-health.example.test"},
+                    totals_json={},
+                    issue_counts_json={"by_code": {}, "by_severity": {}},
+                    issue_summary_json=[],
+                    alert_status="ok",
+                ),
+                ContentScriptAssetScanRun(
+                    run_key="content-script-remote-drift:scheduler:health-active",
+                    scan_type="remote_drift",
+                    trigger_source="scheduler",
+                    status="running",
+                    started_at=now - timedelta(minutes=10),
+                    finished_at=None,
+                    attempt_count=1,
+                    scheduler_lease_owner="scheduler-health-active",
+                    scheduler_lease_token="secret-health-active-token",
+                    scheduler_lease_expires_at=now + timedelta(minutes=5),
+                    scheduler_heartbeat_at=now - timedelta(minutes=1),
+                    filters_json={"source_host": "cdn-health.example.test"},
+                    totals_json={},
+                    issue_counts_json={"by_code": {}, "by_severity": {}},
+                    issue_summary_json=[],
+                    alert_status="ok",
+                ),
+                ContentScriptAssetScanRun(
+                    run_key="content-script-remote-drift:scheduler:health-legacy",
+                    scan_type="remote_drift",
+                    trigger_source="scheduler",
+                    status="running",
+                    started_at=now - timedelta(hours=6),
+                    finished_at=None,
+                    attempt_count=1,
+                    filters_json={"source_host": "cdn-health.example.test"},
+                    totals_json={},
+                    issue_counts_json={"by_code": {}, "by_severity": {}},
+                    issue_summary_json=[],
+                    alert_status="ok",
+                ),
+                ContentScriptAssetScanRun(
+                    run_key="content-script-remote-drift:manual:health-warning",
+                    scan_type="remote_drift",
+                    trigger_source="manual",
+                    status="success",
+                    started_at=now - timedelta(hours=1),
+                    finished_at=now - timedelta(minutes=55),
+                    created_by_user_id=None,
+                    attempt_count=1,
+                    filters_json={"source_host": "cdn-health.example.test"},
+                    totals_json={"total_issues": 1},
+                    issue_counts_json={"by_code": {"remote_asset_unavailable": 1}, "by_severity": {"warning": 1}},
+                    issue_summary_json=[],
+                    alert_status="warning",
+                ),
+            ]
+        )
+        db.commit()
+
+    health = client.get(
+        "/api/admin/content/script-assets/remote-drift-scan-runs/health"
+        "?problem_limit=10&lease_expiring_seconds=900&now=2026-07-08T16:00:00Z",
+        headers={**_auth_header(admin_token), "X-Request-ID": "remote-drift-health"},
+    )
+    assert health.status_code == 200
+    health_body = health.json()
+    assert health_body["health_status"] == "attention"
+    assert health_body["running_count"] == 3
+    assert health_body["stale_running_count"] == 2
+    assert health_body["lease_expiring_count"] == 1
+    assert health_body["legacy_running_without_lease_count"] == 1
+    assert health_body["failed_count"] == 1
+    assert health_body["warning_run_count"] == 1
+    problem_flags = {flag for item in health_body["problem_runs"] for flag in item["health_flags"]}
+    assert {"failed", "stale_running", "legacy_running_without_lease", "lease_expiring", "warning_issues"} <= problem_flags
+    health_text = json.dumps(health_body, ensure_ascii=False)
+    assert "secret-health-stale-token" not in health_text
+    assert "secret-health-active-token" not in health_text
+    assert "source_url" not in health_text
+    assert "integrity" not in health_text
+
+    monkeypatch.setenv("ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_INTERVAL_SECONDS", "3600")
+    monkeypatch.setenv("ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_SCAN_LIMIT", "5")
+    monkeypatch.setenv("ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_SOURCE_HOST", "cdn-queue.example.test")
+    get_settings.cache_clear()
+    queue = client.get(
+        "/api/admin/content/script-assets/remote-drift-scan-runs/queue"
+        "?item_limit=10&now=2026-07-08T16:00:00Z",
+        headers={**_auth_header(admin_token), "X-Request-ID": "remote-drift-queue"},
+    )
+    assert queue.status_code == 200
+    queue_body = queue.json()
+    assert queue_body["queue_status"] == "ready"
+    assert queue_body["dispatchable_now_count"] == 1
+    assert queue_body["manual_review_count"] == 3
+    assert queue_body["blocked_count"] == 1
+    assert queue_body["failed_count"] == 1
+    assert queue_body["stale_running_count"] == 2
+    assert queue_body["active_running_count"] == 1
+    assert queue_body["ready_jobs"][0]["source"] == "due"
+    assert queue_body["ready_jobs"][0]["reason"] == "scheduler_window_missing_run"
+    assert {item["source"] for item in queue_body["manual_review_runs"]} >= {"failed", "stale_running"}
+    queue_text = json.dumps(queue_body, ensure_ascii=False)
+    assert "secret-health-stale-token" not in queue_text
+    assert "secret-health-active-token" not in queue_text
+    assert "source_url" not in queue_text
+    assert "integrity" not in queue_text
+
+    for action, request_id in [
+        ("admin.content_script_asset.remote_drift_scan_run.health_report", "remote-drift-health"),
+        ("admin.content_script_asset.remote_drift_scan_run.queue_report", "remote-drift-queue"),
+    ]:
+        audit = client.get(
+            f"/api/admin/audit-logs?action={action}&resource_type=content_script_asset_scan_run&request_id={request_id}",
+            headers=_auth_header(admin_token),
+        )
+        assert audit.status_code == 200
+        assert audit.json()["total"] == 1
+        audit_text = json.dumps(audit.json()["items"][0]["snapshot_json"], ensure_ascii=False)
+        assert "secret-health-stale-token" not in audit_text
+        assert "secret-health-active-token" not in audit_text
+        assert "source_url" not in audit_text
+        assert "integrity" not in audit_text
+
+
 def test_content_script_remote_drift_scheduler_run_once_writes_observe_only_run(client, monkeypatch):
     actor_id = _insert_admin_user("script_scheduler_admin")
     captured = {}
