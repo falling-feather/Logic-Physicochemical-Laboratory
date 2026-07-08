@@ -100,6 +100,34 @@ def test_login_records_session_device_metadata_and_last_seen(client):
         assert "203.0.113.20" not in auth_session.last_seen_ip_hash
 
 
+def test_login_sets_secure_cookie_flags_in_production(client, monkeypatch):
+    monkeypatch.setenv("ASTRA_ENVIRONMENT", "production")
+    get_settings.cache_clear()
+
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "prod_cookie_owner",
+            "password": "secret123",
+            "display_name": "Production Cookie Owner",
+            "role": "teacher",
+        },
+    )
+    assert register.status_code == 201
+
+    login = client.post(
+        "/api/auth/login",
+        json={"username": "prod_cookie_owner", "password": "secret123"},
+    )
+
+    assert login.status_code == 200
+    set_cookie = login.headers["set-cookie"]
+    assert get_settings().session_cookie_name in set_cookie
+    assert "HttpOnly" in set_cookie
+    assert "SameSite=lax" in set_cookie
+    assert "Secure" in set_cookie
+
+
 def test_authenticated_request_refreshes_session_last_seen(client):
     register = client.post(
         "/api/auth/register",

@@ -37,14 +37,14 @@ python -m scripts.init_content_pages --publisher-user-id <admin_id> --allow-revi
 | 方法 | 路径 | 说明 |
 | ---- | ---- | ---- |
 | POST | `/api/auth/register` | 本地账号注册；用户名会修剪并小写落库，重复校验大小写不敏感；拒绝短密码、纯数字/纯字母、常见弱口令和包含用户名的密码 |
-| POST | `/api/auth/login` | 登录并返回 Bearer token，同时写入 HttpOnly cookie；用户名按规范化值大小写不敏感匹配，连续失败达到阈值返回 `429` 与 `Retry-After`；成功登录会记录 best-effort 设备标识、登录 user-agent、`last_seen_at` 和 IP 哈希；成功、失败和锁定事件写入审计 |
+| POST | `/api/auth/login` | 登录并返回 Bearer token，同时写入 HttpOnly cookie；生产环境 cookie 预期带 `Secure/HttpOnly/SameSite=Lax`，前端不得把 session/bearer token 写入 localStorage/sessionStorage；用户名按规范化值大小写不敏感匹配，连续失败达到阈值返回 `429` 与 `Retry-After`；成功登录会记录 best-effort 设备标识、登录 user-agent、`last_seen_at` 和 IP 哈希；成功、失败和锁定事件写入审计 |
 | POST | `/api/auth/logout` | 注销当前用户所有活动会话，并写入审计 |
 | POST | `/api/auth/password-reset/request` | 用户自助密码重置请求；响应始终泛化为 `ok`，active 用户会生成哈希存储的一次性 token，并按账号哈希/IP 哈希冷却；生产环境不返回 token，本地调试也必须显式开启 `ASTRA_PASSWORD_RESET_RETURN_TOKEN_FOR_DEV=true` |
 | POST | `/api/auth/password-reset/confirm` | 使用一次性 token 重置密码；行锁消费 token，复用密码强度策略，成功后撤销用户未撤销会话、清理登录失败桶，并写入不含明文密码或 token 的 `auth.password_reset.*` 审计 |
 | GET | `/api/auth/sessions` | 当前用户活动会话列表；只返回未撤销、未过期会话，并标记 `is_current`；返回 `device_label`、登录时 `user_agent`、`last_seen_at` 等会话摘要，不返回 token 或 IP 明文 |
 | DELETE | `/api/auth/sessions/{id}` | 撤销当前用户自己的单个活动会话；撤销当前会话会清理 cookie，并写入 `auth.session.revoke` 审计 |
 | GET | `/api/users/me` | 当前用户；已撤销、过期或非 active 用户会话返回 `401` |
-| POST | `/api/admin/bootstrap` | 首个管理员受控初始化；用户名会修剪并小写落库，复用密码策略，公开注册仍拒绝 admin |
+| POST | `/api/admin/bootstrap` | 首个管理员受控初始化；生产环境必须提供 `ASTRA_ADMIN_BOOTSTRAP_TOKEN` 且响应/审计不回显 token，用户名会修剪并小写落库，复用密码策略，公开注册仍拒绝 admin |
 | GET/PATCH | `/api/admin/users` / `/api/admin/users/{id}` | 管理端用户列表与角色/状态维护；列表返回 `items/total/limit/offset/next_offset`；把用户置为 `disabled` 时撤销未撤销会话，并在 `admin.user.update` 快照记录 `revoked_sessions` |
 | POST | `/api/admin/users/{id}/password-reset` | 管理员重置用户密码；复用密码强度策略，成功后撤销目标用户未撤销会话、清理登录失败桶，并写入不含密码明文或 hash 的 `admin.user.password_reset` 审计 |
 | GET | `/api/admin/schools` | 管理端学校基础查看；支持分页与关键字搜索 |
@@ -220,6 +220,7 @@ http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#phy
 - `app.services.request_metadata` 统一解析请求元数据；审计与会话治理共享 request_id、user-agent 和 IP 哈希口径。`AuthSession.device_label` 优先来自 `X-Device-Label` / `X-Device-Name`，缺省回退到登录 user-agent，因此只是 best-effort 设备摘要，不等同强设备绑定。
 - `app.api.deps.auth.get_current_auth_context()` 会在有效鉴权后按 `ASTRA_SESSION_LAST_SEEN_UPDATE_SECONDS` 刷新当前 `AuthSession.last_seen_at` 和 `last_seen_ip_hash`；默认 300 秒内同一 IP 哈希不重复写库，窗口过期、IP 哈希变化或配置为 `0` 时刷新。该机制只降低 last_seen 写放大，不等同强设备绑定或长期会话风控。
 - `/api/auth/password-reset/request` 与 `/api/auth/password-reset/confirm` 只提供本地账号自助重置 token 能力；邮件/短信/MFA 投递暂列 `P4 / 最低优先级 / 暂缓`。请求审计使用账号哈希作为 `resource_id`，不记录明文用户名或 token；确认阶段会对 token 行加锁并一次性消费。`app.services.password_reset_tokens` 与 `scripts.cleanup_password_reset_tokens` 提供过期/已用 token 的离线清理入口，默认 dry-run，显式 `--apply` 才删除，摘要不返回用户名、IP 哈希、user-agent 或 token hash。
+- `app.services.auth_sessions` 与 `scripts.cleanup_auth_sessions` 提供过期认证会话离线撤销入口；默认 dry-run，显式 `--apply` 才为 expired+unrevoked 会话写入 `revoked_at`，不删除会话行，摘要不返回 token hash、IP hash、user-agent 或明文 token。`scripts.auth_security_drill` 用于输出认证生产姿态报告，覆盖 admin bootstrap token、cookie、password reset、localStorage、审计盐和清理命令入口，报告不回显 secret。
 - `app.services.content_catalog` 负责内容页 seed、正式内容初始化、已发布 schema 读取和内容页摘要；`/api/content/pages*` 与 `/api/render/page/*` 查询只读 published 当前记录，不在 GET 路径隐式写库，公开响应会剥离原始脚本引用、SRI/crossorigin 元数据和 sandbox 原始字段，只保留带稳定 `sandboxId` 的 `scriptManifest`；manifest 会返回沙箱 enforcement/capabilities，`/api/render/page/{slug}` 会额外返回 `X-Astra-Content-Script-Sandbox`、`X-Astra-Content-Script-Manifest-Count`、`X-Astra-Content-Script-Iframe-Sandbox` 和 `X-Astra-Content-Script-CSP` 稳定契约头，并为可执行且全页唯一的 sandbox manifest 注入 `embed` 描述符。`embed` 只包含前端 iframe 编排所需的同源 sandbox document `src`、`sandbox=allow-scripts`、`referrerPolicy=no-referrer`、消息协议、能力摘要和资产数量，不包含原始脚本 URL/路径值、SRI、crossorigin、nonce、bootstrap/asset URL、镜像表 metadata 或数据库 id；blocked/ambiguous manifest 不生成可执行 embed。`/api/render/script-sandboxes/{sandbox_id}/page/{slug}` 会读取已发布私有 schema 生成 sandbox HTML，运行时 CSP nonce 只存在于单次 HTML 响应，不进入公开 manifest、sandboxId 或 policy hash；脚本标签只引用 `/api/render/script-sandboxes/{sandbox_id}/bootstrap/page/{slug}`；bootstrap 端点生成受控资产 URL 列表并顺序加载 `/api/render/script-sandboxes/{sandbox_id}/assets/{asset_sha256}/page/{slug}`，资产端点会重新绑定 published slug、当前 page version、sandboxId 和脚本引用 hash，本地脚本读受控根，外部脚本读发布事务写入的镜像资产，不在 GET 路径联网或写库；正式初始化会显式创建/修复内置内容页版本，默认不覆盖已有差异版本。
 - `app.services.content_identity` 负责内容协议稳定身份契约：历史 schema 读取仍允许缺失 `sectionId/sourceId`，但新建/编辑/发布草稿和内置内容初始化要求每个 section/source 带稳定 ID，并拒绝重复 ID 或与 `props.sectionId/props.id` 冲突的章节身份。
 - `app.services.content_script_policy` 负责内容草稿脚本静态分析、脚本资产 allowlist/SRI 静态门禁、后端下载校验、public manifest 与 sandbox 契约；当前识别脚本引用、外链脚本、事件处理器、阻断协议、路径穿越、内联 `<script>` 和不安全 sandbox 能力。外部 `scriptUrl/scriptSrc` 默认阻断，只有 host 出现在 `ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS` 且 URL 为显式 `https://`、无 query/fragment、声明合法 SRI 与 `crossorigin=anonymous` 时才可进入 high-risk 管理员审核；管理员批准外部脚本和发布已审核草稿时会下载资产并按声明 SRI 比对字节，下载失败、SRI mismatch、host policy blocked 或发布前 CDN 字节漂移会阻断流程，默认下载器不跟随重定向。下载校验 finding 会通过 metadata 保留资产 SHA-256、字节大小、SRI token 数量和匹配算法；公开 `scriptManifest.sandbox` 会按 `network=none/same-origin` 派生稳定 CSP、显式返回 enforcement/capabilities，并对 unsafe sandbox 防御性降级为 blocked；sandbox HTML 响应会按单次请求生成 nonce，把响应级 `script-src` 收紧为 nonce source，并强制 `Content-Security-Policy`、`X-Content-Type-Options: nosniff` 和 `Referrer-Policy: no-referrer`，本地 JS 资产必须位于受控根且通过 bootstrap + `asset_sha256` 端点加载；外部脚本发布成功后由 `app.services.content_script_assets` 写入 `content_script_assets`，render 阶段只读取当前 published version 绑定的镜像字节，不联网、不代理任意 CDN、不暴露原始 URL。管理端 `GET /api/admin/content/script-assets` 可分页审计这些镜像资产，`GET /api/admin/content/script-assets/mirror-audit` 可离线复核当前 published schema 与镜像表绑定、本地字节 hash/大小/SRI 和重复引用，`POST /api/admin/content/script-assets/remote-drift-scan` 可在 admin 显式确认后小批量触发远端漂移扫描并写入 run 台账，`GET /api/admin/content/script-assets/remote-drift-alerts` 可从 run 台账、failed run 与 stale running run 派生只读告警候选，`GET/PATCH /api/admin/content/script-host-policies` 可维护 host 评审状态并用 `blocked` 作为发布链路 fail-closed 门禁；响应与审计都不返回原始 CDN URL、完整 SRI、远端字节或 `content_bytes`。分析结果带 `policy_context_hash`，allowlist 配置变化会触发发布/审核前重分析。当前仍不承担前端实际 iframe 生命周期编排、实时监控、外部告警投递、自动信任/封禁策略或浏览器自动化隔离证明。
@@ -297,6 +298,25 @@ python -m scripts.cleanup_password_reset_tokens --retention-days 30 --apply
 ```
 
 该脚本按 `used_at <= cutoff` 或 `used_at IS NULL AND expires_at <= cutoff` 选择已使用或已过期的终态 token。默认只做 dry-run，显式传入 `--apply` 才删除；`--retention-days` 与 `--before` 互斥，`--before` 不允许指向未来时间，`--limit` 控制单批候选数量。输出只包含数量、状态、id 范围、终态时间和候选口径，不返回用户名、IP 哈希、user-agent、token hash 或明文 token。
+
+过期认证会话清理：
+
+```bash
+cd backend
+python -m scripts.cleanup_auth_sessions --before 2026-07-08T00:00:00Z
+python -m scripts.cleanup_auth_sessions --before 2026-07-08T00:00:00Z --apply
+```
+
+该脚本按 `revoked_at IS NULL AND expires_at <= cutoff_at` 选择过期且未撤销的登录会话。默认只做 dry-run，显式 `--apply` 才写入 `revoked_at`；不会删除 `auth_sessions` 行，不返回 token hash、IP hash、user-agent 或明文 token。
+
+认证生产姿态报告：
+
+```bash
+cd backend
+python -m scripts.auth_security_drill --require-production --require-admin-bootstrap-token
+```
+
+报告检查 production-like 环境、admin bootstrap token 配置强度、session cookie 策略、password reset dev token 回传、登录锁定、审计脱敏和清理命令入口；只返回布尔状态和策略判断，不回显 secret。该报告是上线前清单，不替代真实 MySQL 注册/登录/登出/撤销/密码重置演练。
 
 部署预检：
 

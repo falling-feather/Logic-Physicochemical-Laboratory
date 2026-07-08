@@ -145,6 +145,59 @@ def test_admin_bootstrap_is_single_use(client):
     assert me.json()["role"] == "admin"
 
 
+def test_admin_bootstrap_requires_token_in_production_without_leaking_token(client, monkeypatch):
+    monkeypatch.setenv("ASTRA_ENVIRONMENT", "production")
+    monkeypatch.delenv("ASTRA_ADMIN_BOOTSTRAP_TOKEN", raising=False)
+    get_settings.cache_clear()
+
+    missing_token = client.post(
+        "/api/admin/bootstrap",
+        json={
+            "username": "prod_admin_missing_token",
+            "password": "secret123",
+            "display_name": "Production Admin",
+        },
+    )
+    assert missing_token.status_code == 403
+
+    bootstrap_token = "prod-bootstrap-token-123456789012345678901234567890"
+    monkeypatch.setenv("ASTRA_ADMIN_BOOTSTRAP_TOKEN", bootstrap_token)
+    get_settings.cache_clear()
+    wrong_token = client.post(
+        "/api/admin/bootstrap",
+        json={
+            "username": "prod_admin_wrong_token",
+            "password": "secret123",
+            "display_name": "Production Admin",
+            "bootstrap_token": "wrong-token",
+        },
+    )
+    assert wrong_token.status_code == 403
+    assert bootstrap_token not in wrong_token.text
+
+    created = client.post(
+        "/api/admin/bootstrap",
+        headers={"X-Request-ID": "prod-bootstrap-token-check"},
+        json={
+            "username": "prod_admin_root",
+            "password": "secret123",
+            "display_name": "Production Admin",
+            "bootstrap_token": bootstrap_token,
+        },
+    )
+    assert created.status_code == 201
+    assert created.json()["role"] == "admin"
+    assert bootstrap_token not in created.text
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        audit = db.scalar(select(AuditLog).where(AuditLog.action == "admin.bootstrap"))
+        assert audit is not None
+        assert audit.request_id == "prod-bootstrap-token-check"
+        assert bootstrap_token not in json.dumps(audit.snapshot_json, ensure_ascii=False)
+        assert "password" not in json.dumps(audit.snapshot_json, ensure_ascii=False).lower()
+
+
 def test_admin_views_user_management_stats_and_bug_records(client):
     admin_token = _bootstrap_admin(client)
     teacher_token = _register_and_login(client, "teacher_admin_scope", "teacher")
