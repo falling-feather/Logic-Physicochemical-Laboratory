@@ -221,7 +221,7 @@ function updateFooterVisibility() {
 
 window.updateFooterVisibility = updateFooterVisibility;
 
-const ENGLAB_ASSET_VERSION = '20260704qianduanV70';
+const ENGLAB_ASSET_VERSION = '20260709v66BackendIframeP1';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',
