@@ -28,6 +28,7 @@ const Router = {
         chemistry: 'englab',
         algorithms: 'englab',
         biology: 'englab',
+        teacher: 'englab',
         admin: 'englab',
         frontier: 'frontier',
         cosmos: 'frontier',
@@ -80,7 +81,8 @@ const Router = {
         engineering: 'pages/engineering/bridge-truss.js?v=20260630mainV64',
         license: 'pages/about/about.js?v=20260630mainV64',
         changelog: 'pages/about/about.js?v=20260630mainV64',
-        admin: 'pages/admin/admin.js?v=20260709v6649AdminMvpP1'
+        teacher: 'pages/teacher/teacher.js?v=20260709v6650TeacherMvpP1',
+        admin: 'pages/admin/admin.js?v=20260709v6650TeacherMvpP1'
     },
     pageReadyChecks: {
         home: () => typeof window.initHome === 'function',
@@ -93,6 +95,7 @@ const Router = {
         engineering: () => typeof window.initBridgeTruss === 'function',
         license: () => typeof window.initLicense === 'function',
         changelog: () => typeof window.initChangelog === 'function',
+        teacher: () => typeof window.initTeacher === 'function',
         admin: () => typeof window.initAdmin === 'function'
     },
     // Store origin point for radial wipe (set by selectModule or default center)
@@ -918,6 +921,8 @@ const Router = {
             if (typeof initLicense === 'function') initLicense();
         } else if (page === 'changelog') {
             if (typeof initChangelog === 'function') initChangelog();
+        } else if (page === 'teacher') {
+            if (typeof initTeacher === 'function') initTeacher();
         } else if (page === 'admin') {
             if (typeof initAdmin === 'function') initAdmin();
         }
