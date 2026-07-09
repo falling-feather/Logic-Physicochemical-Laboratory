@@ -34,7 +34,7 @@
     <link rel="stylesheet" href="shared/css/page-layout.css?v=20260606v62e">
     <link rel="stylesheet" href="shared/css/cards.css?v=20260630mainV64">
     <link rel="stylesheet" href="shared/css/module-selector.css?v=20260630mainV64">
-    <link rel="stylesheet" href="shared/css/backend-content.css?v=20260709v66BackendIframeP1">
+    <link rel="stylesheet" href="shared/css/backend-content.css?v=20260709v6649AdminMvpP1">
     <link rel="stylesheet" href="shared/css/experiment-guide.css?v=20260630mainV64">
     <link rel="stylesheet" href="shared/css/experiment-export.css?v=20260424v44a">
     <link rel="stylesheet" href="shared/css/experiment-quiz.css?v=20260422z">
@@ -57,6 +57,7 @@
     <link rel="stylesheet" href="pages/chemistry/chemistry.css?v=20260618ionP1">
     <link rel="stylesheet" href="pages/algorithms/algorithms.css?v=20260618algoTextP1">
     <link rel="stylesheet" href="pages/biology/biology.css?v=20260618neuralP1">
+    <link rel="stylesheet" href="pages/admin/admin.css?v=20260709v6649AdminMvpP1">
     <!-- v4.5-α1 全局搜索 -->
     <link rel="stylesheet" href="shared/css/global-search.css?v=20260606v62e">
     <!-- v4.5-α3 相关实验推荐 -->
@@ -118,7 +119,7 @@
         window.__astraBoot = (function () {
             var raw = (location.hash || '#planets').slice(1).split('/')[0] || 'planets';
             var frontierPages = ['frontier', 'cosmos', 'engineering', 'datascience', 'infotech', 'materials', 'humanities'];
-            var englabPages = ['home', 'mathematics', 'physics', 'chemistry', 'algorithms', 'biology', 'license', 'changelog'];
+            var englabPages = ['home', 'mathematics', 'physics', 'chemistry', 'algorithms', 'biology', 'admin', 'license', 'changelog'];
             var galaxy = frontierPages.indexOf(raw) > -1 ? 'frontier' : (englabPages.indexOf(raw) > -1 ? 'englab' : 'astra');
             var labels = {
                 astra: '正在进入星序',
@@ -233,6 +234,10 @@
                 <a href="#biology" class="nav-item" data-page="biology">
                     <i data-lucide="leaf"></i>
                     <span>生物</span>
+                </a>
+                <a href="#admin" class="nav-item nav-item--admin" data-page="admin">
+                    <i data-lucide="shield-check"></i>
+                    <span>管理</span>
                 </a>
                 <button type="button" id="nav-search-trigger" aria-label="全局搜索实验" title="搜索实验 (Ctrl+K 或 /)">
                     <i data-lucide="search"></i>
@@ -4996,6 +5001,16 @@
         <section id="page-changelog" class="page" aria-label="更新日志">
             <div class="about-doc" id="about-changelog-content"></div>
         </section>
+
+        <!-- ═══════════════ Admin · 后端治理控制台 ═══════════════ -->
+        <section id="page-admin" class="page admin-page" aria-label="后端治理控制台">
+            <div class="admin-governance" data-admin-governance>
+                <div class="admin-loading">
+                    <i data-lucide="loader-circle"></i>
+                    <span>正在载入管理端</span>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- ═══════════════ Element Detail Panel ═══════════════ -->
@@ -5100,10 +5115,10 @@
     </div>
 
     <!-- Application Scripts: minimal boot path -->
-    <script src="shared/js/config.js?v=20260709v66BackendIframeP1"></script>
-    <script src="shared/js/backend-content.js?v=20260709v66BackendIframeP1"></script>
-    <script src="shared/js/router.js?v=20260709v66BackendIframeP1"></script>
-    <script src="shared/js/main.js?v=20260709v66BackendIframeP1"></script>
+    <script src="shared/js/config.js?v=20260709v6649AdminMvpP1"></script>
+    <script src="shared/js/backend-content.js?v=20260709v6649AdminMvpP1"></script>
+    <script src="shared/js/router.js?v=20260709v6649AdminMvpP1"></script>
+    <script src="shared/js/main.js?v=20260709v6649AdminMvpP1"></script>
     <script>
         (function () {
             try {

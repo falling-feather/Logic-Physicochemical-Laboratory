@@ -28,6 +28,7 @@ const Router = {
         chemistry: 'englab',
         algorithms: 'englab',
         biology: 'englab',
+        admin: 'englab',
         frontier: 'frontier',
         cosmos: 'frontier',
         engineering: 'frontier',
@@ -47,6 +48,7 @@ const Router = {
             'shared/js/lucide.min.js?v=20260417d'
         ],
         englab: [
+            'shared/js/lucide.min.js?v=20260417d',
             'shared/js/learning-progress.js?v=20260422a',
             'shared/js/back-to-top.js?v=20260424rr',
             'shared/js/fab-trigger.js?v=20260528v61g',
@@ -77,7 +79,8 @@ const Router = {
         humanities: 'pages/humanities/text-lab.js?v=20260630mainV64',
         engineering: 'pages/engineering/bridge-truss.js?v=20260630mainV64',
         license: 'pages/about/about.js?v=20260630mainV64',
-        changelog: 'pages/about/about.js?v=20260630mainV64'
+        changelog: 'pages/about/about.js?v=20260630mainV64',
+        admin: 'pages/admin/admin.js?v=20260709v6649AdminMvpP1'
     },
     pageReadyChecks: {
         home: () => typeof window.initHome === 'function',
@@ -89,7 +92,8 @@ const Router = {
         humanities: () => typeof window.initHumanitiesLab === 'function',
         engineering: () => typeof window.initBridgeTruss === 'function',
         license: () => typeof window.initLicense === 'function',
-        changelog: () => typeof window.initChangelog === 'function'
+        changelog: () => typeof window.initChangelog === 'function',
+        admin: () => typeof window.initAdmin === 'function'
     },
     // Store origin point for radial wipe (set by selectModule or default center)
     transitionOrigin: { x: 50, y: 50 },
@@ -914,6 +918,8 @@ const Router = {
             if (typeof initLicense === 'function') initLicense();
         } else if (page === 'changelog') {
             if (typeof initChangelog === 'function') initChangelog();
+        } else if (page === 'admin') {
+            if (typeof initAdmin === 'function') initAdmin();
         }
         // Subject pages: show sidebar toggle if an experiment was previously open,
         // but don't eagerly initialize any experiments (ModuleSelector handles it).
