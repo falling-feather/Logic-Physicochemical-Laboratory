@@ -12,6 +12,7 @@
 > **Review 回流状态**: 2026-07-06，`review` 分支已交付代码审查报告（审查基线 `V6.5.23 Review 前基线快照`，范围 `re1` 至 `re17`）。本 `houduan` 分支未合并 review 代码修复；后续仅按 `02` / `07` 中记录的优先级在 `houduan` 上选择性吸收。
 > **最新治理**: 2026-07-09，`houduan` 已补齐 BE-09/V6.6.48 浏览器隔离证明首轮：`scriptManifest.embed` 会由 opt-in 前端创建 iframe sandbox，后端 sandbox HTML 的 `frame-ancestors` 只吸收受信 CORS origin，bootstrap/asset 可执行资源支持 opaque sandbox 加载。
 > **最新回归**: 2026-07-09，`tools/browser/script-sandbox-isolation-proof.cjs` 已用 Edge/Playwright 覆盖 iframe sandbox 属性、opaque origin、父页 DOM/storage/cookie/top location 越权阻断、unknown sandbox/asset fail closed、console/network 和截图留证；旧实验脚本 sandbox DOM 模板化仍属后续。
+> **最新产品化**: 2026-07-10，V6.6.51 已完成学生端学习闭环首轮：主站新增 `#student`，后端补齐本人班级与分页作业中心契约；三端首轮入口现已齐备，错误/离线/缓存硬化和复杂统计权限继续进入 V6.6.52-V6.6.53。
 > **下一阶段规划**: Python + MySQL 后端化、内容协议、登录用户体系与管理员 / 教师 / 学生三端平台设计，详见 [`doc/07-后端优化与设计.md`](doc/07-后端优化与设计.md)
 > **当前分支**: `houduan` — 后端化设计与重构开发分支；`main` 保持主线维护
 > **v6.4 主线**：未来星系产品内容保留，比赛提交/评审/截图临时层清理 + `20260630mainV64` 资产版本同步
@@ -23,6 +24,7 @@
 
 | 版本 | 发布日期 | 主题 | 详情 |
 |------|---------|------|------|
+| **v6.6.51（houduan）** | 2026-07-10 | 学生端学习闭环首轮，管理 / 教师 / 学生三端入口齐备 | [→](doc/09-后端阶段收束小版本开发安排.md) |
 | **v6.5（规划中）** | 2026-07-03 起 | Python + MySQL 后端化 + 三端教学平台设计 | [→](doc/07-后端优化与设计.md) |
 | **v6.4.0** | 2026-06-30 | 已结束赛事材料清理 + future 分支主线合并 + 底栏恢复 + 缓存版本同步 | [→](#v640--2026-06-30) |
 | **v6.1 ~ v6.2** | 2026-05-26 ~ 2026-06 | 工科试验室内容扩充、未来星系 MVP 接入、可信学习框架推进 | [→](doc/03-发布历史.md) |

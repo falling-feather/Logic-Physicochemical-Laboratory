@@ -87,6 +87,7 @@ def _active_teacher_ids(db: Session, class_id: int) -> set[int]:
 @router.get("", response_model=list[ClassRead])
 def list_classes(
     school_id: int | None = Query(default=None),
+    mine: bool = Query(default=False),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[ClassGroup]:
@@ -99,6 +100,17 @@ def list_classes(
         if not school_ids:
             return []
         statement = statement.where(ClassGroup.school_id.in_(school_ids))
+    if mine:
+        statement = (
+            statement.join(ClassMembership, ClassMembership.class_id == ClassGroup.id)
+            .where(
+                ClassMembership.user_id == current_user.id,
+                ClassMembership.status == "active",
+            )
+        )
+        if current_user.role in {"student", "teacher"}:
+            statement = statement.where(ClassMembership.role == current_user.role)
+        statement = statement.distinct()
     return list(db.scalars(statement).all())
 
 

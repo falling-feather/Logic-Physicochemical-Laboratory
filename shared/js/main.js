@@ -221,16 +221,16 @@ function updateFooterVisibility() {
 
 window.updateFooterVisibility = updateFooterVisibility;
 
-const ENGLAB_ASSET_VERSION = '20260709v6650TeacherMvpP1';
+const ENGLAB_ASSET_VERSION = '20260710v6651StudentMvpP1';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',
     './shared/css/tokens.css?v=20260424ss',
     './shared/css/base.css?v=20260630mainV64',
     './shared/css/typography.css?v=20260526v61c',
-    './shared/css/navbar.css?v=20260630mainV64',
+    './shared/css/navbar.css?v=' + ENGLAB_ASSET_VERSION,
     './shared/css/page-layout.css?v=20260606v62e',
-    './shared/css/responsive.css?v=20260704qianduanV70',
+    './shared/css/responsive.css?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/lucide.min.js?v=20260417d',
     './shared/js/config.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/router.js?v=' + ENGLAB_ASSET_VERSION,
@@ -238,7 +238,8 @@ const CORE_HTTP_FALLBACK_ASSETS = [
     './shared/js/backend-content.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/css/backend-content.css?v=' + ENGLAB_ASSET_VERSION,
     './pages/admin/admin.css?v=' + ENGLAB_ASSET_VERSION,
-    './pages/teacher/teacher.css?v=' + ENGLAB_ASSET_VERSION
+    './pages/teacher/teacher.css?v=' + ENGLAB_ASSET_VERSION,
+    './pages/student/student.css?v=' + ENGLAB_ASSET_VERSION
 ];
 
 const GALAXY_HTTP_FALLBACK_ASSETS = {
@@ -263,6 +264,7 @@ const GALAXY_HTTP_FALLBACK_ASSETS = {
         './pages/biology/biology.css?v=20260618neuralP1',
         './pages/admin/admin.css?v=' + ENGLAB_ASSET_VERSION,
         './pages/teacher/teacher.css?v=' + ENGLAB_ASSET_VERSION,
+        './pages/student/student.css?v=' + ENGLAB_ASSET_VERSION,
         './shared/js/module-selector.js?v=' + ENGLAB_ASSET_VERSION,
         './shared/js/experiment-guide.js?v=20260630mainV64',
         './shared/js/experiment-export.js?v=20260528v61f',
@@ -275,7 +277,8 @@ const GALAXY_HTTP_FALLBACK_ASSETS = {
         './shared/js/related-experiments.js?v=20260424v45c',
         './pages/home/home.js?v=20260704qianduanV70',
         './pages/admin/admin.js?v=' + ENGLAB_ASSET_VERSION,
-        './pages/teacher/teacher.js?v=' + ENGLAB_ASSET_VERSION
+        './pages/teacher/teacher.js?v=' + ENGLAB_ASSET_VERSION,
+        './pages/student/student.js?v=' + ENGLAB_ASSET_VERSION
     ],
     frontier: [
         './shared/js/frontier-learning.js?v=20260630mainV64',
@@ -304,7 +307,7 @@ function getFallbackGalaxy() {
     if (window.__astraBoot && window.__astraBoot.galaxy) return window.__astraBoot.galaxy;
     const hash = (window.location.hash || '#planets').slice(1).split('/')[0];
     const frontierPages = ['frontier', 'cosmos', 'engineering', 'datascience', 'infotech', 'materials', 'humanities'];
-    const englabPages = ['home', 'mathematics', 'physics', 'chemistry', 'algorithms', 'biology', 'teacher', 'admin', 'license', 'changelog'];
+    const englabPages = ['home', 'mathematics', 'physics', 'chemistry', 'algorithms', 'biology', 'teacher', 'student', 'admin', 'license', 'changelog'];
     if (frontierPages.includes(hash)) return 'frontier';
     if (englabPages.includes(hash)) return 'englab';
     return 'astra';

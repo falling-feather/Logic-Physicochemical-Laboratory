@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
 from app.db.session import get_db
 from app.models import (
     Assignment,
+    ClassGroup,
+    ClassMembership,
     Course,
+    CourseClass,
     CourseUnit,
     LearningEvent,
     PointLedger,
@@ -14,13 +18,25 @@ from app.models import (
     User,
 )
 from app.models.base import utc_now
-from app.schemas.course import AssignmentRead, AssignmentReviewRead, SubmissionCreate, SubmissionGrade, SubmissionRead
+from app.schemas.course import (
+    AssignmentRead,
+    AssignmentReviewRead,
+    CourseRead,
+    CourseUnitRead,
+    StudentAssignmentCenterItem,
+    StudentAssignmentCenterPage,
+    StudentAssignmentFilter,
+    SubmissionCreate,
+    SubmissionGrade,
+    SubmissionRead,
+)
+from app.schemas.school import ClassRead
 from app.services.audit import record_audit_log
 from app.services.access_control import (
     course_attached_to_class,
     get_class,
-    require_class_member,
     require_class_teacher_or_admin,
+    require_course_scope,
     require_course_visible,
     require_school_role,
     require_student_unit_published,
@@ -34,6 +50,95 @@ from app.services.points import (
 
 
 router = APIRouter()
+
+
+@router.get("/assignments/me", response_model=StudentAssignmentCenterPage)
+def list_my_assignments(
+    class_id: int | None = Query(default=None),
+    course_id: int | None = Query(default=None),
+    filter_by: StudentAssignmentFilter = Query(default="all", alias="filter"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> StudentAssignmentCenterPage:
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Only students can view their assignment center")
+
+    class_group: ClassGroup | None = None
+    if class_id is not None:
+        class_group = _require_active_user_class(db, current_user.id, class_id)
+    if course_id is not None:
+        if class_group is not None:
+            require_course_scope(db, current_user, class_group, course_id)
+        else:
+            require_course_visible(db, current_user, course_id)
+
+    active_class_ids = select(ClassMembership.class_id).where(
+        ClassMembership.user_id == current_user.id,
+        ClassMembership.role == "student",
+        ClassMembership.status == "active",
+    )
+    statement = (
+        select(ClassGroup, Course, CourseUnit, Assignment, Submission)
+        .select_from(ClassGroup)
+        .join(CourseClass, CourseClass.class_id == ClassGroup.id)
+        .join(Course, Course.id == CourseClass.course_id)
+        .join(CourseUnit, CourseUnit.course_id == Course.id)
+        .join(Assignment, Assignment.unit_id == CourseUnit.id)
+        .outerjoin(
+            Submission,
+            and_(
+                Submission.assignment_id == Assignment.id,
+                Submission.student_id == current_user.id,
+                Submission.class_id == ClassGroup.id,
+            ),
+        )
+        .where(
+            ClassGroup.id.in_(active_class_ids),
+            CourseClass.status == "active",
+            Course.status == "published",
+            CourseUnit.status == "published",
+            Assignment.status.in_(["active", "closed", "archived"]),
+        )
+    )
+    if class_id is not None:
+        statement = statement.where(ClassGroup.id == class_id)
+    if course_id is not None:
+        statement = statement.where(Course.id == course_id)
+    if filter_by == "active":
+        statement = statement.where(Assignment.status == "active")
+    elif filter_by == "feedback":
+        statement = statement.where(Submission.status.in_(["graded", "returned"]))
+    elif filter_by == "history":
+        statement = statement.where(Assignment.status.in_(["closed", "archived"]))
+
+    statement = statement.order_by(ClassGroup.id, Course.id, CourseUnit.position, Assignment.id)
+    total = int(db.scalar(select(func.count()).select_from(statement.order_by(None).subquery())) or 0)
+    rows = db.execute(statement.offset(offset).limit(limit)).all()
+    items: list[StudentAssignmentCenterItem] = []
+    for row_class, course, unit, assignment, submission in rows:
+        submit_block_reason = _assignment_submit_block_reason(assignment, submission)
+        items.append(
+            StudentAssignmentCenterItem(
+                class_=ClassRead.model_validate(row_class),
+                course=CourseRead.model_validate(course),
+                unit=CourseUnitRead.model_validate(unit),
+                assignment=AssignmentRead.model_validate(assignment),
+                submission=SubmissionRead.model_validate(submission) if submission is not None else None,
+                can_submit=submit_block_reason is None,
+                read_only=submit_block_reason is not None,
+                submit_block_reason=submit_block_reason,
+            )
+        )
+    next_offset = offset + len(items)
+    return StudentAssignmentCenterPage(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        next_offset=next_offset if next_offset < total else None,
+    )
 
 
 @router.post(
@@ -55,7 +160,7 @@ def create_submission(
         raise HTTPException(status_code=409, detail="Assignment is not active")
     require_course_visible(db, current_user, course.id)
     require_student_unit_published(current_user, unit)
-    class_group = require_class_member(db, current_user, payload.class_id)
+    class_group = _require_active_user_class(db, current_user.id, payload.class_id)
     if class_group.school_id != course.school_id:
         raise HTTPException(status_code=422, detail="Class does not belong to assignment school")
     if not course_attached_to_class(db, course.id, class_group.id):
@@ -80,44 +185,57 @@ def create_submission(
         status="submitted",
         submitted_at=now,
     )
-    db.add(submission)
-    db.flush()
-    db.add(
-        LearningEvent(
-            user_id=current_user.id,
+    try:
+        db.add(submission)
+        db.flush()
+        db.add(
+            LearningEvent(
+                user_id=current_user.id,
+                school_id=course.school_id,
+                class_id=class_group.id,
+                course_id=course.id,
+                unit_id=unit.id,
+                assignment_id=assignment.id,
+                event_type="submit",
+                payload={"submission_id": submission.id},
+                occurred_at=now,
+            )
+        )
+        record_audit_log(
+            db,
+            actor=current_user,
+            action="submission.create",
+            resource_type="submission",
+            resource_id=submission.id,
             school_id=course.school_id,
             class_id=class_group.id,
-            course_id=course.id,
-            unit_id=unit.id,
-            assignment_id=assignment.id,
-            event_type="submit",
-            payload={"submission_id": submission.id},
-            occurred_at=now,
+            event_result="success",
+            request=request,
+            snapshot={
+                "after": {
+                    "assignment_id": assignment.id,
+                    "student_id": current_user.id,
+                    "class_id": class_group.id,
+                    "course_id": course.id,
+                    "unit_id": unit.id,
+                    "status": submission.status,
+                    "content_keys": sorted(payload.content.keys()),
+                }
+            },
         )
-    )
-    record_audit_log(
-        db,
-        actor=current_user,
-        action="submission.create",
-        resource_type="submission",
-        resource_id=submission.id,
-        school_id=course.school_id,
-        class_id=class_group.id,
-        event_result="success",
-        request=request,
-        snapshot={
-            "after": {
-                "assignment_id": assignment.id,
-                "student_id": current_user.id,
-                "class_id": class_group.id,
-                "course_id": course.id,
-                "unit_id": unit.id,
-                "status": submission.status,
-                "content_keys": sorted(payload.content.keys()),
-            }
-        },
-    )
-    db.commit()
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        conflict = db.scalar(
+            select(Submission.id).where(
+                Submission.assignment_id == assignment.id,
+                Submission.student_id == current_user.id,
+                Submission.class_id == class_group.id,
+            )
+        )
+        if conflict is not None:
+            raise HTTPException(status_code=409, detail="Assignment already submitted") from exc
+        raise
     db.refresh(submission)
     return submission
 
@@ -143,12 +261,22 @@ def read_assignment_review(
         .order_by(Submission.submitted_at.desc(), Submission.id.desc())
     )
     if class_id is not None:
-        class_group = require_class_member(db, current_user, class_id)
+        class_group = _require_active_user_class(db, current_user.id, class_id)
         if class_group.school_id != course.school_id:
             raise HTTPException(status_code=422, detail="Class does not belong to assignment school")
         if not course_attached_to_class(db, course.id, class_group.id):
             raise HTTPException(status_code=403, detail="Course is not attached to this class")
         statement = statement.where(Submission.class_id == class_group.id)
+    else:
+        eligible_class_ids = _active_user_course_class_ids(db, current_user.id, course.id)
+        if len(eligible_class_ids) > 1:
+            raise HTTPException(
+                status_code=422,
+                detail="class_id is required when assignment is available in multiple classes",
+            )
+        if not eligible_class_ids:
+            raise HTTPException(status_code=403, detail="Assignment is outside current student class scope")
+        statement = statement.where(Submission.class_id == eligible_class_ids[0])
     submission = db.scalars(statement.limit(1)).first()
     submit_block_reason = _assignment_submit_block_reason(assignment, submission)
     can_submit = submit_block_reason is None
@@ -178,7 +306,7 @@ def list_assignment_submissions(
         require_student_unit_published(current_user, unit)
         statement = statement.where(Submission.student_id == current_user.id)
         if class_id is not None:
-            require_class_member(db, current_user, class_id)
+            _require_active_user_class(db, current_user.id, class_id)
             statement = statement.where(Submission.class_id == class_id)
         return list(db.scalars(statement).all())
 
@@ -285,6 +413,39 @@ def grade_submission(
     db.commit()
     db.refresh(submission)
     return submission
+
+
+def _require_active_user_class(db: Session, user_id: int, class_id: int) -> ClassGroup:
+    class_group = get_class(db, class_id)
+    membership = db.scalar(
+        select(ClassMembership.id).where(
+            ClassMembership.class_id == class_id,
+            ClassMembership.user_id == user_id,
+            ClassMembership.role == "student",
+            ClassMembership.status == "active",
+        )
+    )
+    if membership is None:
+        raise HTTPException(status_code=403, detail="Class is outside current student scope")
+    return class_group
+
+
+def _active_user_course_class_ids(db: Session, user_id: int, course_id: int) -> list[int]:
+    return list(
+        db.scalars(
+            select(ClassMembership.class_id)
+            .join(CourseClass, CourseClass.class_id == ClassMembership.class_id)
+            .where(
+                ClassMembership.user_id == user_id,
+                ClassMembership.role == "student",
+                ClassMembership.status == "active",
+                CourseClass.course_id == course_id,
+                CourseClass.status == "active",
+            )
+            .distinct()
+            .order_by(ClassMembership.class_id)
+        ).all()
+    )
 
 
 def _assignment_submit_block_reason(assignment: Assignment, submission: Submission | None) -> str | None:

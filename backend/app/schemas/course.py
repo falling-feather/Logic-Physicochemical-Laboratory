@@ -3,6 +3,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.school import ClassRead
+
 
 CourseStatus = Literal["draft", "published", "archived"]
 UnitStatus = Literal["draft", "published", "archived"]
@@ -13,6 +15,7 @@ LearningEventType = Literal["visit", "start", "submit", "complete"]
 AssignmentPointRuleSource = Literal["default", "custom"]
 CourseCollaboratorRole = Literal["editor"]
 CourseCollaboratorStatus = Literal["active", "inactive"]
+StudentAssignmentFilter = Literal["all", "active", "feedback", "history"]
 
 
 class CourseCreate(BaseModel):
@@ -161,6 +164,27 @@ class AssignmentReviewRead(BaseModel):
     can_submit: bool
     read_only: bool
     submit_block_reason: str | None = None
+
+
+class StudentAssignmentCenterItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    class_: ClassRead = Field(alias="class")
+    course: CourseRead
+    unit: CourseUnitRead
+    assignment: AssignmentRead
+    submission: SubmissionRead | None = None
+    can_submit: bool
+    read_only: bool
+    submit_block_reason: str | None = None
+
+
+class StudentAssignmentCenterPage(BaseModel):
+    items: list[StudentAssignmentCenterItem]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
 
 
 class SubmissionGrade(BaseModel):

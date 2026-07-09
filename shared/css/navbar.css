@@ -45,13 +45,19 @@
 .nav-logo {
     display: flex;
     align-items: center;
+    flex: 0 0 auto;
     gap: var(--space-3);
     text-decoration: none;
     color: var(--text-primary);
     font-size: var(--text-base);
     font-weight: 600;
     font-family: var(--font-display);
+    white-space: nowrap;
     transition: opacity var(--duration-fast) ease;
+}
+
+.navbar:not(.navbar--frontier) .nav-container {
+    max-width: 1240px;
 }
 
 .nav-logo:hover {
@@ -127,12 +133,14 @@
 .nav-item {
     display: flex;
     align-items: center;
+    flex: 0 0 auto;
     gap: var(--space-2);
     padding: var(--space-3) var(--space-4);
     text-decoration: none;
     color: var(--text-tertiary);
     font-size: var(--text-sm);
     font-weight: 400;
+    white-space: nowrap;
     border-radius: var(--radius-default);
     transition: color var(--duration-fast) ease;
     position: relative;

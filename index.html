@@ -30,11 +30,11 @@
     <link rel="stylesheet" href="shared/css/tokens.css?v=20260424ss">
     <link rel="stylesheet" href="shared/css/base.css?v=20260630mainV64">
     <link rel="stylesheet" href="shared/css/typography.css?v=20260526v61c">
-    <link rel="stylesheet" href="shared/css/navbar.css?v=20260630mainV64">
+    <link rel="stylesheet" href="shared/css/navbar.css?v=20260710v6651StudentMvpP1">
     <link rel="stylesheet" href="shared/css/page-layout.css?v=20260606v62e">
     <link rel="stylesheet" href="shared/css/cards.css?v=20260630mainV64">
     <link rel="stylesheet" href="shared/css/module-selector.css?v=20260630mainV64">
-    <link rel="stylesheet" href="shared/css/backend-content.css?v=20260709v6650TeacherMvpP1">
+    <link rel="stylesheet" href="shared/css/backend-content.css?v=20260710v6651StudentMvpP1">
     <link rel="stylesheet" href="shared/css/experiment-guide.css?v=20260630mainV64">
     <link rel="stylesheet" href="shared/css/experiment-export.css?v=20260424v44a">
     <link rel="stylesheet" href="shared/css/experiment-quiz.css?v=20260422z">
@@ -57,15 +57,16 @@
     <link rel="stylesheet" href="pages/chemistry/chemistry.css?v=20260618ionP1">
     <link rel="stylesheet" href="pages/algorithms/algorithms.css?v=20260618algoTextP1">
     <link rel="stylesheet" href="pages/biology/biology.css?v=20260618neuralP1">
-    <link rel="stylesheet" href="pages/admin/admin.css?v=20260709v6650TeacherMvpP1">
-    <link rel="stylesheet" href="pages/teacher/teacher.css?v=20260709v6650TeacherMvpP1">
+    <link rel="stylesheet" href="pages/admin/admin.css?v=20260710v6651StudentMvpP1">
+    <link rel="stylesheet" href="pages/teacher/teacher.css?v=20260710v6651StudentMvpP1">
+    <link rel="stylesheet" href="pages/student/student.css?v=20260710v6651StudentMvpP1">
     <!-- v4.5-α1 全局搜索 -->
     <link rel="stylesheet" href="shared/css/global-search.css?v=20260606v62e">
     <!-- v4.5-α3 相关实验推荐 -->
     <link rel="stylesheet" href="shared/css/related-experiments.css?v=20260424v45c">
     <link rel="stylesheet" href="shared/css/experiment-polish.css?v=20260526v61c">
     <!-- CSS: Responsive (must be last) -->
-    <link rel="stylesheet" href="shared/css/responsive.css?v=20260704qianduanV70">
+    <link rel="stylesheet" href="shared/css/responsive.css?v=20260710v6651StudentMvpP1">
 
     <!-- Loading Screen (inline — zero dependency, shows immediately) -->
     <style id="loading-screen-styles">
@@ -120,7 +121,7 @@
         window.__astraBoot = (function () {
             var raw = (location.hash || '#planets').slice(1).split('/')[0] || 'planets';
             var frontierPages = ['frontier', 'cosmos', 'engineering', 'datascience', 'infotech', 'materials', 'humanities'];
-            var englabPages = ['home', 'mathematics', 'physics', 'chemistry', 'algorithms', 'biology', 'teacher', 'admin', 'license', 'changelog'];
+            var englabPages = ['home', 'mathematics', 'physics', 'chemistry', 'algorithms', 'biology', 'student', 'teacher', 'admin', 'license', 'changelog'];
             var galaxy = frontierPages.indexOf(raw) > -1 ? 'frontier' : (englabPages.indexOf(raw) > -1 ? 'englab' : 'astra');
             var labels = {
                 astra: '正在进入星序',
@@ -212,35 +213,39 @@
                 <span class="logo-text desktop-only">未来星系</span>
             </a>
             <div class="nav-menu nav-menu--englab" data-galaxy-nav="englab">
-                <a href="#home" class="nav-item active" data-page="home">
+                <a href="#home" class="nav-item active" data-page="home" aria-label="首页">
                     <i data-lucide="home"></i>
                     <span>首页</span>
                 </a>
-                <a href="#mathematics" class="nav-item" data-page="mathematics">
+                <a href="#mathematics" class="nav-item" data-page="mathematics" aria-label="数学">
                     <i data-lucide="calculator"></i>
                     <span>数学</span>
                 </a>
-                <a href="#physics" class="nav-item" data-page="physics">
+                <a href="#physics" class="nav-item" data-page="physics" aria-label="物理">
                     <i data-lucide="atom"></i>
                     <span>物理</span>
                 </a>
-                <a href="#chemistry" class="nav-item" data-page="chemistry">
+                <a href="#chemistry" class="nav-item" data-page="chemistry" aria-label="化学">
                     <i data-lucide="flask-conical"></i>
                     <span>化学</span>
                 </a>
-                <a href="#algorithms" class="nav-item" data-page="algorithms">
+                <a href="#algorithms" class="nav-item" data-page="algorithms" aria-label="算法">
                     <i data-lucide="code"></i>
                     <span>算法</span>
                 </a>
-                <a href="#biology" class="nav-item" data-page="biology">
+                <a href="#biology" class="nav-item" data-page="biology" aria-label="生物">
                     <i data-lucide="leaf"></i>
                     <span>生物</span>
                 </a>
-                <a href="#teacher" class="nav-item nav-item--teacher" data-page="teacher">
+                <a href="#student" class="nav-item nav-item--student" data-page="student" aria-label="学习">
+                    <i data-lucide="graduation-cap"></i>
+                    <span>学习</span>
+                </a>
+                <a href="#teacher" class="nav-item nav-item--teacher" data-page="teacher" aria-label="教师">
                     <i data-lucide="presentation"></i>
                     <span>教师</span>
                 </a>
-                <a href="#admin" class="nav-item nav-item--admin" data-page="admin">
+                <a href="#admin" class="nav-item nav-item--admin" data-page="admin" aria-label="管理">
                     <i data-lucide="shield-check"></i>
                     <span>管理</span>
                 </a>
@@ -5026,6 +5031,16 @@
                 </div>
             </div>
         </section>
+
+        <!-- Student · 学生学习台 -->
+        <section id="page-student" class="page student-page" aria-label="学生学习台">
+            <div class="student-workbench" data-student-workbench>
+                <div class="student-loading">
+                    <i data-lucide="loader-circle"></i>
+                    <span>正在载入学生学习台</span>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- ═══════════════ Element Detail Panel ═══════════════ -->
@@ -5130,10 +5145,10 @@
     </div>
 
     <!-- Application Scripts: minimal boot path -->
-    <script src="shared/js/config.js?v=20260709v6650TeacherMvpP1"></script>
-    <script src="shared/js/backend-content.js?v=20260709v6650TeacherMvpP1"></script>
-    <script src="shared/js/router.js?v=20260709v6650TeacherMvpP1"></script>
-    <script src="shared/js/main.js?v=20260709v6650TeacherMvpP1"></script>
+    <script src="shared/js/config.js?v=20260710v6651StudentMvpP1"></script>
+    <script src="shared/js/backend-content.js?v=20260710v6651StudentMvpP1"></script>
+    <script src="shared/js/router.js?v=20260710v6651StudentMvpP1"></script>
+    <script src="shared/js/main.js?v=20260710v6651StudentMvpP1"></script>
     <script>
         (function () {
             try {
