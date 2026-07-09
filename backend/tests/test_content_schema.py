@@ -105,7 +105,7 @@ def test_render_script_sandbox_document_serves_isolated_html(client):
     assert response.headers["Cache-Control"] == "no-store"
     assert "X-Astra-Content-Script-Nonce" not in response.headers
     assert "connect-src 'self'" in response.headers["Content-Security-Policy"]
-    assert "frame-ancestors 'self'" in response.headers["Content-Security-Policy"]
+    assert "frame-ancestors 'self' http://127.0.0.1:8766 http://localhost:8766" in response.headers["Content-Security-Policy"]
     assert "form-action 'none'" in response.headers["Content-Security-Policy"]
     nonce = _nonce_from_csp(response.headers["Content-Security-Policy"])
     assert nonce is not None
@@ -134,7 +134,7 @@ def test_render_script_sandbox_document_serves_isolated_html(client):
     assert bootstrap.headers["X-Astra-Content-Script-Bootstrap-Version"] == "bootstrap-v1"
     assert bootstrap.headers["X-Astra-Content-Script-Asset-Count"] == "1"
     assert bootstrap.headers["X-Content-Type-Options"] == "nosniff"
-    assert bootstrap.headers["Cross-Origin-Resource-Policy"] == "same-origin"
+    assert bootstrap.headers["Cross-Origin-Resource-Policy"] == "cross-origin"
     assert "astra-script-sandbox-bootstrap-v1" in bootstrap.text
     assert "__ASTRA_SCRIPT_SANDBOX__" in bootstrap.text
     assert "document.currentScript" in bootstrap.text
@@ -150,6 +150,9 @@ def test_render_script_sandbox_document_serves_isolated_html(client):
     assert asset.headers["X-Astra-Content-Script-Sandbox-Id"] == sandbox_id
     assert asset.headers["X-Astra-Content-Script-Asset-Sha256"] == asset_sha256
     assert asset.headers["X-Content-Type-Options"] == "nosniff"
+    assert asset.headers["Cache-Control"] == "no-store"
+    assert asset.headers["Cross-Origin-Resource-Policy"] == "cross-origin"
+    assert asset.headers["Referrer-Policy"] == "no-referrer"
     assert "const EnergyConservation" in asset.text
 
     missing_asset = client.get(
@@ -178,6 +181,13 @@ def test_sandbox_csp_nonce_updates_script_src_without_mutating_public_manifest(c
     assert "connect-src 'none'" in csp
     assert "frame-ancestors 'self'" in csp
     assert "form-action 'none'" in csp
+
+    dev_frame_csp = _harden_sandbox_csp(
+        "default-src 'none'; script-src 'self'",
+        nonce="frontend_nonce",
+        frame_ancestors=["'self'", "http://frontend.example.test"],
+    )
+    assert "frame-ancestors 'self' http://frontend.example.test" in dev_frame_csp
 
     no_script_src = _harden_sandbox_csp("default-src 'none'; img-src 'self'", nonce="another_nonce")
     assert "script-src 'nonce-another_nonce'" in no_script_src

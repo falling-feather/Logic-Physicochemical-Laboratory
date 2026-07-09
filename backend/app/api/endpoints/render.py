@@ -3,7 +3,7 @@ import secrets
 from html import escape
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, unquote
+from urllib.parse import quote, unquote, urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import HTMLResponse
@@ -40,7 +40,7 @@ def render_script_sandbox_document(sandbox_id: str, slug: str, response: Respons
     for reference in references:
         _script_asset_binding(db, page_record, sandbox_id, reference)
     nonce = _script_sandbox_nonce()
-    csp = _harden_sandbox_csp(str(sandbox["csp"]), nonce=nonce)
+    csp = _harden_sandbox_csp(str(sandbox["csp"]), nonce=nonce, frame_ancestors=_sandbox_frame_ancestors())
     response.headers["Content-Security-Policy"] = csp
     response.headers["X-Astra-Content-Script-Sandbox-Id"] = sandbox_id
     response.headers["X-Astra-Content-Script-Iframe-Sandbox"] = str(sandbox["iframeSandbox"])
@@ -76,7 +76,7 @@ def render_script_sandbox_bootstrap(
     response.headers["X-Astra-Content-Script-Bootstrap-Version"] = "bootstrap-v1"
     response.headers["X-Astra-Content-Script-Asset-Count"] = str(len(asset_urls))
     response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+    response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
     response.headers["Referrer-Policy"] = "no-referrer"
     return Response(
         content=payload,
@@ -112,6 +112,8 @@ def render_script_sandbox_asset(
     response.headers["X-Astra-Content-Script-Asset-Sha256"] = asset_sha256
     response.headers["X-Astra-Content-Script-Reference-Sha256"] = asset_sha256
     response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
     response.headers["Referrer-Policy"] = "no-referrer"
     return Response(
         content=payload,
@@ -513,13 +515,14 @@ def _is_allowed_local_script_asset(candidate: Path) -> bool:
     return False
 
 
-def _harden_sandbox_csp(csp: str, *, nonce: str) -> str:
+def _harden_sandbox_csp(csp: str, *, nonce: str, frame_ancestors: list[str] | None = None) -> str:
     directives = _parse_csp_directives(csp)
     _upsert_script_src_nonce(directives, nonce=nonce)
+    ancestors = frame_ancestors or ["'self'"]
     for name, values in [
         ("base-uri", ["'none'"]),
         ("object-src", ["'none'"]),
-        ("frame-ancestors", ["'self'"]),
+        ("frame-ancestors", ancestors),
         ("form-action", ["'none'"]),
     ]:
         directives[name] = values
@@ -545,6 +548,25 @@ def _parse_csp_directives(csp: str) -> dict[str, list[str]]:
 def _upsert_script_src_nonce(directives: dict[str, list[str]], *, nonce: str) -> None:
     nonce_source = f"'nonce-{nonce}'"
     directives["script-src"] = [nonce_source]
+
+
+def _sandbox_frame_ancestors() -> list[str]:
+    ancestors = ["'self'"]
+    for origin in get_settings().cors_origin_list:
+        normalized = _frame_ancestor_origin(origin)
+        if normalized and normalized not in ancestors:
+            ancestors.append(normalized)
+    return ancestors
+
+
+def _frame_ancestor_origin(value: str) -> str:
+    stripped = value.strip()
+    if stripped in {"*", "null"}:
+        return ""
+    parsed = urlsplit(stripped)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+    return f"{parsed.scheme}://{parsed.netloc}"
 
 
 def _script_sandbox_nonce() -> str:
