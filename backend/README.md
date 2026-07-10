@@ -8,6 +8,8 @@ V6.6.55 已增加 `background_tasks/background_task_attempts` DB-backed 控制�
 
 V6.6.56 选择默认关闭的 HTTPS hash 回执作为审计外部锚定方案。`audit_chain_heads` 在 MySQL 通过 `SELECT ... FOR UPDATE` 串行化链尾，SQLite 本地回归使用事务级进程锁；归档 Manifest v2 记录范围、archive hash、导出人、导出时间和删除/脱敏/恢复审批策略。`audit_archive_anchors` 保存回执状态，锚定任务复用统一 worker 的 attempt/退避/dead-letter；外发信封只包含 manifest/archive hash、链边界和范围摘要，不包含审计正文、快照、文件路径、URL 或 token。
 
+V6.6.57 已新增外部 issue provider 协议与首个 GitHub REST 适配器。管理员可沿用 `BugRecord.external_issue_provider/id/url` 手工绑定，也可显式确认创建 issue、同步本地状态和发送单条安全评论；`bug_external_sync_operations` 以稳定操作键记录 create/status/comment 的 attempt、成功、失败或 ambiguous 状态，成功操作可恢复读取，创建和评论的未知结果禁止盲重试。系统不自动接收外部状态，不让外部 issue 覆盖本地字段；自动创建只发送本地编号、分类、严重度、状态和本地权威声明，不发送 evidence、notes、source、URL 或凭据。当前只有 GitHub 可执行，Gitee/Jira 仅保留 provider 扩展位；真实 GitHub staging 和凭据/限流证据归 V6.6.60。
+
 ## 本地启动
 
 ```bash
@@ -154,6 +156,11 @@ python -m scripts.backend_stage_gate --require-mysql \
 | GET | `/api/admin/audit-logs/high-frequency` | 管理端审计高频候选摘要；复用审计筛选，默认查看最近 24 小时，按 action、actor/action、ip/action、resource/action 和 failure_reason 聚合候选；成功生成后写入 `admin.audit.high_frequency` 摘要，不记录候选明细 |
 | GET | `/api/admin/submissions/pending` | 待批改队列；全局管理员可跨范围过滤，教师仅可读取本人任教班级内 `submitted/returned` 提交，`status=graded` 仍为管理员治理视图 |
 | GET/POST/PATCH | `/api/admin/bugs` | 缺陷/风险清单基础维护；可记录外部 issue provider/id/url，列表支持分页、状态过滤和关键字搜索 |
+| GET | `/api/admin/bugs/external-sync/posture` | 外部 issue 同步安全姿态；只报告 enabled/configured/provider/transport/本地权威和重试边界，不返回 owner/repo host、路径或 token |
+| GET | `/api/admin/bugs/{id}/external-sync-operations` | 外部 issue 操作账本分页列表；返回 create/status/comment 的脱敏状态、attempt 和 receipt 摘要，不返回评论正文或完整操作键 |
+| POST | `/api/admin/bugs/{id}/external-sync/create` | 管理员显式确认后创建 GitHub issue；稳定 create 操作键防重复，未知结果标记 ambiguous 并禁止盲重试 |
+| POST | `/api/admin/bugs/{id}/external-sync/status` | 以本地 `BugRecord.status` 映射外部 open/closed；本地修订号进入操作键，外部响应不会反向覆盖本地状态 |
+| POST | `/api/admin/bugs/{id}/external-sync/comments` | 管理员显式提交安全评论；按规范化评论 hash 幂等，敏感标记 fail closed，响应/审计/账本不保存评论正文 |
 | GET/POST | `/api/schools` | 当前用户可见学校 / 创建学校 |
 | GET | `/api/schools/{id}/classes` | 学校内班级 |
 | GET/POST | `/api/classes` | 当前用户可见班级 / 创建班级；`GET ?mine=true` 只返回当前用户 active membership 对应班级 |
@@ -281,6 +288,14 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 | `ASTRA_AUDIT_ANCHOR_WEBHOOK_TOKEN` | 空 | 外部回执服务 SecretStr token；仅从环境或安全配置注入 |
 | `ASTRA_AUDIT_ANCHOR_TIMEOUT_SECONDS` | `5` | 单次锚定请求超时，范围 1-30 秒 |
 | `ASTRA_AUDIT_ANCHOR_MAX_ATTEMPTS` | `5` | 锚定任务进入 dead-letter 前的最大 attempt 数 |
+| `ASTRA_EXTERNAL_ISSUE_SYNC_ENABLED` | `false` | 外部 issue 同步总开关；默认关闭，手工保存引用元数据不受影响 |
+| `ASTRA_EXTERNAL_ISSUE_SYNC_PROVIDER` | `github` | 当前可执行 provider；协议预留 Gitee/Jira，当前仅支持 GitHub |
+| `ASTRA_EXTERNAL_ISSUE_SYNC_GITHUB_API_URL` | `https://api.github.com` | GitHub REST HTTPS 基址；重定向仅允许同源 307/308 |
+| `ASTRA_EXTERNAL_ISSUE_SYNC_GITHUB_WEB_URL` | `https://github.com` | 用于校验 issue 回执与手工绑定 URL 的 HTTPS 基址 |
+| `ASTRA_EXTERNAL_ISSUE_SYNC_GITHUB_OWNER` / `REPO` | 空 | 目标仓库 owner/repo；启用时必填，姿态报告不回显 |
+| `ASTRA_EXTERNAL_ISSUE_SYNC_GITHUB_TOKEN` | 空 | GitHub SecretStr token；需目标仓库 Issues 写权限，仅从环境或 secret store 注入 |
+| `ASTRA_EXTERNAL_ISSUE_SYNC_GITHUB_API_VERSION` | `2026-03-10` | GitHub REST API 版本请求头 |
+| `ASTRA_EXTERNAL_ISSUE_SYNC_TIMEOUT_SECONDS` | `10` | 单次 GitHub 请求超时，范围 1-30 秒 |
 | `ASTRA_AUDIT_IP_HASH_SALT` | `astra-dev-audit-salt` | 审计中客户端 IP 哈希盐；生产环境应替换 |
 | `ASTRA_AUDIT_TRUST_FORWARDED_FOR` | `false` | 是否允许审计 IP 哈希读取 `X-Forwarded-For`；默认关闭，防止客户端伪造转发链 |
 | `ASTRA_AUDIT_TRUSTED_PROXY_HOSTS` | 空 | 可信反向代理连接来源，逗号分隔；只有开启 `ASTRA_AUDIT_TRUST_FORWARDED_FOR=true` 且 `request.client.host` 命中该列表时，才使用 `X-Forwarded-For` 首个 IP |
@@ -348,7 +363,7 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 - `app.services.audit_archive_anchors` 与 `app.services.audit_anchor_delivery` 负责校验 Manifest/归档文件、创建幂等锚定账本并发送 `astra.audit-archive-anchor.v1` hash-only 信封。稳定 Idempotency-Key、HMAC-SHA256、no-redirect、严格回执 hash 匹配和统一任务重试用于 staging/生产接入；失败只更新独立账本，不改写 `audit_logs`、Manifest 或归档字节。
 - `app.services.audit_archive_drill` 与 `scripts.audit_archive_drill` 提供审计归档/留存生产演练前后的只读姿态报告；检查数据库方言、留存 cutoff、候选/保留/临期数量、归档预览、候选链完整性、敏感字段扫描、操作边界和真实 MySQL/WORM/外部锚定待留证项，不写文件、不写审计、不删除或移动 `audit_logs`，不返回密码、token、密钥、原始快照正文或复核备注。
 - `app.services.audit_chain` 负责复用型审计链校验：按传入顺序重算 `current_hash`、检查相邻记录 `prev_hash` 是否衔接上一条 `current_hash`，并把历史空 hash 作为 partial 状态暴露给 API 与归档 Manifest；它只报告 `current_hash_mismatch`、`prev_hash_mismatch` 和 `null_current_hash`，不执行修复、删除、回填或外部锚定。
-- `/api/admin/bugs` 负责缺陷与风险清单的最小维护；`external_issue_provider/external_issue_id/external_issue_url` 只是外部 issue 链接元数据，不代表已经实现外部平台自动创建或双向状态同步。
+- `/api/admin/bugs` 仍以本地 `BugRecord` 为唯一权威；V6.6.57 支持手工绑定和显式 GitHub 创建/状态/评论出站同步，但不做自动入站或双向覆盖。`app.services.external_issue_providers` 负责 HTTPS provider 合同、回执校验和敏感文本门禁，`app.services.bug_external_sync` 负责稳定操作键、失败/歧义账本与本地成功提交；Gitee/Jira 尚未实现。
 - `app.services.request_metadata` 统一解析请求元数据；审计与会话治理共享 request_id、user-agent 和 IP 哈希口径。`AuthSession.device_label` 优先来自 `X-Device-Label` / `X-Device-Name`，缺省回退到登录 user-agent，因此只是 best-effort 设备摘要，不等同强设备绑定。
 - `app.api.deps.auth.get_current_auth_context()` 会在有效鉴权后按 `ASTRA_SESSION_LAST_SEEN_UPDATE_SECONDS` 刷新当前 `AuthSession.last_seen_at` 和 `last_seen_ip_hash`；默认 300 秒内同一 IP 哈希不重复写库，窗口过期、IP 哈希变化或配置为 `0` 时刷新。该机制只降低 last_seen 写放大，不等同强设备绑定或长期会话风控。
 - `/api/auth/password-reset/request` 与 `/api/auth/password-reset/confirm` 只提供本地账号自助重置 token 能力；邮件/短信/MFA 投递暂列 `P4 / 最低优先级 / 暂缓`。请求审计使用账号哈希作为 `resource_id`，不记录明文用户名或 token；确认阶段会对 token 行加锁并一次性消费。`app.services.password_reset_tokens` 与 `scripts.cleanup_password_reset_tokens` 提供过期/已用 token 的离线清理入口，默认 dry-run，显式 `--apply` 才删除，摘要不返回用户名、IP 哈希、user-agent 或 token hash。
@@ -378,17 +393,18 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 python -m pytest backend
 ```
 
-V6.6.56 基线为 311 项全量 pytest；权限/班级策略/统计、外部投递、统一任务和审计锚定专项可运行：
+V6.6.57 基线为 317 项全量 pytest；权限/班级策略/统计、外部投递、统一任务、审计锚定和外部 issue 同步专项可运行：
 
 ```bash
 python -m pytest backend/tests/test_school_classes.py backend/tests/test_access_control.py backend/tests/test_course_learning_loop.py -q
 python -m pytest backend/tests/test_alert_delivery.py -q
 python -m pytest backend/tests/test_background_tasks.py backend/tests/test_background_task_api_worker.py -q
 python -m pytest backend/tests/test_audit_archive.py backend/tests/test_audit_archive_anchor.py backend/tests/test_audit_chain_concurrency.py -q
+python -m pytest backend/tests/test_bug_external_sync.py backend/tests/test_deploy_preflight.py -q
 node tools/tests/v6653-permission-analytics-contract.cjs
 ```
 
-迁移最低门禁需验证 `upgrade head -> downgrade 20260710_0040 -> upgrade head`，最终 `alembic current` 必须为 `20260710_0041`；SQLite 往返只证明迁移结构可执行，真实 MySQL 锁等待仍归 V6.6.60 RC 部署门禁。
+迁移最低门禁需验证 `upgrade 20260710_0041 -> upgrade head -> downgrade 20260710_0041 -> upgrade head`，最终 `alembic current` 必须为 `20260710_0042`；SQLite 往返只证明迁移结构可执行，真实 MySQL 行锁、外网和凭据仍归 V6.6.60 RC 部署门禁。
 
 权限范围回归可单独运行：
 
@@ -404,7 +420,7 @@ $env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
 python -m alembic upgrade head
 ```
 
-当前 Alembic head：`20260710_0041`。`0040` 新增统一任务与 attempt 台账，`0041` 新增 `audit_chain_heads/audit_archive_anchors` 并以最新非空审计 hash 初始化单例链尾。回滚 0041 会删除外部回执账本和链尾互斥行，必须先停锚定 worker、导出回执证据并备份；再次升级会从最新审计行重建链尾。
+当前 Alembic head：`20260710_0042`。`0041` 新增 `audit_chain_heads/audit_archive_anchors`；`0042` 为 `bug_records` 增加外部状态、最后同步时间和本地修订号，并新增 `bug_external_sync_operations` 操作账本。回滚 0042 前必须先关闭外部 issue 同步、导出未完成/ambiguous 操作证据并核对外部平台；回滚会删除同步账本和三个状态字段，但保留原有 provider/id/url 手工绑定字段。再次升级不会自动重建已删除的操作历史。
 
 内容脚本远端漂移 CLI：
 

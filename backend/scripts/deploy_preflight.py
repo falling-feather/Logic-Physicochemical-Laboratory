@@ -16,6 +16,7 @@ from app.core.config import get_settings
 from app.db.session import check_database, make_engine
 from app.services.alert_delivery import alert_delivery_posture
 from app.services.audit_anchor_delivery import audit_anchor_posture
+from app.services.external_issue_providers import external_issue_sync_posture
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -51,11 +52,15 @@ def _configuration_report(settings: Any, *, require_mysql: bool) -> dict[str, An
     auto_create_tables = bool(settings.auto_create_tables)
     delivery_posture = alert_delivery_posture(settings)
     anchor_posture = audit_anchor_posture(settings)
+    issue_sync_posture = external_issue_sync_posture(settings)
     if delivery_posture["enabled"] and not delivery_posture["configured"]:
         status = "alert_delivery_not_configured"
         ok = False
     elif anchor_posture["enabled"] and not anchor_posture["configured"]:
         status = "audit_anchor_not_configured"
+        ok = False
+    elif issue_sync_posture["enabled"] and not issue_sync_posture["configured"]:
+        status = "external_issue_sync_not_configured"
         ok = False
     elif require_mysql and auto_create_tables:
         status = "auto_create_tables_enabled"
@@ -76,6 +81,7 @@ def _configuration_report(settings: Any, *, require_mysql: bool) -> dict[str, An
         "auto_create_tables_policy": "must_be_false_when_require_mysql",
         "alert_delivery": delivery_posture,
         "audit_anchor": anchor_posture,
+        "external_issue_sync": issue_sync_posture,
         "background_task_worker": {
             "enabled": settings.background_task_worker_enabled,
             "queue_backend": "database",

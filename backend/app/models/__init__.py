@@ -7,6 +7,7 @@ from app.models.admin import (
     AuditLog,
     BackgroundTask,
     BackgroundTaskAttempt,
+    BugExternalSyncOperation,
     BugRecord,
 )
 from app.models.content import (
@@ -44,6 +45,7 @@ __all__ = [
     "AuditLog",
     "BackgroundTask",
     "BackgroundTaskAttempt",
+    "BugExternalSyncOperation",
     "AuthSession",
     "Base",
     "BugRecord",

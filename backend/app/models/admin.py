@@ -18,8 +18,36 @@ class BugRecord(TimestampMixin, Base):
     external_issue_provider: Mapped[str | None] = mapped_column(String(80), nullable=True)
     external_issue_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
     external_issue_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    external_issue_state: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    external_issue_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    external_sync_revision: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class BugExternalSyncOperation(TimestampMixin, Base):
+    __tablename__ = "bug_external_sync_operations"
+    __table_args__ = (UniqueConstraint("operation_key", name="uq_bug_external_sync_operations_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    bug_record_id: Mapped[int] = mapped_column(ForeignKey("bug_records.id"), index=True, nullable=False)
+    provider: Mapped[str] = mapped_column(String(40), index=True, nullable=False)
+    operation: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    operation_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="pending", index=True, nullable=False)
+    desired_state: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    comment_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    comment_length: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    external_issue_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    external_issue_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    external_state: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    external_comment_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
+    response_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
 
 
 class AuditLog(TimestampMixin, Base):

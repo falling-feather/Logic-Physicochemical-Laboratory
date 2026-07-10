@@ -1508,6 +1508,9 @@ class BugRecordRead(BaseModel):
     external_issue_provider: str | None = None
     external_issue_id: str | None = None
     external_issue_url: str | None = None
+    external_issue_state: str | None = None
+    external_issue_synced_at: datetime | None = None
+    external_sync_revision: int
     evidence: str | None = None
     notes: str | None = None
     created_at: datetime
@@ -1520,3 +1523,52 @@ class BugRecordPage(BaseModel):
     limit: int
     offset: int
     next_offset: int | None = None
+
+
+class BugExternalSyncRequest(BaseModel):
+    confirm_external_sync: bool = False
+
+
+class BugExternalCommentSyncRequest(BugExternalSyncRequest):
+    comment: str = Field(min_length=1, max_length=2000)
+
+
+class BugExternalSyncOperationRead(BaseModel):
+    id: int
+    bug_record_id: int
+    provider: str
+    operation: Literal["create", "status", "comment"]
+    operation_key_prefix: str
+    status: Literal["pending", "dispatching", "succeeded", "failed", "ambiguous"]
+    desired_state: str | None = None
+    comment_sha256: str | None = None
+    comment_length: int | None = None
+    external_issue_id: str | None = None
+    external_issue_url: str | None = None
+    external_state: str | None = None
+    external_comment_id: str | None = None
+    attempt_count: int
+    last_error_code: str | None = None
+    last_attempt_at: datetime | None = None
+    finished_at: datetime | None = None
+    response_hash: str | None = None
+    created_by_user_id: int | None = None
+    created_at: datetime
+    updated_at: datetime
+    comment_body_returned: bool
+    operation_key_redacted: bool
+
+
+class BugExternalSyncOperationPage(BaseModel):
+    items: list[BugExternalSyncOperationRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class BugExternalSyncResponse(BaseModel):
+    bug: BugRecordRead
+    operation: BugExternalSyncOperationRead
+    recovered: bool
+    posture: dict[str, Any]

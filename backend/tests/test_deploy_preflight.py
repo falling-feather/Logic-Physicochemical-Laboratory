@@ -41,6 +41,8 @@ def test_deploy_preflight_reports_migrated_database(monkeypatch):
         assert report["configuration"]["background_task_worker"]["lease_token_returned"] is False
         assert report["configuration"]["audit_anchor"]["enabled"] is False
         assert report["configuration"]["audit_anchor"]["payload_policy"] == "hashes_and_range_only"
+        assert report["configuration"]["external_issue_sync"]["enabled"] is False
+        assert report["configuration"]["external_issue_sync"]["local_authority"] is True
         assert report["database"]["ok"] is True
         assert report["migrations"]["status"] == "up_to_date"
         assert report["migrations"]["current"] == report["migrations"]["heads"]
@@ -185,6 +187,32 @@ def test_deploy_preflight_rejects_incomplete_audit_anchor_and_accepts_https_conf
     assert complete["audit_anchor"]["configured"] is True
     assert "anchor.example.test" not in str(complete)
     assert "audit-anchor-secret-token" not in str(complete)
+
+
+def test_deploy_preflight_rejects_incomplete_external_issue_sync_and_redacts_target(monkeypatch):
+    monkeypatch.setenv("ASTRA_EXTERNAL_ISSUE_SYNC_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_EXTERNAL_ISSUE_SYNC_GITHUB_OWNER", "")
+    monkeypatch.setenv("ASTRA_EXTERNAL_ISSUE_SYNC_GITHUB_REPO", "")
+    monkeypatch.setenv("ASTRA_EXTERNAL_ISSUE_SYNC_GITHUB_TOKEN", "")
+    get_settings.cache_clear()
+
+    incomplete = deploy_preflight._configuration_report(get_settings(), require_mysql=False)
+    assert incomplete["ok"] is False
+    assert incomplete["status"] == "external_issue_sync_not_configured"
+    assert incomplete["external_issue_sync"]["enabled"] is True
+    assert incomplete["external_issue_sync"]["configured"] is False
+
+    monkeypatch.setenv("ASTRA_EXTERNAL_ISSUE_SYNC_GITHUB_OWNER", "example")
+    monkeypatch.setenv("ASTRA_EXTERNAL_ISSUE_SYNC_GITHUB_REPO", "private-astra")
+    monkeypatch.setenv("ASTRA_EXTERNAL_ISSUE_SYNC_GITHUB_TOKEN", "issue-sync-secret-token")
+    get_settings.cache_clear()
+    complete = deploy_preflight._configuration_report(get_settings(), require_mysql=False)
+    assert complete["ok"] is True
+    assert complete["status"] == "ready"
+    assert complete["external_issue_sync"]["configured"] is True
+    assert complete["external_issue_sync"]["local_authority"] is True
+    assert "private-astra" not in str(complete)
+    assert "issue-sync-secret-token" not in str(complete)
 
 
 def test_deploy_preflight_mysql_compatibility_accepts_utf8mb4(monkeypatch):
@@ -660,3 +688,70 @@ def test_audit_archive_anchor_migration_round_trip_seeds_chain_head(monkeypatch)
         reset_database_state()
         if database_path.exists():
             database_path.unlink()
+
+
+def test_bug_external_sync_migration_round_trip_preserves_local_bug(monkeypatch):
+    backend_root = Path(__file__).resolve().parents[1]
+    database_path, database_url = _empty_sqlite_database(monkeypatch, backend_root)
+    config = _alembic_config(backend_root)
+    now = datetime.now(UTC)
+    try:
+        command.upgrade(config, "20260710_0041")
+        with make_engine(database_url).begin() as connection:
+            result = connection.execute(
+                text(
+                    """
+                    INSERT INTO bug_records (
+                        title, category, severity, status, source,
+                        external_issue_provider, external_issue_id, external_issue_url,
+                        evidence, notes, created_at, updated_at
+                    ) VALUES (
+                        'legacy sync bug', 'BE', 'P1', 'open', NULL,
+                        NULL, NULL, NULL, NULL, NULL, :created_at, :updated_at
+                    )
+                    """
+                ),
+                {"created_at": now, "updated_at": now},
+            )
+            bug_id = int(result.lastrowid)
+
+        command.upgrade(config, "head")
+        with make_engine(database_url).connect() as connection:
+            bug = connection.execute(
+                text(
+                    "SELECT external_issue_state, external_issue_synced_at, external_sync_revision "
+                    "FROM bug_records WHERE id = :bug_id"
+                ),
+                {"bug_id": bug_id},
+            ).mappings().one()
+            operation_count = connection.execute(
+                text("SELECT COUNT(*) FROM bug_external_sync_operations")
+            ).scalar_one()
+        assert bug["external_issue_state"] is None
+        assert bug["external_issue_synced_at"] is None
+        assert bug["external_sync_revision"] == 1
+        assert operation_count == 0
+
+        command.downgrade(config, "20260710_0041")
+        with make_engine(database_url).connect() as connection:
+            columns = {
+                row[1] for row in connection.execute(text("PRAGMA table_info(bug_records)")).all()
+            }
+            tables = {
+                row[0]
+                for row in connection.execute(
+                    text("SELECT name FROM sqlite_master WHERE type = 'table'")
+                ).all()
+            }
+        assert "external_sync_revision" not in columns
+        assert "bug_external_sync_operations" not in tables
+
+        command.upgrade(config, "head")
+        with make_engine(database_url).connect() as connection:
+            restored_revision = connection.execute(
+                text("SELECT external_sync_revision FROM bug_records WHERE id = :bug_id"),
+                {"bug_id": bug_id},
+            ).scalar_one()
+        assert restored_revision == 1
+    finally:
+        _dispose_and_remove(database_url, database_path)

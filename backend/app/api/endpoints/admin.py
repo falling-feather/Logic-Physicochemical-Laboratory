@@ -25,6 +25,7 @@ from app.models import (
     AssignmentClassPolicy,
     BackgroundTask,
     BackgroundTaskAttempt,
+    BugExternalSyncOperation,
     BugRecord,
     ClassGroup,
     ClassJoinRequest,
@@ -148,11 +149,24 @@ from app.schemas.admin import (
     AuditLogRetentionSummary,
     AuditLogActionReport,
     BugRecordCreate,
+    BugExternalCommentSyncRequest,
+    BugExternalSyncOperationPage,
+    BugExternalSyncOperationRead,
+    BugExternalSyncRequest,
+    BugExternalSyncResponse,
     BugRecordPage,
     BugRecordRead,
     BugRecordUpdate,
 )
 from app.services.audit import record_audit_log
+from app.services.bug_external_sync import (
+    BugExternalSyncError,
+    BugExternalSyncResult,
+    bug_external_sync_operation_read,
+    create_external_issue_for_bug,
+    sync_external_issue_comment_for_bug,
+    sync_external_issue_status_for_bug,
+)
 from app.services.assignment_policies import (
     assignment_class_effective_status_expression,
     assignment_class_is_assigned_expression,
@@ -172,6 +186,10 @@ from app.services.background_tasks import (
     cancel_background_task,
     enqueue_background_task,
     retry_background_task,
+)
+from app.services.external_issue_providers import (
+    build_issue_provider_adapter,
+    external_issue_sync_posture,
 )
 from app.services.access_control import (
     require_class_teacher_or_admin_by_id,
@@ -3790,6 +3808,7 @@ def update_bug_record(
         raise HTTPException(status_code=404, detail="Bug record not found")
 
     before = _bug_snapshot(bug)
+    authoritative_before = _bug_authority_snapshot(bug)
     for field in (
         "title",
         "category",
@@ -3815,6 +3834,8 @@ def update_bug_record(
         bug.severity = payload.severity
     if payload.status is not None:
         bug.status = payload.status
+    if _bug_authority_snapshot(bug) != authoritative_before:
+        bug.external_sync_revision += 1
 
     after = _bug_snapshot(bug)
     record_audit_log(
@@ -3830,6 +3851,226 @@ def update_bug_record(
     db.commit()
     db.refresh(bug)
     return bug
+
+
+@router.get("/bugs/external-sync/posture")
+def get_bug_external_sync_posture(
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    _require_admin(current_user)
+    return external_issue_sync_posture(get_settings())
+
+
+@router.get(
+    "/bugs/{bug_id}/external-sync-operations",
+    response_model=BugExternalSyncOperationPage,
+)
+def list_bug_external_sync_operations(
+    bug_id: int,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BugExternalSyncOperationPage:
+    _require_admin(current_user)
+    if db.get(BugRecord, bug_id) is None:
+        raise HTTPException(status_code=404, detail="Bug record not found")
+    statement = (
+        select(BugExternalSyncOperation)
+        .where(BugExternalSyncOperation.bug_record_id == bug_id)
+        .order_by(BugExternalSyncOperation.id.desc())
+    )
+    total = _statement_count(db, statement)
+    operations = list(db.scalars(statement.offset(offset).limit(limit)).all())
+    return BugExternalSyncOperationPage(
+        items=[BugExternalSyncOperationRead(**bug_external_sync_operation_read(item)) for item in operations],
+        total=total,
+        limit=limit,
+        offset=offset,
+        next_offset=_next_offset(total, offset, len(operations)),
+    )
+
+
+@router.post("/bugs/{bug_id}/external-sync/create", response_model=BugExternalSyncResponse)
+def create_bug_external_issue(
+    bug_id: int,
+    payload: BugExternalSyncRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BugExternalSyncResponse:
+    _require_admin(current_user)
+    if not payload.confirm_external_sync:
+        raise HTTPException(status_code=422, detail="confirm_external_sync must be true")
+    return _run_bug_external_sync_action(
+        db,
+        bug_id=bug_id,
+        actor=current_user,
+        request=request,
+        operation="create",
+        execute=lambda: create_external_issue_for_bug(
+            db,
+            bug_id=bug_id,
+            settings=get_settings(),
+            created_by_user_id=current_user.id,
+            adapter_factory=build_issue_provider_adapter,
+        ),
+    )
+
+
+@router.post("/bugs/{bug_id}/external-sync/status", response_model=BugExternalSyncResponse)
+def sync_bug_external_issue_status(
+    bug_id: int,
+    payload: BugExternalSyncRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BugExternalSyncResponse:
+    _require_admin(current_user)
+    if not payload.confirm_external_sync:
+        raise HTTPException(status_code=422, detail="confirm_external_sync must be true")
+    return _run_bug_external_sync_action(
+        db,
+        bug_id=bug_id,
+        actor=current_user,
+        request=request,
+        operation="status",
+        execute=lambda: sync_external_issue_status_for_bug(
+            db,
+            bug_id=bug_id,
+            settings=get_settings(),
+            created_by_user_id=current_user.id,
+            adapter_factory=build_issue_provider_adapter,
+        ),
+    )
+
+
+@router.post("/bugs/{bug_id}/external-sync/comments", response_model=BugExternalSyncResponse)
+def sync_bug_external_issue_comment(
+    bug_id: int,
+    payload: BugExternalCommentSyncRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BugExternalSyncResponse:
+    _require_admin(current_user)
+    if not payload.confirm_external_sync:
+        raise HTTPException(status_code=422, detail="confirm_external_sync must be true")
+    normalized_comment = payload.comment.strip()
+    return _run_bug_external_sync_action(
+        db,
+        bug_id=bug_id,
+        actor=current_user,
+        request=request,
+        operation="comment",
+        audit_context={
+            "comment_sha256": sha256(normalized_comment.encode("utf-8")).hexdigest(),
+            "comment_length": len(normalized_comment),
+        },
+        execute=lambda: sync_external_issue_comment_for_bug(
+            db,
+            bug_id=bug_id,
+            comment=normalized_comment,
+            settings=get_settings(),
+            created_by_user_id=current_user.id,
+            adapter_factory=build_issue_provider_adapter,
+        ),
+    )
+
+
+def _run_bug_external_sync_action(
+    db: Session,
+    *,
+    bug_id: int,
+    actor: User,
+    request: Request,
+    operation: str,
+    execute: Any,
+    audit_context: dict[str, Any] | None = None,
+) -> BugExternalSyncResponse:
+    action = f"admin.bug.external_sync.{operation}"
+    try:
+        result: BugExternalSyncResult = execute()
+    except BugExternalSyncError as exc:
+        db.rollback()
+        if exc.code == "bug_record_not_found":
+            raise HTTPException(status_code=404, detail="Bug record not found") from None
+        record_audit_log(
+            db,
+            actor=actor,
+            action=action,
+            resource_type="bug_record",
+            resource_id=bug_id,
+            event_result="failure",
+            failure_reason=exc.code,
+            request=request,
+            snapshot={
+                "operation": operation,
+                "operation_id": exc.operation_id,
+                "retryable": exc.retryable,
+                "ambiguous": exc.ambiguous,
+                **(audit_context or {}),
+            },
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=_bug_external_sync_error_status(exc),
+            detail={
+                "code": exc.code,
+                "retryable": exc.retryable,
+                "ambiguous": exc.ambiguous,
+                "operation_id": exc.operation_id,
+                "posture": external_issue_sync_posture(get_settings()),
+            },
+        ) from None
+    operation_read = bug_external_sync_operation_read(result.operation)
+    record_audit_log(
+        db,
+        actor=actor,
+        action=action,
+        resource_type="bug_record",
+        resource_id=bug_id,
+        event_result="success",
+        request=request,
+        snapshot={
+            "operation": operation,
+            "operation_id": result.operation.id,
+            "operation_status": result.operation.status,
+            "provider": result.operation.provider,
+            "external_issue_id": result.operation.external_issue_id,
+            "external_state": result.operation.external_state,
+            "recovered": result.recovered,
+            **(audit_context or {}),
+        },
+    )
+    db.commit()
+    db.refresh(result.bug)
+    return BugExternalSyncResponse(
+        bug=result.bug,
+        operation=BugExternalSyncOperationRead(**operation_read),
+        recovered=result.recovered,
+        posture=external_issue_sync_posture(get_settings()),
+    )
+
+
+def _bug_external_sync_error_status(error: BugExternalSyncError) -> int:
+    if error.code in {
+        "external_issue_comment_empty",
+        "external_issue_comment_sensitive",
+        "external_issue_title_sensitive",
+    }:
+        return 422
+    if error.ambiguous or error.code in {
+        "external_issue_already_bound",
+        "external_issue_binding_invalid",
+        "external_issue_not_bound",
+        "external_issue_provider_mismatch",
+        "external_issue_sync_ambiguous",
+        "external_issue_sync_disabled",
+        "external_issue_sync_not_configured",
+    }:
+        return 409
+    return 502
 
 
 def _get_school(db: Session, school_id: int) -> School:
@@ -7443,7 +7684,7 @@ def _user_snapshot(user: User) -> dict[str, str]:
     }
 
 
-def _bug_snapshot(bug: BugRecord) -> dict[str, str | None]:
+def _bug_snapshot(bug: BugRecord) -> dict[str, Any]:
     return {
         "title": bug.title,
         "category": bug.category,
@@ -7453,9 +7694,27 @@ def _bug_snapshot(bug: BugRecord) -> dict[str, str | None]:
         "external_issue_provider": bug.external_issue_provider,
         "external_issue_id": bug.external_issue_id,
         "external_issue_url": bug.external_issue_url,
+        "external_issue_state": bug.external_issue_state,
+        "external_issue_synced_at": bug.external_issue_synced_at.isoformat()
+        if bug.external_issue_synced_at is not None
+        else None,
+        "external_sync_revision": bug.external_sync_revision,
         "evidence": bug.evidence,
         "notes": bug.notes,
     }
+
+
+def _bug_authority_snapshot(bug: BugRecord) -> tuple[str | None, ...]:
+    return (
+        bug.title,
+        bug.category,
+        bug.severity,
+        bug.status,
+        bug.source,
+        bug.external_issue_provider,
+        bug.external_issue_id,
+        bug.external_issue_url,
+    )
 
 
 def _change_snapshot(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:

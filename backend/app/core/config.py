@@ -34,6 +34,15 @@ class Settings(BaseSettings):
     audit_anchor_webhook_token: SecretStr | None = None
     audit_anchor_timeout_seconds: int = Field(default=5, ge=1, le=30)
     audit_anchor_max_attempts: int = Field(default=5, ge=1, le=20)
+    external_issue_sync_enabled: bool = False
+    external_issue_sync_provider: Literal["github"] = "github"
+    external_issue_sync_github_api_url: str = "https://api.github.com"
+    external_issue_sync_github_web_url: str = "https://github.com"
+    external_issue_sync_github_owner: str | None = None
+    external_issue_sync_github_repo: str | None = None
+    external_issue_sync_github_token: SecretStr | None = None
+    external_issue_sync_github_api_version: str = "2026-03-10"
+    external_issue_sync_timeout_seconds: int = Field(default=10, ge=1, le=30)
     content_script_allowed_hosts: str = ""
     cors_origins: str = "http://127.0.0.1:8766,http://localhost:8766"
     admin_bootstrap_token: str | None = None
