@@ -4,9 +4,23 @@ from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
 from app.db.session import get_db
-from app.models import Assignment, ClassMembership, Course, CourseUnit, LearningEvent, PointLedger, Submission, User
+from app.models import (
+    Assignment,
+    AssignmentClassPolicy,
+    ClassMembership,
+    Course,
+    CourseUnit,
+    LearningEvent,
+    PointLedger,
+    Submission,
+    User,
+)
 from app.schemas.course import ProgressSummary
 from app.services.access_control import get_class, require_class_member, require_class_teacher_or_admin
+from app.services.assignment_policies import (
+    assignment_class_effective_status_expression,
+    assignment_class_is_assigned_expression,
+)
 
 
 router = APIRouter()
@@ -51,7 +65,7 @@ def get_user_progress(
     )
     if target_membership is None:
         raise HTTPException(status_code=403, detail="User is outside requested class scope")
-    return _build_progress_summary(db, user_id, class_id)
+    return _build_progress_summary(db, user_id, class_id, student_visible_resources=True)
 
 
 def _build_progress_summary(
@@ -112,7 +126,19 @@ def _apply_student_visible_submission_filters(statement):
         statement.join(Assignment, Assignment.id == Submission.assignment_id)
         .join(CourseUnit, CourseUnit.id == Assignment.unit_id)
         .join(Course, Course.id == CourseUnit.course_id)
-        .where(Course.status == "published", CourseUnit.status == "published", Assignment.status == "active")
+        .outerjoin(
+            AssignmentClassPolicy,
+            and_(
+                AssignmentClassPolicy.assignment_id == Assignment.id,
+                AssignmentClassPolicy.class_id == Submission.class_id,
+            ),
+        )
+        .where(
+            Course.status == "published",
+            CourseUnit.status == "published",
+            assignment_class_is_assigned_expression(),
+            assignment_class_effective_status_expression() == "active",
+        )
     )
 
 
@@ -121,10 +147,23 @@ def _apply_student_visible_event_filters(statement):
         statement.outerjoin(Course, Course.id == LearningEvent.course_id)
         .outerjoin(CourseUnit, CourseUnit.id == LearningEvent.unit_id)
         .outerjoin(Assignment, Assignment.id == LearningEvent.assignment_id)
+        .outerjoin(
+            AssignmentClassPolicy,
+            and_(
+                AssignmentClassPolicy.assignment_id == LearningEvent.assignment_id,
+                AssignmentClassPolicy.class_id == LearningEvent.class_id,
+            ),
+        )
         .where(
             or_(LearningEvent.course_id.is_(None), Course.status == "published"),
             or_(LearningEvent.unit_id.is_(None), CourseUnit.status == "published"),
-            or_(LearningEvent.assignment_id.is_(None), Assignment.status == "active"),
+            or_(
+                LearningEvent.assignment_id.is_(None),
+                and_(
+                    assignment_class_is_assigned_expression(),
+                    assignment_class_effective_status_expression() == "active",
+                ),
+            ),
         )
     )
 
@@ -134,13 +173,21 @@ def _apply_student_visible_point_filters(statement):
         statement.outerjoin(Assignment, Assignment.id == PointLedger.assignment_id)
         .outerjoin(CourseUnit, CourseUnit.id == Assignment.unit_id)
         .outerjoin(Course, Course.id == CourseUnit.course_id)
+        .outerjoin(
+            AssignmentClassPolicy,
+            and_(
+                AssignmentClassPolicy.assignment_id == PointLedger.assignment_id,
+                AssignmentClassPolicy.class_id == PointLedger.class_id,
+            ),
+        )
         .where(
             or_(
                 PointLedger.assignment_id.is_(None),
                 and_(
                     Course.status == "published",
                     CourseUnit.status == "published",
-                    Assignment.status == "active",
+                    assignment_class_is_assigned_expression(),
+                    assignment_class_effective_status_expression() == "active",
                 ),
             )
         )

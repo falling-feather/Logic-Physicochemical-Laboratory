@@ -236,13 +236,30 @@ def require_course_editor_or_admin(
     *,
     detail: str = "Course editor role is required",
 ) -> None:
+    require_course_collaborator_or_admin(
+        db,
+        user,
+        course,
+        {"editor"},
+        detail=detail,
+    )
+
+
+def require_course_collaborator_or_admin(
+    db: Session,
+    user: User,
+    course: Course,
+    roles: set[str],
+    *,
+    detail: str = "Course collaborator role is required",
+) -> None:
     if user.role == "admin" or course.creator_user_id == user.id:
         return
     collaborator = db.scalar(
         select(CourseCollaborator).where(
             CourseCollaborator.course_id == course.id,
             CourseCollaborator.user_id == user.id,
-            CourseCollaborator.role == "editor",
+            CourseCollaborator.role.in_(roles),
             CourseCollaborator.status == "active",
         )
     )

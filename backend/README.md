@@ -2,7 +2,7 @@
 
 本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、脚本资产 allowlist/SRI 静态门禁、脚本资产下载校验证据、发布版本绑定的外部脚本资产镜像、管理端脚本资产供应链清单、内容脚本镜像一致性审计、内容脚本远端漂移扫描、内容脚本扫描 run 台账与远端漂移告警候选摘要、内容脚本远端漂移扫描调度/CLI observe-only 首轮、内容脚本扫描 run 健康/队列摘要、内容脚本远端漂移告警 outbox 人工复核入队与状态流转、内容脚本 CDN host 信任治理首轮、公开 render 脚本 manifest 脱敏、sandbox embed 描述符与沙箱执行契约头、浏览器自动化隔离证明、稳定 `sectionId/sourceId` 内容身份、草稿编辑、提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 敏感预览脱敏与带显式稳定 ID 字段的 semantic 富语义摘要、登录、密码策略、登录失败锁定、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、用户自助密码重置令牌、密码重置 token 留存清理脚本、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、跨班级提交唯一性、学生资源状态可见性、学生侧作业历史/复盘只读入口、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端知识快照运行列表/健康摘要、协作式取消、手动 requeue、调度积压摘要、告警候选摘要与告警 outbox 人工复核台账、状态流转、队列摘要、批量复核、dispatch dry-run、执行计划台账与再校验、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、中文路径/中文 slug 回归、待批改队列、缺陷记录外部 issue 链接、审计元数据、认证事件审计、审计日志链式哈希、审计链完整性校验、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要、审计留存预检、本地审计归档包导出/Manifest 校验和导出/摘要行为审计留痕等能力。
 
-V6.6.52 已冻结前端 API 与内容脚本运行边界：浏览器端统一使用 HttpOnly Cookie、`credentials=include` 和 `cache=no-store`，不发送或持久化 Bearer token；FastAPI 对 `/api` 与 `/api/*` 的成功、错误和预检响应统一返回 `no-store`；内置能量守恒脚本只在后端 allowlist DOM 模板和受控 document contract 下生成可执行 embed，未知模板 fail closed。
+V6.6.53 已在 V6.6.52 前端 API/内容脚本冻结边界上补齐复杂教学权限：班级学生软移除、同校转班与逐项批量导入，四类课程协作者与批量 upsert，班级作业/积分 effective policy，以及 `rule_version=v2` 多维学习分析。浏览器继续只使用 HttpOnly Cookie、`credentials=include` 和 `cache=no-store`，写入不自动重试并以权威读取对账。
 
 ## 本地启动
 
@@ -150,17 +150,22 @@ python -m scripts.backend_stage_gate --require-mysql \
 | PATCH | `/api/classes/{id}/members/{membership_id}` | 维护成员状态；班级教师仅可维护 student membership，管理员可维护 student/teacher membership，均只支持 `active/inactive` 并写入审计 |
 | PATCH | `/api/classes/{id}/members/batch-status` | 批量维护成员状态；班级教师仅可批量维护 student membership，全局 admin 可批量维护 student/teacher membership；整批 all-or-nothing，最终不能让 active teacher 归零 |
 | POST | `/api/classes/{id}/teachers/transfer` | 班级 teacher membership 转让；仅全局 admin 可把源 active teacher 转给同校 active teacher/admin，目标 membership 不存在则创建、inactive 则恢复，可选择停用源 teacher |
+| POST | `/api/classes/{id}/students/{membership_id}/transfer` | 学生同校转班；要求操作者同时具备源班和目标班 active teacher scope，源 membership 软停用、目标创建或恢复，目标状态已存在时幂等返回 `applied=false` |
+| POST | `/api/classes/{id}/students/batch-import` | 按校内用户名批量导入学生；只接纳 active 同校 student membership，逐项返回 `created/restored/unchanged/failed`，允许部分失败并按成员权威状态幂等 |
 | POST | `/api/classes/{id}/join-requests` | 审批流入口：创建班级加入申请；不立即生成成员关系 |
 | GET | `/api/classes/{id}/join-requests` | 班级教师或管理员查看加入申请，可按 `status` 过滤 |
 | PATCH | `/api/classes/{id}/join-requests/{request_id}` | 班级教师或管理员审批加入申请，支持 `approved` / `rejected` |
 | GET/POST | `/api/courses` | 当前用户可见课程 / 教师创建课程；学生仅返回本人 active 班级内 published 课程 |
 | POST | `/api/courses/{id}/classes` | 将课程挂接到班级 |
 | PATCH | `/api/courses/{id}/owner` | 课程 owner 转让；课程创建者或全局 admin 可转给同校 active teacher/admin，目标原 active collaborator 会置为 inactive |
-| GET/POST | `/api/courses/{id}/collaborators` | 课程协作者列表与创建；课程创建者或全局 admin 可创建 active editor，active editor 可读取列表但不能管理协作者 |
-| PATCH | `/api/courses/{id}/collaborators/{collaborator_id}` | 课程协作者状态维护；课程创建者或全局 admin 可将 editor 在 `active/inactive` 间切换 |
-| GET/POST | `/api/courses/{id}/units` | 课程单元列表 / 课程创建者、active editor 或全局 admin 创建单元；学生仅可读取 published 课程下的 published 单元 |
-| GET | `/api/courses/{id}/assignments` | 课程作业列表；学生仅可读取 published 单元下的 active 作业 |
-| POST | `/api/courses/{id}/units/{unit_id}/assignments` | 课程创建者、active editor 或全局 admin 创建作业 |
+| GET/POST | `/api/courses/{id}/collaborators` | 课程协作者列表与创建；课程 owner/admin 管理 `editor/content_editor/assessment_editor/viewer`，任一 active collaborator 可读取列表但不能管理协作者 |
+| POST | `/api/courses/{id}/collaborators/batch` | owner/admin 批量 upsert 协作者；逐项返回 created/updated/unchanged/failed，active 写入要求同校 active teacher/admin，inactive 可回收已失校级范围的旧协作者 |
+| PATCH | `/api/courses/{id}/collaborators/{collaborator_id}` | owner/admin 维护协作者角色与状态；重新激活时再次校验 active 同校 teacher/admin membership |
+| GET/POST | `/api/courses/{id}/units` | 课程单元列表 / owner、active editor/content_editor 或全局 admin 创建单元；学生仅可读取 published 课程下的 published 单元 |
+| GET | `/api/courses/{id}/assignments` | 课程作业列表；可传 `class_id` 读取 effective class policy，学生必须落到唯一 active 班级且只返回本班有效 active 作业 |
+| POST | `/api/courses/{id}/units/{unit_id}/assignments` | owner、active editor/content_editor/assessment_editor 或全局 admin 创建作业，可声明 `audience_mode=all_attached_classes/selected_classes` |
+| PATCH | `/api/assignments/{id}/audience` | 课程 owner/admin 切换作业受众模式；selected 模式只向持久化且 `assigned=true` 的班级开放 |
+| GET/PUT/DELETE | `/api/assignments/{id}/classes/{class_id}/policy` | 读取、全量写入或删除班级作业策略；支持 assigned、状态/截止时间和积分规则覆盖；写入要求课程 editor/assessment_editor（owner/admin 等价）且同时具备本班 teacher scope |
 | GET/POST | `/api/learning-events` | 学习事件查询 / 记录访问、提交、完成等事件；学生读写仅计入 published 课程、published 单元和 active 作业；教师查询按本班 teacher scope 收束 |
 | GET | `/api/assignments/me` | 学生作业中心；按 active 班级 membership 展开班级、课程、单元、作业、本人提交与复盘状态，支持 `class_id/course_id`、`filter=all/active/feedback/history` 和 `limit/offset` 分页，响应返回 `items/total/limit/offset/next_offset` |
 | POST | `/api/assignments/{id}/submissions` | 学生按 `class_id` 提交作业；同一 `assignment/student/class` 只能提交一次，同一作业挂到多个班级时可分别提交；数据库唯一约束冲突统一返回 `409`；提交目标必须位于 published 课程和 published 单元下且作业 active |
@@ -168,13 +173,13 @@ python -m scripts.backend_stage_gate --require-mysql \
 | GET | `/api/assignments/{id}/submissions` | 学生查看本人提交 / 教师查看作业提交 |
 | PATCH | `/api/submissions/{id}/grade` | 教师批改作业，并按作业积分规则目标值与当前 submission 已入账 `assignment_grade` 积分差额生成流水 |
 | GET | `/api/points/ledger` | 查询个人或班级范围积分流水；教师查询按本班 teacher scope 收束 |
-| GET/PATCH | `/api/points/assignments/{id}/rule` | 读取/维护 assignment 级积分规则；学校 teacher/admin 可读，课程创建者、active editor 或全局 admin 可写，默认规则不额外落库 |
+| GET/PATCH | `/api/points/assignments/{id}/rule` | 读取/维护 assignment 全局积分规则；学校 teacher/admin 可读，课程 owner、active editor/assessment_editor 或全局 admin 可写；班级 override 由 assignment class policy 承载 |
 | GET | `/api/progress/me` | 当前用户个人进度摘要；学生个人口径仅计入当前可见资源 |
 | GET | `/api/progress/users/{id}` | 教师查看班级内学生进度摘要；要求本班 teacher scope |
-| GET | `/api/knowledge/me` | 当前用户知识状态规则统计，可按班级/课程/时间窗过滤；学生个人口径仅计入 published 课程、published 单元和 active 作业 |
+| GET | `/api/knowledge/me` | 当前用户知识状态 v2 统计，可按班级/课程/时间窗过滤；返回 overall/course/unit/knowledge_point/assignment 维度、规则版本和可解释 evidence，只计入 effective active assignment-class pairs |
 | POST | `/api/knowledge/me/snapshots` | 当前用户按时间窗重算并写入个人知识快照，重复窗口幂等更新；学生快照使用同一可见性口径 |
 | GET | `/api/knowledge/me/snapshots` | 当前用户分页查看自己的知识快照，可按班级、课程、粒度和时间窗过滤；学生列表不暴露 hidden course 旧快照 |
-| GET | `/api/classes/{id}/knowledge` | 教师查看班级知识状态与作业/正确率聚合 |
+| GET | `/api/classes/{id}/knowledge` | 教师查看班级知识状态与课程/单元/知识点/作业/提交/事件/积分聚合；隐藏、draft、archived、closed 或本班未分配资源不进入当前 v2 分母 |
 | POST | `/api/classes/{id}/knowledge/snapshots` | 教师或管理员按时间窗重算并写入班级知识快照，重复窗口幂等更新 |
 | GET | `/api/classes/{id}/knowledge/snapshots` | 教师或管理员分页查看班级知识快照，可按课程、粒度和时间窗过滤 |
 | GET | `/api/content/pages` | 当前已发布内容页摘要 |
@@ -209,7 +214,7 @@ python -m scripts.backend_stage_gate --require-mysql \
 - 同一作业对学生存在多个 eligible class 时，`GET /api/assignments/{id}/review` 必须携带 `class_id`；遗漏返回 `422`。`due_at` 当前只用于显示，提交权限以 review 的可提交状态和服务端写入校验为准。
 - 同一 `assignment/student/class` 重复提交统一返回 `409`。提交请求出现超时或其他未知网络结果时，客户端必须先重新读取 review / 作业中心核对服务端状态，不得自动重发。
 - 个人 progress、points、knowledge 和 snapshots 可用于规则式补强建议；首轮不伪装 AI 推断，也不自动触发 snapshot rebuild。认证 token、提交正文、成绩、反馈、事件、知识状态和快照不得写入 localStorage/sessionStorage。
-- 统一错误态、离线与缓存硬化已由 V6.6.52 完成；细粒度统计、复杂权限和扩展画像留给 V6.6.53。
+- 统一错误态、离线与缓存硬化已由 V6.6.52 完成；V6.6.53 进一步补齐复杂成员操作、多角色协作者、班级作业策略与 `rule_version=v2` 多维学习分析。正式邀请模型、监护人/联系方式档案和生成式学习建议仍不在当前承诺范围。
 
 ## 前端 schema smoke
 
@@ -291,8 +296,25 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 
 ## 服务层边界
 
-- `app.services.access_control` 负责学校、班级和课程范围判断，普通业务端点不再各自复制 `_require_*` helper；学生课程访问会额外要求课程 `published`，单元读取/事件/提交/复盘会继续要求单元 `published`，事件与提交写入要求作业 `active`；教师端涉及班级挂课、班级成员列表、学生成员状态维护、学习事件查询、积分流水、学生进度、查看提交、批改和待批改队列时必须具备对应班级的 active teacher membership；同校非本班教师不能通过 legacy direct join 自助成为班级 teacher，必须提交 join request 并由本班 active teacher 或 admin 审批；学校/班级深度统计分别要求对应 school teacher scope / class teacher scope，且非授权用户不通过统计端点暴露对象存在性；课程结构写入（单元/作业创建）和 assignment 级积分规则维护要求课程创建者、active editor 协作者或全局 admin，协作者管理和课程 owner 转让仅限课程创建者或全局 admin；全局 admin 保留跨范围治理能力，可维护、批量维护或转让 teacher membership，但不能禁用班级最后一个 active teacher；后续权限矩阵扩展应优先在这里收口。
+### V6.6.53 课程与班级权限矩阵
+
+| 身份 | 课程结构 | 作业/积分 | 协作者治理 | 班级数据/评分 | 班级策略 |
+| --- | --- | --- | --- | --- | --- |
+| 全局 admin | 读写 | 读写 | 读写 | 跨范围治理 | 读写 |
+| course owner | 读写 | 全局规则与受众读写 | 角色/批量/状态/owner 转让 | 不自动获得，仍需 class teacher scope | 同时具备 class teacher scope 时读写 |
+| active `editor` | 单元/作业读写 | 全局规则读写 | 只读列表 | 不自动获得 | 同时具备 class teacher scope 时读写 |
+| active `content_editor` | 单元/作业读写 | 不可维护积分规则 | 只读列表 | 不自动获得 | 不可写 |
+| active `assessment_editor` | 不可创建单元，可创建作业 | 全局规则读写 | 只读列表 | 不自动获得 | 同时具备 class teacher scope 时读写 |
+| active `viewer` | 只读 | 只读 | 只读列表 | 不自动获得 | 仅本班 teacher 可读 effective policy |
+| class active teacher | 可为本班挂接同校课程 | 可批改本班提交，不可改共享规则 | 无课程治理权 | 本班成员/提交/事件/积分/学情 | 还需 owner/editor/assessment_editor 才可写 |
+| student | published + effective assigned 只读 | 本班 active 作业提交/复盘 | 无 | 仅本人 | 无 |
+
+课程角色和班级角色是两条独立授权轴：课程协作者不会因为能编辑课程而获得任意班级成员、提交、评分或学情权限；class teacher 也不会因为能批改本班提交而获得共享课程结构、全局积分规则或协作者治理权限。
+
+- `app.services.access_control` 负责学校、班级和课程范围判断，`app.services.assignment_policies` 负责同一作业在指定班级的 assigned/status/due_at/point rule effective 解析与 SQL 可见性表达式；提交、事件、积分、进度、知识统计与作业中心必须复用该口径，禁止只在前端隐藏。
+- 学生移除采用 class membership `active -> inactive` 软移除，保留提交、积分和审计历史；同校转班要求源/目标双 class teacher scope。批量导入不会仅凭用户名创建跨校关系，只接纳 active 同校 student membership；逐项失败不回显目标账号的学校归属。
 - `app.services.points` 负责 assignment 级积分规则规范化与批改积分计算；默认规则为 `enabled=true`、`points_per_score=1`、`max_points=null`，批改时写入“规则目标积分 - 当前 submission 已入账 assignment_grade 积分”的差额流水，避免重复批改累计膨胀，并支持封顶或禁用规则后的反向校正。
+- 知识统计 `rule_version=v2` 把分母定义为 effective active assignment-class pair；课程/单元必须 published，班级策略必须 assigned，effective status 必须 active。提交数按 `submitted_at`、评分与分数按 `graded_at`、事件按 `occurred_at`、积分按 ledger `created_at` 进入时间窗；`LearningEvent.knowledge_code` 经 trim/lower 后作为知识点稳定编码。`knowledge_stats_json` 继续承载扩展维度，因此 v1 历史快照无需回填即可兼容读取，新重算写入 v2 并按 course/unit/knowledge_point/assignment 稳定排序输出 evidence。
 - `app.services.class_join_requests` 负责加入申请审批状态流转和成员关系补齐。
 - `POST /api/classes/{id}/join` 与 `POST /api/classes/{id}/join-requests` 长期并存：前者是保留给学生自助加入、admin 治理、受控导入/邀请码或旧 UI 的 direct join；teacher 角色的普通教师加入必须走后者，由教师/admin 审批后生成 teacher membership；前端不得把审批流表现为唯一加入路径，也不得让普通教师绕过审批自助成为班级 teacher。
 - 学生端不得依赖公共学校/班级发现：`GET /api/classes?mine=true` 只返回当前用户 active membership 对应班级；无班级学生只能使用教师提供的 `class_id` 走 direct join。学生作业中心必须按 `/api/assignments/me` 返回的 class-expanded 条目保留班级上下文。
@@ -318,7 +340,7 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 - `app.services.knowledge_snapshot_runs` 与 `app.services.knowledge_snapshot_scheduler` 负责知识快照窗口重算、运行记录、进程内调度、数据库租约防重入、长重算自动心跳、健康摘要、调度积压摘要、告警候选摘要、协作式取消和手动 requeue；同一 `run_key` 通过 scheduler lease owner/token/expires/heartbeat 元数据抢占，调度器与 CLI 会把 token-guard heartbeat callback 注入重算循环，开始重算前用 `id/status/owner/token` 再确认租约仍有效，完成或失败释放使用 token guard，失去租约或被 admin 取消的旧 worker 会中止而不覆盖新状态；requeue 会把 failed、cancelled 或过期带租约 running run 重置为 pending，调度器会扫描 pending run 并重新抢占执行；积压摘要会显式区分 scheduler 实际会处理的 dispatchable now 和仅符合租约抢占规则的 claimable by lease rule，告警候选摘要会从 health/queue 派生 severity/action hint，管理端响应不返回 `scheduler_lease_token` 或 `metadata_json`。
 - `app.services.knowledge_snapshot_scheduler_drill` 与 `scripts.knowledge_snapshot_scheduler_drill` 提供知识快照调度器生产演练前后的只读姿态报告；检查 scheduler 配置、run ledger、lease/heartbeat、due/pending 队列、快照输出计数和真实 MySQL 待留证项，不执行 rebuild、不抢租约、不取消、不重排，也不返回 `scheduler_lease_token`、`metadata_json`、异常原文或 secret。`--require-mysql` 用于防止把 SQLite 回归误判为真实 MySQL 演练，`--expect-scheduler-enabled` 用于生产调度器启用门禁。
 - `app.services.admin_alert_outbox` 负责把管理端告警候选写入本地 outbox 人工复核台账；当前承接知识快照告警候选和内容脚本远端漂移告警候选，分别以 `knowledge_snapshot_run_alert`、`content_script_asset_scan_run_alert` 写入 `admin_alert_outbox_entries`，按 source/run/code/action 与 host/hash/asset hash 定位信息生成 dedupe key，重复入队只刷新 `last_seen_at/seen_count/payload_hash`，且不会覆盖已经人工复核为 `planned/queued/suppressed/cancelled` 的状态。outbox payload 只保存脱敏运行摘要，不保存 scheduler lease token、metadata、原始 CDN URL、完整 SRI、远端字节、异常原文、`content_bytes` 或重排原因；普通列表、入队响应和单条复核响应统一使用安全摘要，不返回 dedupe key、完整 payload hash、payload JSON 或复核备注正文，只返回 `payload_hash_prefix`、状态字段和 `review_note_present`；`GET /api/admin/alert-outbox/queue` 只读派生队列摘要、状态 bucket、stale pending review 和 due planned/queued，用 `admin.alert_outbox.queue_report` 记录聚合审计且不返回 payload 或备注正文；`POST /api/admin/alert-outbox/dispatch-dry-run` 只读生成 queued due 执行预检，按 blocker/expired/not due 分类并写入 `admin.alert_outbox.dispatch_dry_run` 聚合审计，不修改 `status/attempt_count/last_error_code/reviewed_*`；`POST/GET /api/admin/alert-outbox/dispatch-plans` 会把显式 ID 的执行预检结果持久化为 `admin_alert_outbox_dispatch_plans` 脱敏 ledger，只保存筛选、policy、计数、有限 ready ID、ready entry payload hash 快照和 blocker 原因计数；`POST /api/admin/alert-outbox/dispatch-plans/{id}/validate` 会基于计划快照重新校验 entry 存在、状态、due/expired、delivery 边界和 payload hash 漂移，并以 `admin.alert_outbox.dispatch_plan.validate` 写入脱敏审计，不返回完整 hash、payload 或备注正文；单条与批量复核分别通过 `PATCH /api/admin/alert-outbox/{id}` 和 `PATCH /api/admin/alert-outbox/reviews` 记录 `reviewed_by_user_id/reviewed_at/review_note`，批量路径必须显式列出 ID 且 all-or-nothing，响应使用不含 payload/备注正文的瘦身条目；`external_delivery=false`、`dispatch_mode=manual_review`，当前不发送邮件/短信/Webhook、不接入 broker、不自动处置 run。
-- `POST /api/assignments/{id}/submissions` 的提交唯一性按 `assignment_id + student_id + class_id` 收口；同一课程作业挂到多个班级时，学生可在不同班级各提交一次，同班级重复提交仍返回 `409`；学生提交只允许 published 课程、published 单元下的 active 作业。`GET /api/classes/{id}/members` 只允许全局 admin 或该班 active teacher membership 读取，默认仅返回 active 成员，响应包含成员关系状态和用户状态但不暴露密码、会话或联系方式；`PATCH /api/classes/{id}/members/{membership_id}` 支持 student membership 的 `active/inactive`，teacher membership 仅限全局 admin 维护；`PATCH /api/classes/{id}/members/batch-status` 支持 all-or-nothing 批量维护，普通班级教师只能批量维护 student membership，全局 admin 可批量维护 teacher membership；`POST /api/classes/{id}/teachers/transfer` 支持 admin 将源 active teacher 转给同校 active teacher/admin，目标 class membership 不存在则创建、inactive 则恢复；单条、批量和转让路径都不能让 active teacher 归零。`GET /api/assignments/{id}/submissions` 对教师默认只返回其任教班级内的提交，指定 `class_id` 时要求本班 teacher scope；`PATCH /api/submissions/{id}/grade` 同样要求本班 teacher scope，并按 assignment 级积分规则写入差额流水。`PATCH /api/courses/{id}/owner` 提供课程 owner 转让首轮，课程创建者或全局 admin 可转给同校 active teacher/admin membership 用户，目标若原本是 active editor 会被置为 `inactive` 以避免 owner/协作者身份重叠。`GET/POST /api/courses/{id}/collaborators` 与 `PATCH /api/courses/{id}/collaborators/{collaborator_id}` 提供课程协作者最小闭环，课程创建者或全局 admin 可把同校 active teacher/admin membership 用户设为 `editor` 或置为 `inactive`，active editor 可创建单元/作业和维护作业积分规则，但不能管理协作者。`GET /api/points/assignments/{id}/rule` 允许学校 teacher/admin 读取，`PATCH /api/points/assignments/{id}/rule` 只允许课程创建者、active editor 或全局 admin 维护；同校非作者/非协作者教师可批改自己班级提交，但不能改写共享作业规则。`GET /api/learning-events`、`GET /api/points/ledger` 和 `GET /api/progress/users/{id}` 对教师也使用同一班级 teacher scope；不传 `class_id` 的事件/积分查询只返回教师任教班级内的数据。
+- `POST /api/assignments/{id}/submissions` 的提交唯一性按 `assignment_id + student_id + class_id` 收口；同一共享作业可在不同班级各提交一次，同班重复提交返回 `409`。提交、学习事件、作业中心、复盘、批改、积分、进度和知识统计都按班级 effective policy 复核：课程/单元须 published，班级须被分配，effective status 须 active；closed/archived 只保留受权历史复盘与教师治理视角。班级成员采用软停用保留历史，学生转班要求源/目标双 teacher scope，批量导入只接纳 active 同校 student membership。课程协作者支持 `editor/content_editor/assessment_editor/viewer` 与 owner/admin 批量 upsert；课程角色不会自动授予班级成员、提交、评分或学情权限。全局积分规则由 owner、editor、assessment_editor 或 admin 维护；班级覆盖规则还要求操作者同时具备目标班级 teacher scope。教师查询学习事件、积分、进度、提交和班级知识统计始终按本班 scope 收束。
 - `GET /api/assignments/me` 是学生侧分页作业聚合入口，按 active membership 与 published 课程/单元展开 `all/active/feedback/history`；响应中的 `can_submit/read_only/submit_block_reason` 用于前端展示与入口状态，实际提交仍由服务端复核。`GET /api/assignments/{id}/review` 是单项复盘入口：只允许 student 访问自己的提交历史，多班级可见时必须显式提供 `class_id`；published 课程/单元内 closed / archived 作业不允许再次提交但仍返回题目、成绩和反馈，`due_at` 当前只作展示；教师和管理员继续使用 submissions 列表与批改接口。
 
 ## 验证
@@ -326,6 +348,15 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 ```bash
 python -m pytest backend
 ```
+
+V6.6.53 基线为 285 项全量 pytest；权限/班级策略/统计专项可运行：
+
+```bash
+python -m pytest backend/tests/test_school_classes.py backend/tests/test_access_control.py backend/tests/test_course_learning_loop.py -q
+node tools/tests/v6653-permission-analytics-contract.cjs
+```
+
+迁移最低门禁需验证 `upgrade head -> downgrade 20260708_0037 -> upgrade head`，最终 `alembic current` 必须为 `20260710_0039`；SQLite 往返只证明迁移结构可执行，真实 MySQL 仍归 V6.6.54+ 部署门禁。
 
 权限范围回归可单独运行：
 
@@ -341,7 +372,7 @@ $env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
 python -m alembic upgrade head
 ```
 
-当前 Alembic head：`20260708_0037`（管理端告警 outbox dispatch plan payload hash 快照；用于执行计划再校验）。
+当前 Alembic head：`20260710_0039`。`0038` 新增 `assignments.audience_mode` 与 `assignment_class_policies`；`0039` 新增 `learning_events.knowledge_code`。旧 assignment 自动使用 `all_attached_classes`，旧知识快照保持 v1 可读，新重算写入 v2。
 
 内容脚本远端漂移 CLI：
 

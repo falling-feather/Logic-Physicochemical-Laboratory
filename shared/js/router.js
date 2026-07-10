@@ -82,9 +82,9 @@ const Router = {
         engineering: 'pages/engineering/bridge-truss.js?v=20260630mainV64',
         license: 'pages/about/about.js?v=20260630mainV64',
         changelog: 'pages/about/about.js?v=20260630mainV64',
-        student: 'pages/student/student.js?v=20260710v6652FrontendHardeningP1',
-        teacher: 'pages/teacher/teacher.js?v=20260710v6652FrontendHardeningP1',
-        admin: 'pages/admin/admin.js?v=20260710v6652FrontendHardeningP1'
+        student: 'pages/student/student.js?v=20260710v6653PermissionMatrixP1',
+        teacher: 'pages/teacher/teacher.js?v=20260710v6653PermissionMatrixP1',
+        admin: 'pages/admin/admin.js?v=20260710v6653PermissionMatrixP1'
     },
     pageReadyChecks: {
         home: () => typeof window.initHome === 'function',

@@ -72,6 +72,20 @@ class ClassTeacherTransfer(BaseModel):
     note: str | None = Field(default=None, max_length=500)
 
 
+class ClassStudentTransfer(BaseModel):
+    target_class_id: int
+    note: str | None = Field(default=None, max_length=500)
+
+
+class ClassStudentBatchImportItem(BaseModel):
+    username: str = Field(min_length=1, max_length=64)
+    client_ref: str | None = Field(default=None, max_length=64)
+
+
+class ClassStudentBatchImport(BaseModel):
+    items: list[ClassStudentBatchImportItem] = Field(min_length=1, max_length=100)
+
+
 class ClassJoinRequestRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -112,3 +126,25 @@ class ClassMemberRead(BaseModel):
 class ClassTeacherTransferRead(BaseModel):
     source_membership: ClassMemberRead
     target_membership: ClassMemberRead
+
+
+class ClassStudentTransferRead(BaseModel):
+    source_membership: ClassMemberRead
+    target_membership: ClassMemberRead
+    applied: bool
+
+
+class ClassStudentBatchImportResult(BaseModel):
+    username: str
+    client_ref: str | None = None
+    outcome: Literal["created", "restored", "unchanged", "failed"]
+    membership: ClassMemberRead | None = None
+    error_code: Literal["duplicate_item", "invalid_username", "student_not_eligible"] | None = None
+
+
+class ClassStudentBatchImportRead(BaseModel):
+    items: list[ClassStudentBatchImportResult]
+    created_count: int
+    restored_count: int
+    unchanged_count: int
+    failed_count: int

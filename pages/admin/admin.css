@@ -119,6 +119,12 @@
     background: rgba(28, 31, 46, 0.96);
 }
 
+.admin-icon-button--confirming {
+    border-color: rgba(226, 178, 80, 0.72);
+    background: rgba(96, 67, 18, 0.62);
+    color: #ffe7a6;
+}
+
 .admin-icon-button:disabled {
     opacity: 0.42;
     cursor: not-allowed;
@@ -456,6 +462,50 @@
     color: #b9d8ef;
     border-color: rgba(91, 141, 206, 0.32);
     background: rgba(91, 141, 206, 0.1);
+}
+
+.admin-status-pill--ready {
+    border-color: rgba(111, 224, 164, 0.4);
+    background: rgba(31, 128, 79, 0.24);
+    color: #bff5d5;
+}
+
+.admin-notice {
+    margin: 12px 0;
+    padding: 10px 12px;
+    border: 1px solid rgba(201, 221, 211, 0.18);
+    border-radius: 8px;
+    background: rgba(11, 21, 25, 0.86);
+    color: #eef8f3;
+    font-size: 0.84rem;
+    font-weight: 800;
+}
+
+.admin-notice[hidden] {
+    display: none !important;
+}
+
+.admin-notice--success {
+    border-color: rgba(111, 224, 164, 0.42);
+    background: rgba(31, 128, 79, 0.25);
+}
+
+.admin-notice--warning {
+    border-color: rgba(226, 178, 80, 0.45);
+    background: rgba(96, 67, 18, 0.42);
+    color: #ffe7a6;
+}
+
+.admin-notice--error {
+    border-color: rgba(232, 133, 108, 0.5);
+    background: rgba(92, 35, 29, 0.44);
+    color: #ffc5b7;
+}
+
+.admin-row-actions {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
 }
 
 .admin-row-detail summary {

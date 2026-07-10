@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, utc_now
@@ -65,6 +65,23 @@ class Assignment(TimestampMixin, Base):
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     max_score: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
+    audience_mode: Mapped[str] = mapped_column(String(32), default="all_attached_classes", nullable=False)
+    point_rule_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
+class AssignmentClassPolicy(TimestampMixin, Base):
+    __tablename__ = "assignment_class_policies"
+    __table_args__ = (
+        UniqueConstraint("assignment_id", "class_id", name="uq_assignment_class_policies_assignment_class"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    assignment_id: Mapped[int] = mapped_column(ForeignKey("assignments.id"), index=True, nullable=False)
+    class_id: Mapped[int] = mapped_column(ForeignKey("class_groups.id"), index=True, nullable=False)
+    assigned: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    status_override: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    due_at_overridden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    due_at_override: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     point_rule_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
@@ -117,6 +134,7 @@ class LearningEvent(TimestampMixin, Base):
     course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True, nullable=True)
     unit_id: Mapped[int | None] = mapped_column(ForeignKey("course_units.id"), index=True, nullable=True)
     assignment_id: Mapped[int | None] = mapped_column(ForeignKey("assignments.id"), index=True, nullable=True)
+    knowledge_code: Mapped[str | None] = mapped_column(String(120), index=True, nullable=True)
     event_type: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
     payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)

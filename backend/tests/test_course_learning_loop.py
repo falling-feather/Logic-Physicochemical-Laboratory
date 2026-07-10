@@ -1,11 +1,18 @@
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import Assignment, ClassKnowledgeSnapshot, KnowledgeSnapshotRun, SchoolMembership, UserKnowledgeSnapshot
+from app.models import (
+    Assignment,
+    ClassKnowledgeSnapshot,
+    KnowledgeSnapshotRun,
+    SchoolMembership,
+    Submission,
+    UserKnowledgeSnapshot,
+)
 from app.models.base import utc_now
 from app.services import knowledge_snapshot_runs
 
@@ -653,7 +660,7 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client, monke
     assert user_snapshot_body["class_id"] == class_id
     assert user_snapshot_body["course_id"] == course_id
     assert user_snapshot_body["granularity"] == "day"
-    assert user_snapshot_body["rule_version"] == "v1"
+    assert user_snapshot_body["rule_version"] == "v2"
     assert user_snapshot_body["assignment_count"] == knowledge_body["assignment_count"]
     assert user_snapshot_body["submitted_assignments"] == knowledge_body["submitted_assignments"]
     assert user_snapshot_body["graded_assignments"] == knowledge_body["graded_assignments"]
@@ -731,7 +738,7 @@ def test_teacher_course_assignment_and_student_learning_event_loop(client, monke
     assert class_snapshot_body["class_id"] == class_id
     assert class_snapshot_body["course_id"] == course_id
     assert class_snapshot_body["granularity"] == "day"
-    assert class_snapshot_body["rule_version"] == "v1"
+    assert class_snapshot_body["rule_version"] == "v2"
     assert class_snapshot_body["students_total"] == class_knowledge_body["students_total"]
     assert class_snapshot_body["students_active"] == class_knowledge_body["students_active"]
     assert class_snapshot_body["expected_submissions"] == class_knowledge_body["expected_submissions"]
@@ -1076,7 +1083,7 @@ def test_assignment_point_rule_controls_grading_points(client):
         json={"enabled": True, "points_per_score": 2, "max_points": 25},
     )
     assert peer_update.status_code == 403
-    assert peer_update.json()["detail"] == "Assignment point rule requires course editor role"
+    assert peer_update.json()["detail"] == "Assignment point rule requires editor or assessment_editor role"
 
     update = client.patch(
         f"/api/points/assignments/{assignment_id}/rule",
@@ -1147,3 +1154,434 @@ def test_assignment_point_rule_controls_grading_points(client):
     progress_after_disable = client.get(f"/api/progress/me?class_id={class_id}", headers=_auth_header(student_token))
     assert progress_after_disable.status_code == 200
     assert progress_after_disable.json()["total_points"] == 0
+
+
+def test_assignment_class_policy_controls_audience_status_events_and_point_override(client):
+    teacher_token = _register_and_login(client, "teacher_class_policy", "teacher")
+    assessment_token = _register_and_login(client, "assessment_class_policy", "teacher")
+    student_one_token = _register_and_login(client, "student_policy_one", "student")
+    student_two_token = _register_and_login(client, "student_policy_two", "student")
+    admin_token = _bootstrap_admin(client, "admin_class_policy_audit")
+    assessment_me = client.get("/api/users/me", headers=_auth_header(assessment_token)).json()
+
+    school = client.post(
+        "/api/schools",
+        headers=_auth_header(teacher_token),
+        json={"name": "Assignment Policy School"},
+    )
+    assert school.status_code == 201
+    school_id = school.json()["id"]
+    class_one = client.post(
+        "/api/classes",
+        headers=_auth_header(teacher_token),
+        json={"school_id": school_id, "name": "Policy Class One"},
+    )
+    class_two = client.post(
+        "/api/classes",
+        headers=_auth_header(teacher_token),
+        json={"school_id": school_id, "name": "Policy Class Two"},
+    )
+    unattached_class = client.post(
+        "/api/classes",
+        headers=_auth_header(teacher_token),
+        json={"school_id": school_id, "name": "Policy Unattached Class"},
+    )
+    assert class_one.status_code == class_two.status_code == unattached_class.status_code == 201
+    class_one_id = class_one.json()["id"]
+    class_two_id = class_two.json()["id"]
+
+    course = client.post(
+        "/api/courses",
+        headers=_auth_header(teacher_token),
+        json={"school_id": school_id, "title": "Class Policy Course", "status": "published"},
+    )
+    assert course.status_code == 201
+    course_id = course.json()["id"]
+    for class_id in (class_one_id, class_two_id):
+        attach = client.post(
+            f"/api/courses/{course_id}/classes",
+            headers=_auth_header(teacher_token),
+            json={"class_id": class_id},
+        )
+        assert attach.status_code == 201
+    unit = client.post(
+        f"/api/courses/{course_id}/units",
+        headers=_auth_header(teacher_token),
+        json={"title": "Policy Unit", "position": 1, "status": "published"},
+    )
+    assert unit.status_code == 201
+    assignment = client.post(
+        f"/api/courses/{course_id}/units/{unit.json()['id']}/assignments",
+        headers=_auth_header(teacher_token),
+        json={"title": "Selected Class Assignment", "max_score": 20, "status": "active"},
+    )
+    assert assignment.status_code == 201
+    assignment_id = assignment.json()["id"]
+
+    with get_session_factory(get_settings().database_url)() as db:
+        db.add(
+            SchoolMembership(
+                school_id=school_id,
+                user_id=assessment_me["id"],
+                role="teacher",
+                status="active",
+            )
+        )
+        db.commit()
+    collaborator = client.post(
+        f"/api/courses/{course_id}/collaborators",
+        headers=_auth_header(teacher_token),
+        json={"user_id": assessment_me["id"], "role": "assessment_editor"},
+    )
+    assert collaborator.status_code == 201
+
+    assessment_audience_forbidden = client.patch(
+        f"/api/assignments/{assignment_id}/audience",
+        headers=_auth_header(assessment_token),
+        json={"audience_mode": "selected_classes"},
+    )
+    assert assessment_audience_forbidden.status_code == 403
+    assessment_policy_forbidden = client.put(
+        f"/api/assignments/{assignment_id}/classes/{class_one_id}/policy",
+        headers=_auth_header(assessment_token),
+        json={"assigned": True},
+    )
+    assert assessment_policy_forbidden.status_code == 403
+    assert assessment_policy_forbidden.json()["detail"] == "Assignment class policy requires class teacher scope"
+    assessment_read_forbidden = client.get(
+        f"/api/assignments/{assignment_id}/classes/{class_one_id}/policy",
+        headers=_auth_header(assessment_token),
+    )
+    assert assessment_read_forbidden.status_code == 403
+
+    unattached_policy = client.put(
+        f"/api/assignments/{assignment_id}/classes/{unattached_class.json()['id']}/policy",
+        headers=_auth_header(teacher_token),
+        json={"assigned": True},
+    )
+    assert unattached_policy.status_code == 403
+
+    other_school = client.post(
+        "/api/schools",
+        headers=_auth_header(teacher_token),
+        json={"name": "Assignment Policy Other School"},
+    )
+    other_class = client.post(
+        "/api/classes",
+        headers=_auth_header(teacher_token),
+        json={"school_id": other_school.json()["id"], "name": "Policy Other School Class"},
+    )
+    cross_school_policy = client.put(
+        f"/api/assignments/{assignment_id}/classes/{other_class.json()['id']}/policy",
+        headers=_auth_header(teacher_token),
+        json={"assigned": True},
+    )
+    assert cross_school_policy.status_code == 422
+
+    global_rule = client.patch(
+        f"/api/points/assignments/{assignment_id}/rule",
+        headers=_auth_header(teacher_token),
+        json={"enabled": True, "points_per_score": 2, "max_points": None},
+    )
+    assert global_rule.status_code == 200
+    class_one_policy_payload = {
+        "assigned": True,
+        "status_override": None,
+        "due_at_overridden": True,
+        "due_at_override": "2026-08-01T12:00:00Z",
+        "point_rule": {"enabled": True, "points_per_score": 3, "max_points": 50},
+    }
+    class_one_policy = client.put(
+        f"/api/assignments/{assignment_id}/classes/{class_one_id}/policy",
+        headers={**_auth_header(teacher_token), "X-Request-ID": "class-one-policy"},
+        json=class_one_policy_payload,
+    )
+    assert class_one_policy.status_code == 200
+    assert class_one_policy.json()["persisted"] is True
+    assert class_one_policy.json()["assigned"] is True
+    assert class_one_policy.json()["point_rule"]["source"] == "class_override"
+    assert class_one_policy.json()["effective_assignment"]["policy_source"] == "class_policy"
+    assert class_one_policy.json()["effective_assignment"]["due_at"].startswith("2026-08-01T12:00:00")
+
+    class_two_policy_payload = {
+        "assigned": False,
+        "status_override": None,
+        "due_at_overridden": False,
+        "point_rule": None,
+    }
+    class_two_policy = client.put(
+        f"/api/assignments/{assignment_id}/classes/{class_two_id}/policy",
+        headers={**_auth_header(teacher_token), "X-Request-ID": "class-two-policy"},
+        json=class_two_policy_payload,
+    )
+    assert class_two_policy.status_code == 200
+    class_two_policy_replay = client.put(
+        f"/api/assignments/{assignment_id}/classes/{class_two_id}/policy",
+        headers={**_auth_header(teacher_token), "X-Request-ID": "class-two-policy-replay"},
+        json=class_two_policy_payload,
+    )
+    assert class_two_policy_replay.status_code == 200
+
+    selected_audience = client.patch(
+        f"/api/assignments/{assignment_id}/audience",
+        headers={**_auth_header(teacher_token), "X-Request-ID": "assignment-selected-audience"},
+        json={"audience_mode": "selected_classes"},
+    )
+    assert selected_audience.status_code == 200
+    assert selected_audience.json()["audience_mode"] == "selected_classes"
+
+    for token, class_id in ((student_one_token, class_one_id), (student_two_token, class_two_id)):
+        joined = client.post(
+            f"/api/classes/{class_id}/join",
+            headers=_auth_header(token),
+            json={"role": "student"},
+        )
+        assert joined.status_code == 201
+
+    class_one_center = client.get(
+        f"/api/assignments/me?class_id={class_one_id}",
+        headers=_auth_header(student_one_token),
+    )
+    assert class_one_center.status_code == 200
+    assert class_one_center.json()["total"] == 1
+    effective_assignment = class_one_center.json()["items"][0]["assignment"]
+    assert effective_assignment["effective_class_id"] == class_one_id
+    assert effective_assignment["policy_source"] == "class_policy"
+    assert effective_assignment["due_at"].startswith("2026-08-01T12:00:00")
+
+    class_two_center = client.get(
+        f"/api/assignments/me?class_id={class_two_id}",
+        headers=_auth_header(student_two_token),
+    )
+    assert class_two_center.status_code == 200
+    assert class_two_center.json()["total"] == 0
+    class_two_course_assignments = client.get(
+        f"/api/courses/{course_id}/assignments",
+        headers=_auth_header(student_two_token),
+    )
+    assert class_two_course_assignments.status_code == 200
+    assert class_two_course_assignments.json() == []
+
+    class_two_submission = client.post(
+        f"/api/assignments/{assignment_id}/submissions",
+        headers=_auth_header(student_two_token),
+        json={"class_id": class_two_id, "content": {"answer": "not assigned"}},
+    )
+    assert class_two_submission.status_code == 403
+    assert class_two_submission.json()["detail"] == "Assignment is not assigned to this class"
+    class_two_event = client.post(
+        "/api/learning-events",
+        headers=_auth_header(student_two_token),
+        json={
+            "class_id": class_two_id,
+            "assignment_id": assignment_id,
+            "event_type": "complete",
+            "payload": {},
+        },
+    )
+    assert class_two_event.status_code == 403
+
+    class_one_event = client.post(
+        "/api/learning-events",
+        headers=_auth_header(student_one_token),
+        json={
+            "class_id": class_one_id,
+            "assignment_id": assignment_id,
+            "knowledge_code": "Energy.Balance",
+            "event_type": "complete",
+            "payload": {},
+        },
+    )
+    assert class_one_event.status_code == 201
+    class_one_submission = client.post(
+        f"/api/assignments/{assignment_id}/submissions",
+        headers=_auth_header(student_one_token),
+        json={"class_id": class_one_id, "content": {"answer": "class override"}},
+    )
+    assert class_one_submission.status_code == 201
+    grade = client.patch(
+        f"/api/submissions/{class_one_submission.json()['id']}/grade",
+        headers=_auth_header(teacher_token),
+        json={"score": 10, "feedback": "class rule"},
+    )
+    assert grade.status_code == 200
+    with get_session_factory(get_settings().database_url)() as db:
+        stored_submission = db.get(Submission, class_one_submission.json()["id"])
+        stored_submission.submitted_at = utc_now() - timedelta(days=10)
+        stored_submission.graded_at = utc_now() - timedelta(hours=1)
+        db.commit()
+    ledger = client.get(
+        f"/api/points/ledger?class_id={class_one_id}",
+        headers=_auth_header(teacher_token),
+    )
+    assert ledger.status_code == 200
+    assert [item["delta"] for item in ledger.json()] == [30]
+
+    window_from = (utc_now() - timedelta(days=2)).isoformat()
+    window_to = (utc_now() + timedelta(days=2)).isoformat()
+    windowed_knowledge = client.get(
+        "/api/knowledge/me",
+        headers=_auth_header(student_one_token),
+        params={
+            "class_id": class_one_id,
+            "course_id": course_id,
+            "from": window_from,
+            "to": window_to,
+        },
+    )
+    assert windowed_knowledge.status_code == 200
+    assert windowed_knowledge.json()["submitted_assignments"] == 0
+    assert windowed_knowledge.json()["graded_assignments"] == 1
+    windowed_assignment_dimension = next(
+        item
+        for item in windowed_knowledge.json()["knowledge_stats"]
+        if item["dimension"] == "assignment"
+    )
+    assert windowed_assignment_dimension["evidence"]["submitted_count"] == 0
+    assert windowed_assignment_dimension["evidence"]["graded_count"] == 1
+    assert windowed_assignment_dimension["evidence"]["score_total"] == 10
+
+    student_knowledge = client.get(
+        f"/api/knowledge/me?class_id={class_one_id}&course_id={course_id}",
+        headers=_auth_header(student_one_token),
+    )
+    assert student_knowledge.status_code == 200
+    student_knowledge_body = student_knowledge.json()
+    assert student_knowledge_body["rule_version"] == "v2"
+    assert student_knowledge_body["statistics_policy"]["knowledge_point_source"] == (
+        "normalized learning_event.knowledge_code"
+    )
+    dimensions = {item["dimension"] for item in student_knowledge_body["knowledge_stats"]}
+    assert {"overall", "course", "unit", "assignment", "knowledge_point"}.issubset(dimensions)
+    knowledge_point = next(
+        item
+        for item in student_knowledge_body["knowledge_stats"]
+        if item["dimension"] == "knowledge_point"
+    )
+    assert knowledge_point["knowledge_code"] == "energy.balance"
+    assert knowledge_point["frequency"] == 1
+    assert knowledge_point["sample_size"] == 1
+    assignment_dimension = next(
+        item
+        for item in student_knowledge_body["knowledge_stats"]
+        if item["dimension"] == "assignment"
+    )
+    assert assignment_dimension["evidence"]["points"] == 30
+    assert assignment_dimension["evidence"]["events"]["complete"] == 1
+
+    class_knowledge = client.get(
+        f"/api/classes/{class_one_id}/knowledge?course_id={course_id}",
+        headers=_auth_header(teacher_token),
+    )
+    assert class_knowledge.status_code == 200
+    assert class_knowledge.json()["assignment_count"] == 1
+    assert class_knowledge.json()["expected_submissions"] == 1
+    assert class_knowledge.json()["total_points"] == 30
+
+    visible_events = client.get(
+        f"/api/learning-events?class_id={class_one_id}",
+        headers=_auth_header(student_one_token),
+    )
+    assert visible_events.status_code == 200
+    assert {item["assignment_id"] for item in visible_events.json()} == {assignment_id}
+
+    closed_policy_payload = {
+        **class_one_policy_payload,
+        "status_override": "closed",
+    }
+    closed_policy = client.put(
+        f"/api/assignments/{assignment_id}/classes/{class_one_id}/policy",
+        headers=_auth_header(teacher_token),
+        json=closed_policy_payload,
+    )
+    assert closed_policy.status_code == 200
+    assert closed_policy.json()["effective_assignment"]["status"] == "closed"
+    active_after_close = client.get(
+        f"/api/assignments/me?class_id={class_one_id}&filter=active",
+        headers=_auth_header(student_one_token),
+    )
+    assert active_after_close.status_code == 200
+    assert active_after_close.json()["total"] == 0
+    history_after_close = client.get(
+        f"/api/assignments/me?class_id={class_one_id}&filter=history",
+        headers=_auth_header(student_one_token),
+    )
+    assert history_after_close.status_code == 200
+    assert history_after_close.json()["total"] == 1
+    assert history_after_close.json()["items"][0]["assignment"]["status"] == "closed"
+    hidden_events = client.get(
+        f"/api/learning-events?class_id={class_one_id}",
+        headers=_auth_header(student_one_token),
+    )
+    assert hidden_events.status_code == 200
+    assert hidden_events.json() == []
+    student_knowledge_after_close = client.get(
+        f"/api/knowledge/me?class_id={class_one_id}&course_id={course_id}",
+        headers=_auth_header(student_one_token),
+    )
+    assert student_knowledge_after_close.status_code == 200
+    assert student_knowledge_after_close.json()["assignment_count"] == 0
+    assert student_knowledge_after_close.json()["submitted_assignments"] == 0
+    assert student_knowledge_after_close.json()["total_events"] == 0
+    assert student_knowledge_after_close.json()["total_points"] == 0
+    class_knowledge_after_close = client.get(
+        f"/api/classes/{class_one_id}/knowledge?course_id={course_id}",
+        headers=_auth_header(teacher_token),
+    )
+    assert class_knowledge_after_close.status_code == 200
+    assert class_knowledge_after_close.json()["assignment_count"] == 0
+    assert class_knowledge_after_close.json()["expected_submissions"] == 0
+    assert class_knowledge_after_close.json()["total_events"] == 0
+    assert class_knowledge_after_close.json()["total_points"] == 0
+
+    deleted = client.delete(
+        f"/api/assignments/{assignment_id}/classes/{class_one_id}/policy",
+        headers={**_auth_header(teacher_token), "X-Request-ID": "class-one-policy-delete"},
+    )
+    assert deleted.status_code == 204
+    inherited_selected = client.get(
+        f"/api/assignments/{assignment_id}/classes/{class_one_id}/policy",
+        headers=_auth_header(teacher_token),
+    )
+    assert inherited_selected.status_code == 200
+    assert inherited_selected.json()["persisted"] is False
+    assert inherited_selected.json()["assigned"] is False
+    selected_after_delete = client.get(
+        f"/api/assignments/me?class_id={class_one_id}",
+        headers=_auth_header(student_one_token),
+    )
+    assert selected_after_delete.status_code == 200
+    assert selected_after_delete.json()["total"] == 0
+
+    global_audience = client.patch(
+        f"/api/assignments/{assignment_id}/audience",
+        headers={**_auth_header(teacher_token), "X-Request-ID": "assignment-global-audience"},
+        json={"audience_mode": "all_attached_classes"},
+    )
+    assert global_audience.status_code == 200
+    compatible_center = client.get(
+        f"/api/assignments/me?class_id={class_one_id}",
+        headers=_auth_header(student_one_token),
+    )
+    assert compatible_center.status_code == 200
+    assert compatible_center.json()["total"] == 1
+    assert compatible_center.json()["items"][0]["assignment"]["policy_source"] == "base"
+
+    policy_audits = client.get(
+        f"/api/admin/audit-logs?action=assignment.class_policy.upsert&resource_id={class_one_policy.json()['id']}",
+        headers=_auth_header(admin_token),
+    )
+    assert policy_audits.status_code == 200
+    assert policy_audits.json()["total"] == 2
+    delete_audit = client.get(
+        f"/api/admin/audit-logs?action=assignment.class_policy.delete&class_id={class_one_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert delete_audit.status_code == 200
+    assert delete_audit.json()["total"] == 1
+    audience_audits = client.get(
+        f"/api/admin/audit-logs?action=assignment.audience.update&resource_id={assignment_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert audience_audits.status_code == 200
+    assert audience_audits.json()["total"] == 2

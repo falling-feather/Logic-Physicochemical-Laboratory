@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    const ADMIN_ASSET_VERSION = '20260710v6652FrontendHardeningP1';
+    const ADMIN_ASSET_VERSION = '20260710v6653PermissionMatrixP1';
     const API_BASE_STORAGE_KEY = 'astra-admin-api-base';
 
     const state = {
@@ -16,6 +16,8 @@
         lifecycleController: null,
         requestGeneration: 0,
         panelGenerations: Object.create(null),
+        writeLock: null,
+        pendingJoinReview: null,
         onOnline: null,
         onOffline: null,
         onAuthRequired: null,
@@ -116,7 +118,8 @@
                 badgeCol('status', '状态'),
                 dateCol('created_at', '申请时间')
             ],
-            details: ['message', 'review_note', 'reviewed_by_user_id', 'reviewed_at']
+            details: ['message', 'review_note', 'reviewed_by_user_id', 'reviewed_at'],
+            actions: 'join-request-review'
         },
         {
             id: 'content-drafts',
@@ -470,6 +473,7 @@
                 </div>
             </header>
             <div class="admin-auth-state" data-admin-auth-state></div>
+            <div class="admin-notice" data-admin-notice hidden role="status" aria-live="polite"></div>
             <div class="admin-dashboard" data-admin-dashboard hidden>
                 <section class="admin-kpi-grid" data-admin-stats></section>
                 <section class="admin-summary-grid" data-admin-summary></section>
@@ -536,7 +540,16 @@
         state.root.addEventListener('click', (event) => {
             const refreshAllButton = event.target.closest('[data-admin-action="refresh"]');
             if (refreshAllButton) {
+                state.writeLock = null;
+                state.pendingJoinReview = null;
+                setNotice('', '');
                 refreshAll();
+                return;
+            }
+
+            const joinReviewButton = event.target.closest('[data-admin-join-review]');
+            if (joinReviewButton) {
+                reviewJoinRequest(joinReviewButton);
                 return;
             }
 
@@ -638,6 +651,7 @@
         } finally {
             if (isCurrentRequest(generation)) {
                 setBusy(false);
+                rerenderJoinRequestsPanel();
                 refreshIcons();
             }
         }
@@ -652,9 +666,11 @@
             const stats = await fetchJson('/api/admin/stats');
             if (!isCurrentRequest(requestGeneration)) return;
             container.innerHTML = renderStats(stats);
+            return true;
         } catch (error) {
             if (AstraApiClient.isCancelled(error) || !isCurrentRequest(requestGeneration)) return;
             container.innerHTML = renderError(error, '统计读取失败');
+            return false;
         }
     }
 
@@ -700,12 +716,14 @@
             state.panelData[panelId] = data;
             body.innerHTML = renderPanelData(config, data);
             if (meta) meta.textContent = `共 ${formatNumber(data.total || 0)} 条`;
+            return true;
         } catch (error) {
             if (AstraApiClient.isCancelled(error)
                 || !isCurrentRequest(requestGeneration)
                 || state.panelGenerations[panelId] !== panelGeneration) return;
             body.innerHTML = renderError(error, '队列读取失败');
             if (meta) meta.textContent = '读取失败';
+            return false;
         } finally {
             refreshIcons();
         }
@@ -742,7 +760,7 @@
                     <strong>${escapeHtml(user.display_name || user.username)}</strong>
                     <span>${escapeHtml(user.username)} · ${escapeHtml(user.role)} · ${escapeHtml(user.status)}</span>
                 </div>
-                <span class="admin-status-pill admin-status-pill--readonly">只读</span>
+                <span class="admin-status-pill admin-status-pill--ready">治理操作已启用</span>
             </div>
         `;
     }
@@ -866,10 +884,22 @@
 
     function renderDetails(config, item) {
         const details = {};
+        const approvePending = state.pendingJoinReview === `${item.id}:approved`;
+        const rejectPending = state.pendingJoinReview === `${item.id}:rejected`;
         config.details.forEach((key) => {
             details[key] = valueAt(item, key);
         });
         return `
+            ${config.actions === 'join-request-review' && item.status === 'pending' ? `
+                <div class="admin-row-actions">
+                    <button type="button" class="admin-icon-button admin-icon-button--compact${approvePending ? ' admin-icon-button--confirming' : ''}" data-admin-join-review="approved" data-join-request-id="${item.id}" ${state.busy || state.writeLock || !state.online ? 'disabled' : ''} aria-label="${approvePending ? '再次点击确认批准加入请求' : '批准加入请求'}">
+                        <i data-lucide="check"></i>
+                    </button>
+                    <button type="button" class="admin-icon-button admin-icon-button--compact${rejectPending ? ' admin-icon-button--confirming' : ''}" data-admin-join-review="rejected" data-join-request-id="${item.id}" ${state.busy || state.writeLock || !state.online ? 'disabled' : ''} aria-label="${rejectPending ? '再次点击确认拒绝加入请求' : '拒绝加入请求'}">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+            ` : ''}
             <details class="admin-row-detail">
                 <summary>查看</summary>
                 <pre>${escapeHtml(JSON.stringify(details, null, 2))}</pre>
@@ -897,6 +927,78 @@
                 </div>
             </div>
         `;
+    }
+
+    async function reviewJoinRequest(button) {
+        if (state.busy || state.writeLock) return;
+        if (!state.online) {
+            setNotice('warning', '当前离线，审批写入已停用');
+            return;
+        }
+        const joinRequestId = Number(button.dataset.joinRequestId);
+        const nextStatus = button.dataset.adminJoinReview;
+        if (!joinRequestId || !['approved', 'rejected'].includes(nextStatus)) return;
+        const actionLabel = nextStatus === 'approved' ? '批准' : '拒绝';
+        const confirmationKey = `${joinRequestId}:${nextStatus}`;
+        if (state.pendingJoinReview !== confirmationKey) {
+            state.pendingJoinReview = confirmationKey;
+            setNotice('warning', `再次点击同一按钮以确认${actionLabel}加入请求 #${joinRequestId}；未发送任何写入`);
+            rerenderJoinRequestsPanel();
+            refreshIcons();
+            return;
+        }
+        state.pendingJoinReview = null;
+        setBusy(true);
+        try {
+            await AstraApiClient.request(`/api/admin/class-join-requests/${joinRequestId}`, {
+                baseUrl: state.apiBase,
+                method: 'PATCH',
+                body: { status: nextStatus, note: 'reviewed from admin governance UI' },
+                signal: state.lifecycleController && state.lifecycleController.signal
+            });
+            const [panelReconciled, statsReconciled] = await Promise.all([
+                refreshPanel('join-requests'),
+                refreshStats()
+            ]);
+            if (!panelReconciled || !statsReconciled) {
+                state.writeLock = { action: 'join-request-review', resourceId: joinRequestId };
+                setNotice('warning', '审批已由服务器确认，但列表或统计刷新失败；系统不会重复发送，请点击顶部刷新完成核对');
+            } else {
+                setNotice('success', nextStatus === 'approved' ? '加入请求已批准并完成权威列表核对' : '加入请求已拒绝并完成权威列表核对');
+            }
+        } catch (error) {
+            if (error && (error.confirmed || AstraApiClient.isAmbiguousMutation(error))) {
+                state.writeLock = {
+                    action: 'join-request-review',
+                    resourceId: joinRequestId,
+                    requestId: String(error.requestId || '')
+                };
+                await Promise.all([refreshPanel('join-requests'), refreshStats()]);
+                setNotice('warning', '审批结果尚未确认，系统未自动重试；写入已锁定，请点击顶部刷新并核对请求状态');
+            } else {
+                setNotice('error', errorMessage(error));
+            }
+        } finally {
+            setBusy(false);
+            rerenderJoinRequestsPanel();
+            refreshIcons();
+        }
+    }
+
+    function rerenderJoinRequestsPanel() {
+        const data = state.panelData['join-requests'];
+        const config = PANEL_CONFIGS.find((item) => item.id === 'join-requests');
+        const body = state.root && state.root.querySelector('[data-admin-panel-body="join-requests"]');
+        if (data && config && body) body.innerHTML = renderPanelData(config, data);
+    }
+
+    function setNotice(type, message) {
+        const notice = state.root && state.root.querySelector('[data-admin-notice]');
+        if (!notice) return;
+        const text = String(message || '').trim();
+        notice.hidden = !text;
+        notice.className = `admin-notice${type ? ` admin-notice--${type}` : ''}`;
+        notice.textContent = text;
     }
 
     async function fetchJson(path, params) {

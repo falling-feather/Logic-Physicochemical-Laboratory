@@ -8,10 +8,14 @@ KnowledgeSnapshotGranularity = Literal["day", "week", "custom"]
 
 class KnowledgeStatRead(BaseModel):
     rule_code: str
+    dimension: Literal["overall", "course", "unit", "knowledge_point", "assignment"] = "overall"
     user_id: int | None = None
     class_id: int | None = None
     course_id: int | None = None
     unit_id: int | None = None
+    assignment_id: int | None = None
+    knowledge_code: str | None = None
+    label: str | None = None
     frequency: int
     sample_size: int
     percent: float
@@ -19,6 +23,8 @@ class KnowledgeStatRead(BaseModel):
 
 
 class UserKnowledgeRead(BaseModel):
+    rule_version: str = "v2"
+    statistics_policy: dict[str, Any] = Field(default_factory=dict)
     user_id: int
     class_id: int | None = None
     course_id: int | None = None
@@ -50,6 +56,7 @@ class UserKnowledgeSnapshotRead(BaseModel):
     period_start: datetime
     period_end: datetime
     rule_version: str
+    statistics_policy: dict[str, Any] = Field(default_factory=dict)
     created_by_user_id: int
     calculated_at: datetime
     created_at: datetime
@@ -79,6 +86,8 @@ class UserKnowledgeSnapshotPage(BaseModel):
 
 
 class ClassKnowledgeRead(BaseModel):
+    rule_version: str = "v2"
+    statistics_policy: dict[str, Any] = Field(default_factory=dict)
     class_id: int
     school_id: int
     course_id: int | None = None
@@ -110,6 +119,7 @@ class ClassKnowledgeSnapshotRead(BaseModel):
     period_start: datetime
     period_end: datetime
     rule_version: str
+    statistics_policy: dict[str, Any] = Field(default_factory=dict)
     created_by_user_id: int
     calculated_at: datetime
     created_at: datetime

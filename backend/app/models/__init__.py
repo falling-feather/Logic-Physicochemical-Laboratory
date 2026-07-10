@@ -10,6 +10,7 @@ from app.models.content import (
 )
 from app.models.course import (
     Assignment,
+    AssignmentClassPolicy,
     ClassKnowledgeSnapshot,
     Course,
     CourseClass,
@@ -26,6 +27,7 @@ from app.models.user import AuthSession, LoginAttempt, PasswordResetToken, User
 
 __all__ = [
     "Assignment",
+    "AssignmentClassPolicy",
     "AdminAlertOutboxDispatchPlan",
     "AdminAlertOutboxEntry",
     "AuditLog",

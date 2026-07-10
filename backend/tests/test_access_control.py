@@ -403,7 +403,7 @@ def test_course_editor_collaborator_scope_controls_course_structure(client):
 
     peer_collaborators = client.get(f"/api/courses/{scope['course_id']}/collaborators", headers=peer_headers)
     assert peer_collaborators.status_code == 403
-    assert peer_collaborators.json()["detail"] == "Course collaborators require course editor role"
+    assert peer_collaborators.json()["detail"] == "Course collaborators require active collaborator role"
 
     peer_manage_collaborators = client.post(
         f"/api/courses/{scope['course_id']}/collaborators",
@@ -419,7 +419,7 @@ def test_course_editor_collaborator_scope_controls_course_structure(client):
         json={"title": "Peer Edited Unit", "position": 2, "status": "published"},
     )
     assert peer_unit_create.status_code == 403
-    assert peer_unit_create.json()["detail"] == "Course unit creation requires course editor role"
+    assert peer_unit_create.json()["detail"] == "Course unit creation requires editor or content_editor role"
 
     peer_assignment_create = client.post(
         f"/api/courses/{scope['course_id']}/units/{scope['unit_id']}/assignments",
@@ -427,7 +427,7 @@ def test_course_editor_collaborator_scope_controls_course_structure(client):
         json={"title": "Peer Edited Assignment", "max_score": 20},
     )
     assert peer_assignment_create.status_code == 403
-    assert peer_assignment_create.json()["detail"] == "Assignment creation requires course editor role"
+    assert peer_assignment_create.json()["detail"] == "Assignment creation requires active editing collaborator role"
 
     student_collaborator = client.post(
         f"/api/courses/{scope['course_id']}/collaborators",
@@ -547,7 +547,7 @@ def test_course_editor_collaborator_scope_controls_course_structure(client):
         json={"title": "Peer Inactive Unit", "position": 3, "status": "published"},
     )
     assert peer_inactive_unit.status_code == 403
-    assert peer_inactive_unit.json()["detail"] == "Course unit creation requires course editor role"
+    assert peer_inactive_unit.json()["detail"] == "Course unit creation requires editor or content_editor role"
 
     peer_inactive_assignment = client.post(
         f"/api/courses/{scope['course_id']}/units/{scope['unit_id']}/assignments",
@@ -555,7 +555,7 @@ def test_course_editor_collaborator_scope_controls_course_structure(client):
         json={"title": "Peer Inactive Assignment", "max_score": 20},
     )
     assert peer_inactive_assignment.status_code == 403
-    assert peer_inactive_assignment.json()["detail"] == "Assignment creation requires course editor role"
+    assert peer_inactive_assignment.json()["detail"] == "Assignment creation requires active editing collaborator role"
 
     peer_inactive_rule_update = client.patch(
         f"/api/points/assignments/{scope['assignment_id']}/rule",
@@ -563,14 +563,14 @@ def test_course_editor_collaborator_scope_controls_course_structure(client):
         json={"enabled": True, "points_per_score": 4, "max_points": 40},
     )
     assert peer_inactive_rule_update.status_code == 403
-    assert peer_inactive_rule_update.json()["detail"] == "Assignment point rule requires course editor role"
+    assert peer_inactive_rule_update.json()["detail"] == "Assignment point rule requires editor or assessment_editor role"
 
     peer_inactive_collaborators = client.get(
         f"/api/courses/{scope['course_id']}/collaborators",
         headers=peer_headers,
     )
     assert peer_inactive_collaborators.status_code == 403
-    assert peer_inactive_collaborators.json()["detail"] == "Course collaborators require course editor role"
+    assert peer_inactive_collaborators.json()["detail"] == "Course collaborators require active collaborator role"
 
     owner_active_collaborators = client.get(
         f"/api/courses/{scope['course_id']}/collaborators",
@@ -662,6 +662,228 @@ def test_course_editor_collaborator_scope_controls_course_structure(client):
     assert admin_created_collaborator.status_code == 201
     assert admin_created_collaborator.json()["role"] == "editor"
     assert admin_created_collaborator.json()["status"] == "active"
+
+
+def test_course_collaborator_roles_and_batch_updates_enforce_capability_and_class_boundaries(client):
+    scope = _create_learning_scope(client)
+    content_editor = _register_and_login(client, "scope_content_editor", "teacher")
+    assessment_editor = _register_and_login(client, "scope_assessment_editor", "teacher")
+    viewer = _register_and_login(client, "scope_course_viewer", "teacher")
+    inactive_target = _register_and_login(client, "scope_inactive_batch_target", "teacher")
+    outside_teacher = _register_and_login(client, "scope_batch_outside", "teacher")
+    for target in (content_editor, assessment_editor, viewer, inactive_target):
+        _grant_school_teacher_membership(target["id"], scope["school_id"])
+    admin_token = _bootstrap_admin(client, "admin_course_collaborator_batch")
+
+    owner_headers = _auth_header(scope["teacher"]["token"])
+    content_headers = _auth_header(content_editor["token"])
+    assessment_headers = _auth_header(assessment_editor["token"])
+    viewer_headers = _auth_header(viewer["token"])
+    batch_payload = {
+        "items": [
+            {
+                "user_id": content_editor["id"],
+                "role": "content_editor",
+                "status": "active",
+                "client_ref": "content",
+            },
+            {
+                "user_id": assessment_editor["id"],
+                "role": "assessment_editor",
+                "status": "active",
+                "client_ref": "assessment",
+            },
+            {"user_id": viewer["id"], "role": "viewer", "status": "active", "client_ref": "viewer"},
+            {
+                "user_id": outside_teacher["id"],
+                "role": "editor",
+                "status": "active",
+                "client_ref": "outside",
+            },
+            {
+                "user_id": scope["teacher"]["id"],
+                "role": "editor",
+                "status": "active",
+                "client_ref": "owner",
+            },
+            {
+                "user_id": inactive_target["id"],
+                "role": "viewer",
+                "status": "inactive",
+                "client_ref": "missing-inactive",
+            },
+            {
+                "user_id": content_editor["id"],
+                "role": "editor",
+                "status": "active",
+                "client_ref": "duplicate-content",
+            },
+        ]
+    }
+    created = client.post(
+        f"/api/courses/{scope['course_id']}/collaborators/batch",
+        headers={**owner_headers, "X-Request-ID": "course-collaborator-batch-create"},
+        json=batch_payload,
+    )
+    assert created.status_code == 200
+    created_body = created.json()
+    assert (
+        created_body["created_count"],
+        created_body["updated_count"],
+        created_body["unchanged_count"],
+        created_body["failed_count"],
+    ) == (3, 0, 0, 4)
+    assert [item["error_code"] for item in created_body["items"][3:]] == [
+        "collaborator_not_eligible",
+        "course_owner_conflict",
+        "collaborator_not_found",
+        "duplicate_item",
+    ]
+    collaborator_ids = {
+        item["user_id"]: item["collaborator"]["id"]
+        for item in created_body["items"][:3]
+    }
+
+    replay = client.post(
+        f"/api/courses/{scope['course_id']}/collaborators/batch",
+        headers={**owner_headers, "X-Request-ID": "course-collaborator-batch-replay"},
+        json=batch_payload,
+    )
+    assert replay.status_code == 200
+    assert replay.json()["created_count"] == 0
+    assert replay.json()["updated_count"] == 0
+    assert replay.json()["unchanged_count"] == 3
+    assert replay.json()["failed_count"] == 4
+
+    content_list = client.get(
+        f"/api/courses/{scope['course_id']}/collaborators",
+        headers=content_headers,
+    )
+    assert content_list.status_code == 200
+    assert {item["role"] for item in content_list.json()} == {
+        "content_editor",
+        "assessment_editor",
+        "viewer",
+    }
+    content_unit = client.post(
+        f"/api/courses/{scope['course_id']}/units",
+        headers=content_headers,
+        json={"title": "Content Role Unit", "position": 2, "status": "published"},
+    )
+    assert content_unit.status_code == 201
+    content_assignment = client.post(
+        f"/api/courses/{scope['course_id']}/units/{content_unit.json()['id']}/assignments",
+        headers=content_headers,
+        json={"title": "Content Role Assignment", "max_score": 30},
+    )
+    assert content_assignment.status_code == 201
+    content_rule_forbidden = client.patch(
+        f"/api/points/assignments/{content_assignment.json()['id']}/rule",
+        headers=content_headers,
+        json={"enabled": True, "points_per_score": 2, "max_points": 20},
+    )
+    assert content_rule_forbidden.status_code == 403
+    assert content_rule_forbidden.json()["detail"] == (
+        "Assignment point rule requires editor or assessment_editor role"
+    )
+
+    assessment_unit_forbidden = client.post(
+        f"/api/courses/{scope['course_id']}/units",
+        headers=assessment_headers,
+        json={"title": "Assessment Forbidden Unit", "position": 3, "status": "published"},
+    )
+    assert assessment_unit_forbidden.status_code == 403
+    assessment_assignment = client.post(
+        f"/api/courses/{scope['course_id']}/units/{scope['unit_id']}/assignments",
+        headers=assessment_headers,
+        json={"title": "Assessment Role Assignment", "max_score": 40},
+    )
+    assert assessment_assignment.status_code == 201
+    assessment_rule = client.patch(
+        f"/api/points/assignments/{assessment_assignment.json()['id']}/rule",
+        headers=assessment_headers,
+        json={"enabled": True, "points_per_score": 2, "max_points": 40},
+    )
+    assert assessment_rule.status_code == 200
+
+    viewer_list = client.get(
+        f"/api/courses/{scope['course_id']}/collaborators",
+        headers=viewer_headers,
+    )
+    assert viewer_list.status_code == 200
+    viewer_unit_forbidden = client.post(
+        f"/api/courses/{scope['course_id']}/units",
+        headers=viewer_headers,
+        json={"title": "Viewer Forbidden Unit", "position": 3, "status": "published"},
+    )
+    assert viewer_unit_forbidden.status_code == 403
+    viewer_assignment_forbidden = client.post(
+        f"/api/courses/{scope['course_id']}/units/{scope['unit_id']}/assignments",
+        headers=viewer_headers,
+        json={"title": "Viewer Forbidden Assignment", "max_score": 20},
+    )
+    assert viewer_assignment_forbidden.status_code == 403
+    viewer_members_forbidden = client.get(
+        f"/api/classes/{scope['class_id']}/members",
+        headers=viewer_headers,
+    )
+    assert viewer_members_forbidden.status_code == 403
+    viewer_attach_forbidden = client.post(
+        f"/api/courses/{scope['course_id']}/classes",
+        headers=viewer_headers,
+        json={"class_id": scope["class_id"]},
+    )
+    assert viewer_attach_forbidden.status_code == 403
+
+    collaborator_manage_forbidden = client.post(
+        f"/api/courses/{scope['course_id']}/collaborators/batch",
+        headers=assessment_headers,
+        json={"items": [{"user_id": inactive_target["id"], "role": "viewer", "status": "active"}]},
+    )
+    assert collaborator_manage_forbidden.status_code == 403
+
+    viewer_promoted = client.patch(
+        f"/api/courses/{scope['course_id']}/collaborators/{collaborator_ids[viewer['id']]}",
+        headers=owner_headers,
+        json={"role": "content_editor"},
+    )
+    assert viewer_promoted.status_code == 200
+    assert viewer_promoted.json()["role"] == "content_editor"
+    assert viewer_promoted.json()["status"] == "active"
+    promoted_unit = client.post(
+        f"/api/courses/{scope['course_id']}/units",
+        headers=viewer_headers,
+        json={"title": "Promoted Viewer Unit", "position": 3, "status": "published"},
+    )
+    assert promoted_unit.status_code == 201
+
+    _set_school_teacher_membership_status(viewer["id"], scope["school_id"], "inactive")
+    deactivated_after_scope_loss = client.patch(
+        f"/api/courses/{scope['course_id']}/collaborators/{collaborator_ids[viewer['id']]}",
+        headers=owner_headers,
+        json={"status": "inactive"},
+    )
+    assert deactivated_after_scope_loss.status_code == 200
+    blocked_reactivation = client.patch(
+        f"/api/courses/{scope['course_id']}/collaborators/{collaborator_ids[viewer['id']]}",
+        headers=owner_headers,
+        json={"status": "active"},
+    )
+    assert blocked_reactivation.status_code == 422
+
+    batch_audit = client.get(
+        f"/api/admin/audit-logs?action=course.collaborator.batch_update&resource_id={scope['course_id']}",
+        headers=_auth_header(admin_token),
+    )
+    assert batch_audit.status_code == 200
+    assert batch_audit.json()["total"] == 2
+    create_audit = next(
+        item for item in batch_audit.json()["items"]
+        if item["request_id"] == "course-collaborator-batch-create"
+    )
+    assert create_audit["snapshot_json"]["created_count"] == 3
+    assert create_audit["snapshot_json"]["failed_count"] == 4
+    assert create_audit["snapshot_json"]["partial_failure"] is True
 
 
 def test_course_owner_transfer_rebinds_course_management_scope(client):
@@ -784,7 +1006,7 @@ def test_course_owner_transfer_rebinds_course_management_scope(client):
         json={"title": "Old Owner Unit", "position": 2, "status": "published"},
     )
     assert old_owner_unit.status_code == 403
-    assert old_owner_unit.json()["detail"] == "Course unit creation requires course editor role"
+    assert old_owner_unit.json()["detail"] == "Course unit creation requires editor or content_editor role"
 
     old_owner_collaborator_create = client.post(
         f"/api/courses/{scope['course_id']}/collaborators",
@@ -800,7 +1022,7 @@ def test_course_owner_transfer_rebinds_course_management_scope(client):
         json={"enabled": True, "points_per_score": 2, "max_points": 20},
     )
     assert old_owner_rule_update.status_code == 403
-    assert old_owner_rule_update.json()["detail"] == "Assignment point rule requires course editor role"
+    assert old_owner_rule_update.json()["detail"] == "Assignment point rule requires editor or assessment_editor role"
 
     successor_unit = client.post(
         f"/api/courses/{scope['course_id']}/units",
@@ -1251,11 +1473,11 @@ def test_student_personal_progress_and_knowledge_exclude_hidden_resource_history
         headers=teacher_headers,
     )
     assert teacher_progress.status_code == 200
-    assert teacher_progress.json()["submitted_assignments"] == 2
-    assert teacher_progress.json()["graded_assignments"] == 2
-    assert teacher_progress.json()["learning_events"] == 4
-    assert teacher_progress.json()["completed_events"] == 2
-    assert teacher_progress.json()["total_points"] == 16
+    assert teacher_progress.json()["submitted_assignments"] == 1
+    assert teacher_progress.json()["graded_assignments"] == 1
+    assert teacher_progress.json()["learning_events"] == 2
+    assert teacher_progress.json()["completed_events"] == 1
+    assert teacher_progress.json()["total_points"] == 7
 
     knowledge = client.get(f"/api/knowledge/me?class_id={class_id}&course_id={course_id}", headers=student_headers)
     assert knowledge.status_code == 200

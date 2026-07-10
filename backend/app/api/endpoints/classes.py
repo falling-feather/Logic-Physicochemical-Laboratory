@@ -15,6 +15,11 @@ from app.schemas.school import (
     ClassJoinRequestReview,
     ClassMemberRead,
     ClassMemberStatusUpdate,
+    ClassStudentBatchImport,
+    ClassStudentBatchImportRead,
+    ClassStudentBatchImportResult,
+    ClassStudentTransfer,
+    ClassStudentTransferRead,
     ClassTeacherTransfer,
     ClassTeacherTransferRead,
     ClassRead,
@@ -37,6 +42,7 @@ from app.services.access_control import (
     visible_school_ids,
 )
 from app.services.text import require_trimmed_text
+from app.services.users import normalize_username
 
 
 router = APIRouter()
@@ -374,6 +380,327 @@ def transfer_class_teacher(
     return ClassTeacherTransferRead(
         source_membership=_class_member_read(source_membership, source_user),
         target_membership=_class_member_read(target_membership, target_user),
+    )
+
+
+@router.post(
+    "/{class_id}/students/{membership_id}/transfer",
+    response_model=ClassStudentTransferRead,
+)
+def transfer_class_student(
+    class_id: int,
+    membership_id: int,
+    payload: ClassStudentTransfer,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClassStudentTransferRead:
+    source_class = db.get(ClassGroup, class_id)
+    if source_class is None:
+        raise HTTPException(status_code=404, detail="Source class not found")
+    require_class_teacher_or_admin(
+        db,
+        current_user,
+        source_class,
+        detail="Student transfer requires source class teacher scope",
+    )
+    if payload.target_class_id == source_class.id:
+        raise HTTPException(status_code=409, detail="Target class must differ from source class")
+
+    target_class = db.get(ClassGroup, payload.target_class_id)
+    if target_class is None:
+        raise HTTPException(status_code=404, detail="Target class not found")
+    if target_class.school_id != source_class.school_id:
+        raise HTTPException(status_code=422, detail="Student transfer requires classes in the same school")
+    require_class_teacher_or_admin(
+        db,
+        current_user,
+        target_class,
+        detail="Student transfer requires target class teacher scope",
+    )
+
+    source_row = db.execute(
+        select(ClassMembership, User)
+        .join(User, User.id == ClassMembership.user_id)
+        .where(
+            ClassMembership.id == membership_id,
+            ClassMembership.class_id == source_class.id,
+            ClassMembership.role == "student",
+        )
+    ).one_or_none()
+    if source_row is None:
+        raise HTTPException(status_code=404, detail="Source student membership not found")
+    source_membership, student = source_row
+    school_membership = db.scalar(
+        select(SchoolMembership).where(
+            SchoolMembership.school_id == source_class.school_id,
+            SchoolMembership.user_id == student.id,
+            SchoolMembership.role == "student",
+            SchoolMembership.status == "active",
+        )
+    )
+    if student.status != "active" or student.role != "student" or school_membership is None:
+        raise HTTPException(status_code=409, detail="Student must have an active same-school membership")
+
+    target_membership = db.scalar(
+        select(ClassMembership).where(
+            ClassMembership.class_id == target_class.id,
+            ClassMembership.user_id == student.id,
+            ClassMembership.role == "student",
+        )
+    )
+    if source_membership.status != "active":
+        if target_membership is not None and target_membership.status == "active":
+            return ClassStudentTransferRead(
+                source_membership=_class_member_read(source_membership, student),
+                target_membership=_class_member_read(target_membership, student),
+                applied=False,
+            )
+        raise HTTPException(status_code=409, detail="Source student membership is not active")
+
+    target_before = None
+    target_created = False
+    if target_membership is None:
+        target_membership = ClassMembership(
+            class_id=target_class.id,
+            user_id=student.id,
+            role="student",
+            status="active",
+        )
+        db.add(target_membership)
+        db.flush()
+        target_created = True
+    else:
+        target_before = {
+            "id": target_membership.id,
+            "class_id": target_membership.class_id,
+            "status": target_membership.status,
+        }
+        target_membership.status = "active"
+
+    source_before = {
+        "id": source_membership.id,
+        "class_id": source_membership.class_id,
+        "status": source_membership.status,
+    }
+    source_membership.status = "inactive"
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="class.student.transfer",
+        resource_type="class_membership",
+        resource_id=source_membership.id,
+        school_id=source_class.school_id,
+        class_id=source_class.id,
+        event_result="success",
+        request=request,
+        snapshot={
+            "before": {
+                "source": source_before,
+                "target": target_before,
+            },
+            "after": {
+                "source": {
+                    "id": source_membership.id,
+                    "class_id": source_membership.class_id,
+                    "status": source_membership.status,
+                },
+                "target": {
+                    "id": target_membership.id,
+                    "class_id": target_membership.class_id,
+                    "status": target_membership.status,
+                    "created": target_created,
+                },
+                "user_id": student.id,
+                "has_note": trim_optional(payload.note) is not None,
+            },
+        },
+    )
+    db.commit()
+    db.refresh(source_membership)
+    db.refresh(target_membership)
+    return ClassStudentTransferRead(
+        source_membership=_class_member_read(source_membership, student),
+        target_membership=_class_member_read(target_membership, student),
+        applied=True,
+    )
+
+
+@router.post(
+    "/{class_id}/students/batch-import",
+    response_model=ClassStudentBatchImportRead,
+)
+def batch_import_class_students(
+    class_id: int,
+    payload: ClassStudentBatchImport,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClassStudentBatchImportRead:
+    class_group = db.get(ClassGroup, class_id)
+    if class_group is None:
+        raise HTTPException(status_code=404, detail="Class not found")
+    require_class_teacher_or_admin(
+        db,
+        current_user,
+        class_group,
+        detail="Student batch import requires class teacher scope",
+    )
+
+    normalized_names = [normalize_username(item.username) for item in payload.items]
+    lookup_names = {name for name in normalized_names if name}
+    users = list(db.scalars(select(User).where(User.normalized_username.in_(lookup_names))).all()) if lookup_names else []
+    user_by_name = {user.normalized_username: user for user in users}
+    user_ids = [user.id for user in users]
+    eligible_user_ids = set(
+        db.scalars(
+            select(SchoolMembership.user_id).where(
+                SchoolMembership.school_id == class_group.school_id,
+                SchoolMembership.user_id.in_(user_ids),
+                SchoolMembership.role == "student",
+                SchoolMembership.status == "active",
+            )
+        ).all()
+    ) if user_ids else set()
+    existing_memberships = list(
+        db.scalars(
+            select(ClassMembership).where(
+                ClassMembership.class_id == class_group.id,
+                ClassMembership.user_id.in_(user_ids),
+                ClassMembership.role == "student",
+            )
+        ).all()
+    ) if user_ids else []
+    membership_by_user_id = {membership.user_id: membership for membership in existing_memberships}
+
+    seen_names: set[str] = set()
+    prepared_results: list[dict] = []
+    audit_items: list[dict] = []
+    counts = {"created": 0, "restored": 0, "unchanged": 0, "failed": 0}
+    for index, (item, normalized_name) in enumerate(zip(payload.items, normalized_names, strict=True)):
+        client_ref = trim_optional(item.client_ref)
+        user = user_by_name.get(normalized_name)
+        error_code = None
+        if not normalized_name:
+            error_code = "invalid_username"
+        elif normalized_name in seen_names:
+            error_code = "duplicate_item"
+        elif (
+            user is None
+            or user.status != "active"
+            or user.role != "student"
+            or user.id not in eligible_user_ids
+        ):
+            error_code = "student_not_eligible"
+        seen_names.add(normalized_name)
+
+        if error_code is not None:
+            counts["failed"] += 1
+            prepared_results.append(
+                {
+                    "username": normalized_name,
+                    "client_ref": client_ref,
+                    "outcome": "failed",
+                    "membership": None,
+                    "error_code": error_code,
+                }
+            )
+            audit_items.append(
+                {
+                    "index": index,
+                    "client_ref": client_ref,
+                    "outcome": "failed",
+                    "error_code": error_code,
+                }
+            )
+            continue
+
+        membership = membership_by_user_id.get(user.id)
+        previous_status = membership.status if membership is not None else None
+        if membership is None:
+            membership = ClassMembership(
+                class_id=class_group.id,
+                user_id=user.id,
+                role="student",
+                status="active",
+            )
+            db.add(membership)
+            membership_by_user_id[user.id] = membership
+            outcome = "created"
+        elif membership.status == "inactive":
+            membership.status = "active"
+            outcome = "restored"
+        else:
+            outcome = "unchanged"
+        counts[outcome] += 1
+        prepared_results.append(
+            {
+                "username": normalized_name,
+                "client_ref": client_ref,
+                "outcome": outcome,
+                "membership": membership,
+                "user": user,
+                "error_code": None,
+            }
+        )
+        audit_items.append(
+            {
+                "index": index,
+                "client_ref": client_ref,
+                "user_id": user.id,
+                "outcome": outcome,
+                "previous_status": previous_status,
+            }
+        )
+
+    db.flush()
+    for audit_item, prepared in zip(audit_items, prepared_results, strict=True):
+        membership = prepared.get("membership")
+        if membership is not None:
+            audit_item["membership_id"] = membership.id
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="class.student.batch_import",
+        resource_type="class_membership_batch",
+        resource_id=class_group.id,
+        school_id=class_group.school_id,
+        class_id=class_group.id,
+        event_result="success",
+        request=request,
+        snapshot={
+            "items": audit_items,
+            "item_count": len(payload.items),
+            "created_count": counts["created"],
+            "restored_count": counts["restored"],
+            "unchanged_count": counts["unchanged"],
+            "failed_count": counts["failed"],
+            "partial_failure": 0 < counts["failed"] < len(payload.items),
+        },
+    )
+    db.commit()
+
+    results: list[ClassStudentBatchImportResult] = []
+    for prepared in prepared_results:
+        membership = prepared.get("membership")
+        user = prepared.get("user")
+        if membership is not None:
+            db.refresh(membership)
+        results.append(
+            ClassStudentBatchImportResult(
+                username=prepared["username"],
+                client_ref=prepared["client_ref"],
+                outcome=prepared["outcome"],
+                membership=_class_member_read(membership, user) if membership is not None else None,
+                error_code=prepared["error_code"],
+            )
+        )
+    return ClassStudentBatchImportRead(
+        items=results,
+        created_count=counts["created"],
+        restored_count=counts["restored"],
+        unchanged_count=counts["unchanged"],
+        failed_count=counts["failed"],
     )
 
 

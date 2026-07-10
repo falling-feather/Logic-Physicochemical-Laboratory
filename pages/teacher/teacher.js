@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    const TEACHER_ASSET_VERSION = '20260710v6652FrontendHardeningP1';
+    const TEACHER_ASSET_VERSION = '20260710v6653PermissionMatrixP1';
     const API_BASE_STORAGE_KEY = 'astra-teacher-api-base';
 
     const state = {
@@ -39,12 +39,16 @@
             units: [],
             assignments: [],
             members: [],
+            activeStudents: [],
             submissions: [],
             assignmentSubmissions: [],
             collaborators: [],
+            collaboratorBatchResult: null,
             pointRule: null,
+            assignmentClassPolicy: null,
             knowledge: null,
-            progress: null
+            progress: null,
+            studentBatchImportResult: null
         },
         errors: {},
         flash: null
@@ -182,6 +186,11 @@
             const collaboratorButton = target.closest('[data-teacher-collaborator-status]');
             if (collaboratorButton) {
                 updateCollaboratorStatus(collaboratorButton);
+                return;
+            }
+            const policyResetButton = target.closest('[data-teacher-class-policy-reset]');
+            if (policyResetButton) {
+                resetAssignmentClassPolicy();
                 return;
             }
         });
@@ -324,6 +333,7 @@
     async function loadClassScope(generation = state.requestGeneration) {
         if (!isCurrentRequest(generation)) return;
         state.data.members = [];
+        state.data.activeStudents = [];
         state.data.submissions = [];
         state.data.knowledge = null;
         state.data.progress = null;
@@ -346,8 +356,9 @@
         const knowledgeParams = {
             course_id: state.selected.courseId || undefined
         };
-        const [membersResult, submissionsResult, knowledgeResult] = await Promise.allSettled([
+        const [membersResult, activeStudentsResult, submissionsResult, knowledgeResult] = await Promise.allSettled([
             fetchJson(`/api/classes/${classId}/members`, { params: memberParams }),
+            fetchJson(`/api/classes/${classId}/members`, { params: { role: 'student', status: 'active' } }),
             fetchJson('/api/admin/submissions/pending', { params: submissionParams }),
             fetchJson(`/api/classes/${classId}/knowledge`, { params: knowledgeParams })
         ]);
@@ -361,6 +372,9 @@
             }
         } else {
             state.errors.members = membersResult.reason;
+        }
+        if (activeStudentsResult.status === 'fulfilled') {
+            state.data.activeStudents = activeStudentsResult.value;
         }
         if (submissionsResult.status === 'fulfilled') {
             state.data.submissions = Array.isArray(submissionsResult.value.items) ? submissionsResult.value.items : [];
@@ -443,13 +457,19 @@
         if (!isCurrentRequest(generation)) return;
         state.data.assignmentSubmissions = [];
         state.data.pointRule = null;
+        state.data.assignmentClassPolicy = null;
         state.errors.assignmentSubmissions = null;
         state.errors.pointRule = null;
+        state.errors.assignmentClassPolicy = null;
         if (!state.selected.assignmentId) return;
         const params = state.selected.classId ? { class_id: state.selected.classId } : {};
-        const [submissionsResult, ruleResult] = await Promise.allSettled([
+        const policyRequest = state.selected.classId
+            ? fetchJson(`/api/assignments/${state.selected.assignmentId}/classes/${state.selected.classId}/policy`)
+            : Promise.resolve(null);
+        const [submissionsResult, ruleResult, policyResult] = await Promise.allSettled([
             fetchJson(`/api/assignments/${state.selected.assignmentId}/submissions`, { params }),
-            fetchJson(`/api/points/assignments/${state.selected.assignmentId}/rule`)
+            fetchJson(`/api/points/assignments/${state.selected.assignmentId}/rule`),
+            policyRequest
         ]);
         if (!isCurrentRequest(generation)) return;
         if (submissionsResult.status === 'fulfilled') {
@@ -461,6 +481,11 @@
             state.data.pointRule = ruleResult.value;
         } else {
             state.errors.pointRule = ruleResult.reason;
+        }
+        if (policyResult.status === 'fulfilled') {
+            state.data.assignmentClassPolicy = policyResult.value;
+        } else {
+            state.errors.assignmentClassPolicy = policyResult.reason;
         }
     }
 
@@ -579,11 +604,13 @@
         const courseDisabled = !state.selected.courseId || isCourseReadOnly();
         const classDisabled = !state.selected.classId || isClassReadOnly();
         const unitOptions = state.data.units.map((unit) => `<option value="${unit.id}"${String(unit.id) === state.selected.unitId ? ' selected' : ''}>${escapeHtml(unit.title)}</option>`).join('');
+        const unitDisabled = !canCreateCourseUnit();
+        const assignmentDisabled = !unitOptions || !canCreateCourseAssignment();
         return `
             <article class="teacher-panel teacher-panel--wide">
                 <header class="teacher-panel__header">
                     <h2><i data-lucide="layout-dashboard"></i>主路径</h2>
-                    <span class="teacher-status-pill teacher-status-pill--readonly">V6.6.52</span>
+                    <span class="teacher-status-pill teacher-status-pill--readonly">V6.6.53</span>
                 </header>
                 <div class="teacher-form-grid">
                     <form class="teacher-form" data-teacher-form="school">
@@ -614,21 +641,22 @@
                     </form>
                     <form class="teacher-form" data-teacher-form="unit">
                         <h3>单元</h3>
-                        <label><span>标题</span><input name="title" maxlength="180" required ${courseDisabled ? 'disabled' : ''}></label>
-                        <label><span>序号</span><input name="position" type="number" min="1" value="${state.data.units.length + 1}" required ${courseDisabled ? 'disabled' : ''}></label>
-                        <label><span>状态</span><select name="status" ${courseDisabled ? 'disabled' : ''}>${optionSet(['draft', 'published', 'archived'], 'published')}</select></label>
-                        <label><span>内容 slug</span><input name="content_slug" maxlength="180" ${courseDisabled ? 'disabled' : ''}></label>
-                        <button type="submit" ${courseDisabled ? 'disabled' : ''}><i data-lucide="layers-3"></i><span>创建</span></button>
+                        <label><span>标题</span><input name="title" maxlength="180" required ${unitDisabled ? 'disabled' : ''}></label>
+                        <label><span>序号</span><input name="position" type="number" min="1" value="${state.data.units.length + 1}" required ${unitDisabled ? 'disabled' : ''}></label>
+                        <label><span>状态</span><select name="status" ${unitDisabled ? 'disabled' : ''}>${optionSet(['draft', 'published', 'archived'], 'published')}</select></label>
+                        <label><span>内容 slug</span><input name="content_slug" maxlength="180" ${unitDisabled ? 'disabled' : ''}></label>
+                        <button type="submit" ${unitDisabled ? 'disabled' : ''}><i data-lucide="layers-3"></i><span>创建</span></button>
                     </form>
                     <form class="teacher-form" data-teacher-form="assignment">
                         <h3>作业</h3>
-                        <label><span>单元</span><select name="unit_id" ${!unitOptions || courseDisabled ? 'disabled' : ''}>${unitOptions || '<option value="">--</option>'}</select></label>
-                        <label><span>标题</span><input name="title" maxlength="180" required ${!unitOptions || courseDisabled ? 'disabled' : ''}></label>
-                        <label><span>满分</span><input name="max_score" type="number" min="0" max="1000" value="100" ${!unitOptions || courseDisabled ? 'disabled' : ''}></label>
-                        <label><span>状态</span><select name="status" ${!unitOptions || courseDisabled ? 'disabled' : ''}>${optionSet(['active', 'closed', 'archived'], 'active')}</select></label>
-                        <label><span>截止</span><input name="due_at" type="datetime-local" ${!unitOptions || courseDisabled ? 'disabled' : ''}></label>
-                        <label class="teacher-form__full"><span>说明</span><textarea name="description" maxlength="4000" rows="2" ${!unitOptions || courseDisabled ? 'disabled' : ''}></textarea></label>
-                        <button type="submit" ${!unitOptions || courseDisabled ? 'disabled' : ''}><i data-lucide="clipboard-plus"></i><span>创建</span></button>
+                        <label><span>单元</span><select name="unit_id" ${assignmentDisabled ? 'disabled' : ''}>${unitOptions || '<option value="">--</option>'}</select></label>
+                        <label><span>标题</span><input name="title" maxlength="180" required ${assignmentDisabled ? 'disabled' : ''}></label>
+                        <label><span>满分</span><input name="max_score" type="number" min="0" max="1000" value="100" ${assignmentDisabled ? 'disabled' : ''}></label>
+                        <label><span>状态</span><select name="status" ${assignmentDisabled ? 'disabled' : ''}>${optionSet(['active', 'closed', 'archived'], 'active')}</select></label>
+                        <label><span>受众</span><select name="audience_mode" ${assignmentDisabled ? 'disabled' : ''}>${optionSet(['all_attached_classes', 'selected_classes'], 'all_attached_classes')}</select></label>
+                        <label><span>截止</span><input name="due_at" type="datetime-local" ${assignmentDisabled ? 'disabled' : ''}></label>
+                        <label class="teacher-form__full"><span>说明</span><textarea name="description" maxlength="4000" rows="2" ${assignmentDisabled ? 'disabled' : ''}></textarea></label>
+                        <button type="submit" ${assignmentDisabled ? 'disabled' : ''}><i data-lucide="clipboard-plus"></i><span>创建</span></button>
                     </form>
                 </div>
             </article>
@@ -638,6 +666,12 @@
     function renderCoursePanel() {
         const selectedAssignment = findById(state.data.assignments, state.selected.assignmentId);
         const rule = state.data.pointRule || {};
+        const policy = state.data.assignmentClassPolicy || {};
+        const policyRule = policy.point_rule || {};
+        const policyDisabled = !selectedAssignment || !state.selected.classId || !canManageAssignmentClassPolicy();
+        const audienceDisabled = !selectedAssignment || !canManageCourseOwnership();
+        const pointRuleDisabled = !selectedAssignment || !canManageAssignmentPointRule();
+        const collaboratorDisabled = !canManageCourseOwnership();
         return `
             <article class="teacher-panel teacher-panel--wide">
                 <header class="teacher-panel__header">
@@ -661,32 +695,84 @@
                     </div>
                 </div>
                 <div class="teacher-subpanel-grid">
+                    <form class="teacher-form teacher-form--inline" data-teacher-form="assignment-audience">
+                        <h3>作业受众</h3>
+                        <label><span>作业</span><select name="assignment_id" ${selectedAssignment ? '' : 'disabled'}>${assignmentOptions()}</select></label>
+                        <label><span>模式</span><select name="audience_mode" ${audienceDisabled ? 'disabled' : ''}>${optionSet(['all_attached_classes', 'selected_classes'], selectedAssignment && selectedAssignment.audience_mode || 'all_attached_classes')}</select></label>
+                        <button type="submit" ${audienceDisabled ? 'disabled' : ''}><i data-lucide="users-round"></i><span>保存受众</span></button>
+                    </form>
+                    <form class="teacher-form teacher-form--inline teacher-form--class-policy" data-teacher-form="assignment-class-policy">
+                        <h3>当前班级策略</h3>
+                        <label class="teacher-checkbox"><input name="assigned" type="checkbox" ${policy.assigned ? 'checked' : ''} ${policyDisabled ? 'disabled' : ''}><span>分配给本班</span></label>
+                        <label><span>状态覆盖</span><select name="status_override" ${policyDisabled ? 'disabled' : ''}>${optionSet(['active', 'closed', 'archived'], policy.status_override || '', [['', '继承全局']])}</select></label>
+                        <label class="teacher-checkbox"><input name="due_at_overridden" type="checkbox" ${policy.due_at_overridden ? 'checked' : ''} ${policyDisabled ? 'disabled' : ''}><span>覆盖截止</span></label>
+                        <label><span>班级截止</span><input name="due_at_override" type="datetime-local" value="${escapeAttr(datetimeLocalValue(policy.due_at_override))}" ${policyDisabled ? 'disabled' : ''}></label>
+                        <label class="teacher-checkbox"><input name="override_points" type="checkbox" ${policyRule.source === 'class_override' ? 'checked' : ''} ${policyDisabled ? 'disabled' : ''}><span>覆盖积分</span></label>
+                        <label><span>每分积分</span><input name="points_per_score" type="number" min="0" max="1000" value="${escapeAttr(policyRule.points_per_score ?? 1)}" ${policyDisabled ? 'disabled' : ''}></label>
+                        <label><span>积分上限</span><input name="max_points" type="number" min="0" max="100000" value="${escapeAttr(policyRule.max_points ?? '')}" ${policyDisabled ? 'disabled' : ''}></label>
+                        <label class="teacher-checkbox"><input name="points_enabled" type="checkbox" ${policyRule.enabled !== false ? 'checked' : ''} ${policyDisabled ? 'disabled' : ''}><span>积分启用</span></label>
+                        <button type="submit" ${policyDisabled ? 'disabled' : ''}><i data-lucide="save"></i><span>保存班级策略</span></button>
+                        <button type="button" class="teacher-icon-button" data-teacher-class-policy-reset ${policyDisabled || !policy.persisted ? 'disabled' : ''}><i data-lucide="rotate-ccw"></i><span>恢复继承</span></button>
+                    </form>
                     <form class="teacher-form teacher-form--inline" data-teacher-form="point-rule">
                         <h3>积分规则</h3>
                         <label><span>作业</span><select name="assignment_id" ${selectedAssignment ? '' : 'disabled'}>${assignmentOptions()}</select></label>
                         <label class="teacher-checkbox"><input name="enabled" type="checkbox" ${rule.enabled !== false ? 'checked' : ''} ${selectedAssignment ? '' : 'disabled'}><span>启用</span></label>
                         <label><span>每分积分</span><input name="points_per_score" type="number" min="0" max="1000" value="${escapeAttr(rule.points_per_score ?? 1)}" ${selectedAssignment ? '' : 'disabled'}></label>
                         <label><span>上限</span><input name="max_points" type="number" min="0" max="100000" value="${escapeAttr(rule.max_points ?? '')}" ${selectedAssignment ? '' : 'disabled'}></label>
-                        <button type="submit" ${selectedAssignment && !isCourseReadOnly() ? '' : 'disabled'}><i data-lucide="save"></i><span>保存</span></button>
+                        <button type="submit" ${pointRuleDisabled ? 'disabled' : ''}><i data-lucide="save"></i><span>保存</span></button>
                     </form>
                     <form class="teacher-form teacher-form--inline" data-teacher-form="collaborator">
                         <h3>协作者</h3>
-                        <label><span>用户 ID</span><input name="user_id" type="number" min="1" ${state.selected.courseId && !isCourseReadOnly() ? '' : 'disabled'}></label>
-                        <button type="submit" ${state.selected.courseId && !isCourseReadOnly() ? '' : 'disabled'}><i data-lucide="user-plus"></i><span>添加</span></button>
+                        <label><span>用户 ID</span><input name="user_id" type="number" min="1" ${collaboratorDisabled ? 'disabled' : ''}></label>
+                        <label><span>角色</span><select name="role" ${collaboratorDisabled ? 'disabled' : ''}>${optionSet(['editor', 'content_editor', 'assessment_editor', 'viewer'], 'editor')}</select></label>
+                        <button type="submit" ${collaboratorDisabled ? 'disabled' : ''}><i data-lucide="user-plus"></i><span>添加</span></button>
+                    </form>
+                    <form class="teacher-form teacher-form--inline" data-teacher-form="collaborator-batch">
+                        <h3>批量协作者</h3>
+                        <label class="teacher-form__full"><span>每行：用户ID,角色,状态</span><textarea name="items" maxlength="12000" rows="4" placeholder="12,content_editor,active" ${collaboratorDisabled ? 'disabled' : ''}></textarea></label>
+                        <button type="submit" ${collaboratorDisabled ? 'disabled' : ''}><i data-lucide="list-plus"></i><span>逐项处理</span></button>
                     </form>
                 </div>
                 ${renderCollaborators()}
+                ${renderCollaboratorBatchResult()}
+                ${state.errors.assignmentClassPolicy ? renderError(state.errors.assignmentClassPolicy, '当前班级未挂接课程或无策略读取权限') : ''}
             </article>
         `;
     }
 
     function renderMembersPanel() {
+        const classDisabled = !state.selected.classId || isClassReadOnly();
+        const targetClasses = state.data.classes.filter((item) => (
+            item.status === 'active' && String(item.id) !== String(state.selected.classId)
+        ));
+        const activeStudentOptions = state.data.activeStudents.map((member) => (
+            `<option value="${member.id}">${escapeHtml(member.display_name || member.username)} · ${escapeHtml(member.username)}</option>`
+        )).join('');
+        const targetClassOptions = targetClasses.map((item) => (
+            `<option value="${item.id}">${escapeHtml(item.name)}</option>`
+        )).join('');
         return `
             <article class="teacher-panel">
                 <header class="teacher-panel__header">
                     <h2><i data-lucide="users-round"></i>成员</h2>
                     ${statusBadge(selectedClass() && selectedClass().status)}
                 </header>
+                <div class="teacher-member-operations">
+                    <form class="teacher-form teacher-form--member-operation" data-teacher-form="student-batch-import">
+                        <h3>批量导入学生</h3>
+                        <label class="teacher-form__full"><span>校内学生用户名（换行、逗号或空格分隔）</span><textarea name="usernames" maxlength="6500" rows="3" required ${classDisabled ? 'disabled' : ''}></textarea></label>
+                        <button type="submit" ${classDisabled ? 'disabled' : ''}><i data-lucide="user-round-plus"></i><span>逐项导入</span></button>
+                    </form>
+                    <form class="teacher-form teacher-form--member-operation" data-teacher-form="student-transfer">
+                        <h3>同校转班</h3>
+                        <label><span>学生</span><select name="membership_id" required ${classDisabled || !activeStudentOptions ? 'disabled' : ''}>${activeStudentOptions || '<option value="">暂无在班学生</option>'}</select></label>
+                        <label><span>目标班级</span><select name="target_class_id" required ${classDisabled || !targetClassOptions ? 'disabled' : ''}>${targetClassOptions || '<option value="">暂无可转班级</option>'}</select></label>
+                        <label class="teacher-form__full"><span>备注（只记录是否填写，不写入敏感正文）</span><input name="note" maxlength="500" ${classDisabled ? 'disabled' : ''}></label>
+                        <button type="submit" ${classDisabled || !activeStudentOptions || !targetClassOptions ? 'disabled' : ''}><i data-lucide="arrow-right-left"></i><span>确认转班</span></button>
+                    </form>
+                </div>
+                ${renderStudentBatchImportResult()}
                 <div class="teacher-filter-row">
                     <label><span>角色</span><select data-teacher-filter="memberRole">${optionSet(['student', 'teacher'], state.filters.memberRole, [['', '全部']])}</select></label>
                     <label><span>状态</span><select data-teacher-filter="memberStatus">${optionSet(['active', 'inactive'], state.filters.memberStatus)}</select></label>
@@ -712,7 +798,7 @@
                                 <td>${statusBadge(member.status)}</td>
                                 <td>
                                     ${member.role === 'student' ? `
-                                        <button type="button" class="teacher-icon-button teacher-icon-button--compact" data-teacher-member-status="${member.status === 'active' ? 'inactive' : 'active'}" data-membership-id="${member.id}" ${isClassReadOnly() ? 'disabled' : ''} aria-label="切换学生状态">
+                                        <button type="button" class="teacher-icon-button teacher-icon-button--compact" data-teacher-member-status="${member.status === 'active' ? 'inactive' : 'active'}" data-membership-id="${member.id}" ${isClassReadOnly() ? 'disabled' : ''} aria-label="${member.status === 'active' ? '移出班级并保留历史' : '恢复班级成员'}" title="${member.status === 'active' ? '软移除：保留提交、积分和审计历史' : '恢复班级成员'}">
                                             <i data-lucide="${member.status === 'active' ? 'user-minus' : 'user-check'}"></i>
                                         </button>
                                     ` : '<span class="teacher-muted">--</span>'}
@@ -721,6 +807,25 @@
                         `).join('')}
                     </tbody>
                 </table>
+            </div>
+        `;
+    }
+
+    function renderStudentBatchImportResult() {
+        const result = state.data.studentBatchImportResult;
+        if (!result || !Array.isArray(result.items)) return '';
+        return `
+            <div class="teacher-member-import-result" role="status">
+                <strong>导入结果：新增 ${formatNumber(result.created_count)} · 恢复 ${formatNumber(result.restored_count)} · 已存在 ${formatNumber(result.unchanged_count)} · 失败 ${formatNumber(result.failed_count)}</strong>
+                <ul>
+                    ${result.items.map((item) => `
+                        <li>
+                            <span>${escapeHtml(item.username || '(空用户名)')}</span>
+                            ${statusBadge(item.outcome)}
+                            ${item.error_code ? `<code>${escapeHtml(item.error_code)}</code>` : ''}
+                        </li>
+                    `).join('')}
+                </ul>
             </div>
         `;
     }
@@ -814,10 +919,8 @@
 
     function renderReservedPanel() {
         const items = [
-            ['移除/转班', '后续'],
-            ['批量导入', '后续'],
-            ['多角色协作者', '后续'],
-            ['班级专属作业', '后续']
+            ['外部告警投递适配器', 'V6.6.54'],
+            ['任务队列执行治理', 'V6.6.55']
         ];
         return `
             <article class="teacher-panel teacher-panel--reserved">
@@ -848,8 +951,13 @@
             if (formType === 'attach') await attachCourseToClass();
             if (formType === 'unit') await createUnit(form);
             if (formType === 'assignment') await createAssignment(form);
+            if (formType === 'assignment-audience') await updateAssignmentAudience(form);
+            if (formType === 'assignment-class-policy') await updateAssignmentClassPolicy(form);
             if (formType === 'point-rule') await updatePointRule(form);
             if (formType === 'collaborator') await createCollaborator(form);
+            if (formType === 'collaborator-batch') await batchUpdateCollaborators(form);
+            if (formType === 'student-batch-import') await batchImportStudents(form);
+            if (formType === 'student-transfer') await transferStudent(form);
             if (formType === 'grade') await gradeSubmission(form);
             form.reset();
         } catch (error) {
@@ -938,12 +1046,69 @@
                 description: optional(data.description),
                 due_at: data.due_at ? new Date(data.due_at).toISOString() : null,
                 max_score: Number(data.max_score) || 0,
-                status: data.status || 'active'
+                status: data.status || 'active',
+                audience_mode: data.audience_mode || 'all_attached_classes'
             }
         });
         setFlash('success', '作业已创建');
         state.selected.assignmentId = String(assignment.id);
         await reconcileConfirmedWrite('创建作业', () => loadCourseScope());
+    }
+
+    async function updateAssignmentAudience(form) {
+        const data = formData(form);
+        const assignmentId = data.assignment_id || state.selected.assignmentId;
+        await fetchJson(`/api/assignments/${assignmentId}/audience`, {
+            method: 'PATCH',
+            body: { audience_mode: data.audience_mode || 'all_attached_classes' }
+        });
+        state.selected.assignmentId = String(assignmentId);
+        setFlash('success', '作业受众模式已更新');
+        await reconcileConfirmedWrite('更新作业受众', () => loadCourseScope());
+    }
+
+    async function updateAssignmentClassPolicy(form) {
+        const data = formData(form);
+        const pointRule = data.override_points ? {
+            enabled: Boolean(data.points_enabled),
+            points_per_score: Number(data.points_per_score) || 0,
+            max_points: data.max_points ? Number(data.max_points) : null
+        } : null;
+        await fetchJson(
+            `/api/assignments/${state.selected.assignmentId}/classes/${state.selected.classId}/policy`,
+            {
+                method: 'PUT',
+                body: {
+                    assigned: Boolean(data.assigned),
+                    status_override: optional(data.status_override),
+                    due_at_overridden: Boolean(data.due_at_overridden),
+                    due_at_override: data.due_at_overridden && data.due_at_override
+                        ? new Date(data.due_at_override).toISOString()
+                        : null,
+                    point_rule: pointRule
+                }
+            }
+        );
+        setFlash('success', '当前班级作业与积分覆盖策略已保存');
+        await reconcileConfirmedWrite('保存班级作业策略', () => Promise.all([loadAssignmentScope(), loadClassScope()]));
+    }
+
+    async function resetAssignmentClassPolicy() {
+        if (!canStartMutation('assignment-class-policy-reset')) return;
+        try {
+            setBusy(true);
+            await fetchJson(
+                `/api/assignments/${state.selected.assignmentId}/classes/${state.selected.classId}/policy`,
+                { method: 'DELETE' }
+            );
+            setFlash('success', '当前班级已恢复继承全局作业策略');
+            await reconcileConfirmedWrite('恢复班级作业策略', () => Promise.all([loadAssignmentScope(), loadClassScope()]));
+        } catch (error) {
+            await handleMutationFailure(error, 'assignment-class-policy-reset');
+        } finally {
+            setBusy(false);
+            renderWorkspace();
+        }
     }
 
     async function updatePointRule(form) {
@@ -966,10 +1131,73 @@
         const data = formData(form);
         await fetchJson(`/api/courses/${state.selected.courseId}/collaborators`, {
             method: 'POST',
-            body: { user_id: Number(data.user_id), role: 'editor' }
+            body: { user_id: Number(data.user_id), role: data.role || 'editor' }
         });
         setFlash('success', '协作者已添加');
         await reconcileConfirmedWrite('添加协作者', () => loadCourseScope());
+    }
+
+    async function batchUpdateCollaborators(form) {
+        const data = formData(form);
+        const roles = new Set(['editor', 'content_editor', 'assessment_editor', 'viewer']);
+        const statuses = new Set(['active', 'inactive']);
+        const lines = String(data.items || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+        if (!lines.length) throw new Error('请至少输入一行协作者数据');
+        if (lines.length > 100) throw new Error('单次最多处理 100 个协作者');
+        const items = lines.map((line, index) => {
+            const [userIdText, role = 'editor', status = 'active'] = line.split(/[,，\s]+/).filter(Boolean);
+            const userId = Number(userIdText);
+            if (!Number.isInteger(userId) || userId < 1) throw new Error(`第 ${index + 1} 行用户 ID 无效`);
+            if (!roles.has(role)) throw new Error(`第 ${index + 1} 行协作者角色无效`);
+            if (!statuses.has(status)) throw new Error(`第 ${index + 1} 行协作者状态无效`);
+            return { user_id: userId, role, status, client_ref: `row-${index + 1}` };
+        });
+        const result = await fetchJson(`/api/courses/${state.selected.courseId}/collaborators/batch`, {
+            method: 'POST',
+            body: { items }
+        });
+        state.data.collaboratorBatchResult = result;
+        setFlash(
+            result.failed_count ? 'warning' : 'success',
+            `批量协作者已处理：新增 ${result.created_count}，更新 ${result.updated_count}，未变化 ${result.unchanged_count}，失败 ${result.failed_count}`
+        );
+        await reconcileConfirmedWrite('批量协作者管理', () => loadCourseScope());
+    }
+
+    async function batchImportStudents(form) {
+        const data = formData(form);
+        const usernames = String(data.usernames || '')
+            .split(/[\s,;，；]+/)
+            .map((value) => value.trim())
+            .filter(Boolean);
+        if (!usernames.length) throw new Error('请至少输入一个学生用户名');
+        if (usernames.length > 100) throw new Error('单次最多导入 100 个学生用户名');
+        const result = await fetchJson(`/api/classes/${state.selected.classId}/students/batch-import`, {
+            method: 'POST',
+            body: {
+                items: usernames.map((username, index) => ({ username, client_ref: `row-${index + 1}` }))
+            }
+        });
+        state.data.studentBatchImportResult = result;
+        const level = result.failed_count ? 'warning' : 'success';
+        setFlash(level, `批量导入已处理：新增 ${result.created_count}，恢复 ${result.restored_count}，已存在 ${result.unchanged_count}，失败 ${result.failed_count}`);
+        await reconcileConfirmedWrite('批量导入学生', () => loadClassScope());
+    }
+
+    async function transferStudent(form) {
+        const data = formData(form);
+        const result = await fetchJson(
+            `/api/classes/${state.selected.classId}/students/${Number(data.membership_id)}/transfer`,
+            {
+                method: 'POST',
+                body: {
+                    target_class_id: Number(data.target_class_id),
+                    note: optional(data.note)
+                }
+            }
+        );
+        setFlash('success', result.applied ? '学生已转入目标班级，源班历史记录继续保留' : '转班目标状态已存在，无需重复写入');
+        await reconcileConfirmedWrite('学生转班', () => loadClassScope());
     }
 
     async function gradeSubmission(form) {
@@ -1100,10 +1328,15 @@
         }
         const key = target.dataset.teacherScope;
         state.selected[key] = target.value;
+        if (key === 'schoolId' || key === 'classId') state.data.studentBatchImportResult = null;
+        if (key === 'schoolId' || key === 'courseId') state.data.collaboratorBatchResult = null;
         setBusy(true);
         try {
             if (key === 'schoolId') await loadSchoolScope();
-            if (key === 'classId') await loadClassScope();
+            if (key === 'classId') {
+                await loadClassScope();
+                await loadAssignmentScope();
+            }
             if (key === 'courseId') {
                 await loadCourseScope();
                 await loadClassScope();
@@ -1198,7 +1431,7 @@
                         <span>#${item.user_id}</span>
                         ${statusBadge(item.role)}
                         ${statusBadge(item.status)}
-                        <button type="button" class="teacher-icon-button teacher-icon-button--compact" data-teacher-collaborator-status="${item.status === 'active' ? 'inactive' : 'active'}" data-collaborator-id="${item.id}" ${isCourseReadOnly() ? 'disabled' : ''} aria-label="切换协作者状态">
+                        <button type="button" class="teacher-icon-button teacher-icon-button--compact" data-teacher-collaborator-status="${item.status === 'active' ? 'inactive' : 'active'}" data-collaborator-id="${item.id}" ${canManageCourseOwnership() ? '' : 'disabled'} aria-label="切换协作者状态">
                             <i data-lucide="${item.status === 'active' ? 'user-minus' : 'user-check'}"></i>
                         </button>
                     </div>
@@ -1207,19 +1440,56 @@
         `;
     }
 
+    function renderCollaboratorBatchResult() {
+        const result = state.data.collaboratorBatchResult;
+        if (!result || !Array.isArray(result.items)) return '';
+        return `
+            <div class="teacher-member-import-result" role="status">
+                <strong>批量协作者：新增 ${formatNumber(result.created_count)} · 更新 ${formatNumber(result.updated_count)} · 未变化 ${formatNumber(result.unchanged_count)} · 失败 ${formatNumber(result.failed_count)}</strong>
+                <ul>
+                    ${result.items.map((item) => `
+                        <li>
+                            <span>用户 #${formatNumber(item.user_id)}</span>
+                            ${statusBadge(item.outcome)}
+                            ${item.error_code ? `<code>${escapeHtml(item.error_code)}</code>` : ''}
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
     function renderKnowledgeStats(knowledge) {
         if (!knowledge || !Array.isArray(knowledge.knowledge_stats) || !knowledge.knowledge_stats.length) {
             return renderEmpty('暂无规则统计');
         }
+        const overall = knowledge.knowledge_stats.filter((item) => !item.dimension || item.dimension === 'overall');
+        const dimensions = knowledge.knowledge_stats
+            .filter((item) => item.dimension && item.dimension !== 'overall' && Number(item.sample_size || 0) > 0)
+            .slice()
+            .sort((a, b) => Number(a.percent || 0) - Number(b.percent || 0))
+            .slice(0, 6);
         return `
+            <p class="teacher-muted">统计口径 ${escapeHtml(knowledge.rule_version || 'v1')}：仅纳入已发布课程/单元、本班有效分配且有效状态为 active 的作业。</p>
             <div class="teacher-knowledge-list">
-                ${knowledge.knowledge_stats.slice(0, 5).map((item) => `
+                ${overall.slice(0, 3).map((item) => `
                     <div>
                         <strong>${escapeHtml(item.rule_code)}</strong>
                         <span>${formatNumber(item.frequency)} / ${formatNumber(item.sample_size)} · ${formatPercent(item.percent)}</span>
                     </div>
                 `).join('')}
             </div>
+            ${dimensions.length ? `
+                <div class="teacher-divider"></div>
+                <div class="teacher-knowledge-list">
+                    ${dimensions.map((item) => `
+                        <div>
+                            <strong>${escapeHtml(item.label || item.knowledge_code || item.rule_code)}</strong>
+                            <span>${escapeHtml(item.dimension)} · ${formatNumber(item.frequency)} / ${formatNumber(item.sample_size)} · ${formatPercent(item.percent)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
         `;
     }
 
@@ -1323,6 +1593,43 @@
         return !course || course.status === 'archived';
     }
 
+    function activeCourseCollaboratorRole() {
+        if (!state.user) return '';
+        const collaborator = state.data.collaborators.find((item) => (
+            Number(item.user_id) === Number(state.user.id) && item.status === 'active'
+        ));
+        return collaborator ? collaborator.role : '';
+    }
+
+    function hasCourseCapability(roles) {
+        if (isCourseReadOnly() || !state.user) return false;
+        const course = selectedCourse();
+        if (state.user.role === 'admin' || Number(course.creator_user_id) === Number(state.user.id)) return true;
+        return roles.includes(activeCourseCollaboratorRole());
+    }
+
+    function canManageCourseOwnership() {
+        if (isCourseReadOnly() || !state.user) return false;
+        const course = selectedCourse();
+        return state.user.role === 'admin' || Number(course.creator_user_id) === Number(state.user.id);
+    }
+
+    function canCreateCourseUnit() {
+        return hasCourseCapability(['editor', 'content_editor']);
+    }
+
+    function canCreateCourseAssignment() {
+        return hasCourseCapability(['editor', 'content_editor', 'assessment_editor']);
+    }
+
+    function canManageAssignmentPointRule() {
+        return hasCourseCapability(['editor', 'assessment_editor']);
+    }
+
+    function canManageAssignmentClassPolicy() {
+        return hasCourseCapability(['editor', 'assessment_editor']);
+    }
+
     function assignmentOptions() {
         return state.data.assignments.map((assignment) => (
             `<option value="${assignment.id}"${String(assignment.id) === state.selected.assignmentId ? ' selected' : ''}>${escapeHtml(assignment.title)}</option>`
@@ -1376,12 +1683,16 @@
             state.data.units = [];
             state.data.assignments = [];
             state.data.members = [];
+            state.data.activeStudents = [];
             state.data.submissions = [];
             state.data.assignmentSubmissions = [];
             state.data.collaborators = [];
+            state.data.collaboratorBatchResult = null;
             state.data.pointRule = null;
+            state.data.assignmentClassPolicy = null;
             state.data.knowledge = null;
             state.data.progress = null;
+            state.data.studentBatchImportResult = null;
         }
     }
 
@@ -1526,6 +1837,14 @@
             hour: '2-digit',
             minute: '2-digit'
         }).format(date);
+    }
+
+    function datetimeLocalValue(value) {
+        if (!value) return '';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+        return local.toISOString().slice(0, 16);
     }
 
     function escapeHtml(value) {

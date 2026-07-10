@@ -8,7 +8,7 @@ from typing import Any, Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, Response, status
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -22,6 +22,7 @@ from app.models import (
     AuthSession,
     AuditLog,
     Assignment,
+    AssignmentClassPolicy,
     BugRecord,
     ClassGroup,
     ClassJoinRequest,
@@ -139,6 +140,10 @@ from app.schemas.admin import (
     BugRecordUpdate,
 )
 from app.services.audit import record_audit_log
+from app.services.assignment_policies import (
+    assignment_class_effective_status_expression,
+    assignment_class_is_assigned_expression,
+)
 from app.services.admin_alert_outbox import (
     admin_alert_outbox_write_snapshot,
     enqueue_content_script_remote_drift_alert_outbox,
@@ -5795,10 +5800,25 @@ def _class_assignment_count(db: Session, class_id: int, active_only: bool = Fals
         .join(CourseUnit, CourseUnit.id == Assignment.unit_id)
         .join(Course, Course.id == CourseUnit.course_id)
         .join(CourseClass, CourseClass.course_id == Course.id)
-        .where(CourseClass.class_id == class_id, CourseClass.status == "active")
+        .outerjoin(
+            AssignmentClassPolicy,
+            and_(
+                AssignmentClassPolicy.assignment_id == Assignment.id,
+                AssignmentClassPolicy.class_id == CourseClass.class_id,
+            ),
+        )
+        .where(
+            CourseClass.class_id == class_id,
+            CourseClass.status == "active",
+            assignment_class_is_assigned_expression(),
+        )
     )
     if active_only:
-        statement = statement.where(Assignment.status == "active", Course.status != "archived")
+        statement = statement.where(
+            assignment_class_effective_status_expression() == "active",
+            Course.status == "published",
+            CourseUnit.status == "published",
+        )
     return int(db.scalar(statement) or 0)
 
 

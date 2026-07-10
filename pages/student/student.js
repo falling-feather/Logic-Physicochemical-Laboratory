@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    const STUDENT_ASSET_VERSION = '20260710v6652FrontendHardeningP1';
+    const STUDENT_ASSET_VERSION = '20260710v6653PermissionMatrixP1';
     const API_BASE_STORAGE_KEY = 'astra-student-api-base';
     const REQUEST_TIMEOUT_MS = 12000;
     const ASSIGNMENT_PAGE_LIMIT = 8;
@@ -1186,6 +1186,12 @@
         if (!container) return;
         const knowledge = state.data.knowledge;
         const stats = knowledge && Array.isArray(knowledge.knowledge_stats) ? knowledge.knowledge_stats : [];
+        const overallStats = stats.filter((item) => !item.dimension || item.dimension === 'overall');
+        const weakDimensions = stats
+            .filter((item) => item.dimension && item.dimension !== 'overall' && Number(item.sample_size || 0) > 0)
+            .slice()
+            .sort((a, b) => Number(a.percent || 0) - Number(b.percent || 0))
+            .slice(0, 3);
         const suggestion = ruleSuggestion(stats);
         const latestSnapshot = state.data.snapshots.items && state.data.snapshots.items[0];
         container.innerHTML = panelHeader('知识状态', 'brain-circuit') + (state.errors.knowledge
@@ -1195,7 +1201,7 @@
                 : stats.length
                     ? `
                         <div class="student-knowledge-list">
-                            ${stats.map((item) => {
+                            ${overallStats.map((item) => {
                                 const percent = clampNumber(item.percent, 0, 100);
                                 const tone = percent >= 75 ? 'good' : percent >= 45 ? 'warn' : 'weak';
                                 return `
@@ -1207,8 +1213,23 @@
                                 `;
                             }).join('')}
                         </div>
+                        ${weakDimensions.length ? `
+                            <div class="student-knowledge-list">
+                                ${weakDimensions.map((item) => {
+                                    const percent = clampNumber(item.percent, 0, 100);
+                                    const tone = percent >= 75 ? 'good' : percent >= 45 ? 'warn' : 'weak';
+                                    return `
+                                        <div class="student-knowledge-row">
+                                            <span>${escapeHtml(item.label || item.knowledge_code || ruleLabel(item.rule_code))}</span>
+                                            <div class="student-knowledge-bar"><span class="is-${tone}" style="width:${percent}%"></span></div>
+                                            <strong class="is-${tone}">${formatPercent(percent)}</strong>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        ` : ''}
                         <div class="student-rule-suggestion">
-                            <span>规则建议</span>
+                            <span>规则建议 · ${escapeHtml((knowledge && knowledge.rule_version) || 'v1')}</span>
                             <strong>${escapeHtml(suggestion)}</strong>
                             ${latestSnapshot ? `<small>最近快照：${escapeHtml(formatDate(latestSnapshot.calculated_at || latestSnapshot.created_at))}</small>` : '<small>基于当前实时规则统计</small>'}
                         </div>
@@ -1467,6 +1488,11 @@
             .sort((a, b) => Number(a.percent || 0) - Number(b.percent || 0));
         if (!eligible.length) return '完成首个学习任务后再查看建议';
         const weakest = eligible[0];
+        const label = weakest.label || weakest.knowledge_code || '';
+        if (weakest.dimension === 'knowledge_point') return `优先复习知识点：${label || '当前薄弱知识点'}`;
+        if (weakest.dimension === 'assignment') return `优先完成或复盘作业：${label || '当前薄弱作业'}`;
+        if (weakest.dimension === 'unit') return `优先补强单元：${label || '当前薄弱单元'}`;
+        if (weakest.dimension === 'course') return `优先补强课程：${label || '当前薄弱课程'}`;
         const suggestions = {
             assignment_completion: '优先完成仍开放的作业',
             graded_score: '复盘已批改作业中的失分点',

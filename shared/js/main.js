@@ -224,7 +224,7 @@ function updateFooterVisibility() {
 
 window.updateFooterVisibility = updateFooterVisibility;
 
-const ENGLAB_ASSET_VERSION = '20260710v6652FrontendHardeningP1';
+const ENGLAB_ASSET_VERSION = '20260710v6653PermissionMatrixP1';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',
