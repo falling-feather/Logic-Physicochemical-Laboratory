@@ -467,7 +467,12 @@ def rollback_content_page_version(
     target_version = db.get(ContentPageVersion, version_id)
     if target_version is None:
         raise HTTPException(status_code=404, detail="Content page version not found")
-    page = db.get(ContentPageRecord, target_version.page_id)
+    page = db.scalar(
+        select(ContentPageRecord)
+        .where(ContentPageRecord.id == target_version.page_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     if page is None:
         raise HTTPException(status_code=409, detail="Published content page is missing")
     target_script_policy = _analyze_content_script_policy(ContentPage.model_validate(target_version.schema_json))
@@ -481,6 +486,8 @@ def rollback_content_page_version(
         )
 
     previous_version = _current_content_page_version(db, target_version.slug)
+    if previous_version is not None and previous_version.restored_from_version_id == target_version.id:
+        raise HTTPException(status_code=409, detail="Content page is already restored from this version")
     page_before = _content_page_snapshot(page)
     version = _next_content_version(db, target_version.slug)
     page_schema = _published_page_schema(target_version.schema_json, target_version.slug, version)
@@ -796,8 +803,11 @@ def _reject_stale_content_draft(db: Session, draft: ContentDraft) -> None:
         if draft.base_schema_hash is not None and current_version.schema_hash != draft.base_schema_hash:
             raise HTTPException(status_code=409, detail="Content draft base schema hash is stale")
         return
-    if _as_utc(current_version.published_at) > _as_utc(draft.created_at):
-        raise HTTPException(status_code=409, detail="Content draft is based on an older published version")
+    # New drafts created after a publication always persist base_version_id.
+    # A missing base therefore means the draft predates the current page (or
+    # is legacy data) and must fail closed without relying on DB timestamp
+    # precision.
+    raise HTTPException(status_code=409, detail="Content draft is based on an older published version")
 
 
 def _content_draft_script_policy(draft: ContentDraft, *, verify_external_assets: bool = False):

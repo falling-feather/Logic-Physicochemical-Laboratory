@@ -1,9 +1,14 @@
 from datetime import datetime
 
 from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, utc_now
+
+
+def _knowledge_window_datetime_type():
+    return DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql")
 
 
 class Course(TimestampMixin, Base):
@@ -162,8 +167,8 @@ class ClassKnowledgeSnapshot(TimestampMixin, Base):
     course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True, nullable=True)
     course_scope_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     granularity: Mapped[str] = mapped_column(String(16), default="custom", index=True, nullable=False)
-    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
-    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    period_start: Mapped[datetime] = mapped_column(_knowledge_window_datetime_type(), index=True, nullable=False)
+    period_end: Mapped[datetime] = mapped_column(_knowledge_window_datetime_type(), index=True, nullable=False)
     rule_version: Mapped[str] = mapped_column(String(32), default="v1", nullable=False)
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
     students_total: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -207,8 +212,8 @@ class UserKnowledgeSnapshot(TimestampMixin, Base):
     course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True, nullable=True)
     course_scope_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     granularity: Mapped[str] = mapped_column(String(16), default="custom", index=True, nullable=False)
-    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
-    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    period_start: Mapped[datetime] = mapped_column(_knowledge_window_datetime_type(), index=True, nullable=False)
+    period_end: Mapped[datetime] = mapped_column(_knowledge_window_datetime_type(), index=True, nullable=False)
     rule_version: Mapped[str] = mapped_column(String(32), default="v1", nullable=False)
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
     assignment_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -239,8 +244,8 @@ class KnowledgeSnapshotRun(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     run_key: Mapped[str] = mapped_column(String(160), nullable=False)
     granularity: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
-    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
-    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    period_start: Mapped[datetime] = mapped_column(_knowledge_window_datetime_type(), index=True, nullable=False)
+    period_end: Mapped[datetime] = mapped_column(_knowledge_window_datetime_type(), index=True, nullable=False)
     trigger_source: Mapped[str] = mapped_column(String(32), default="script", nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="running", index=True, nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)

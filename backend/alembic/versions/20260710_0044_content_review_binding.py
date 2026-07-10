@@ -41,7 +41,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     with op.batch_alter_table("content_drafts") as batch_op:
-        batch_op.drop_index("ix_content_drafts_last_editor_user_id")
         batch_op.drop_constraint("fk_content_drafts_last_editor_user_id_users", type_="foreignkey")
+        batch_op.drop_index("ix_content_drafts_last_editor_user_id")
         batch_op.drop_column("script_reviewed_schema_hash")
         batch_op.drop_column("last_editor_user_id")

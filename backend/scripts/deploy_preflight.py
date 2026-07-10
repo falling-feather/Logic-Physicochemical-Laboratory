@@ -131,7 +131,7 @@ def _database_compatibility_report(database_url: str, *, require_mysql: bool) ->
                         @@sql_mode AS sql_mode,
                         @@max_connections AS max_connections,
                         DATABASE() AS database_name,
-                        CURRENT_USER() AS current_user
+                        CURRENT_USER() AS current_user_name
                     """
                 )
             ).mappings().one()
@@ -170,7 +170,7 @@ def _database_compatibility_report(database_url: str, *, require_mysql: bool) ->
         "sql_mode": _variable_text(variables, "sql_mode"),
         "max_connections": _variable_int(variables, "max_connections"),
         "database_name": _variable_text(variables, "database_name"),
-        "current_user": _variable_text(variables, "current_user"),
+        "current_user": _variable_text(variables, "current_user_name"),
         "expected_character_set": "utf8mb4",
         "expected_collation_prefix": "utf8mb4_",
         "time_zone_policy": "reported_only",
@@ -262,7 +262,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     report = run_preflight(database_url=args.database_url, require_mysql=args.require_mysql)
-    print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+    print(json.dumps(report, ensure_ascii=True, indent=2, sort_keys=True))
     return 0 if report["ok"] else 1
 
 

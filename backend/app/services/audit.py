@@ -106,6 +106,10 @@ def record_audit_log(
     resource = f"{resource_type}:{resource_id_value}" if resource_id_value is not None else resource_type
     metadata = request_metadata(request)
     timestamp = utc_now()
+    if db.get_bind().dialect.name == "mysql":
+        # MySQL DATETIME defaults to second precision. Hash the value that can
+        # actually be persisted so a later chain verification is stable.
+        timestamp = timestamp.replace(microsecond=0)
     snapshot_json = redact_audit_snapshot(snapshot)
     previous_hash = _previous_hash(db)
     audit_log = AuditLog(

@@ -26,6 +26,12 @@ _RUNTIME_ENV_KEYS = (
     "ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_RUN_ON_START",
 )
 
+_MYSQL_MICROSECOND_COLUMNS = {
+    "class_knowledge_snapshots": ("period_start", "period_end"),
+    "user_knowledge_snapshots": ("period_start", "period_end"),
+    "knowledge_snapshot_runs": ("period_start", "period_end"),
+}
+
 
 def run_smoke(
     database_url: str | None = None,
@@ -93,21 +99,32 @@ def _schema_report(database_url: str, *, require_mysql: bool) -> dict[str, Any]:
     try:
         engine = make_engine(database_url)
         inspector = inspect(engine)
+        dialect = engine.dialect.name
+        driver = engine.dialect.driver
         actual_tables = sorted(inspector.get_table_names())
         missing_tables = sorted(set(expected_tables).difference(actual_tables))
         extra_tables = sorted(set(actual_tables).difference(expected_tables))
         missing_columns: dict[str, list[str]] = {}
+        datetime_precision_mismatches: dict[str, dict[str, int | None]] = {}
         checked_column_tables = 0
         for table_name, table_columns in expected_columns.items():
             if table_name in missing_tables:
                 continue
             checked_column_tables += 1
-            actual_columns = {column["name"] for column in inspector.get_columns(table_name)}
+            column_details = inspector.get_columns(table_name)
+            actual_columns = {column["name"] for column in column_details}
             missing = sorted(set(table_columns).difference(actual_columns))
             if missing:
                 missing_columns[table_name] = missing
-        dialect = engine.dialect.name
-        driver = engine.dialect.driver
+            if dialect == "mysql" and table_name in _MYSQL_MICROSECOND_COLUMNS:
+                types_by_name = {str(column["name"]): column.get("type") for column in column_details}
+                mismatches = {
+                    column_name: getattr(types_by_name.get(column_name), "fsp", None)
+                    for column_name in _MYSQL_MICROSECOND_COLUMNS[table_name]
+                    if getattr(types_by_name.get(column_name), "fsp", None) != 6
+                }
+                if mismatches:
+                    datetime_precision_mismatches[table_name] = mismatches
     except SQLAlchemyError as exc:
         return {
             "ok": False,
@@ -118,6 +135,7 @@ def _schema_report(database_url: str, *, require_mysql: bool) -> dict[str, Any]:
             "extra_tables": [],
             "checked_column_tables": 0,
             "missing_columns": {},
+            "datetime_precision_mismatches": {},
             "error": exc.__class__.__name__,
         }
     finally:
@@ -127,6 +145,7 @@ def _schema_report(database_url: str, *, require_mysql: bool) -> dict[str, Any]:
     dialect_ok = not require_mysql or dialect == "mysql"
     tables_ok = not missing_tables
     columns_ok = not missing_columns
+    datetime_precision_ok = not datetime_precision_mismatches
     status = "ready"
     if not dialect_ok:
         status = "unexpected_dialect"
@@ -134,8 +153,10 @@ def _schema_report(database_url: str, *, require_mysql: bool) -> dict[str, Any]:
         status = "missing_tables"
     elif not columns_ok:
         status = "missing_columns"
+    elif not datetime_precision_ok:
+        status = "datetime_precision_mismatch"
     return {
-        "ok": dialect_ok and tables_ok and columns_ok,
+        "ok": dialect_ok and tables_ok and columns_ok and datetime_precision_ok,
         "status": status,
         "dialect": dialect,
         "driver": driver,
@@ -146,6 +167,8 @@ def _schema_report(database_url: str, *, require_mysql: bool) -> dict[str, Any]:
         "extra_tables": extra_tables,
         "checked_column_tables": checked_column_tables,
         "missing_columns": missing_columns,
+        "datetime_precision_mismatches": datetime_precision_mismatches,
+        "mysql_expected_datetime_precision": 6,
     }
 
 
@@ -182,7 +205,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     report = run_smoke(database_url=args.database_url, require_mysql=args.require_mysql)
-    print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+    print(json.dumps(report, ensure_ascii=True, indent=2, sort_keys=True))
     return 0 if report["ok"] else 1
 
 

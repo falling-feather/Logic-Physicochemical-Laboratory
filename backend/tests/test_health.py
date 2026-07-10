@@ -1,3 +1,7 @@
+from app.core.config import get_settings
+from app.db.session import make_engine
+
+
 def test_health_reports_sqlite_test_database(client):
     response = client.get("/api/health", headers={"X-Request-ID": "health-smoke"})
 
@@ -10,6 +14,16 @@ def test_health_reports_sqlite_test_database(client):
     assert payload["service"] == "astra-backend"
     assert payload["database"]["ok"] is True
     assert payload["database"]["status"] == "connected"
+
+
+def test_health_probe_reuses_the_application_connection_pool(client):
+    engine = make_engine(get_settings().database_url)
+    pool = engine.pool
+
+    response = client.get("/api/health")
+
+    assert response.status_code == 200
+    assert engine.pool is pool
 
 
 def test_health_generates_request_id_when_header_missing(client):

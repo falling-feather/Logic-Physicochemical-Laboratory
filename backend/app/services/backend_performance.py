@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 from time import perf_counter
 from typing import Any
 
@@ -278,6 +279,9 @@ def build_backend_performance_report(
         "summary": {
             "profile_count": len(profiles),
             "index_present_count": sum(1 for item in profiles if item["index_present"]),
+            "explain_analyze_count": sum(
+                1 for item in profiles if item["explain"].get("analyze", {}).get("status") == "ok"
+            ),
             "missing_index_count": len(missing_indexes),
             "explain_error_count": len(explain_errors),
             "benchmark_error_count": len(benchmark_errors),
@@ -288,8 +292,13 @@ def build_backend_performance_report(
         "budget_exceeded_profiles": sorted(budget_exceeded),
         "deferred_risks": [
             {
-                "code": "mysql_runtime_evidence_pending",
-                "detail": "SQLite plans do not prove MySQL cardinality, lock, buffer-pool, or filesort behavior.",
+                "code": "mysql_runtime_evidence_captured" if dialect == "mysql" else "mysql_runtime_evidence_pending",
+                "detail": (
+                    "MySQL EXPLAIN ANALYZE and bounded benchmarks were executed; production cardinality and load must "
+                    "still be compared with the captured release dataset."
+                    if dialect == "mysql"
+                    else "SQLite plans do not prove MySQL cardinality, lock, buffer-pool, or filesort behavior."
+                ),
             },
             {
                 "code": "leading_wildcard_search",
@@ -326,6 +335,12 @@ def _explain_profile(db: Session, profile: QueryProfile, *, dialect: str) -> dic
                 f"SCAN {profile.table}".upper() in detail.upper() and "USING" not in detail.upper()
                 for detail in access
             )
+            analyze = {
+                "executed": False,
+                "status": "not_applicable",
+                "plan_sha256": None,
+                "plan_line_count": 0,
+            }
         else:
             mappings = rows.mappings().all()
             access = [
@@ -339,11 +354,22 @@ def _explain_profile(db: Session, profile: QueryProfile, *, dialect: str) -> dic
                 for row in mappings
             ]
             full_scan = any(item["access_type"].upper() == "ALL" for item in access)
+            analyze = _mysql_explain_analyze(db, profile)
+            if analyze["status"] != "ok":
+                return {
+                    "executed": True,
+                    "status": "error",
+                    "error": analyze.get("error", "ExplainAnalyzeError"),
+                    "access": access,
+                    "full_scan_detected": full_scan,
+                    "analyze": analyze,
+                }
         return {
             "executed": True,
             "status": "ok",
             "access": access,
             "full_scan_detected": full_scan,
+            "analyze": analyze,
         }
     except Exception as exc:
         return {
@@ -352,6 +378,36 @@ def _explain_profile(db: Session, profile: QueryProfile, *, dialect: str) -> dic
             "error": exc.__class__.__name__,
             "access": [],
             "full_scan_detected": None,
+            "analyze": {
+                "executed": dialect == "mysql",
+                "status": "error" if dialect == "mysql" else "not_applicable",
+                "error": exc.__class__.__name__ if dialect == "mysql" else None,
+                "plan_sha256": None,
+                "plan_line_count": 0,
+            },
+        }
+
+
+def _mysql_explain_analyze(db: Session, profile: QueryProfile) -> dict[str, Any]:
+    try:
+        rows = db.connection().exec_driver_sql(f"EXPLAIN ANALYZE {profile.explain_sql}").fetchall()
+        plan_lines = [str(row[0]) for row in rows]
+        plan_text = "\n".join(plan_lines)
+        return {
+            "executed": True,
+            "status": "ok",
+            "plan_sha256": sha256(plan_text.encode("utf-8")).hexdigest(),
+            "plan_line_count": len(plan_lines),
+            "plan_text_returned": False,
+        }
+    except Exception as exc:
+        return {
+            "executed": True,
+            "status": "error",
+            "error": exc.__class__.__name__,
+            "plan_sha256": None,
+            "plan_line_count": 0,
+            "plan_text_returned": False,
         }
 
 
@@ -381,7 +437,6 @@ def _benchmark_profile(
             "sql_text_returned": False,
         }
     sorted_durations = sorted(durations)
-    p95_index = max(0, min(len(sorted_durations) - 1, int(len(sorted_durations) * 0.95)))
     maximum_ms = max(durations, default=0.0)
     return {
         "executed": True,
@@ -389,10 +444,19 @@ def _benchmark_profile(
         "iterations": iterations,
         "budget_ms": budget_ms,
         "average_ms": round(sum(durations) / max(1, len(durations)), 2),
-        "p95_ms": round(sorted_durations[p95_index] if sorted_durations else 0.0, 2),
+        "p50_ms": round(_percentile(sorted_durations, 0.50), 2),
+        "p95_ms": round(_percentile(sorted_durations, 0.95), 2),
+        "p99_ms": round(_percentile(sorted_durations, 0.99), 2),
         "maximum_ms": round(maximum_ms, 2),
         "maximum_rows": max(row_counts, default=0),
         "within_budget": maximum_ms <= budget_ms,
         "result_values_returned": False,
         "sql_text_returned": False,
     }
+
+
+def _percentile(sorted_values: list[float], quantile: float) -> float:
+    if not sorted_values:
+        return 0.0
+    index = round((len(sorted_values) - 1) * quantile)
+    return sorted_values[max(0, min(len(sorted_values) - 1, index))]

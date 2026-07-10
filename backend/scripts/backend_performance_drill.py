@@ -35,7 +35,7 @@ def main() -> int:
             "error": exc.__class__.__name__,
             "database_url_returned": False,
         }
-    print(json.dumps(report, ensure_ascii=False, indent=2, default=str))
+    print(json.dumps(report, ensure_ascii=True, indent=2, default=str))
     return 0 if report.get("ok") else 1
 
 

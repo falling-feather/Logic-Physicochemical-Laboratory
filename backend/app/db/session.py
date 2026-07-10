@@ -1,6 +1,7 @@
 from functools import lru_cache
 from hashlib import sha256
 import logging
+from threading import Lock
 from time import perf_counter
 from typing import Any
 
@@ -14,6 +15,8 @@ from app.core.config import get_settings
 
 
 logger = logging.getLogger(__name__)
+_ENGINE_REGISTRY: set[Engine] = set()
+_ENGINE_REGISTRY_LOCK = Lock()
 
 
 def _connect_args(database_url: str, settings: Any | None = None) -> dict:
@@ -60,6 +63,8 @@ def make_engine(database_url: str) -> Engine:
         enabled=settings.performance_slow_query_logging_enabled,
         threshold_ms=settings.performance_slow_query_threshold_ms,
     )
+    with _ENGINE_REGISTRY_LOCK:
+        _ENGINE_REGISTRY.add(engine)
     return engine
 
 
@@ -76,6 +81,11 @@ def init_db(database_url: str | None = None) -> None:
 
 
 def reset_database_state() -> None:
+    with _ENGINE_REGISTRY_LOCK:
+        engines = list(_ENGINE_REGISTRY)
+        _ENGINE_REGISTRY.clear()
+    for engine in engines:
+        engine.dispose()
     make_engine.cache_clear()
     get_session_factory.cache_clear()
 
@@ -91,7 +101,6 @@ def get_db():
 
 def check_database(database_url: str) -> dict:
     safe_url = _safe_url(database_url)
-    engine = None
     try:
         engine = make_engine(database_url)
         with engine.connect() as connection:
@@ -122,11 +131,6 @@ def check_database(database_url: str) -> dict:
             "url": safe_url,
             "error": exc.__class__.__name__,
         }
-    finally:
-        if engine is not None:
-            engine.dispose()
-
-
 def _safe_url(database_url: str) -> str:
     if "://" not in database_url or "@" not in database_url:
         return database_url

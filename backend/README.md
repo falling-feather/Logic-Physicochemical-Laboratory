@@ -16,6 +16,8 @@ V6.6.59 已完成安全、隐私和发布冻结：非本地环境 bootstrap/cook
 
 V6.6.60 已完成本地发布候选总验收并判定延期：opaque sandbox 的 SRI 资产端点增加仅资源级、无凭据的匿名 CORS，外部 Edge 桌面/390×844 proof 27/27；SQLite 空库迁移、preflight/smoke 和 MySQL-required fail-closed 通过。真实 MySQL、反向代理/服务注册和合格 C++17 构建仍为 P1，分别进入 V6.6.61-V6.6.62；默认关闭的外部 provider 只有被选入 RC 时才在 V6.6.63 补 staging。
 
+V6.6.61 已在隔离、仅回环监听的 MySQL 8.0.46 上关闭 `RC-MYSQL`。空库 0001→0046、真实 preflight/smoke、内容 publish/rollback、知识快照/脚本扫描/统一任务 lease/cancel/retry、6 writer 审计链与安全控制锁均通过；代表性数据覆盖 11 个 EXPLAIN ANALYZE profile、0043 索引建撤、连接池耗尽恢复、100 API + 100 worker 并发和独立备份恢复。Alembic 0046 将知识快照窗口字段统一为 DATETIME(6)，并修复真实 MySQL 暴露的标识符长度、保留字、DATETIME(0) hash/窗口精度、0044 downgrade 外键顺序和 health 探针重复释放全局连接池问题。当前 stage gate 仅缺 V6.6.62 真实 topology。
+
 ## 本地启动
 
 ```bash
@@ -60,7 +62,7 @@ python -m scripts.content_lifecycle_drill --require-mysql \
 python -m scripts.knowledge_snapshot_scheduler_drill --require-mysql --expect-scheduler-enabled
 ```
 
-该报告检查 scheduler 配置、run ledger、lease/heartbeat、due/pending 队列、快照输出计数和真实 MySQL 待留证项；默认不执行 rebuild、不抢租约、不取消、不重排，不返回 `scheduler_lease_token`、`metadata_json`、异常原文或 secret。真实 MySQL 多 worker/cancel/requeue/锁等待仍需实机留证。
+该报告检查 scheduler 配置、run ledger、lease/heartbeat、due/pending 队列、快照输出计数和真实 MySQL 待留证项；默认不执行 rebuild、不抢租约、不取消、不重排，不返回 `scheduler_lease_token`、`metadata_json`、异常原文或 secret。V6.6.61 已完成真实 MySQL lease/cancel/requeue/stale-token 与窗口精度证据；服务级进程强杀和重启接管留给 V6.6.62。
 
 内容脚本远端漂移观察只读演练报告：
 
@@ -68,7 +70,7 @@ python -m scripts.knowledge_snapshot_scheduler_drill --require-mysql --expect-sc
 python -m scripts.content_script_remote_drift_drill --require-mysql --expect-scheduler-enabled
 ```
 
-该报告检查数据库方言、调度配置、host policy 桶、mirror 记录、scan run ledger、queue/alerts/outbox 和真实观察待留证项；默认不联网、不写库、不入队、不修改 host policy，不返回原始 CDN URL、完整 SRI、远端/镜像字节、`content_bytes`、异常原文、`scheduler_lease_token`、payload 或复核备注。真实安全 CDN 样本、真实 MySQL、真实外网扫描和浏览器隔离证据仍需实机留证。
+该报告检查数据库方言、调度配置、host policy 桶、mirror 记录、scan run ledger、queue/alerts/outbox 和真实观察待留证项；默认不联网、不写库、不入队、不修改 host policy，不返回原始 CDN URL、完整 SRI、远端/镜像字节、`content_bytes`、异常原文、`scheduler_lease_token`、payload 或复核备注。V6.6.61 已完成真实 MySQL scan run 租约/取消/重试台账证据；真实安全 CDN 样本、外网扫描和目标 origin 浏览器复跑仍只在被选入 RC 后单独留证。
 
 后端阶段门禁总账：
 
@@ -414,7 +416,7 @@ python -m pytest backend
 
 V6.6.58 基线为 322 项全量 pytest；权限/班级策略/统计、外部投递、统一任务、审计锚定、外部 issue 和性能专项可运行：
 
-V6.6.59 基线为 352 项全量 pytest，Alembic head 为 `20260710_0045`；新增安全出站、角色一致性、审核绑定、隐私 storage、日志脱敏、无凭据本地数据库默认值与静态发布面合同。
+V6.6.61 基线收集 365 项：默认套件 360 项通过、5 项真实 MySQL 专项按显式环境门禁跳过；真实 MySQL 专项另行 5/5 通过。Alembic head 为 `20260710_0046`，新增知识快照窗口 DATETIME(6) 精度迁移、MySQL 发布证据、运行负载 drill 和 Windows legacy console 安全 JSON 输出回归。
 
 ```bash
 python -m pytest backend/tests/test_school_classes.py backend/tests/test_access_control.py backend/tests/test_course_learning_loop.py -q
@@ -426,7 +428,7 @@ python -m pytest backend/tests/test_backend_performance.py backend/tests/test_ap
 node tools/tests/v6653-permission-analytics-contract.cjs
 ```
 
-迁移最低门禁需验证 `upgrade 20260710_0043 -> upgrade head -> downgrade 20260710_0043 -> upgrade head`，最终 `alembic current` 必须为 `20260710_0045`；0044 绑定最后编辑者/审核 schema hash，0045 串行化 admin 安全控制面。SQLite 往返只证明 DDL 合同，真实 MySQL 建表/行锁证据归 V6.6.61 发布阻断门禁。
+迁移最低门禁需验证 `upgrade 20260710_0043 -> upgrade head -> downgrade 20260710_0043 -> upgrade head`，最终 `alembic current` 必须为 `20260710_0046`；0044 绑定最后编辑者/审核 schema hash，0045 串行化 admin 安全控制面，0046 将知识快照窗口字段提升为 MySQL DATETIME(6) 并修复既有日/周窗口 run key。V6.6.61 已在真实 MySQL 完成 0043 建撤和 0045↔0046 往返。
 
 权限范围回归可单独运行：
 
@@ -442,7 +444,7 @@ $env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
 python -m alembic upgrade head
 ```
 
-当前 Alembic head：`20260710_0043`。`0042` 新增外部 issue 同步账本；`0043` 为审计时间线/资源线、Bug/同步账本、知识 run、脚本扫描 run 和待批改队列新增 10 个复合索引，任务 claim 继续复用 `0040` 已有索引。回滚 0043 只删除本版 10 个索引，不删除业务数据或既有 claim 索引；回滚前仍需评估真实 MySQL DDL 锁和性能退化窗口。
+当前 Alembic head：`20260710_0046`。`0043` 为审计时间线/资源线、Bug/同步账本、知识 run、脚本扫描 run 和待批改队列新增 10 个复合索引；`0044/0045` 分别增加内容审核绑定和安全控制锁；`0046` 将个人/班级快照及 run 的 period_start/period_end 统一为 MySQL DATETIME(6)。V6.6.61 已在代表性真实 MySQL 数据上完成 0043 建撤、0045↔0046 往返和独立恢复库 smoke。
 
 内容脚本远端漂移 CLI：
 
@@ -465,7 +467,7 @@ python -m scripts.rebuild_knowledge_snapshots --granularity week --date 2026-07-
 
 脚本按日或自然周对齐窗口，先抢占 `knowledge_snapshot_runs` 数据库租约，再重算活跃班级已挂接课程的个人/班级快照；学生 user snapshot 跳过 unpublished 课程并按学生可见性过滤单元/作业，class snapshot 保持教师/管理聚合口径；重算长循环会按 `ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_HEARTBEAT_SECONDS` 自动续租，租约不可用时输出 `status=skipped`，失去租约或失败时输出 JSON 并返回非零退出码。
 
-知识快照和内容脚本 scheduler 默认关闭。V6.6.55 后，统一 worker 关闭时保留旧 lifespan 调度器兼容行为；统一 worker 启用时，相同 scheduler 开关改为生成持久化任务，不再并行启动旧调度器。知识快照和内容脚本领域 run 的 owner/token/expiry/heartbeat guard 继续生效，控制面 lease 负责跨进程 claim、attempt/退避/dead-letter 与重启接管。真实 MySQL 多进程、锁等待和长任务强杀仍是 RC 部署证据，不由 SQLite 回归替代。
+知识快照和内容脚本 scheduler 默认关闭。V6.6.55 后，统一 worker 关闭时保留旧 lifespan 调度器兼容行为；统一 worker 启用时，相同 scheduler 开关改为生成持久化任务，不再并行启动旧调度器。知识快照和内容脚本领域 run 的 owner/token/expiry/heartbeat guard 继续生效，控制面 lease 负责跨进程 claim、attempt/退避/dead-letter 与重启接管。V6.6.61 已完成真实 MySQL 竞争、锁等待、cancel/retry/stale-token 与 API/worker 并发证据；长任务进程强杀和注册服务重启恢复归 V6.6.62。
 
 统一 worker 本地入口：
 

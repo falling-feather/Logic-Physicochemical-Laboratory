@@ -8,15 +8,15 @@
 
 星序总览页负责承载一级星系入口；进入某个星系后，才显示该星系自己的二级学科或知识目录。内置 C++ httplib 静态服务器负责静态文件托管，业务 API 由 Python/FastAPI 承担。
 
-> **当前状态**: V6.6.60（2026-07-10）— `houduan` 分支已完成本地发布候选总验收：sandbox SRI 跨源修复、Edge 桌面/390×844 proof 27/27、SQLite 空库迁移/preflight/smoke、延期风险审计和回滚/备份/值守清单；因真实 MySQL、真实反代/服务注册和合格 C++17 工具链缺证，RC 判定延期，当前按 [`doc/09-后端阶段收束小版本开发安排.md`](doc/09-后端阶段收束小版本开发安排.md) 推进 V6.6.61 实机 MySQL 证据。
+> **当前状态**: V6.6.61（2026-07-10）— `houduan` 分支已在隔离、仅回环监听的 MySQL 8.0.46 环境关闭 `RC-MYSQL`：空库 0001→0046、preflight/smoke、内容/任务/调度/审计并发、代表性数据 EXPLAIN ANALYZE、连接池压力、0043 DDL 建撤和独立备份恢复均已实证。生产 stage gate 14 项中 13 项通过，当前按 [`doc/09-后端阶段收束小版本开发安排.md`](doc/09-后端阶段收束小版本开发安排.md) 推进 V6.6.62 的真实反代/服务注册、合格 C++17 构建和回滚证据。
 > **Review 回流状态**: 2026-07-06，`review` 分支已交付代码审查报告（审查基线 `V6.5.23 Review 前基线快照`，范围 `re1` 至 `re17`）。本 `houduan` 分支未合并 review 代码修复；后续仅按 `02` / `07` 中记录的优先级在 `houduan` 上选择性吸收。
 > **最新治理**: 2026-07-10，V6.6.53 将班级与课程权限拆成独立授权轴：学生软移除/双范围转班/逐项批量导入，`editor/content_editor/assessment_editor/viewer` 协作者和批量 upsert，以及班级 assignment/积分覆盖均有审计、幂等和越权回归；管理端加入审批使用内联二次确认、写入不重试并同步对账列表与 KPI。
 > **最新学习分析**: `rule_version=v2` 以 effective active assignment-class pair 为分母，按提交/评分/事件/积分自身时间戳稳定输出 course/unit/knowledge_point/assignment 维度；hidden/draft/archived/closed/unassigned 资源不进入当前统计，v1 历史快照保持兼容读取。
 > **最新外部治理**: 外部告警默认关闭，只在 admin 显式确认、plan/hash/due/expiry 再校验通过且 HTTPS URL/SecretStr token 安全注入后发送脱敏信封；真实 staging 目标、出口网络、接收端验签/幂等与回执仍待部署留证。
-> **最新任务治理**: `background_tasks/background_task_attempts` 保存统一任务控制面，worker 以数据库租约竞争并复用知识快照/脚本扫描领域 run 去重；管理端只返回脱敏摘要，可查看队列和尝试记录并显式 retry/cancel。内容脚本 worker 的外网执行仍默认关闭，真实 MySQL 多进程竞争证据保留到 RC 门禁。
-> **最新审计可信边界**: `audit_chain_heads` 在 MySQL 使用行锁串行化链尾，SQLite 本地回归使用事务级进程锁；归档 Manifest v2 记录范围、文件 hash、导出人/导出时间和生命周期策略。真实 MySQL 锁等待进入 V6.6.61；默认关闭的外部回执只有被选入 RC 时才在 V6.6.63 补 staging。
+> **最新任务治理**: `background_tasks/background_task_attempts` 保存统一任务控制面，worker 以数据库租约竞争并复用知识快照/脚本扫描领域 run 去重；管理端只返回脱敏摘要，可查看队列和尝试记录并显式 retry/cancel。V6.6.61 已用真实 MySQL 验证 lease/cancel/retry、重复副作用防护及 API/worker 并发；服务级进程强杀与重启恢复归 V6.6.62。
+> **最新审计可信边界**: `audit_chain_heads` 在 MySQL 使用行锁串行化链尾，SQLite 本地回归使用事务级进程锁；归档 Manifest v2 记录范围、文件 hash、导出人/导出时间和生命周期策略。V6.6.61 的 6 writer 实测无链分叉，并完成一致性备份和独立恢复；默认关闭的外部回执只有被选入 RC 时才在 V6.6.63 补 staging。
 > **最新外部问题治理**: GitHub 是首个可执行 provider，Gitee/Jira 通过协议接口预留但尚未实现。同步仅允许管理员显式确认，创建/评论结果不确定时不盲重试；外发内容不含 evidence、notes、source 或凭据，不接收外部反向写入，本地 `BugRecord` 始终为权威记录。功能默认关闭，只有被选入 RC 时才在 V6.6.63 补真实 staging、token 权限、限流和人工歧义证据。
-> **最新性能门禁**: `backend_performance_drill` 与管理端报告覆盖 11 个高频查询 profile，复核 10 个新增复合索引和既有任务 claim 索引，并执行不返回 SQL/参数/结果值的 EXPLAIN 与最多 50 行有界基准。SQLite 250 条任务积压合同已通过；真实 MySQL `EXPLAIN ANALYZE`、连接池压力、锁等待和 worker/API 并发证据归 V6.6.61。
+> **最新性能门禁**: `backend_performance_drill` 与管理端报告覆盖 11 个高频查询 profile，复核 10 个新增复合索引和既有任务 claim 索引；真实 MySQL 会执行不返回计划正文的 EXPLAIN ANALYZE，并输出 p50/p95/p99。V6.6.61 已完成代表性数据、0043 DDL、连接池耗尽恢复和 100 API + 100 worker 并发实证；深 offset、leading wildcard 和动态聚合继续作为已归属 P2。
 > **最新隔离**: `physics/energy-conservation` 保持 `sandbox="allow-scripts"`、opaque origin、hash CSP/SRI、静态回退和 opt-in 接入；opaque iframe 的匿名 SRI 资产只在 hash-bound 资产端点使用资源级 CORS，全局凭据型 API 仍为精确 origin。V6.6.60 Edge proof 27/27。
 > **最新缓存边界**: `/api` 与 `/api/*` 由 FastAPI 全状态 `no-store`，Service Worker 在路由最前面直接旁路 API；安装失败不再激活不完整静态缓存。桌面登录态/真实写入和外部 Chrome 390×844 的三端门禁、sandbox 交互、网络失败/恢复均已回归。
 > **下一阶段规划**: Python + MySQL 后端化、内容协议、登录用户体系与管理员 / 教师 / 学生三端平台设计，详见 [`doc/07-后端优化与设计.md`](doc/07-后端优化与设计.md)
@@ -30,6 +30,7 @@
 
 | 版本 | 发布日期 | 主题 | 详情 |
 |------|---------|------|------|
+| **v6.6.61（houduan）** | 2026-07-10 | 真实 MySQL 迁移、并发、性能、连接池与备份恢复实证 | [→](doc/09-后端阶段收束小版本开发安排.md) |
 | **v6.6.60（houduan）** | 2026-07-10 | 发布候选本地总验收、风险/回滚总账与 RC 延期决策 | [→](doc/09-后端阶段收束小版本开发安排.md) |
 | **v6.6.59（houduan）** | 2026-07-10 | 安全、隐私和发布冻结审查 | [→](doc/09-后端阶段收束小版本开发安排.md) |
 | **v6.6.58（houduan）** | 2026-07-10 | 复合索引、性能报告、慢日志、MySQL 连接池和负载预算 | [→](doc/09-后端阶段收束小版本开发安排.md) |
@@ -209,6 +210,7 @@ node server/dev-static-server.mjs --port 8766
 > 完整的细碎微版本详见 [doc/03-发布历史.md](doc/03-发布历史.md)。当前主线在 `main` 分支维护。
 
 ### v6.5 — 2026-07-05（houduan）
+- 2026-07-10 已在 `houduan` 落地 V6.6.61 真实 MySQL 实证：Alembic head 前进到 0046，完成空库迁移、preflight/smoke、内容/知识快照/脚本扫描/统一任务/审计并发、11 个 EXPLAIN ANALYZE profile、0043 DDL 建撤、连接池压力和独立备份恢复；修复 MySQL 标识符、保留字、DATETIME 精度、降级外键顺序与健康探针连接池泄漏等真实方言问题。
 - 2026-07-10 已在 `houduan` 落地 V6.6.55 统一任务执行治理：`background_tasks/background_task_attempts` 覆盖告警 plan、知识快照和内容脚本扫描，支持调度入队、优先级、数据库租约、指数退避、dead-letter、显式 retry/cancel、attempt 历史和重启接管；worker 默认关闭，脚本扫描外网执行另设 opt-in，管理 API 不返回 payload 或 lease token。
 - 2026-07-09 已在 `houduan` 落地 BE-09/V6.6.48 浏览器隔离证明首轮：新增 Playwright/Edge drill，验证 iframe opaque origin 无法读取父页 DOM/storage/cookie，unknown sandbox/asset fail closed，sandbox HTML 的 `frame-ancestors` 和可执行资源 CORP 口径已同步收束。
 - 2026-07-07 已在 `houduan` 落地 BE-02 内容脚本沙箱执行契约：公开 `scriptManifest.sandbox` 返回 enforcement/capabilities，按 `network=none/same-origin` 派生 CSP，unsafe sandbox 防御性降级为 blocked，render API 返回 `X-Astra-Content-Script-*` 契约头。

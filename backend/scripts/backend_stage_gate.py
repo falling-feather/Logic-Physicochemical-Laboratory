@@ -141,7 +141,7 @@ def main(argv: list[str] | None = None) -> int:
             "detail": str(exc),
             "sensitive_fields_returned": False,
         }
-        print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+        print(json.dumps(report, ensure_ascii=True, indent=2, sort_keys=True))
         return 1
 
     topology_options = _topology_options(args)
@@ -163,7 +163,7 @@ def main(argv: list[str] | None = None) -> int:
         confirm_rollback_reviewed=args.confirm_rollback_reviewed,
         generated_at=generated_at,
     )
-    print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+    print(json.dumps(report, ensure_ascii=True, indent=2, sort_keys=True))
     return 0 if report.get("ok") else 1
 
 

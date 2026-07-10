@@ -5,11 +5,25 @@ from uuid import uuid4
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Column, Integer, MetaData, String, Table, text
+from sqlalchemy.dialects import mysql
 
 from app.core.config import get_settings
 from app.db.session import make_engine, reset_database_state
 import scripts.deploy_smoke as deploy_smoke
 from scripts.deploy_smoke import run_smoke
+
+
+def test_deploy_smoke_cli_escapes_non_ascii_for_legacy_windows_consoles(monkeypatch, capsys):
+    monkeypatch.setattr(
+        deploy_smoke,
+        "run_smoke",
+        lambda **_kwargs: {"ok": True, "system_time_zone": "\u05fc"},
+    )
+
+    assert deploy_smoke.main([]) == 0
+    output = capsys.readouterr().out
+    assert "\\u05fc" in output
+    assert "\u05fc" not in output
 
 
 def test_deploy_smoke_reports_ready_database_and_api(monkeypatch):
@@ -101,6 +115,28 @@ def test_deploy_smoke_schema_report_detects_missing_columns(monkeypatch):
     assert report["missing_columns"] == {"users": ["username"]}
 
 
+def test_deploy_smoke_rejects_mysql_knowledge_window_without_microseconds(monkeypatch):
+    metadata = MetaData()
+    Table(
+        "knowledge_snapshot_runs",
+        metadata,
+        Column("period_start", mysql.DATETIME(fsp=6)),
+        Column("period_end", mysql.DATETIME(fsp=6)),
+    )
+    fake_base = type("FakeBase", (), {"metadata": metadata})
+    monkeypatch.setattr(deploy_smoke, "Base", fake_base)
+    monkeypatch.setattr(deploy_smoke, "make_engine", lambda database_url: _FakeMysqlSchemaEngine())
+    monkeypatch.setattr(deploy_smoke, "inspect", lambda engine: _FakeMysqlPrecisionInspector())
+
+    report = deploy_smoke._schema_report("mysql+pymysql://example.invalid/astra", require_mysql=True)
+
+    assert report["ok"] is False
+    assert report["status"] == "datetime_precision_mismatch"
+    assert report["datetime_precision_mismatches"] == {
+        "knowledge_snapshot_runs": {"period_start": 0, "period_end": 0}
+    }
+
+
 def _migrated_sqlite_database(monkeypatch, backend_root: Path) -> Path:
     runtime_dir = backend_root / "pytest-cache-files-smoke"
     runtime_dir.mkdir(exist_ok=True)
@@ -154,3 +190,28 @@ class _FakeSchemaInspector:
         if table_name == "users":
             return [{"name": "id"}]
         return [{"name": "version_num"}]
+
+
+class _FakeMysqlSchemaDialect:
+    name = "mysql"
+    driver = "pymysql"
+
+
+class _FakeMysqlSchemaEngine:
+    dialect = _FakeMysqlSchemaDialect()
+
+    def dispose(self) -> None:
+        pass
+
+
+class _FakeMysqlPrecisionInspector:
+    def get_table_names(self) -> list[str]:
+        return ["alembic_version", "knowledge_snapshot_runs"]
+
+    def get_columns(self, table_name: str) -> list[dict[str, object]]:
+        if table_name == "knowledge_snapshot_runs":
+            return [
+                {"name": "period_start", "type": mysql.DATETIME(fsp=0)},
+                {"name": "period_end", "type": mysql.DATETIME(fsp=0)},
+            ]
+        return [{"name": "version_num", "type": String()}]

@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+import re
 from uuid import uuid4
 
 import pytest
@@ -11,6 +12,42 @@ from app.core.config import get_settings
 from app.db.session import make_engine, reset_database_state
 import scripts.deploy_preflight as deploy_preflight
 from scripts.deploy_preflight import run_preflight
+
+
+def test_deploy_preflight_cli_escapes_non_ascii_for_legacy_windows_consoles(monkeypatch, capsys):
+    monkeypatch.setattr(
+        deploy_preflight,
+        "run_preflight",
+        lambda **_kwargs: {"ok": True, "system_time_zone": "\u05fc"},
+    )
+
+    assert deploy_preflight.main([]) == 0
+    output = capsys.readouterr().out
+    assert "\\u05fc" in output
+    assert "\u05fc" not in output
+
+
+def test_alembic_explicit_identifier_names_fit_mysql_limit():
+    backend_root = Path(__file__).resolve().parents[1]
+    identifier_pattern = re.compile(r'["\']((?:fk|pk|uq|ix|ck)_[A-Za-z0-9_]+)["\']')
+    oversized: list[tuple[str, str, int]] = []
+    for migration_path in sorted((backend_root / "alembic" / "versions").glob("*.py")):
+        for identifier in identifier_pattern.findall(migration_path.read_text(encoding="utf-8")):
+            if len(identifier) > 64:
+                oversized.append((migration_path.name, identifier, len(identifier)))
+    assert oversized == []
+
+
+def test_content_review_downgrade_drops_mysql_fk_before_backing_index():
+    migration_path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic"
+        / "versions"
+        / "20260710_0044_content_review_binding.py"
+    )
+    downgrade_source = migration_path.read_text(encoding="utf-8").split("def downgrade() -> None:", 1)[1]
+
+    assert downgrade_source.index("drop_constraint") < downgrade_source.index("drop_index")
 
 
 def test_deploy_preflight_reports_migrated_database(monkeypatch):
@@ -233,7 +270,7 @@ def test_deploy_preflight_mysql_compatibility_accepts_utf8mb4(monkeypatch):
             "sql_mode": "STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION",
             "max_connections": "151",
             "database_name": "astra_staging",
-            "current_user": "astra@localhost",
+            "current_user_name": "astra@localhost",
         },
     )
 

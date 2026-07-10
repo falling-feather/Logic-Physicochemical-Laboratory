@@ -60,7 +60,7 @@ def upgrade() -> None:
         batch_op.add_column(sa.Column("previous_version_id", sa.Integer(), nullable=True))
         batch_op.create_index(batch_op.f("ix_content_page_versions_previous_version_id"), ["previous_version_id"])
         batch_op.create_foreign_key(
-            "fk_content_page_versions_previous_version_id_content_page_versions",
+            "fk_content_versions_previous_version",
             "content_page_versions",
             ["previous_version_id"],
             ["id"],
@@ -72,7 +72,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     with op.batch_alter_table("content_page_versions") as batch_op:
         batch_op.drop_constraint(
-            "fk_content_page_versions_previous_version_id_content_page_versions",
+            "fk_content_versions_previous_version",
             type_="foreignkey",
         )
         batch_op.drop_index(batch_op.f("ix_content_page_versions_previous_version_id"))
