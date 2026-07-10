@@ -11,6 +11,7 @@ from app.models import (
     BackgroundTaskAttempt,
     ContentScriptAssetScanRun,
     KnowledgeSnapshotRun,
+    User,
 )
 from app.services.alert_delivery import AlertDeliveryReceipt
 from app.services.background_task_worker import BackgroundTaskWorker
@@ -37,6 +38,12 @@ def _bootstrap_admin(client, username: str = "background_task_admin") -> str:
 
 def _session_factory():
     return get_session_factory(get_settings().database_url)
+
+
+def _bootstrap_admin_id(client, username: str) -> int:
+    _bootstrap_admin(client, username=username)
+    with _session_factory()() as db:
+        return int(db.scalar(select(User.id).where(User.username == username)))
 
 
 class _FakeAlertAdapter:
@@ -171,6 +178,7 @@ def test_background_worker_reuses_successful_knowledge_snapshot_domain_run(clien
 
 
 def test_background_worker_alert_delivery_uses_stable_key_and_terminal_recovery_skips_resend(client):
+    actor_id = _bootstrap_admin_id(client, "background_task_alert_admin")
     settings = get_settings().model_copy(deep=True)
     settings.background_task_worker_batch_size = 1
     now = datetime.now(UTC)
@@ -215,6 +223,7 @@ def test_background_worker_alert_delivery_uses_stable_key_and_terminal_recovery_
             source_type="admin_alert_outbox_dispatch_plan",
             source_id=plan.id,
             payload={"plan_id": plan.id},
+            created_by_user_id=actor_id,
         )
         db.commit()
         entry_id = entry.id
@@ -244,6 +253,7 @@ def test_background_worker_alert_delivery_uses_stable_key_and_terminal_recovery_
             source_type="admin_alert_outbox_dispatch_plan",
             source_id=plan_id,
             payload={"plan_id": plan_id},
+            created_by_user_id=actor_id,
         )
         db.commit()
         recovered_task_id = recovered.task.id
@@ -299,6 +309,7 @@ def test_background_worker_dead_letters_invalid_payload_and_leaves_network_scan_
 
 
 def test_background_worker_content_scan_opt_in_recovers_domain_success_without_duplicate_run(client):
+    actor_id = _bootstrap_admin_id(client, "background_task_scan_admin")
     settings = get_settings().model_copy(deep=True)
     settings.background_task_worker_batch_size = 1
     settings.background_task_worker_content_scan_enabled = True
@@ -310,6 +321,7 @@ def test_background_worker_content_scan_opt_in_recovers_domain_success_without_d
             source_type="content_script_asset_scan_request",
             source_id=None,
             payload={"slug": None, "source_host": None, "scan_limit": 25, "scan_offset": 0},
+            created_by_user_id=actor_id,
         )
         db.commit()
         task_id = queued.task.id
@@ -339,6 +351,56 @@ def test_background_worker_content_scan_opt_in_recovers_domain_success_without_d
         assert task.result_summary_json["recovered_existing_run"] is True
         assert run.attempt_count == 1
         assert db.scalar(select(func.count()).select_from(ContentScriptAssetScanRun)) == 1
+
+
+def test_background_worker_reauthorizes_privileged_task_actor_before_execution(client):
+    root_token = _bootstrap_admin(client, username="background_task_root_admin")
+    registered = client.post(
+        "/api/auth/register",
+        json={
+            "username": "background_task_revoked_admin",
+            "password": "secret123",
+            "display_name": "Revoked Task Admin",
+            "role": "teacher",
+        },
+    )
+    assert registered.status_code == 201
+    actor_id = registered.json()["id"]
+    promoted = client.patch(
+        f"/api/admin/users/{actor_id}",
+        headers=_auth_header(root_token),
+        json={"role": "admin"},
+    )
+    assert promoted.status_code == 200
+
+    with _session_factory()() as db:
+        queued = enqueue_background_task(
+            db,
+            task_type="content_script_asset_scan",
+            idempotency_key="revoked-actor-content-scan",
+            source_type="content_script_asset_scan_request",
+            source_id=None,
+            payload={"slug": None, "source_host": None, "scan_limit": 25, "scan_offset": 0},
+            created_by_user_id=actor_id,
+        )
+        db.commit()
+        task_id = queued.task.id
+
+    demoted = client.patch(
+        f"/api/admin/users/{actor_id}",
+        headers=_auth_header(root_token),
+        json={"role": "student"},
+    )
+    assert demoted.status_code == 200
+    settings = get_settings().model_copy(deep=True)
+    settings.background_task_worker_content_scan_enabled = True
+    report = BackgroundTaskWorker(settings=settings, worker_id="revoked-actor-worker").run_once_sync()
+    assert report.dead_letter_count == 1
+    with _session_factory()() as db:
+        task = db.get(BackgroundTask, task_id)
+        assert task.status == "dead_letter"
+        assert task.last_error_code == "privileged_task_actor_unauthorized"
+        assert db.scalar(select(func.count()).select_from(ContentScriptAssetScanRun)) == 0
 
 
 def test_background_worker_materializes_due_schedule_as_unified_task_record(client):

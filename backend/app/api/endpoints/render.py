@@ -1,5 +1,7 @@
 import json
 import secrets
+import base64
+import hashlib
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -42,11 +44,15 @@ def render_script_sandbox_document(sandbox_id: str, slug: str, response: Respons
     manifest = _find_script_sandbox_manifest(page, sandbox_id)
     sandbox = manifest["sandbox"]
     references = _script_manifest_references(manifest)
-    for reference in references:
-        _script_asset_binding(db, page_record, sandbox_id, reference)
+    asset_descriptors = _script_sandbox_asset_descriptors(db, page_record, sandbox_id, references)
     document = _script_sandbox_document_contract(manifest)
     nonce = _script_sandbox_nonce()
-    csp = _harden_sandbox_csp(str(sandbox["csp"]), nonce=nonce, frame_ancestors=_sandbox_frame_ancestors())
+    csp = _harden_sandbox_csp(
+        str(sandbox["csp"]),
+        nonce=nonce,
+        script_hashes=[str(asset["integrity"]) for asset in asset_descriptors],
+        frame_ancestors=_sandbox_frame_ancestors(),
+    )
     response.headers["Content-Security-Policy"] = csp
     response.headers["X-Astra-Content-Script-Sandbox-Id"] = sandbox_id
     response.headers["X-Astra-Content-Script-Iframe-Sandbox"] = str(sandbox["iframeSandbox"])
@@ -74,20 +80,17 @@ def render_script_sandbox_bootstrap(
     for reference in references:
         _script_asset_binding(db, page_record, sandbox_id, reference)
     document = _script_sandbox_document_contract(manifest)
-    asset_urls = [
-        _script_sandbox_asset_url(slug=page.slug, sandbox_id=sandbox_id, asset_sha256=str(reference["valueSha256"]))
-        for reference in references
-    ]
+    asset_descriptors = _script_sandbox_asset_descriptors(db, page_record, sandbox_id, references)
     payload = _script_sandbox_bootstrap_js(
         slug=page.slug,
         sandbox_id=sandbox_id,
-        asset_urls=asset_urls,
+        asset_descriptors=asset_descriptors,
         document=document,
     )
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Astra-Content-Script-Sandbox-Id"] = sandbox_id
     response.headers["X-Astra-Content-Script-Bootstrap-Version"] = "bootstrap-v1"
-    response.headers["X-Astra-Content-Script-Asset-Count"] = str(len(asset_urls))
+    response.headers["X-Astra-Content-Script-Asset-Count"] = str(len(asset_descriptors))
     response.headers["X-Astra-Content-Script-Template-Id"] = document.template_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
@@ -554,9 +557,15 @@ def _is_allowed_local_script_asset(candidate: Path) -> bool:
     return False
 
 
-def _harden_sandbox_csp(csp: str, *, nonce: str, frame_ancestors: list[str] | None = None) -> str:
+def _harden_sandbox_csp(
+    csp: str,
+    *,
+    nonce: str,
+    script_hashes: list[str] | None = None,
+    frame_ancestors: list[str] | None = None,
+) -> str:
     directives = _parse_csp_directives(csp)
-    _upsert_script_src_nonce(directives, nonce=nonce)
+    _upsert_script_src_nonce(directives, nonce=nonce, script_hashes=script_hashes or [])
     ancestors = frame_ancestors or ["'self'"]
     for name, values in [
         ("base-uri", ["'none'"]),
@@ -584,9 +593,15 @@ def _parse_csp_directives(csp: str) -> dict[str, list[str]]:
     return directives
 
 
-def _upsert_script_src_nonce(directives: dict[str, list[str]], *, nonce: str) -> None:
+def _upsert_script_src_nonce(
+    directives: dict[str, list[str]],
+    *,
+    nonce: str,
+    script_hashes: list[str],
+) -> None:
     nonce_source = f"'nonce-{nonce}'"
-    directives["script-src"] = [nonce_source]
+    hash_sources = [f"'{value}'" for value in script_hashes if value.startswith("sha256-")]
+    directives["script-src"] = [nonce_source, *dict.fromkeys(hash_sources)]
 
 
 def _sandbox_frame_ancestors() -> list[str]:
@@ -648,12 +663,12 @@ def _script_sandbox_bootstrap_js(
     *,
     slug: str,
     sandbox_id: str,
-    asset_urls: list[str],
+    asset_descriptors: list[dict[str, str]],
     document: ResolvedScriptSandboxDocument,
 ) -> str:
     slug_literal = _js_string_literal(slug)
     sandbox_id_literal = _js_string_literal(sandbox_id)
-    asset_urls_literal = json.dumps(asset_urls)
+    asset_descriptors_literal = json.dumps(asset_descriptors, separators=(",", ":"))
     template_id_literal = _js_string_literal(document.template_id)
     contract_version_literal = _js_string_literal(document.contract_version)
     initializer_literal = _js_string_literal(document.initializer)
@@ -665,15 +680,15 @@ def _script_sandbox_bootstrap_js(
         "    protocolVersion: \"astra-script-sandbox-bootstrap-v1\",\n"
         f"    slug: {slug_literal},\n"
         f"    sandboxId: {sandbox_id_literal},\n"
-        f"    assetCount: {len(asset_urls)},\n"
+        f"    assetCount: {len(asset_descriptors)},\n"
         f"    documentContractVersion: {contract_version_literal},\n"
         f"    templateId: {template_id_literal},\n"
         "  });\n"
-        f"  const assetUrls = Object.freeze({asset_urls_literal});\n"
+        f"  const assetDescriptors = Object.freeze({asset_descriptors_literal}.map((asset) => Object.freeze(asset)));\n"
+        "  const assetUrls = Object.freeze(assetDescriptors.map((asset) => asset.url));\n"
         f"  const documentConfig = Object.freeze({config_literal});\n"
         f"  const initializerName = {initializer_literal};\n"
         '  const root = document.getElementById("astra-sandbox-root");\n'
-        "  const nonce = document.currentScript && document.currentScript.nonce ? document.currentScript.nonce : \"\";\n"
         "  const post = (type, payload = {}) => {\n"
         "    if (window.parent === window) return;\n"
         "    window.parent.postMessage({ source: \"astra-content-script-sandbox\", type, metadata, payload }, \"*\");\n"
@@ -694,23 +709,23 @@ def _script_sandbox_bootstrap_js(
         "    assetUrls,\n"
         "    documentConfig,\n"
         "    root,\n"
-        "    nonce,\n"
         "    ready(payload = {}) { post(\"ready\", payload); },\n"
         "    error(payload = {}) { post(\"error\", payload); },\n"
         "    post(type, payload = {}) { post(String(type || \"message\"), payload); },\n"
         "  });\n"
-        "  const loadAsset = (url) => new Promise((resolve, reject) => {\n"
+        "  const loadAsset = (asset) => new Promise((resolve, reject) => {\n"
         "    const script = document.createElement(\"script\");\n"
-        "    script.src = url;\n"
+        "    script.src = asset.url;\n"
+        "    script.integrity = asset.integrity;\n"
+        "    script.crossOrigin = \"anonymous\";\n"
         "    script.defer = true;\n"
-        "    if (nonce) script.nonce = nonce;\n"
-        "    script.onload = () => resolve(url);\n"
-        "    script.onerror = () => reject(new Error(`Failed to load sandbox asset: ${url}`));\n"
+        "    script.onload = () => resolve(asset.url);\n"
+        "    script.onerror = () => reject(new Error(\"Failed to load an approved sandbox asset.\"));\n"
         "    document.head.appendChild(script);\n"
         "  });\n"
         "  const loadAssets = async () => {\n"
-        "    for (const url of assetUrls) {\n"
-        "      await loadAsset(url);\n"
+        "    for (const asset of assetDescriptors) {\n"
+        "      await loadAsset(asset);\n"
         "    }\n"
         "  };\n"
         "  const initializeDocument = async () => {\n"
@@ -744,6 +759,30 @@ def _script_sandbox_bootstrap_js(
         "    .catch((error) => post(\"error\", { code: \"content_script_sandbox_bootstrap_failed\", message: normalizeError(error) }));\n"
         "})();\n"
     )
+
+
+def _script_sandbox_asset_descriptors(
+    db: Session,
+    page: ContentPageRecord,
+    sandbox_id: str,
+    references: list[dict[str, Any]],
+) -> list[dict[str, str]]:
+    descriptors: list[dict[str, str]] = []
+    for reference in references:
+        binding = _script_asset_binding(db, page, sandbox_id, reference)
+        payload = binding.content_bytes if isinstance(binding, ContentScriptAsset) else binding.read_bytes()
+        integrity = "sha256-" + base64.b64encode(hashlib.sha256(payload).digest()).decode("ascii")
+        descriptors.append(
+            {
+                "url": _script_sandbox_asset_url(
+                    slug=page.slug,
+                    sandbox_id=sandbox_id,
+                    asset_sha256=str(reference["valueSha256"]),
+                ),
+                "integrity": integrity,
+            }
+        )
+    return descriptors
 
 
 def _js_string_literal(value: str) -> str:

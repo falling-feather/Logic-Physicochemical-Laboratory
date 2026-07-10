@@ -1,5 +1,5 @@
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -33,9 +33,13 @@ def get_course(db: Session, course_id: int) -> Course:
 def visible_school_ids(db: Session, user_id: int) -> list[int]:
     return list(
         db.scalars(
-            select(SchoolMembership.school_id).where(
+            select(SchoolMembership.school_id)
+            .join(User, User.id == SchoolMembership.user_id)
+            .where(
                 SchoolMembership.user_id == user_id,
                 SchoolMembership.status == "active",
+                User.status == "active",
+                _membership_role_matches_global_role(SchoolMembership.role),
             )
         ).all()
     )
@@ -44,10 +48,14 @@ def visible_school_ids(db: Session, user_id: int) -> list[int]:
 def teacher_school_ids(db: Session, user_id: int) -> list[int]:
     return list(
         db.scalars(
-            select(SchoolMembership.school_id).where(
+            select(SchoolMembership.school_id)
+            .join(User, User.id == SchoolMembership.user_id)
+            .where(
                 SchoolMembership.user_id == user_id,
                 SchoolMembership.role.in_(["admin", "teacher"]),
                 SchoolMembership.status == "active",
+                User.status == "active",
+                User.role.in_(["admin", "teacher"]),
             )
         ).all()
     )
@@ -56,9 +64,13 @@ def teacher_school_ids(db: Session, user_id: int) -> list[int]:
 def visible_class_ids(db: Session, user_id: int) -> list[int]:
     return list(
         db.scalars(
-            select(ClassMembership.class_id).where(
+            select(ClassMembership.class_id)
+            .join(User, User.id == ClassMembership.user_id)
+            .where(
                 ClassMembership.user_id == user_id,
                 ClassMembership.status == "active",
+                User.status == "active",
+                _membership_role_matches_global_role(ClassMembership.role),
             )
         ).all()
     )
@@ -67,10 +79,14 @@ def visible_class_ids(db: Session, user_id: int) -> list[int]:
 def teacher_class_ids(db: Session, user_id: int) -> list[int]:
     return list(
         db.scalars(
-            select(ClassMembership.class_id).where(
+            select(ClassMembership.class_id)
+            .join(User, User.id == ClassMembership.user_id)
+            .where(
                 ClassMembership.user_id == user_id,
                 ClassMembership.role == "teacher",
                 ClassMembership.status == "active",
+                User.status == "active",
+                User.role.in_(["admin", "teacher"]),
             )
         ).all()
     )
@@ -79,10 +95,14 @@ def teacher_class_ids(db: Session, user_id: int) -> list[int]:
 def active_class_student_ids(db: Session, class_id: int) -> list[int]:
     return list(
         db.scalars(
-            select(ClassMembership.user_id).where(
+            select(ClassMembership.user_id)
+            .join(User, User.id == ClassMembership.user_id)
+            .where(
                 ClassMembership.class_id == class_id,
                 ClassMembership.role == "student",
                 ClassMembership.status == "active",
+                User.role == "student",
+                User.status == "active",
             )
         ).all()
     )
@@ -101,6 +121,7 @@ def require_school_member(db: Session, user: User, school_id: int) -> None:
         select(SchoolMembership).where(
             SchoolMembership.school_id == school_id,
             SchoolMembership.user_id == user.id,
+            SchoolMembership.role.in_(compatible_scope_roles(user.role)),
             SchoolMembership.status == "active",
         )
     )
@@ -118,11 +139,14 @@ def require_school_role(
 ) -> None:
     if user.role == "admin":
         return
+    compatible_roles = roles.intersection(compatible_scope_roles(user.role))
+    if not compatible_roles:
+        raise HTTPException(status_code=403, detail=detail)
     membership = db.scalar(
         select(SchoolMembership).where(
             SchoolMembership.school_id == school_id,
             SchoolMembership.user_id == user.id,
-            SchoolMembership.role.in_(roles),
+            SchoolMembership.role.in_(compatible_roles),
             SchoolMembership.status == "active",
         )
     )
@@ -142,6 +166,8 @@ def require_school_teacher_or_admin(
         if school is None:
             raise HTTPException(status_code=404, detail="School not found")
         return school
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail=detail)
     school = db.scalar(
         select(School)
         .join(SchoolMembership, SchoolMembership.school_id == School.id)
@@ -165,6 +191,7 @@ def require_class_member(db: Session, user: User, class_id: int) -> ClassGroup:
         select(ClassMembership).where(
             ClassMembership.class_id == class_id,
             ClassMembership.user_id == user.id,
+            ClassMembership.role.in_(compatible_scope_roles(user.role)),
             ClassMembership.status == "active",
         )
     )
@@ -182,6 +209,8 @@ def require_class_teacher_or_admin(
 ) -> None:
     if user.role == "admin":
         return
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail=detail)
     membership = db.scalar(
         select(ClassMembership).where(
             ClassMembership.class_id == class_group.id,
@@ -203,6 +232,8 @@ def require_class_teacher_or_admin_by_id(
 ) -> ClassGroup:
     if user.role == "admin":
         return get_class(db, class_id)
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail=detail)
     class_group = db.scalar(
         select(ClassGroup)
         .join(ClassMembership, ClassMembership.class_id == ClassGroup.id)
@@ -224,7 +255,7 @@ def require_course_author_or_admin(
     *,
     detail: str = "Course author role is required",
 ) -> None:
-    if user.role == "admin" or course.creator_user_id == user.id:
+    if user.role == "admin" or (user.role == "teacher" and course.creator_user_id == user.id):
         return
     raise HTTPException(status_code=403, detail=detail)
 
@@ -253,8 +284,10 @@ def require_course_collaborator_or_admin(
     *,
     detail: str = "Course collaborator role is required",
 ) -> None:
-    if user.role == "admin" or course.creator_user_id == user.id:
+    if user.role == "admin" or (user.role == "teacher" and course.creator_user_id == user.id):
         return
+    if user.role != "teacher":
+        raise HTTPException(status_code=403, detail=detail)
     collaborator = db.scalar(
         select(CourseCollaborator).where(
             CourseCollaborator.course_id == course.id,
@@ -272,11 +305,12 @@ def require_course_visible(db: Session, user: User, course_id: int) -> Course:
     course = get_course(db, course_id)
     if user.role == "admin":
         return course
+    compatible_school_roles = compatible_scope_roles(user.role).intersection({"admin", "teacher"})
     school_membership = db.scalar(
         select(SchoolMembership).where(
             SchoolMembership.school_id == course.school_id,
             SchoolMembership.user_id == user.id,
-            SchoolMembership.role.in_(["admin", "teacher"]),
+            SchoolMembership.role.in_(compatible_school_roles),
             SchoolMembership.status == "active",
         )
     )
@@ -340,3 +374,79 @@ def require_student_unit_published(user: User, unit: CourseUnit) -> None:
 def require_student_assignment_active(user: User, assignment: Assignment) -> None:
     if user.role == "student" and assignment.status != "active":
         raise HTTPException(status_code=409, detail="Assignment is not active")
+
+
+def deactivate_incompatible_authority_rows(db: Session, user: User) -> dict[str, int]:
+    compatible_roles = compatible_scope_roles(user.role)
+    school_result = db.execute(
+        update(SchoolMembership)
+        .where(
+            SchoolMembership.user_id == user.id,
+            SchoolMembership.status == "active",
+            ~SchoolMembership.role.in_(compatible_roles),
+        )
+        .values(status="inactive")
+    )
+    class_result = db.execute(
+        update(ClassMembership)
+        .where(
+            ClassMembership.user_id == user.id,
+            ClassMembership.status == "active",
+            ~ClassMembership.role.in_(compatible_roles),
+        )
+        .values(status="inactive")
+    )
+    collaborator_count = 0
+    if user.role not in {"admin", "teacher"}:
+        collaborator_result = db.execute(
+            update(CourseCollaborator)
+            .where(
+                CourseCollaborator.user_id == user.id,
+                CourseCollaborator.status == "active",
+            )
+            .values(status="inactive")
+        )
+        collaborator_count = int(collaborator_result.rowcount or 0)
+    return {
+        "school_memberships": int(school_result.rowcount or 0),
+        "class_memberships": int(class_result.rowcount or 0),
+        "course_collaborators": collaborator_count,
+    }
+
+
+def lock_scope_eligible_user(
+    db: Session,
+    user_id: int,
+    scope_role: str,
+    *,
+    detail: str = "Membership user is no longer eligible",
+    status_code: int = 409,
+) -> User:
+    compatible_global_roles = {"student"} if scope_role == "student" else {"admin", "teacher"}
+    user = db.scalar(
+        select(User)
+        .where(User.id == user_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if user is None or user.status != "active" or user.role not in compatible_global_roles:
+        raise HTTPException(status_code=status_code, detail=detail)
+    return user
+
+
+def compatible_scope_roles(global_role: str) -> set[str]:
+    if global_role == "student":
+        return {"student"}
+    if global_role == "teacher":
+        return {"admin", "teacher"}
+    if global_role == "admin":
+        return {"admin", "teacher", "student"}
+    return set()
+
+
+def _membership_role_matches_global_role(role_column):
+    return or_(
+        and_(User.role == "student", role_column == "student"),
+        and_(User.role == "teacher", role_column.in_(["admin", "teacher"])),
+        and_(User.role == "admin", role_column.in_(["admin", "teacher", "student"])),
+    )

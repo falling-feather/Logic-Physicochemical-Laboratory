@@ -138,7 +138,7 @@ def login(
         max_age=settings.session_days * 24 * 60 * 60,
         httponly=True,
         samesite="lax",
-        secure=settings.environment.lower() in {"production", "prod"},
+        secure=settings.is_production_like,
     )
     return LoginResponse(user=UserPublic.model_validate(user), access_token=token)
 
@@ -379,10 +379,18 @@ def _enforce_password_strength(password: str, username: str) -> None:
 
 
 def _get_login_attempt(db: Session, username: str) -> LoginAttempt:
-    attempt = db.scalar(select(LoginAttempt).where(LoginAttempt.normalized_username == username))
+    statement = select(LoginAttempt).where(LoginAttempt.normalized_username == username).with_for_update()
+    attempt = db.scalar(statement)
     if attempt is None:
         attempt = LoginAttempt(username=username, normalized_username=username, failure_count=0)
-        db.add(attempt)
+        try:
+            with db.begin_nested():
+                db.add(attempt)
+                db.flush()
+        except IntegrityError:
+            attempt = db.scalar(statement)
+            if attempt is None:
+                raise
     return attempt
 
 
@@ -514,7 +522,7 @@ def _password_reset_subject_hash(username: str) -> str:
 
 
 def _should_return_password_reset_token(settings) -> bool:
-    return settings.password_reset_return_token_for_dev and settings.environment.lower() not in {"production", "prod"}
+    return settings.password_reset_return_token_for_dev and settings.is_local_development
 
 
 def _password_reset_request_is_in_cooldown(

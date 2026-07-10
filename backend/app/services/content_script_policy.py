@@ -9,9 +9,9 @@ import json
 import re
 from typing import Any, Callable
 from urllib.parse import unquote, urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from app.schemas.content import ContentPage
+from app.services.safe_outbound_http import fetch_public_https_bytes
 from app.services.content_script_sandbox_templates import (
     ScriptSandboxDocumentError,
     resolve_script_sandbox_document,
@@ -1024,18 +1024,12 @@ def _sri_token_matches_asset(token: str, asset_bytes: bytes) -> bool:
 
 
 def _default_external_script_fetcher(url: str) -> bytes:
-    request = Request(url, headers={"User-Agent": "Astra-content-script-verifier/1.0"})
-    opener = build_opener(_NoRedirectHandler)
-    with opener.open(request, timeout=EXTERNAL_SCRIPT_FETCH_TIMEOUT_SECONDS) as response:
-        payload = response.read(MAX_EXTERNAL_SCRIPT_BYTES + 1)
-    if len(payload) > MAX_EXTERNAL_SCRIPT_BYTES:
-        raise ValueError("external script asset exceeds maximum verification size")
-    return payload
-
-
-class _NoRedirectHandler(HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
+    return fetch_public_https_bytes(
+        url,
+        max_bytes=MAX_EXTERNAL_SCRIPT_BYTES,
+        timeout_seconds=EXTERNAL_SCRIPT_FETCH_TIMEOUT_SECONDS,
+        user_agent="Astra-content-script-verifier/1.1",
+    )
 
 
 def _preview(value: str | None) -> str | None:

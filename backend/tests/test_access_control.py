@@ -4,7 +4,15 @@ from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import Course, CourseUnit, SchoolMembership, User, UserKnowledgeSnapshot
+from app.models import (
+    ClassMembership,
+    Course,
+    CourseCollaborator,
+    CourseUnit,
+    SchoolMembership,
+    User,
+    UserKnowledgeSnapshot,
+)
 from app.services import knowledge_snapshot_runs
 
 
@@ -152,6 +160,83 @@ def _set_school_teacher_membership_status(user_id: int, school_id: int, status: 
         assert membership is not None
         membership.status = status
         db.commit()
+
+
+def test_global_role_change_revokes_session_and_deactivates_stale_authority(client):
+    scope = _create_learning_scope(client)
+    admin_token = _bootstrap_admin(client, "admin_role_coherence")
+    candidate = _register_and_login(client, "teacher_role_coherence", "teacher")
+    _grant_school_teacher_membership(candidate["id"], scope["school_id"])
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        db.add(
+            ClassMembership(
+                class_id=scope["class_id"],
+                user_id=candidate["id"],
+                role="teacher",
+                status="active",
+            )
+        )
+        db.commit()
+
+    collaborator = client.post(
+        f"/api/courses/{scope['course_id']}/collaborators",
+        headers=_auth_header(scope["teacher"]["token"]),
+        json={"user_id": candidate["id"], "role": "editor"},
+    )
+    assert collaborator.status_code == 201
+    before = client.get(
+        f"/api/admin/classes/{scope['class_id']}/stats",
+        headers=_auth_header(candidate["token"]),
+    )
+    assert before.status_code == 200
+
+    demote = client.patch(
+        f"/api/admin/users/{candidate['id']}",
+        headers=_auth_header(admin_token),
+        json={"role": "student"},
+    )
+    assert demote.status_code == 200
+    assert demote.json()["role"] == "student"
+    assert client.get("/api/users/me", headers=_auth_header(candidate["token"])).status_code == 401
+
+    relogin = client.post(
+        "/api/auth/login",
+        json={"username": "teacher_role_coherence", "password": "secret123"},
+    )
+    assert relogin.status_code == 200
+    student_headers = _auth_header(relogin.json()["access_token"])
+    assert client.get(f"/api/admin/classes/{scope['class_id']}/stats", headers=student_headers).status_code == 403
+    assert client.post(
+        "/api/classes",
+        headers=student_headers,
+        json={"school_id": scope["school_id"], "name": "Unauthorized Class"},
+    ).status_code == 403
+
+    with session_factory() as db:
+        school_membership = db.scalar(
+            select(SchoolMembership).where(
+                SchoolMembership.user_id == candidate["id"],
+                SchoolMembership.school_id == scope["school_id"],
+                SchoolMembership.role == "teacher",
+            )
+        )
+        class_membership = db.scalar(
+            select(ClassMembership).where(
+                ClassMembership.user_id == candidate["id"],
+                ClassMembership.class_id == scope["class_id"],
+                ClassMembership.role == "teacher",
+            )
+        )
+        course_collaborator = db.scalar(
+            select(CourseCollaborator).where(
+                CourseCollaborator.user_id == candidate["id"],
+                CourseCollaborator.course_id == scope["course_id"],
+            )
+        )
+        assert school_membership.status == "inactive"
+        assert class_membership.status == "inactive"
+        assert course_collaborator.status == "inactive"
 
 
 def test_outside_users_cannot_cross_school_class_course_boundaries(client):

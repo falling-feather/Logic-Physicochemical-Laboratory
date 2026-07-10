@@ -393,7 +393,7 @@ def grade_submission(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Submission:
-    submission = db.get(Submission, submission_id)
+    submission = db.scalar(select(Submission).where(Submission.id == submission_id).with_for_update())
     if submission is None:
         raise HTTPException(status_code=404, detail="Submission not found")
     assignment, _, course = _resolve_assignment(db, submission.assignment_id)

@@ -408,13 +408,18 @@ def heartbeat_content_script_asset_scan_job_lease(
 
 
 def finish_content_script_asset_scan_run_success(
-    run: ContentScriptAssetScanRun,
+    db: Session,
+    lease: ContentScriptAssetScanJobLease,
     *,
     report: ContentScriptAssetRemoteDriftReport,
     finished_at: datetime | None = None,
-) -> None:
+) -> ContentScriptAssetScanRun | None:
+    completion_time = _as_naive_utc(finished_at or utc_now())
+    run = _owned_running_content_script_scan(db, lease, now=_as_naive_utc(utc_now()))
+    if run is None:
+        return None
     run.status = CONTENT_SCRIPT_ASSET_SCAN_RUN_STATUS_SUCCESS
-    run.finished_at = _as_naive_utc(finished_at or report.generated_at)
+    run.finished_at = completion_time
     run.totals_json = _remote_drift_report_totals(report)
     run.issue_counts_json = {
         "by_code": dict(report.issue_counts_by_code),
@@ -427,19 +432,46 @@ def finish_content_script_asset_scan_run_success(
     run.alert_status = _alert_status_from_issue_counts(report.issue_counts_by_severity)
     run.error_message = None
     _clear_scheduler_lease(run)
+    return run
 
 
 def finish_content_script_asset_scan_run_failure(
-    run: ContentScriptAssetScanRun,
+    db: Session,
+    lease: ContentScriptAssetScanJobLease,
     *,
     error: BaseException,
     finished_at: datetime | None = None,
-) -> None:
+) -> ContentScriptAssetScanRun | None:
+    completion_time = _as_naive_utc(finished_at or utc_now())
+    run = _owned_running_content_script_scan(db, lease, now=_as_naive_utc(utc_now()))
+    if run is None:
+        return None
     run.status = CONTENT_SCRIPT_ASSET_SCAN_RUN_STATUS_FAILED
-    run.finished_at = _as_naive_utc(finished_at or utc_now())
+    run.finished_at = completion_time
     run.alert_status = "critical"
     run.error_message = error.__class__.__name__
     _clear_scheduler_lease(run)
+    return run
+
+
+def _owned_running_content_script_scan(
+    db: Session,
+    lease: ContentScriptAssetScanJobLease,
+    *,
+    now: datetime,
+) -> ContentScriptAssetScanRun | None:
+    return db.scalar(
+        select(ContentScriptAssetScanRun)
+        .where(
+            ContentScriptAssetScanRun.run_key == lease.run_key,
+            ContentScriptAssetScanRun.status == CONTENT_SCRIPT_ASSET_SCAN_RUN_STATUS_RUNNING,
+            ContentScriptAssetScanRun.scheduler_lease_owner == lease.lease_owner,
+            ContentScriptAssetScanRun.scheduler_lease_token == lease.lease_token,
+            ContentScriptAssetScanRun.scheduler_lease_expires_at > now,
+        )
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
 
 
 def _claim_existing_content_script_asset_scan_job_lease(

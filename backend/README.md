@@ -12,6 +12,8 @@ V6.6.57 已新增外部 issue provider 协议与首个 GitHub REST 适配器。�
 
 V6.6.58 已新增 `app.services.backend_performance`、`scripts.backend_performance_drill` 与管理端性能报告。11 个 query profile 覆盖审计、知识快照 run、脚本扫描 run、待批改、任务 claim、Bug 和外部同步账本；Alembic 0043 新增 10 个复合索引，并复用 0040 既有任务 claim 索引。报告可执行 EXPLAIN 和 3 轮最多 50 行的有界基准，只返回索引/访问方式/耗时/行数摘要，不返回 SQL、参数、结果值或数据库 URL。API 返回 `Server-Timing`，慢 API 只记录 request id/方法/路由模板/状态/耗时，慢 SQL 只记录语句 hash/操作/方言/耗时。MySQL 配置显式定义 pool size、overflow、等待/回收和 connect/read/write timeout；`pool_pre_ping` 与 LIFO 保留，事务写入不自动重试，worker 推荐独立服务。
 
+V6.6.59 已完成安全、隐私和发布冻结：非本地环境 bootstrap/cookie fail closed，CORS 只接受精确 origin；全局角色与 scoped authority 联动，角色变化撤销会话并清理不兼容权限，admin 控制面使用数据库锁串行化。内容审核绑定最后编辑者和精确 schema hash，schema 有界；外部脚本统一走公网 HTTPS pinned fetch，sandbox 资产按 hash CSP/SRI 执行且导航 fail closed。后台外部副作用要求活动 admin actor/有效租约，浏览器敏感学习状态不落普通 storage，静态服务只公开显式前端资源。Alembic head 为 0045。
+
 ## 本地启动
 
 ```bash
@@ -102,7 +104,7 @@ python -m scripts.backend_stage_gate --require-mysql \
 | GET | `/api/auth/sessions` | 当前用户活动会话列表；只返回未撤销、未过期会话，并标记 `is_current`；返回 `device_label`、登录时 `user_agent`、`last_seen_at` 等会话摘要，不返回 token 或 IP 明文 |
 | DELETE | `/api/auth/sessions/{id}` | 撤销当前用户自己的单个活动会话；撤销当前会话会清理 cookie，并写入 `auth.session.revoke` 审计 |
 | GET | `/api/users/me` | 当前用户；已撤销、过期或非 active 用户会话返回 `401` |
-| POST | `/api/admin/bootstrap` | 首个管理员受控初始化；生产环境必须提供 `ASTRA_ADMIN_BOOTSTRAP_TOKEN` 且响应/审计不回显 token，用户名会修剪并小写落库，复用密码策略，公开注册仍拒绝 admin |
+| POST | `/api/admin/bootstrap` | 首个管理员受控初始化；除本地 dev/test 外必须提供 `ASTRA_ADMIN_BOOTSTRAP_TOKEN`，也可用 `ASTRA_ADMIN_BOOTSTRAP_ENABLED=false` 完全关闭；数据库控制锁保证并发单次，响应/审计不回显 token |
 | GET/PATCH | `/api/admin/users` / `/api/admin/users/{id}` | 管理端用户列表与角色/状态维护；列表返回 `items/total/limit/offset/next_offset`；把用户置为 `disabled` 时撤销未撤销会话，并在 `admin.user.update` 快照记录 `revoked_sessions` |
 | POST | `/api/admin/users/{id}/password-reset` | 管理员重置用户密码；复用密码强度策略，成功后撤销目标用户未撤销会话、清理登录失败桶，并写入不含密码明文或 hash 的 `admin.user.password_reset` 审计 |
 | GET | `/api/admin/schools` | 管理端学校基础查看；支持分页与关键字搜索 |
@@ -216,7 +218,7 @@ python -m scripts.backend_stage_gate --require-mysql \
 | PATCH | `/api/content/drafts/{id}/script-review` | 管理员审核允许脚本的草稿；作者不能自审，阻断级脚本策略结果不可审核通过 |
 | POST | `/api/content/page-versions/{id}/rollback` | 管理员按历史版本追加式回滚，生成新的当前版本；版本唯一冲突会返回 `409` |
 | GET | `/api/render/page/{slug}` | 前端可渲染页面结构；公开响应会移除原始脚本引用，仅保留带稳定 `sandboxId` 的 `scriptManifest`，并在可执行且唯一的 manifest 中提供脱敏 `embed` 描述符（iframe src/sandbox/referrerPolicy/messageProtocol/capabilities），同时返回 `X-Astra-Content-Script-*` 沙箱契约头 |
-| GET | `/api/render/script-sandboxes/{sandbox_id}/page/{slug}` | 按已发布私有 schema 和后端模板注册表生成内容脚本 sandbox HTML；document contract 必须匹配 `astra-sandbox-dom-v1`、已登记 templateId 和受控 config。每次响应生成运行时 CSP nonce，`script-src` 与 bootstrap `<script nonce>` 同步绑定，`frame-ancestors` 只允许 `'self'` 和 `ASTRA_CORS_ORIGINS` 中合法 origin；blocked、歧义、缺失镜像、缺失/未知模板 fail closed |
+| GET | `/api/render/script-sandboxes/{sandbox_id}/page/{slug}` | 按已发布私有 schema 和后端模板生成 sandbox HTML；nonce 只启动受信 bootstrap，资产脚本按服务端字节 SHA-256 CSP/SRI 授权且不继承 nonce；`frame-ancestors` 只允许 `'self'` 和精确 CORS origin，blocked/歧义/缺镜像/未知模板 fail closed |
 | GET | `/api/render/script-sandboxes/{sandbox_id}/bootstrap/page/{slug}` | 返回 sandbox 内后端受控 bootstrap JS；按 published slug + sandboxId 生成受控资产 URL 列表，顺序加载资产并调用 allowlist initializer，只有 initializer 显式返回 `{ready:true}` 才发送 ready；postMessage 同时绑定 `bootstrap-v1`、templateId 和 document contract。响应 `application/javascript`、`no-store`、`nosniff`、`no-referrer` 和 `Cross-Origin-Resource-Policy: cross-origin` |
 | GET | `/api/render/script-sandboxes/{sandbox_id}/assets/{asset_sha256}/page/{slug}` | 按 published slug + sandboxId + 脚本引用 SHA-256 读取受控 JS 资产；本地资产仅允许 `pages/`、`shared/js/`、`codevis/shared/js/` 和 `drafts/` 根内 `.js` 文件，外部脚本只返回当前发布版本绑定的镜像字节；响应 `application/javascript`、引用 hash、镜像字节 hash、`no-store`、`nosniff`、`no-referrer` 和 `Cross-Origin-Resource-Policy: cross-origin` |
 
@@ -271,6 +273,8 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 | 变量 | 默认值 | 说明 |
 | ---- | ------ | ---- |
 | `ASTRA_ENVIRONMENT` | `development` | 运行环境 |
+| `ASTRA_ADMIN_BOOTSTRAP_ENABLED` | `true` | 首个管理员初始化开关；生产初始化完成后建议设为 `false` 并重启 |
+| `ASTRA_ADMIN_BOOTSTRAP_TOKEN` | 空 | 除 `dev/development/test/testing` 外，只要 bootstrap 开启就必须配置 |
 | `ASTRA_API_PREFIX` | `/api` | API 前缀 |
 | `ASTRA_API_CACHE_CONTROL` | `no-store` | API 响应固定缓存策略；配置模型只接受 `no-store`，业务 JSON 不进入浏览器或中间层缓存 |
 | `ASTRA_AUTO_CREATE_TABLES` | `false` | 是否启动时自动建表，开发临时可用，正式迁移应使用 Alembic |
@@ -307,12 +311,11 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 | `ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_RUN_ON_START` | `false` | 内容脚本远端漂移调度器启动后是否立即运行一次；部署 smoke 会临时关闭该开关 |
 | `ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_INTERVAL_SECONDS` | `3600` | 内容脚本远端漂移调度轮询间隔，最低 60 秒 |
 | `ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_LEASE_SECONDS` | `3600` | 内容脚本远端漂移扫描 run 租约有效期，过期 running run 可被新 worker 接管，最低 60 秒 |
-| `ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_ACTOR_USER_ID` | 空 | 可选的调度归因用户 id；为空时 run 允许无创建人，仅以 `trigger_source=scheduler` 标记 |
+| `ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_ACTOR_USER_ID` | 空 | 外网扫描调度必须配置的活动 admin 用户 id；为空、禁用或非 admin 时跳过 |
 | `ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_SCAN_LIMIT` | `25` | 单轮调度最多扫描的 published 外部脚本引用数量，范围 1~200 |
 | `ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_SOURCE_HOST` | 空 | 可选调度筛选：仅扫描指定 source host |
 | `ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_SLUG` | 空 | 可选调度筛选：仅扫描指定内容页 slug |
-| `ASTRA_ADMIN_BOOTSTRAP_TOKEN` | 空 | 首个管理员初始化令牌；生产环境必须配置 |
-| `ASTRA_CORS_ORIGINS` | `http://127.0.0.1:8766,http://localhost:8766` | 允许访问 API 的前端来源白名单；sandbox HTML 的 `frame-ancestors` 也只从这里追加合法 `http/https` origin，跳过 `*`、`null` 和非法 origin |
+| `ASTRA_CORS_ORIGINS` | `http://127.0.0.1:8766,http://localhost:8766` | 凭据型 API 与 sandbox frame ancestor 的精确 origin；`*`、`null`、userinfo、路径、query、fragment 会使应用启动失败 |
 | `ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_ENABLED` | `false` | 是否随 FastAPI lifespan 启动知识快照进程内调度器 |
 | `ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_RUN_ON_START` | `false` | 调度器启动后是否立即检查一次到期窗口 |
 | `ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_INTERVAL_SECONDS` | `300` | 调度器轮询间隔，最低 30 秒 |
@@ -342,7 +345,7 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 | `ASTRA_PERFORMANCE_ADMIN_API_BUDGET_MS` | `1000` | 管理列表/query profile 单次预算基线 |
 | `ASTRA_PERFORMANCE_EXPORT_BUDGET_MS` | `5000` | 有界导出/性能报告总预算基线 |
 | `ASTRA_PERFORMANCE_PROBE_ITERATIONS` | `3` | 性能报告每个 query profile 的有界基准轮数，范围 1-20 |
-| `ASTRA_DATABASE_URL` | `mysql+pymysql://astra:astra@127.0.0.1:3306/astra?charset=utf8mb4` | MySQL 连接字符串 |
+| `ASTRA_DATABASE_URL` | `sqlite+pysqlite:///./astra-dev.db` | 安全的本地默认；生产必须通过环境/secret store 注入 MySQL URL，仓库不提供示例密码 |
 
 可从 `.env.example` 复制本地配置；真实密码不要提交到仓库。
 
@@ -409,6 +412,8 @@ python -m pytest backend
 
 V6.6.58 基线为 322 项全量 pytest；权限/班级策略/统计、外部投递、统一任务、审计锚定、外部 issue 和性能专项可运行：
 
+V6.6.59 基线为 352 项全量 pytest，Alembic head 为 `20260710_0045`；新增安全出站、角色一致性、审核绑定、隐私 storage、日志脱敏、无凭据本地数据库默认值与静态发布面合同。
+
 ```bash
 python -m pytest backend/tests/test_school_classes.py backend/tests/test_access_control.py backend/tests/test_course_learning_loop.py -q
 python -m pytest backend/tests/test_alert_delivery.py -q
@@ -419,7 +424,7 @@ python -m pytest backend/tests/test_backend_performance.py backend/tests/test_ap
 node tools/tests/v6653-permission-analytics-contract.cjs
 ```
 
-迁移最低门禁需验证 `upgrade 20260710_0042 -> upgrade head -> downgrade 20260710_0042 -> upgrade head`，最终 `alembic current` 必须为 `20260710_0043`；SQLite 往返只证明索引建撤合同，真实 MySQL 建索引时长、锁等待、空间和查询计划仍归 V6.6.60 RC 部署门禁。
+迁移最低门禁需验证 `upgrade 20260710_0043 -> upgrade head -> downgrade 20260710_0043 -> upgrade head`，最终 `alembic current` 必须为 `20260710_0045`；0044 绑定最后编辑者/审核 schema hash，0045 串行化 admin 安全控制面。SQLite 往返只证明 DDL 合同，真实 MySQL 建表/行锁证据仍归 V6.6.60 RC 部署门禁。
 
 权限范围回归可单独运行：
 
@@ -441,7 +446,7 @@ python -m alembic upgrade head
 
 ```bash
 cd backend
-python -m scripts.scan_content_script_asset_remote_drift --confirm-external-network --limit 25
+python -m scripts.scan_content_script_asset_remote_drift --confirm-external-network --actor-user-id <admin_id> --limit 25
 python -m scripts.scan_content_script_asset_remote_drift --confirm-external-network --source-host cdn.example.com --actor-user-id <admin_id>
 python -m scripts.content_script_remote_drift_drill --require-mysql --expect-scheduler-enabled
 ```
@@ -480,7 +485,7 @@ python -m scripts.audit_archive_drill --require-mysql --retention-days 365
 python -m scripts.archive_audit_logs --require-mysql --retention-days 365 --output-dir audit-archives
 python -m scripts.archive_audit_logs --require-mysql --before 2026-07-01T00:00:00Z --format jsonl --include-snapshot --exported-by <operator> --output-dir audit-archives
 python -m scripts.archive_audit_logs --verify audit-archives/audit-logs-archive-<stamp>.manifest.json
-python -m scripts.anchor_audit_archive --manifest audit-archives/audit-logs-archive-<stamp>.manifest.json --confirm-external-anchor
+python -m scripts.anchor_audit_archive --manifest audit-archives/audit-logs-archive-<stamp>.manifest.json --confirm-external-anchor --actor-user-id <admin_id>
 python -m scripts.run_background_tasks --once --enable-audit-anchor
 python -m scripts.anchor_audit_archive --status <anchor_id>
 ```

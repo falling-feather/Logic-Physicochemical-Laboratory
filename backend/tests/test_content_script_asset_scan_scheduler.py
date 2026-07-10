@@ -14,6 +14,10 @@ from app.services.content_script_asset_scan_scheduler import (
     ContentScriptRemoteDriftScheduleConfig,
     ContentScriptRemoteDriftScheduler,
 )
+from app.services.content_script_asset_scan_runs import (
+    acquire_content_script_asset_scan_job_lease,
+    finish_content_script_asset_scan_run_success,
+)
 from scripts.scan_content_script_asset_remote_drift import run_scan
 
 
@@ -264,6 +268,7 @@ def test_admin_remote_drift_scan_run_health_and_queue_reports_are_redacted(clien
 def test_content_script_remote_drift_scheduler_run_once_writes_observe_only_run(client, monkeypatch):
     actor_id = _insert_admin_user("script_scheduler_admin")
     captured = {}
+    now = datetime(2026, 7, 8, 12, 0, tzinfo=UTC)
 
     def fake_scan(db, **kwargs):
         captured.update(kwargs)
@@ -281,6 +286,10 @@ def test_content_script_remote_drift_scheduler_run_once_writes_observe_only_run(
         )
 
     monkeypatch.setattr("app.services.content_script_asset_scan_scheduler.scan_current_content_script_asset_remote_drift", fake_scan)
+    monkeypatch.setattr(
+        "app.services.content_script_asset_scan_runs.utc_now",
+        lambda: now + timedelta(seconds=1),
+    )
     scheduler = ContentScriptRemoteDriftScheduler(
         database_url=get_settings().database_url,
         schedule_config=ContentScriptRemoteDriftScheduleConfig(
@@ -290,9 +299,9 @@ def test_content_script_remote_drift_scheduler_run_once_writes_observe_only_run(
         ),
         interval_seconds=3600,
         lease_seconds=3600,
+        clock=lambda: now + timedelta(seconds=1),
         instance_id="scheduler-test",
     )
-    now = datetime(2026, 7, 8, 12, 0, tzinfo=UTC)
 
     result = asyncio.run(scheduler.run_once(now))
 
@@ -322,19 +331,26 @@ def test_content_script_remote_drift_scheduler_run_once_writes_observe_only_run(
 
 
 def test_content_script_remote_drift_scheduler_records_failed_run_without_exception_text(client, monkeypatch):
+    actor_id = _insert_admin_user("script_scheduler_failure_admin")
+    now = datetime(2026, 7, 8, 13, 0, tzinfo=UTC)
     def fake_scan(db, **kwargs):
         raise RuntimeError("secret scheduler token")
 
     monkeypatch.setattr("app.services.content_script_asset_scan_scheduler.scan_current_content_script_asset_remote_drift", fake_scan)
+    monkeypatch.setattr(
+        "app.services.content_script_asset_scan_runs.utc_now",
+        lambda: now + timedelta(seconds=1),
+    )
     scheduler = ContentScriptRemoteDriftScheduler(
         database_url=get_settings().database_url,
-        schedule_config=ContentScriptRemoteDriftScheduleConfig(scan_limit=1),
+        schedule_config=ContentScriptRemoteDriftScheduleConfig(scan_limit=1, actor_user_id=actor_id),
         interval_seconds=3600,
         lease_seconds=3600,
+        clock=lambda: now + timedelta(seconds=1),
         instance_id="scheduler-failure-test",
     )
 
-    result = asyncio.run(scheduler.run_once(datetime(2026, 7, 8, 13, 0, tzinfo=UTC)))
+    result = asyncio.run(scheduler.run_once(now))
 
     assert result["ok"] is False
     assert result["status"] == "failed"
@@ -344,7 +360,7 @@ def test_content_script_remote_drift_scheduler_records_failed_run_without_except
         assert run is not None
         assert run.status == "failed"
         assert run.trigger_source == "scheduler"
-        assert run.created_by_user_id is None
+        assert run.created_by_user_id == actor_id
         assert run.error_message == "RuntimeError"
         stored = json.dumps(
             {
@@ -393,7 +409,14 @@ def test_content_script_remote_drift_cli_requires_confirmation_and_writes_script
             actor_user_id=inactive_actor_id,
             database_url=get_settings().database_url,
         )["error"]
-        == "ActorUserNotFound"
+        == "ActiveAdminActorRequired"
+    )
+    assert (
+        run_scan(
+            confirm_external_network=True,
+            database_url=get_settings().database_url,
+        )["error"]
+        == "ActiveAdminActorRequired"
     )
 
     def fake_scan(db, **kwargs):
@@ -444,3 +467,67 @@ def _insert_admin_user(username: str, *, status: str = "active") -> int:
         db.add(user)
         db.commit()
         return user.id
+
+
+def test_reclaimed_scan_lease_cannot_be_overwritten_by_stale_worker(client, monkeypatch):
+    started_at = datetime(2026, 7, 8, 12, 0, tzinfo=UTC)
+    run_key = "content-script-remote-drift:test:reclaimed"
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        first_lease = acquire_content_script_asset_scan_job_lease(
+            db,
+            run_key=run_key,
+            trigger_source="pytest",
+            request_filters={"limit": 1},
+            lease_owner="worker-a",
+            lease_seconds=60,
+            now=started_at,
+        )
+    with session_factory() as db:
+        second_lease = acquire_content_script_asset_scan_job_lease(
+            db,
+            run_key=run_key,
+            trigger_source="pytest",
+            request_filters={"limit": 1},
+            lease_owner="worker-b",
+            lease_seconds=60,
+            now=started_at + timedelta(seconds=120),
+        )
+    assert first_lease is not None
+    assert second_lease is not None
+    report = ContentScriptAssetRemoteDriftReport(
+        generated_at=started_at + timedelta(seconds=121),
+        total_pages_scanned=0,
+        total_external_references=0,
+        total_scanned_references=0,
+        total_remote_fetches=0,
+        total_skipped_references=0,
+        total_issues=0,
+        issue_counts_by_code={},
+        issue_counts_by_severity={},
+        issues=[],
+    )
+    monkeypatch.setattr("app.services.content_script_asset_scan_runs.utc_now", lambda: report.generated_at)
+    with session_factory() as db:
+        assert finish_content_script_asset_scan_run_success(
+            db,
+            first_lease,
+            report=report,
+            finished_at=report.generated_at,
+        ) is None
+        db.rollback()
+    with session_factory() as db:
+        completed = finish_content_script_asset_scan_run_success(
+            db,
+            second_lease,
+            report=report,
+            finished_at=report.generated_at,
+        )
+        assert completed is not None
+        db.commit()
+    with session_factory() as db:
+        run = db.scalar(select(ContentScriptAssetScanRun).where(ContentScriptAssetScanRun.run_key == run_key))
+        assert run.status == "success"
+        assert run.attempt_count == 2
+        assert run.scheduler_lease_owner is None
+        assert run.scheduler_lease_token is None

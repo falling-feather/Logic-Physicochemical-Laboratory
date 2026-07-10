@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -16,38 +17,38 @@ SectionType = Literal[
 class ContentSection(BaseModel):
     sectionId: str | None = Field(default=None, min_length=1, max_length=120, pattern=r"^[a-z0-9][a-z0-9._:-]*$")
     type: SectionType
-    title: str | None = None
-    summary: str | None = None
-    experimentId: str | None = None
-    questionSetId: str | None = None
+    title: str | None = Field(default=None, max_length=240)
+    summary: str | None = Field(default=None, max_length=4000)
+    experimentId: str | None = Field(default=None, max_length=120)
+    questionSetId: str | None = Field(default=None, max_length=120)
     props: dict[str, Any] = Field(default_factory=dict)
 
 
 class CourseUnitRef(BaseModel):
-    courseId: str
-    unitId: str
+    courseId: str = Field(min_length=1, max_length=120)
+    unitId: str = Field(min_length=1, max_length=120)
     order: int
-    title: str
+    title: str = Field(min_length=1, max_length=240)
 
 
 class SourceRef(BaseModel):
     sourceId: str | None = Field(default=None, min_length=1, max_length=120, pattern=r"^[a-z0-9][a-z0-9._:-]*$")
-    label: str
-    url: str
+    label: str = Field(min_length=1, max_length=240)
+    url: str = Field(min_length=1, max_length=2048)
 
 
 class ContentPage(BaseModel):
-    slug: str
-    galaxy: str
-    subject: str
-    title: str
-    layout: str
+    slug: str = Field(min_length=1, max_length=180)
+    galaxy: str = Field(min_length=1, max_length=120)
+    subject: str = Field(min_length=1, max_length=120)
+    title: str = Field(min_length=1, max_length=240)
+    layout: str = Field(min_length=1, max_length=64)
     status: Literal["draft", "published", "archived"] = "draft"
-    version: str
-    summary: str
-    sections: list[ContentSection]
+    version: str = Field(min_length=1, max_length=64)
+    summary: str = Field(max_length=4000)
+    sections: list[ContentSection] = Field(min_length=1, max_length=200)
     courseUnit: CourseUnitRef | None = None
-    sources: list[SourceRef] = Field(default_factory=list)
+    sources: list[SourceRef] = Field(default_factory=list, max_length=200)
 
     @model_validator(mode="after")
     def validate_stable_identity_uniqueness(self) -> "ContentPage":
@@ -59,6 +60,7 @@ class ContentPage(BaseModel):
             "sourceId",
             [source.sourceId for source in self.sources],
         )
+        _validate_content_schema_budget(self.model_dump(mode="json"))
         return self
 
 
@@ -71,6 +73,38 @@ def _reject_duplicate_stable_ids(field_name: str, values: list[str | None]) -> N
         if normalized in seen:
             raise ValueError(f"Duplicate content {field_name}: {value}")
         seen.add(normalized)
+
+
+def _validate_content_schema_budget(payload: dict[str, Any]) -> None:
+    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    if len(serialized.encode("utf-8")) > 256 * 1024:
+        raise ValueError("Content schema exceeds the 256 KiB canonical JSON limit")
+
+    node_count = 0
+
+    def visit(value: Any, depth: int) -> None:
+        nonlocal node_count
+        node_count += 1
+        if node_count > 10_000:
+            raise ValueError("Content schema exceeds the 10000 node limit")
+        if depth > 16:
+            raise ValueError("Content schema exceeds the maximum nesting depth")
+        if isinstance(value, dict):
+            if len(value) > 128:
+                raise ValueError("Content schema object exceeds the 128 field limit")
+            for key, item in value.items():
+                if len(str(key)) > 240:
+                    raise ValueError("Content schema key exceeds the 240 character limit")
+                visit(item, depth + 1)
+        elif isinstance(value, list):
+            if len(value) > 256:
+                raise ValueError("Content schema array exceeds the 256 item limit")
+            for item in value:
+                visit(item, depth + 1)
+        elif isinstance(value, str) and len(value) > 16_000:
+            raise ValueError("Content schema string exceeds the 16000 character limit")
+
+    visit(payload, 0)
 
 
 class ContentDraftCreate(BaseModel):
@@ -142,6 +176,7 @@ class ContentDraftRead(BaseModel):
 
     id: int
     author_user_id: int
+    last_editor_user_id: int
     target_slug: str
     title: str
     status: str
@@ -153,6 +188,7 @@ class ContentDraftRead(BaseModel):
     script_analysis: ScriptAnalysisRead | None = None
     script_review_status: str
     script_reviewed_by_user_id: int | None = None
+    script_reviewed_schema_hash: str | None = None
     script_reviewed_at: datetime | None = None
     script_review_note: str | None = None
     submitted_at: datetime | None = None

@@ -68,10 +68,13 @@ def _active_teacher_count(db: Session, class_id: int) -> int:
         db.scalar(
             select(func.count())
             .select_from(ClassMembership)
+            .join(User, User.id == ClassMembership.user_id)
             .where(
                 ClassMembership.class_id == class_id,
                 ClassMembership.role == "teacher",
                 ClassMembership.status == "active",
+                User.role.in_(["admin", "teacher"]),
+                User.status == "active",
             )
         )
         or 0
@@ -81,10 +84,14 @@ def _active_teacher_count(db: Session, class_id: int) -> int:
 def _active_teacher_ids(db: Session, class_id: int) -> set[int]:
     return set(
         db.scalars(
-            select(ClassMembership.id).where(
+            select(ClassMembership.id)
+            .join(User, User.id == ClassMembership.user_id)
+            .where(
                 ClassMembership.class_id == class_id,
                 ClassMembership.role == "teacher",
                 ClassMembership.status == "active",
+                User.role.in_(["admin", "teacher"]),
+                User.status == "active",
             )
         ).all()
     )
@@ -268,7 +275,7 @@ def transfer_class_teacher(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ClassTeacherTransferRead:
-    class_group = db.get(ClassGroup, class_id)
+    class_group = db.scalar(select(ClassGroup).where(ClassGroup.id == class_id).with_for_update())
     if class_group is None:
         raise HTTPException(status_code=404, detail="Class not found")
     if current_user.role != "admin":
@@ -282,6 +289,8 @@ def transfer_class_teacher(
             ClassMembership.class_id == class_group.id,
             ClassMembership.role == "teacher",
         )
+        .with_for_update()
+        .execution_options(populate_existing=True)
     ).one_or_none()
     if source_row is None:
         raise HTTPException(status_code=404, detail="Source teacher membership not found")
@@ -291,7 +300,12 @@ def transfer_class_teacher(
     if source_membership.user_id == payload.target_user_id:
         raise HTTPException(status_code=409, detail="Target teacher is already the source teacher")
 
-    target_user = db.get(User, payload.target_user_id)
+    target_user = db.scalar(
+        select(User)
+        .where(User.id == payload.target_user_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     if target_user is None:
         raise HTTPException(status_code=404, detail="Target teacher not found")
     if target_user.status != "active" or target_user.role not in {"admin", "teacher"}:
@@ -427,6 +441,8 @@ def transfer_class_student(
             ClassMembership.class_id == source_class.id,
             ClassMembership.role == "student",
         )
+        .with_for_update()
+        .execution_options(populate_existing=True)
     ).one_or_none()
     if source_row is None:
         raise HTTPException(status_code=404, detail="Source student membership not found")
@@ -549,7 +565,15 @@ def batch_import_class_students(
 
     normalized_names = [normalize_username(item.username) for item in payload.items]
     lookup_names = {name for name in normalized_names if name}
-    users = list(db.scalars(select(User).where(User.normalized_username.in_(lookup_names))).all()) if lookup_names else []
+    users = list(
+        db.scalars(
+            select(User)
+            .where(User.normalized_username.in_(lookup_names))
+            .order_by(User.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).all()
+    ) if lookup_names else []
     user_by_name = {user.normalized_username: user for user in users}
     user_ids = [user.id for user in users]
     eligible_user_ids = set(
@@ -748,7 +772,7 @@ def batch_update_class_member_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[ClassMemberRead]:
-    class_group = db.get(ClassGroup, class_id)
+    class_group = db.scalar(select(ClassGroup).where(ClassGroup.id == class_id).with_for_update())
     if class_group is None:
         raise HTTPException(status_code=404, detail="Class not found")
     require_class_teacher_or_admin(
@@ -769,6 +793,8 @@ def batch_update_class_member_status(
             ClassMembership.class_id == class_group.id,
             ClassMembership.id.in_(membership_ids),
         )
+        .with_for_update()
+        .execution_options(populate_existing=True)
     ).all()
     row_by_id = {membership.id: (membership, user) for membership, user in rows}
     missing_ids = [membership_id for membership_id in membership_ids if membership_id not in row_by_id]
@@ -863,7 +889,7 @@ def update_class_member_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ClassMemberRead:
-    class_group = db.get(ClassGroup, class_id)
+    class_group = db.scalar(select(ClassGroup).where(ClassGroup.id == class_id).with_for_update())
     if class_group is None:
         raise HTTPException(status_code=404, detail="Class not found")
     require_class_teacher_or_admin(
@@ -880,6 +906,8 @@ def update_class_member_status(
             ClassMembership.id == membership_id,
             ClassMembership.class_id == class_group.id,
         )
+        .with_for_update()
+        .execution_options(populate_existing=True)
     ).one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="Class member not found")

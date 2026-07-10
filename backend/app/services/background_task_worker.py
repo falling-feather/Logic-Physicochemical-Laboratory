@@ -253,9 +253,14 @@ class BackgroundTaskWorker:
                 configured_actor = db.get(User, configured_actor_id) if configured_actor_id is not None else None
                 active_actor_id = (
                     configured_actor.id
-                    if configured_actor is not None and configured_actor.status == "active"
+                    if configured_actor is not None
+                    and configured_actor.status == "active"
+                    and configured_actor.role == "admin"
                     else None
                 )
+                if active_actor_id is None:
+                    db.commit()
+                    return created_count
                 result = enqueue_background_task(
                     db,
                     task_type="content_script_asset_scan",
@@ -304,6 +309,7 @@ class BackgroundTaskWorker:
             task = db.get(BackgroundTask, lease.task_id)
             actor = db.get(User, task.created_by_user_id) if task and task.created_by_user_id else None
             try:
+                self._require_live_task_actor(lease, actor)
                 summary = self._execute(db, lease, actor)
             except BackgroundTaskExecutionError as exc:
                 db.rollback()
@@ -392,6 +398,24 @@ class BackgroundTaskWorker:
             return self._execute_audit_archive_anchor(db, lease)
         raise BackgroundTaskExecutionError("unsupported_task_type", retryable=False)
 
+    def _require_live_task_actor(self, lease: BackgroundTaskLease, actor: User | None) -> None:
+        if lease.task_type not in {
+            "alert_outbox_dispatch_plan",
+            "content_script_asset_scan",
+            "audit_archive_anchor",
+        }:
+            return
+        if actor is None or actor.status != "active" or actor.role != "admin":
+            raise BackgroundTaskExecutionError("privileged_task_actor_unauthorized", retryable=False)
+
+    def _actor_is_live_admin(self, actor: User | None) -> bool:
+        if actor is None:
+            return False
+        session_factory = get_session_factory(self.settings.database_url)
+        with session_factory() as authorization_db:
+            current = authorization_db.get(User, actor.id)
+            return current is not None and current.status == "active" and current.role == "admin"
+
     def _execute_alert_plan(
         self,
         db: Session,
@@ -405,7 +429,7 @@ class BackgroundTaskWorker:
                 plan_id=plan_id,
                 settings=self.settings,
                 actor=actor,
-                heartbeat=lambda: self._heartbeat(lease),
+                heartbeat=lambda: self._actor_is_live_admin(actor) and self._heartbeat(lease),
                 adapter_factory=self.adapter_factory,
             )
         except AlertDispatchTaskError as exc:
@@ -490,7 +514,7 @@ class BackgroundTaskWorker:
         requested_actor_id = lease.payload.get("actor_user_id")
         if requested_actor_id is not None:
             actor_id = _positive_int(requested_actor_id, "invalid_content_scan_payload")
-            if actor is None or actor.id != actor_id or actor.status != "active":
+            if actor is None or actor.id != actor_id or actor.status != "active" or actor.role != "admin":
                 raise BackgroundTaskExecutionError("content_scan_actor_unavailable", retryable=False)
         slug = _optional_string(lease.payload.get("slug"))
         source_host = _optional_string(lease.payload.get("source_host"))
@@ -535,13 +559,22 @@ class BackgroundTaskWorker:
                 scan_limit=scan_limit,
                 scan_offset=scan_offset,
             )
-            finish_content_script_asset_scan_run_success(run, report=report, finished_at=report.generated_at)
+            run = finish_content_script_asset_scan_run_success(
+                db,
+                domain_lease,
+                report=report,
+                finished_at=utc_now(),
+            )
+            if run is None:
+                raise BackgroundTaskExecutionError("content_scan_domain_lease_lost", retryable=True)
             db.commit()
+        except BackgroundTaskExecutionError:
+            db.rollback()
+            raise
         except Exception as exc:
             db.rollback()
-            failed_run = db.scalar(select(ContentScriptAssetScanRun).where(ContentScriptAssetScanRun.run_key == run_key))
+            failed_run = finish_content_script_asset_scan_run_failure(db, domain_lease, error=exc)
             if failed_run is not None:
-                finish_content_script_asset_scan_run_failure(failed_run, error=exc)
                 db.commit()
             raise BackgroundTaskExecutionError(
                 f"content_scan_{exc.__class__.__name__}"[:80],

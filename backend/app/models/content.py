@@ -6,6 +6,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base, TimestampMixin
 
 
+def _content_draft_author_as_last_editor(context) -> int:
+    return int(context.get_current_parameters()["author_user_id"])
+
+
 class ContentPageRecord(TimestampMixin, Base):
     __tablename__ = "content_pages"
 
@@ -41,6 +45,12 @@ class ContentDraft(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     author_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    last_editor_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        index=True,
+        nullable=False,
+        default=_content_draft_author_as_last_editor,
+    )
     target_slug: Mapped[str] = mapped_column(String(180), index=True, nullable=False)
     title: Mapped[str] = mapped_column(String(240), nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True, nullable=False)
@@ -62,6 +72,7 @@ class ContentDraft(TimestampMixin, Base):
     script_analysis_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     script_review_status: Mapped[str] = mapped_column(String(32), default="not_required", index=True, nullable=False)
     script_reviewed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+    script_reviewed_schema_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     script_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     script_review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)

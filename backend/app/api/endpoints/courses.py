@@ -37,6 +37,7 @@ from app.services.assignment_policies import build_effective_assignment_policy, 
 from app.services.access_control import (
     course_attached_to_class,
     get_course,
+    lock_scope_eligible_user,
     require_class_member,
     require_class_teacher_or_admin,
     require_course_author_or_admin,
@@ -104,6 +105,13 @@ def create_course(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Course:
+    current_user = lock_scope_eligible_user(
+        db,
+        current_user.id,
+        "teacher",
+        detail="Course creation requires an active teacher/admin role",
+        status_code=403,
+    )
     require_school_role(db, current_user, payload.school_id, {"admin", "teacher"})
     title = require_trimmed_text(payload.title, "Course title is required")
     existing = db.scalar(select(Course).where(Course.school_id == payload.school_id, Course.title == title))
@@ -367,15 +375,27 @@ def batch_update_course_collaborators(
     )
 
     user_ids = {item.user_id for item in payload.items}
-    users = list(db.scalars(select(User).where(User.id.in_(user_ids))).all())
+    users = list(
+        db.scalars(
+            select(User)
+            .where(User.id.in_(user_ids))
+            .order_by(User.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).all()
+    )
     active_user_ids = {user.id for user in users if user.status == "active"}
     eligible_user_ids = set(
         db.scalars(
-            select(SchoolMembership.user_id).where(
+            select(SchoolMembership.user_id)
+            .join(User, User.id == SchoolMembership.user_id)
+            .where(
                 SchoolMembership.school_id == course.school_id,
                 SchoolMembership.user_id.in_(active_user_ids),
                 SchoolMembership.role.in_(["admin", "teacher"]),
                 SchoolMembership.status == "active",
+                User.status == "active",
+                User.role.in_(["admin", "teacher"]),
             )
         ).all()
     ) if active_user_ids else set()
@@ -808,10 +828,15 @@ def _require_active_school_teacher(
     target_not_found_detail: str = "Course collaborator user not found",
     membership_detail: str = "Course collaborator must be active school teacher/admin",
 ) -> None:
-    target = db.get(User, user_id)
+    target = db.scalar(
+        select(User)
+        .where(User.id == user_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     if target is None:
         raise HTTPException(status_code=404, detail=target_not_found_detail)
-    if target.status != "active":
+    if target.status != "active" or target.role not in {"admin", "teacher"}:
         raise HTTPException(status_code=422, detail=membership_detail)
     membership = db.scalar(
         select(SchoolMembership).where(

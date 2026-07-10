@@ -57,10 +57,15 @@ def get_user_progress(
         detail="Student progress requires class teacher scope",
     )
     target_membership = db.scalar(
-        select(ClassMembership).where(
+        select(ClassMembership)
+        .join(User, User.id == ClassMembership.user_id)
+        .where(
             ClassMembership.class_id == class_id,
             ClassMembership.user_id == user_id,
+            ClassMembership.role == "student",
             ClassMembership.status == "active",
+            User.role == "student",
+            User.status == "active",
         )
     )
     if target_membership is None:

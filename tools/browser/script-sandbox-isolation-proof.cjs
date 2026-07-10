@@ -341,7 +341,7 @@ async function main() {
 
   const report = {
     ok: false,
-    phase: 'V6.6.52',
+    phase: 'V6.6.59',
     generatedAt,
     appUrl,
     apiBase,
@@ -390,8 +390,15 @@ async function main() {
   if (sandboxUrl) {
     const sandboxDocument = await fetchText(sandboxUrl);
     const csp = sandboxDocument.headers['content-security-policy'] || '';
+    const nonceMatch = csp.match(/script-src 'nonce-([^']+)'/);
+    const bootstrapSrcMatch = sandboxDocument.text.match(/<script\s+src="([^"]+)"\s+nonce="([^"]+)"\s+defer><\/script>/);
+    const bootstrapUrl = bootstrapSrcMatch
+      ? new URL(bootstrapSrcMatch[1], sandboxUrl).href
+      : '';
+    const bootstrap = bootstrapUrl ? await fetchText(bootstrapUrl) : null;
     assertCheck(report, 'sandbox document has hardened CSP and no-store headers', sandboxDocument.status === 200
       && /script-src 'nonce-[^']+'/.test(csp)
+      && /'sha256-[A-Za-z0-9+/=]+'/.test(csp)
       && csp.includes("frame-ancestors 'self'")
       && csp.includes("form-action 'none'")
       && csp.includes("object-src 'none'")
@@ -403,6 +410,22 @@ async function main() {
       cacheControl: sandboxDocument.headers['cache-control'] || '',
       contentTypeOptions: sandboxDocument.headers['x-content-type-options'] || '',
       referrerPolicy: sandboxDocument.headers['referrer-policy'] || '',
+    });
+    assertCheck(report, 'bootstrap nonce cannot authorize mutable asset scripts', Boolean(
+      nonceMatch
+      && bootstrapSrcMatch
+      && nonceMatch[1] === bootstrapSrcMatch[2]
+      && bootstrap
+      && bootstrap.status === 200
+      && !bootstrap.text.includes(nonceMatch[1])
+      && !/currentScript|\.nonce\b|setAttribute\(\s*['"]nonce/.test(bootstrap.text)
+      && /"integrity":"sha256-[A-Za-z0-9+/=]+"/.test(bootstrap.text)
+      && /script\.integrity\s*=\s*asset\.integrity/.test(bootstrap.text)
+    ), {
+      bootstrapUrl,
+      bootstrapStatus: bootstrap && bootstrap.status,
+      cspHasAssetHash: /'sha256-[A-Za-z0-9+/=]+'/.test(csp),
+      nonceExposedToBootstrap: Boolean(nonceMatch && bootstrap && bootstrap.text.includes(nonceMatch[1])),
     });
   }
 
@@ -718,6 +741,29 @@ async function main() {
       await page.screenshot({ path: iframeScreenshot, clip: box });
       report.screenshots.iframe = iframeScreenshot;
     }
+
+    await activeFrame.evaluate(() => window.location.replace('about:blank')).catch(() => {});
+    const navigationState = await waitForSandboxTerminalState(page, timeoutMs);
+    const navigationFallback = await page.evaluate(() => {
+      const card = document.querySelector('[data-backend-sandbox-card]');
+      const iframe = card && card.querySelector('[data-backend-sandbox-frame]');
+      const target = card && card.parentElement;
+      const runtime = window.EnergyConservation || null;
+      return {
+        state: card ? card.dataset.state || '' : '',
+        iframeHasSrc: Boolean(iframe && iframe.hasAttribute('src')),
+        sandboxRuntimeActive: Boolean(target && target.classList.contains('backend-sandbox-runtime-active')),
+        staticRuntimeRunning: Boolean(runtime && runtime.running === true),
+      };
+    });
+    assertCheck(report, 'unexpected iframe navigation fails closed and restores static runtime', navigationState.state === 'error'
+      && navigationFallback.state === 'error'
+      && navigationFallback.iframeHasSrc === false
+      && navigationFallback.sandboxRuntimeActive === false
+      && navigationFallback.staticRuntimeRunning === true, {
+      navigationState,
+      navigationFallback,
+    });
 
     await context.close();
   } finally {

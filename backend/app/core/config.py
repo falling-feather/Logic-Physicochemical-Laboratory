@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -45,6 +46,7 @@ class Settings(BaseSettings):
     external_issue_sync_timeout_seconds: int = Field(default=10, ge=1, le=30)
     content_script_allowed_hosts: str = ""
     cors_origins: str = "http://127.0.0.1:8766,http://localhost:8766"
+    admin_bootstrap_enabled: bool = True
     admin_bootstrap_token: str | None = None
     knowledge_snapshot_scheduler_enabled: bool = False
     knowledge_snapshot_scheduler_run_on_start: bool = False
@@ -97,8 +99,8 @@ class Settings(BaseSettings):
     performance_export_budget_ms: int = Field(default=5000, ge=1, le=120_000)
     performance_probe_iterations: int = Field(default=3, ge=1, le=20)
     database_url: str = Field(
-        default="mysql+pymysql://astra:astra@127.0.0.1:3306/astra?charset=utf8mb4",
-        description="SQLAlchemy database URL. MySQL is the production target.",
+        default="sqlite+pysqlite:///./astra-dev.db",
+        description="SQLAlchemy database URL. SQLite is the safe local default; MySQL is the production target.",
     )
 
     @property
@@ -111,7 +113,57 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        origins: list[str] = []
+        for value in self.cors_origins.split(","):
+            origin = value.strip()
+            if not origin:
+                continue
+            normalized = self._validated_credentialed_origin(origin)
+            if normalized not in origins:
+                origins.append(normalized)
+        return origins
+
+    @property
+    def environment_name(self) -> str:
+        return self.environment.strip().lower()
+
+    @property
+    def is_local_development(self) -> bool:
+        return self.environment_name in {"dev", "development", "test", "testing"}
+
+    @property
+    def is_production_like(self) -> bool:
+        return not self.is_local_development
+
+    def validate_runtime_security(self) -> None:
+        # Force credentialed CORS parsing before middleware is installed.
+        self.cors_origin_list
+        if self.is_production_like and self.admin_bootstrap_enabled and not self.admin_bootstrap_token:
+            raise ValueError(
+                "ASTRA_ADMIN_BOOTSTRAP_TOKEN is required outside local development "
+                "unless ASTRA_ADMIN_BOOTSTRAP_ENABLED=false"
+            )
+
+    @staticmethod
+    def _validated_credentialed_origin(origin: str) -> str:
+        if origin.lower() == "null" or "*" in origin:
+            raise ValueError("ASTRA_CORS_ORIGINS must contain exact http/https origins")
+        parsed = urlsplit(origin)
+        try:
+            parsed.port
+        except ValueError as exc:
+            raise ValueError("ASTRA_CORS_ORIGINS contains an invalid port") from exc
+        if (
+            parsed.scheme.lower() not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("ASTRA_CORS_ORIGINS must contain exact http/https origins")
+        return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
 
     @property
     def content_script_allowed_host_list(self) -> list[str]:

@@ -1,12 +1,13 @@
 // ===== Experiment Rating Module =====
 // Shows a floating 5-star rating card after spending time in an experiment.
-// Ratings persist in localStorage.
+// Ratings remain in memory until a backend-owned account-scoped API is available.
 
 const ExperimentRating = {
     _card: null,
     _timer: null,
     _currentModule: null,
     _storageKey: 'englab-ratings',
+    _ratings: {},
     _delay: 30000, // 30s before showing
 
     init() {
@@ -41,9 +42,7 @@ const ExperimentRating = {
     // ── Internal ──
 
     _getRatings() {
-        try {
-            return JSON.parse(localStorage.getItem(this._storageKey)) || {};
-        } catch (e) { return {}; }
+        return { ...this._ratings };
     },
 
     _getRating(moduleId) {
@@ -53,7 +52,7 @@ const ExperimentRating = {
     _setRating(moduleId, stars) {
         var ratings = this._getRatings();
         ratings[moduleId] = stars;
-        localStorage.setItem(this._storageKey, JSON.stringify(ratings));
+        this._ratings = ratings;
     },
 
     _injectCard(moduleId) {

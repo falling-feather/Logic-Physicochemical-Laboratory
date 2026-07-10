@@ -130,6 +130,10 @@ def sync_external_issue_status_for_bug(
         error = IssueProviderError("external_issue_response_id_mismatch", retryable=False, ambiguous=True)
         _finish_failure(db, operation, error)
         raise _sync_error(error, operation)
+    if receipt.state != desired_state:
+        error = IssueProviderError("external_issue_response_state_mismatch", retryable=False, ambiguous=True)
+        _finish_failure(db, operation, error)
+        raise _sync_error(error, operation)
     _finish_issue_success(db, bug, operation, receipt)
     return BugExternalSyncResult(bug=bug, operation=operation, recovered=False)
 

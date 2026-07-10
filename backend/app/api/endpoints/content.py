@@ -95,6 +95,7 @@ def create_content_draft(
     base_version = _current_content_page_version(db, target_slug)
     draft = ContentDraft(
         author_user_id=current_user.id,
+        last_editor_user_id=current_user.id,
         target_slug=target_slug,
         title=page_schema.title.strip(),
         status=CONTENT_DRAFT_STATUS_DRAFT,
@@ -174,6 +175,7 @@ def update_content_draft(
     draft_payload = page_schema.model_dump(mode="json")
     draft_schema_hash = _schema_hash(draft_payload)
     draft.title = page_schema.title.strip()
+    draft.last_editor_user_id = current_user.id
     draft.schema_json = draft_payload
     draft.schema_hash = draft_schema_hash
     draft.allow_script = allow_script
@@ -181,6 +183,7 @@ def update_content_draft(
     draft.script_analysis_json = script_policy.to_json(schema_hash=draft_schema_hash)
     draft.script_review_status = SCRIPT_REVIEW_PENDING if script_policy.requires_review else SCRIPT_REVIEW_NOT_REQUIRED
     draft.script_reviewed_by_user_id = None
+    draft.script_reviewed_schema_hash = None
     draft.script_reviewed_at = None
     draft.script_review_note = None
     after = _content_draft_snapshot(draft)
@@ -309,19 +312,20 @@ def publish_content_draft(
     db: Session = Depends(get_db),
 ) -> ContentPublicationRead:
     _require_admin(current_user)
-    draft = db.get(ContentDraft, draft_id)
-    if draft is None:
-        raise HTTPException(status_code=404, detail="Content draft not found")
+    draft = _get_content_draft_for_transition(db, draft_id)
     if draft.status != CONTENT_DRAFT_STATUS_SUBMITTED:
         raise HTTPException(status_code=409, detail="Content draft must be submitted before publishing")
+    draft_page_schema = ContentPage.model_validate(draft.schema_json)
+    _reject_blocked_content_script_hosts(db, draft_page_schema, status_code=409)
     script_policy = _content_draft_script_policy(draft, verify_external_assets=True)
     if script_policy.has_blocking_findings:
         raise HTTPException(status_code=409, detail="Content draft script policy findings must be resolved before publishing")
-    _reject_blocked_content_script_hosts(db, ContentPage.model_validate(draft.schema_json), status_code=409)
     if script_policy.has_script_findings and not draft.allow_script:
         raise HTTPException(status_code=409, detail="Content schema includes script references; script review is required")
     if script_policy.requires_review and draft.script_review_status != SCRIPT_REVIEW_APPROVED:
         raise HTTPException(status_code=409, detail="Content draft script review must be approved before publishing")
+    if script_policy.requires_review and draft.script_reviewed_schema_hash != draft.schema_hash:
+        raise HTTPException(status_code=409, detail="Content draft script review does not match the current schema")
     _validate_content_stable_identity_contract(ContentPage.model_validate(draft.schema_json), status_code=409)
     _reject_stale_content_draft(db, draft)
 
@@ -414,25 +418,25 @@ def review_content_draft_script(
     db: Session = Depends(get_db),
 ) -> ContentDraftRead:
     _require_admin(current_user)
-    draft = db.get(ContentDraft, draft_id)
-    if draft is None:
-        raise HTTPException(status_code=404, detail="Content draft not found")
+    draft = _get_content_draft_for_transition(db, draft_id)
     if draft.status in {CONTENT_DRAFT_STATUS_WITHDRAWN, CONTENT_DRAFT_STATUS_PUBLISHED}:
         raise HTTPException(status_code=409, detail="Content draft is closed")
     if not draft.allow_script:
         raise HTTPException(status_code=409, detail="Content draft does not allow scripts")
-    if draft.author_user_id == current_user.id:
-        raise HTTPException(status_code=403, detail="Content draft authors cannot review their own scripts")
+    if draft.author_user_id == current_user.id or draft.last_editor_user_id == current_user.id:
+        raise HTTPException(status_code=403, detail="Content draft authors and last editors cannot review their own scripts")
+    draft_page_schema = ContentPage.model_validate(draft.schema_json)
+    _reject_blocked_content_script_hosts(db, draft_page_schema, status_code=409)
     script_policy = _content_draft_script_policy(draft, verify_external_assets=payload.status == SCRIPT_REVIEW_APPROVED)
     if script_policy.has_blocking_findings:
         raise HTTPException(status_code=409, detail="Content draft script policy findings must be resolved before review")
-    _reject_blocked_content_script_hosts(db, ContentPage.model_validate(draft.schema_json), status_code=409)
 
     before = _content_draft_snapshot(draft)
     draft.script_risk_level = script_policy.risk_level
     draft.script_analysis_json = script_policy.to_json(schema_hash=draft.schema_hash)
     draft.script_review_status = payload.status
     draft.script_reviewed_by_user_id = current_user.id
+    draft.script_reviewed_schema_hash = draft.schema_hash
     draft.script_reviewed_at = utc_now()
     draft.script_review_note = _strip_optional(payload.note)
     after = _content_draft_snapshot(draft)
@@ -550,7 +554,7 @@ def _require_draft_author_or_admin(draft: ContentDraft, user: User) -> None:
 
 
 def _get_content_draft_for_transition(db: Session, draft_id: int) -> ContentDraft:
-    draft = db.get(ContentDraft, draft_id)
+    draft = db.scalar(select(ContentDraft).where(ContentDraft.id == draft_id).with_for_update())
     if draft is None:
         raise HTTPException(status_code=404, detail="Content draft not found")
     return draft
@@ -585,6 +589,7 @@ def _content_draft_read(draft: ContentDraft) -> ContentDraftRead:
     return ContentDraftRead(
         id=draft.id,
         author_user_id=draft.author_user_id,
+        last_editor_user_id=draft.last_editor_user_id,
         target_slug=draft.target_slug,
         title=draft.title,
         status=draft.status,
@@ -596,6 +601,7 @@ def _content_draft_read(draft: ContentDraft) -> ContentDraftRead:
         script_analysis=draft.script_analysis_json,
         script_review_status=draft.script_review_status,
         script_reviewed_by_user_id=draft.script_reviewed_by_user_id,
+        script_reviewed_schema_hash=draft.script_reviewed_schema_hash,
         script_reviewed_at=draft.script_reviewed_at,
         script_review_note=draft.script_review_note,
         submitted_at=draft.submitted_at,
@@ -635,6 +641,7 @@ def _content_publication_read(
 def _content_draft_snapshot(draft: ContentDraft) -> dict:
     return {
         "author_user_id": draft.author_user_id,
+        "last_editor_user_id": draft.last_editor_user_id,
         "target_slug": draft.target_slug,
         "title": draft.title,
         "status": draft.status,
@@ -647,6 +654,7 @@ def _content_draft_snapshot(draft: ContentDraft) -> dict:
         "script_analysis": _content_draft_script_analysis_snapshot(draft),
         "script_review_status": draft.script_review_status,
         "script_reviewed_by_user_id": draft.script_reviewed_by_user_id,
+        "script_reviewed_schema_hash": draft.script_reviewed_schema_hash,
         "script_reviewed_at": _isoformat(draft.script_reviewed_at),
         "script_review_note": draft.script_review_note,
         "submitted_at": _isoformat(draft.submitted_at),

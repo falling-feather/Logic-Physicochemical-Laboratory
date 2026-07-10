@@ -118,6 +118,7 @@ def test_render_script_sandbox_document_serves_isolated_html(client):
     assert "connect-src 'self'" in response.headers["Content-Security-Policy"]
     assert "frame-ancestors 'self' http://127.0.0.1:8766 http://localhost:8766" in response.headers["Content-Security-Policy"]
     assert "form-action 'none'" in response.headers["Content-Security-Policy"]
+    assert "'sha256-" in response.headers["Content-Security-Policy"]
     nonce = _nonce_from_csp(response.headers["Content-Security-Policy"])
     assert nonce is not None
     assert "script-src 'self'" not in response.headers["Content-Security-Policy"]
@@ -163,7 +164,10 @@ def test_render_script_sandbox_document_serves_isolated_html(client):
     assert bootstrap.headers["Cross-Origin-Resource-Policy"] == "cross-origin"
     assert "astra-script-sandbox-bootstrap-v1" in bootstrap.text
     assert "__ASTRA_SCRIPT_SANDBOX__" in bootstrap.text
-    assert "document.currentScript" in bootstrap.text
+    assert "document.currentScript" not in bootstrap.text
+    assert "script.nonce" not in bootstrap.text
+    assert "script.integrity = asset.integrity" in bootstrap.text
+    assert 'script.crossOrigin = "anonymous"' in bootstrap.text
     assert "bootstrap-ready" in bootstrap.text
     assert "assets-ready" in bootstrap.text
     assert "unhandledrejection" in bootstrap.text
@@ -211,10 +215,12 @@ def test_sandbox_csp_nonce_updates_script_src_without_mutating_public_manifest(c
     csp = _harden_sandbox_csp(
         "default-src 'none'; script-src 'self'; connect-src 'none'; script-src https://example.invalid; ",
         nonce="fixed_nonce",
+        script_hashes=["sha256-ZmFrZQ=="],
     )
 
     assert csp.count("script-src") == 1
     assert "script-src 'nonce-fixed_nonce'" in csp
+    assert "'sha256-ZmFrZQ=='" in csp
     assert "script-src 'self'" not in csp
     assert "'unsafe-inline'" not in csp
     assert "connect-src 'none'" in csp
@@ -230,6 +236,18 @@ def test_sandbox_csp_nonce_updates_script_src_without_mutating_public_manifest(c
 
     no_script_src = _harden_sandbox_csp("default-src 'none'; img-src 'self'", nonce="another_nonce")
     assert "script-src 'nonce-another_nonce'" in no_script_src
+
+
+def test_content_schema_enforces_breadth_and_string_budgets():
+    oversized_string = _content_page_payload()
+    oversized_string["sections"][0]["props"] = {"explanation": "x" * 16_001}
+    with pytest.raises(ValueError, match="16000 character limit"):
+        ContentPage.model_validate(oversized_string)
+
+    oversized_object = _content_page_payload()
+    oversized_object["sections"][0]["props"] = {f"field_{index}": index for index in range(129)}
+    with pytest.raises(ValueError, match="128 field limit"):
+        ContentPage.model_validate(oversized_object)
 
 
 def test_render_script_sandbox_document_fails_closed_for_missing_or_blocked_manifest(client):

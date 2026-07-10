@@ -7,7 +7,12 @@
         'astra-access-token',
         'englab-access-token',
         'access_token',
-        'auth_token'
+        'auth_token',
+        'englab-favorites',
+        'englab-ratings',
+        'englab-quiz-scores',
+        'englab-guide-seen',
+        'englab-progress'
     ]);
 
     class AstraApiError extends Error {

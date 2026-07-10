@@ -306,6 +306,7 @@ const BackendContent = {
             terminal: false,
             staticRuntimeSuspended: false,
             lastMessageType: '',
+            initialLoadObserved: false,
             timeoutId: null,
             onMessage: null,
             onLoad: null,
@@ -314,9 +315,14 @@ const BackendContent = {
 
         controller.onMessage = (event) => this._handleSandboxMessage(controller, event);
         controller.onLoad = () => {
-            if (!controller.terminal && controller.state === 'loading') {
+            if (controller.destroyed || controller.terminal) return;
+            if (!controller.initialLoadObserved) {
+                controller.initialLoadObserved = true;
+                if (controller.state !== 'loading') return;
                 this._setSandboxState(controller, 'bootstrapping', '隔离文档已加载，等待脚本启动。');
+                return;
             }
+            this._markSandboxTerminal(controller, 'error', '隔离内容发生未预期导航，已恢复静态实验。');
         };
         controller.onError = () => {
             this._markSandboxTerminal(controller, 'error', '隔离内容加载失败。');

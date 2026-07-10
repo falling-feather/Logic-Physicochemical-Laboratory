@@ -7,7 +7,7 @@ from app.db.session import get_db
 from app.models import ClassGroup, School, SchoolMembership, User
 from app.schemas.school import ClassRead, SchoolCreate, SchoolRead
 from app.services.audit import record_audit_log
-from app.services.access_control import require_school_member
+from app.services.access_control import compatible_scope_roles, lock_scope_eligible_user, require_school_member
 from app.services.text import require_trimmed_text
 
 
@@ -23,6 +23,7 @@ def list_schools(current_user: User = Depends(get_current_user), db: Session = D
         .join(SchoolMembership, SchoolMembership.school_id == School.id)
         .where(
             SchoolMembership.user_id == current_user.id,
+            SchoolMembership.role.in_(compatible_scope_roles(current_user.role)),
             SchoolMembership.status == "active",
         )
         .order_by(School.id)
@@ -37,8 +38,13 @@ def create_school(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> School:
-    if current_user.role not in {"admin", "teacher"}:
-        raise HTTPException(status_code=403, detail="Only admins or teachers can create schools")
+    current_user = lock_scope_eligible_user(
+        db,
+        current_user.id,
+        "teacher",
+        detail="Only active admins or teachers can create schools",
+        status_code=403,
+    )
     name = require_trimmed_text(payload.name, "School name is required")
     existing = db.scalar(select(School).where(School.name == name))
     if existing is not None:

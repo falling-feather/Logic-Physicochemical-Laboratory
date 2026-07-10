@@ -4,7 +4,7 @@ import pytest
 from starlette.requests import Request
 
 from app.core.config import get_settings
-from app.services.request_metadata import request_client_ip_hash
+from app.services.request_metadata import request_client_ip_hash, request_device_label, request_user_agent
 
 
 @pytest.fixture(autouse=True)
@@ -59,6 +59,19 @@ def test_request_client_ip_hash_ignores_forwarded_for_from_untrusted_proxy(monke
     )
 
     assert request_client_ip_hash(request) == _expected_hash("198.51.100.25")
+
+
+def test_request_metadata_redacts_sensitive_user_agent_and_device_label():
+    request = _request(
+        headers={
+            "User-Agent": "browser Authorization: Bearer user-agent-secret",
+            "X-Device-Label": "access_token=device-label-secret",
+        },
+        client_host="198.51.100.25",
+    )
+
+    assert request_user_agent(request) == "[redacted]"
+    assert request_device_label(request) == "[redacted]"
 
 
 def _request(*, headers: dict[str, str], client_host: str) -> Request:

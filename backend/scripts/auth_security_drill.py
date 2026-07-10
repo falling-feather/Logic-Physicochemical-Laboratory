@@ -27,7 +27,7 @@ def run_auth_security_drill(
     require_admin_bootstrap_token: bool = False,
 ) -> dict[str, Any]:
     resolved_settings = settings or get_settings()
-    production_like = _is_production_like(resolved_settings.environment)
+    production_like = getattr(resolved_settings, "is_production_like", _is_production_like(resolved_settings.environment))
     environment = _environment_report(
         resolved_settings.environment,
         require_production=require_production,
@@ -244,7 +244,7 @@ def _bootstrap_token_looks_weak(token: str | None) -> bool:
 
 
 def _is_production_like(environment: str) -> bool:
-    return environment.strip().lower() in {"production", "prod"}
+    return environment.strip().lower() not in {"dev", "development", "test", "testing"}
 
 
 def main(argv: list[str] | None = None) -> int:

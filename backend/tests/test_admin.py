@@ -22,6 +22,7 @@ from app.models import (
     KnowledgeSnapshotRun,
     LoginAttempt,
     SchoolMembership,
+    SecurityControlLock,
     User,
 )
 from app.services import content_script_assets
@@ -144,6 +145,8 @@ def test_admin_bootstrap_is_single_use(client):
     me = client.get("/api/users/me", headers=_auth_header(admin_token))
     assert me.status_code == 200
     assert me.json()["role"] == "admin"
+    with get_session_factory(get_settings().database_url)() as db:
+        assert db.get(SecurityControlLock, "admin-authority") is not None
 
 
 def test_admin_bootstrap_requires_token_in_production_without_leaking_token(client, monkeypatch):
@@ -197,6 +200,24 @@ def test_admin_bootstrap_requires_token_in_production_without_leaking_token(clie
         assert audit.request_id == "prod-bootstrap-token-check"
         assert bootstrap_token not in json.dumps(audit.snapshot_json, ensure_ascii=False)
         assert "password" not in json.dumps(audit.snapshot_json, ensure_ascii=False).lower()
+
+
+def test_admin_bootstrap_fails_closed_for_noncanonical_environment(client, monkeypatch):
+    monkeypatch.setenv("ASTRA_ENVIRONMENT", "staging-blue")
+    monkeypatch.delenv("ASTRA_ADMIN_BOOTSTRAP_TOKEN", raising=False)
+    get_settings.cache_clear()
+
+    response = client.post(
+        "/api/admin/bootstrap",
+        json={
+            "username": "staging_admin",
+            "password": "secret123",
+            "display_name": "Staging Admin",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Admin bootstrap token is required outside local development"
 
 
 def test_admin_views_user_management_stats_and_bug_records(client):

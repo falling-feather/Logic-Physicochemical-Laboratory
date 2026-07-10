@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
-from app.models import AuditArchiveAnchor
+from app.models import AuditArchiveAnchor, User
 from app.models.base import utc_now
 from app.services.audit_anchor_delivery import (
     AuditAnchorAdapter,
@@ -45,6 +45,9 @@ def enqueue_audit_archive_anchor(
     settings: Settings,
     created_by_user_id: int | None = None,
 ) -> AuditArchiveAnchorEnqueueResult:
+    actor = db.get(User, created_by_user_id) if created_by_user_id is not None else None
+    if actor is None or actor.status != "active" or actor.role != "admin":
+        raise AuditArchiveAnchorError("audit_anchor_actor_unauthorized", retryable=False)
     resolved_path = manifest_path.expanduser().resolve()
     verification = verify_archive_manifest(resolved_path)
     if not verification.get("ok"):

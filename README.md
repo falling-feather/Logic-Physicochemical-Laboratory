@@ -116,6 +116,8 @@ cmake --build build --config Release
 # 访问 http://localhost:910
 ```
 
+V6.6.59 起该服务默认只监听 `127.0.0.1`，且只公开审核过的前端资源目录；不要用 `--host 0.0.0.0` 绕过反向代理和防火墙边界。构建需 MSVC 2019+、GCC 9.1+ 或等效的完整 C++17 filesystem 工具链。
+
 ### 方式三：Windows 云服务器一键部署
 
 ```powershell

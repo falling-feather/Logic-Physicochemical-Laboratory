@@ -5,6 +5,27 @@ from fastapi import Request
 from app.core.config import get_settings
 
 
+_SENSITIVE_METADATA_MARKERS = (
+    "password=",
+    "passwd=",
+    "pwd=",
+    "token=",
+    "secret=",
+    "api_key=",
+    "apikey=",
+    "authorization:",
+    "bearer ",
+    "set-cookie",
+    "cookie:",
+    "session=",
+    "access_token",
+    "refresh_token",
+    "client_secret",
+    "private_key",
+)
+_REDACTED_METADATA_VALUE = "[redacted]"
+
+
 def request_metadata(request: Request | None) -> dict[str, str | None]:
     if request is None:
         return {
@@ -37,13 +58,13 @@ def request_client_ip_hash(request: Request | None) -> str | None:
 def request_user_agent(request: Request | None) -> str | None:
     if request is None:
         return None
-    return trim_metadata_value(request.headers.get("user-agent"), 240)
+    return safe_client_metadata_value(request.headers.get("user-agent"), 240)
 
 
 def request_device_label(request: Request | None) -> str | None:
     if request is None:
         return None
-    explicit_label = trim_metadata_value(
+    explicit_label = safe_client_metadata_value(
         request.headers.get("x-device-label") or request.headers.get("x-device-name"),
         120,
     )
@@ -59,6 +80,16 @@ def trim_metadata_value(value: str | None, max_length: int) -> str | None:
     if not value:
         return None
     return value[:max_length]
+
+
+def safe_client_metadata_value(value: str | None, max_length: int) -> str | None:
+    normalized = trim_metadata_value(value, max_length)
+    if normalized is None:
+        return None
+    lowered = normalized.lower()
+    if any(marker in lowered for marker in _SENSITIVE_METADATA_MARKERS):
+        return _REDACTED_METADATA_VALUE
+    return normalized
 
 
 def _client_ip(request: Request) -> str | None:

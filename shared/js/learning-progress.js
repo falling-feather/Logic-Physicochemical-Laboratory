@@ -1,5 +1,5 @@
 // ===== X-01: Learning Progress System =====
-// Tracks which experiments the user has visited using localStorage.
+// Tracks which experiments the user has visited in memory for the current page lifecycle.
 // Renders ✓ badges on gallery cards and a progress bar in page heroes.
 
 const LearningProgress = {
@@ -53,22 +53,15 @@ const LearningProgress = {
         this._renderAll();
     },
 
-    // ── Storage ──
+    // ── In-memory state ──
 
     _load() {
         if (this._data) return;
-        try {
-            const raw = localStorage.getItem(this._KEY);
-            this._data = raw ? JSON.parse(raw) : { visited: {} };
-        } catch (_) {
-            this._data = { visited: {} };
-        }
+        this._data = { visited: {} };
     },
 
     _save() {
-        try {
-            localStorage.setItem(this._KEY, JSON.stringify(this._data));
-        } catch (_) { /* quota exceeded — silently ignore */ }
+        // Intentionally not persisted: account-linked learning state belongs to the backend.
     },
 
     // ── UI Rendering ──

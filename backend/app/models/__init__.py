@@ -9,6 +9,7 @@ from app.models.admin import (
     BackgroundTaskAttempt,
     BugExternalSyncOperation,
     BugRecord,
+    SecurityControlLock,
 )
 from app.models.content import (
     ContentDraft,
@@ -49,6 +50,7 @@ __all__ = [
     "AuthSession",
     "Base",
     "BugRecord",
+    "SecurityControlLock",
     "ClassGroup",
     "ClassJoinRequest",
     "ClassKnowledgeSnapshot",

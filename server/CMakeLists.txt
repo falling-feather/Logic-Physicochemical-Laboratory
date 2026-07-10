@@ -3,6 +3,11 @@ project(EngLabServer LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.1)
+    message(FATAL_ERROR "englab_server requires GCC 9.1+ for complete C++17 filesystem support")
+endif()
 
 # ─── httplib (header-only HTTP library) ───
 include(FetchContent)

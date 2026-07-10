@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 import logging
+import re
 from time import perf_counter
 from uuid import uuid4
 
@@ -22,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    settings.validate_runtime_security()
+    cors_origins = settings.cors_origin_list
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
@@ -35,10 +38,10 @@ def create_app() -> FastAPI:
         with session_factory() as db:
             ensure_seed_pages(db)
 
-    if settings.cors_origin_list:
+    if cors_origins:
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=settings.cors_origin_list,
+            allow_origins=cors_origins,
             allow_credentials=True,
             allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
             allow_headers=[
@@ -60,16 +63,21 @@ def create_app() -> FastAPI:
         is_api = _is_api_path(request.url.path, settings.api_prefix)
         try:
             response = await call_next(request)
-        except Exception:
+        except Exception as exc:
             if not is_api:
                 raise
-            logger.exception("Unhandled API error request_id=%s path=%s", request_id, request.url.path)
+            logger.error(
+                "Unhandled API error request_id=%s path=%s error_type=%s",
+                request_id,
+                request.url.path,
+                exc.__class__.__name__,
+            )
             response = JSONResponse(
                 status_code=500,
                 content={"detail": "Internal server error"},
             )
             origin = request.headers.get("origin", "")
-            if origin in settings.cors_origin_list:
+            if origin in cors_origins:
                 response.headers["Access-Control-Allow-Origin"] = origin
                 response.headers["Access-Control-Allow-Credentials"] = "true"
                 response.headers["Access-Control-Expose-Headers"] = "X-Request-ID, Server-Timing"
@@ -130,9 +138,9 @@ async def lifespan(app: FastAPI):
 
 def _request_id_from_header(value: str | None) -> str:
     request_id = (value or "").strip()
-    if not request_id:
+    if not re.fullmatch(r"[A-Za-z0-9._:-]{1,64}", request_id):
         return uuid4().hex
-    return request_id[:64]
+    return request_id
 
 
 def _is_api_path(path: str, api_prefix: str) -> bool:

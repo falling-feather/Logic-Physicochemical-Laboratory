@@ -90,6 +90,12 @@ class AuditChainHead(TimestampMixin, Base):
     current_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
+class SecurityControlLock(TimestampMixin, Base):
+    __tablename__ = "security_control_locks"
+
+    name: Mapped[str] = mapped_column(String(80), primary_key=True)
+
+
 class AuditArchiveAnchor(TimestampMixin, Base):
     __tablename__ = "audit_archive_anchors"
     __table_args__ = (UniqueConstraint("manifest_sha256", name="uq_audit_archive_anchors_manifest_sha256"),)

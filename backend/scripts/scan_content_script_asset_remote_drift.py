@@ -56,11 +56,11 @@ def run_scan(
     run_key = f"content-script-remote-drift:script:{now.astimezone(UTC).strftime('%Y%m%dT%H%M%S%fZ')}:{uuid4().hex[:12]}"
     with session_factory() as db:
         actor = db.get(User, actor_user_id) if actor_user_id is not None else None
-        if actor_user_id is not None and (actor is None or actor.status != "active"):
+        if actor is None or actor.status != "active" or actor.role != "admin":
             return {
                 "ok": False,
                 "status": "failed",
-                "error": "ActorUserNotFound",
+                "error": "ActiveAdminActorRequired",
                 "actor_user_id": actor_user_id,
             }
         lease = acquire_content_script_asset_scan_job_lease(
@@ -89,7 +89,14 @@ def run_scan(
                 scan_offset=offset,
                 generated_at=now,
             )
-            finish_content_script_asset_scan_run_success(run, report=report, finished_at=report.generated_at)
+            run = finish_content_script_asset_scan_run_success(
+                db,
+                lease,
+                report=report,
+                finished_at=utc_now(),
+            )
+            if run is None:
+                return {"ok": False, "status": "lease_lost", "error": "ScanLeaseLost", "run_key": run_key}
             db.commit()
             return {
                 "ok": True,
@@ -109,9 +116,13 @@ def run_scan(
             }
         except Exception as exc:
             db.rollback()
-            failed_run = db.scalar(select(ContentScriptAssetScanRun).where(ContentScriptAssetScanRun.run_key == run_key))
+            failed_run = finish_content_script_asset_scan_run_failure(
+                db,
+                lease,
+                error=exc,
+                finished_at=utc_now(),
+            )
             if failed_run is not None:
-                finish_content_script_asset_scan_run_failure(failed_run, error=exc, finished_at=utc_now())
                 db.commit()
             return {
                 "ok": False,

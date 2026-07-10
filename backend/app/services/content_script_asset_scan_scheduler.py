@@ -101,11 +101,11 @@ class ContentScriptRemoteDriftScheduler:
         session_factory = get_session_factory(self.database_url)
         with session_factory() as db:
             actor = _scheduler_actor(db, self.schedule_config.actor_user_id)
-            if self.schedule_config.actor_user_id is not None and actor is None:
+            if actor is None:
                 return {
                     "ok": True,
                     "status": "skipped",
-                    "reason": "actor_user_not_found",
+                    "reason": "active_admin_actor_required",
                     "run_key": run_key,
                 }
             lease = acquire_content_script_asset_scan_job_lease(
@@ -143,7 +143,19 @@ class ContentScriptRemoteDriftScheduler:
                     scan_offset=self.schedule_config.scan_offset,
                     generated_at=now,
                 )
-                finish_content_script_asset_scan_run_success(run, report=report, finished_at=report.generated_at)
+                run = finish_content_script_asset_scan_run_success(
+                    db,
+                    lease,
+                    report=report,
+                    finished_at=self.clock(),
+                )
+                if run is None:
+                    return {
+                        "ok": False,
+                        "status": "lease_lost",
+                        "error": "ScanLeaseLost",
+                        "run_key": run_key,
+                    }
                 db.commit()
                 return {
                     "ok": True,
@@ -157,9 +169,13 @@ class ContentScriptRemoteDriftScheduler:
                 }
             except Exception as exc:
                 db.rollback()
-                failed_run = db.scalar(select(ContentScriptAssetScanRun).where(ContentScriptAssetScanRun.run_key == run_key))
+                failed_run = finish_content_script_asset_scan_run_failure(
+                    db,
+                    lease,
+                    error=exc,
+                    finished_at=self.clock(),
+                )
                 if failed_run is not None:
-                    finish_content_script_asset_scan_run_failure(failed_run, error=exc, finished_at=self.clock())
                     db.commit()
                 return {
                     "ok": False,
@@ -188,7 +204,7 @@ def _scheduler_actor(db, actor_user_id: int | None) -> User | None:
     if actor_user_id is None:
         return None
     actor = db.get(User, actor_user_id)
-    if actor is None or actor.status != "active":
+    if actor is None or actor.status != "active" or actor.role != "admin":
         return None
     return actor
 

@@ -191,8 +191,10 @@ from app.services.external_issue_providers import (
     build_issue_provider_adapter,
     external_issue_sync_posture,
 )
+from app.services.security_control_locks import ADMIN_AUTHORITY_LOCK, acquire_security_control_lock
 from app.services.backend_performance import build_backend_performance_report
 from app.services.access_control import (
+    deactivate_incompatible_authority_rows,
     require_class_teacher_or_admin_by_id,
     require_school_teacher_or_admin,
     teacher_class_ids,
@@ -307,15 +309,18 @@ _AUDIT_LOG_REPORT_CSV_FIELDS = ("section", "key", "total", "success", "failure",
 
 @router.post("/bootstrap", response_model=AdminUserRead, status_code=status.HTTP_201_CREATED)
 def bootstrap_admin(payload: AdminBootstrapRequest, request: Request, db: Session = Depends(get_db)) -> User:
+    acquire_security_control_lock(db, ADMIN_AUTHORITY_LOCK)
     if _active_admin_count(db) > 0:
         raise HTTPException(status_code=409, detail="Admin bootstrap is already complete")
 
     settings = get_settings()
+    if not settings.admin_bootstrap_enabled:
+        raise HTTPException(status_code=403, detail="Admin bootstrap is disabled")
     if settings.admin_bootstrap_token:
         if payload.bootstrap_token != settings.admin_bootstrap_token:
             raise HTTPException(status_code=403, detail="Invalid admin bootstrap token")
-    elif settings.environment.lower() in {"production", "prod"}:
-        raise HTTPException(status_code=403, detail="Admin bootstrap token is required in production")
+    elif not settings.is_local_development:
+        raise HTTPException(status_code=403, detail="Admin bootstrap token is required outside local development")
 
     username = require_normalized_username(payload.username, min_length=3)
     display_name = require_trimmed_text(payload.display_name, "Display name is required")
@@ -390,7 +395,8 @@ def update_user(
     db: Session = Depends(get_db),
 ) -> User:
     _require_admin(current_user)
-    user = db.get(User, user_id)
+    acquire_security_control_lock(db, ADMIN_AUTHORITY_LOCK)
+    user = db.scalar(select(User).where(User.id == user_id).with_for_update())
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -400,6 +406,10 @@ def update_user(
     if user.role == "admin" and (next_role != "admin" or next_status != "active"):
         if _active_admin_count(db) <= 1:
             raise HTTPException(status_code=409, detail="Cannot remove the last active admin")
+    if next_role == "student" and user.role != "student":
+        owned_course_count = _count(db, Course, Course.creator_user_id == user.id)
+        if owned_course_count:
+            raise HTTPException(status_code=409, detail="Transfer owned courses before changing user to student")
 
     if payload.display_name is not None:
         user.display_name = require_trimmed_text(payload.display_name, "Display name is required")
@@ -410,7 +420,10 @@ def update_user(
 
     after = _user_snapshot(user)
     snapshot = _change_snapshot(before, after)
-    revoked_sessions = _revoke_user_sessions(db, user) if payload.status == "disabled" else 0
+    authority_changed = payload.role is not None and before["role"] != after["role"]
+    if authority_changed:
+        snapshot["deactivated_authority_rows"] = deactivate_incompatible_authority_rows(db, user)
+    revoked_sessions = _revoke_user_sessions(db, user) if authority_changed or payload.status == "disabled" else 0
     if revoked_sessions:
         snapshot["revoked_sessions"] = revoked_sessions
     record_audit_log(
@@ -437,7 +450,7 @@ def reset_user_password(
     db: Session = Depends(get_db),
 ) -> AdminUserPasswordResetResponse:
     _require_admin(current_user)
-    user = db.get(User, user_id)
+    user = db.scalar(select(User).where(User.id == user_id).with_for_update())
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 

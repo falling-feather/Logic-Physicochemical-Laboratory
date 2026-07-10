@@ -1076,6 +1076,47 @@ def test_class_join_request_requires_teacher_approval(client):
     assert join_audit.json()["items"][0]["snapshot_json"]["after"]["source_join_request_id"] == join_request_body["id"]
 
 
+def test_class_join_approval_rechecks_applicant_global_role(client):
+    teacher_token = _register_and_login(client, "teacher_join_role_recheck", "teacher")
+    student_token = _register_and_login(client, "student_join_role_recheck", "student")
+    _, class_id = _create_school_and_class(
+        client,
+        teacher_token,
+        "Astra Role Recheck School",
+        "Role Recheck Physics",
+    )
+    requested = client.post(
+        f"/api/classes/{class_id}/join-requests",
+        headers=_auth_header(student_token),
+        json={"role": "student"},
+    )
+    assert requested.status_code == 201
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        applicant = db.scalar(select(User).where(User.username == "student_join_role_recheck"))
+        applicant.role = "teacher"
+        db.commit()
+        applicant_id = applicant.id
+
+    approval = client.patch(
+        f"/api/classes/{class_id}/join-requests/{requested.json()['id']}",
+        headers=_auth_header(teacher_token),
+        json={"status": "approved", "note": "stale request"},
+    )
+    assert approval.status_code == 409
+    assert approval.json()["detail"] == "Class join applicant is no longer eligible"
+    with session_factory() as db:
+        membership = db.scalar(
+            select(ClassMembership).where(
+                ClassMembership.class_id == class_id,
+                ClassMembership.user_id == applicant_id,
+                ClassMembership.role == "student",
+            )
+        )
+        assert membership is None
+
+
 def test_rejected_class_join_request_can_be_reopened(client):
     teacher_token = _register_and_login(client, "teacher_reopen_request", "teacher")
     student_token = _register_and_login(client, "student_reopen_request", "student")

@@ -8,6 +8,7 @@ def test_redact_audit_snapshot_removes_sensitive_fields_recursively():
         "format": "unit_test",
         "current_hash": "hash-is-not-secret-here",
         "after": {"name": "Visible School"},
+        "message": "Authorization: Bearer scalar-secret",
         "payload_json": {"secret": "payload-secret"},
         "nested": {
             "source_url": "https://cdn.example.test/secret.js",
@@ -25,6 +26,7 @@ def test_redact_audit_snapshot_removes_sensitive_fields_recursively():
     assert redacted["format"] == "unit_test"
     assert redacted["current_hash"] == "hash-is-not-secret-here"
     assert redacted["after"] == {"name": "Visible School"}
+    assert redacted["message"]["redacted"] is True
     assert redacted["payload_json"]["redacted"] is True
     assert redacted["nested"]["source_url"]["redacted"] is True
     assert redacted["nested"]["metadata_json"]["redacted"] is True
@@ -36,3 +38,4 @@ def test_redact_audit_snapshot_removes_sensitive_fields_recursively():
     assert "metadata-secret" not in redacted_text
     assert "manual-review-secret" not in redacted_text
     assert "lease-secret" not in redacted_text
+    assert "scalar-secret" not in redacted_text

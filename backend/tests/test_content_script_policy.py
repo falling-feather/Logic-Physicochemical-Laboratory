@@ -315,38 +315,22 @@ def test_script_policy_blocks_external_script_asset_download_failure():
     assert "script_integrity_verified" not in codes
 
 
-def test_default_external_script_fetcher_uses_no_redirect_opener(monkeypatch):
+def test_default_external_script_fetcher_uses_public_https_boundary(monkeypatch):
     captured = {}
 
-    class FakeResponse:
-        def __enter__(self):
-            return self
+    def fake_fetch(url: str, **kwargs):
+        captured["url"] = url
+        captured.update(kwargs)
+        return b"console.log('ok');"
 
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-        def read(self, size: int) -> bytes:
-            captured["read_size"] = size
-            return b"console.log('ok');"
-
-    class FakeOpener:
-        def open(self, request, timeout: int):
-            captured["request"] = request
-            captured["timeout"] = timeout
-            return FakeResponse()
-
-    def fake_build_opener(handler):
-        captured["handler"] = handler
-        return FakeOpener()
-
-    monkeypatch.setattr(content_script_policy, "build_opener", fake_build_opener)
+    monkeypatch.setattr(content_script_policy, "fetch_public_https_bytes", fake_fetch)
 
     payload = content_script_policy._default_external_script_fetcher("https://cdn.example.test/tool.js")
 
     assert payload == b"console.log('ok');"
-    assert captured["handler"]().redirect_request(None, None, 302, "Found", {}, "https://other.example.test") is None
-    assert captured["timeout"] == content_script_policy.EXTERNAL_SCRIPT_FETCH_TIMEOUT_SECONDS
-    assert captured["read_size"] == content_script_policy.MAX_EXTERNAL_SCRIPT_BYTES + 1
+    assert captured["url"] == "https://cdn.example.test/tool.js"
+    assert captured["timeout_seconds"] == content_script_policy.EXTERNAL_SCRIPT_FETCH_TIMEOUT_SECONDS
+    assert captured["max_bytes"] == content_script_policy.MAX_EXTERNAL_SCRIPT_BYTES
 
 
 def test_script_policy_blocks_external_script_asset_without_sri_contract_details():

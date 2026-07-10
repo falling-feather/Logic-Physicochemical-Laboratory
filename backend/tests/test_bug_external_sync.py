@@ -105,6 +105,19 @@ class _AmbiguousCreateAdapter(_FakeIssueAdapter):
         raise IssueProviderError("provider_network_error", retryable=True, ambiguous=True)
 
 
+class _WrongStateReceiptAdapter(_FakeIssueAdapter):
+    def update_issue_state(self, issue_id: str, *, state: str) -> ExternalIssueReceipt:
+        self.status_calls.append((issue_id, state))
+        return ExternalIssueReceipt(
+            provider="github",
+            issue_id=issue_id,
+            issue_url=f"https://github.com/example/astra/issues/{issue_id}",
+            state="open" if state == "closed" else "closed",
+            updated_at=datetime(2026, 7, 10, 10, 6, tzinfo=UTC),
+            response_hash="d" * 64,
+        )
+
+
 class _FakeGitHubResponse:
     status = 201
 
@@ -324,6 +337,48 @@ def test_ambiguous_issue_creation_never_blindly_retries_or_mutates_local_bug(cli
         assert operation.status == "ambiguous"
         assert operation.attempt_count == 1
         assert operation.last_error_code == "provider_network_error"
+
+
+def test_issue_status_sync_rejects_opposite_provider_receipt_state(client, monkeypatch):
+    token = _bootstrap_admin(client)
+    bug = _create_bug(client, token, title="Receipt state mismatch")
+    _configure_issue_sync()
+    initial_adapter = _FakeIssueAdapter()
+    monkeypatch.setattr(admin_endpoint, "build_issue_provider_adapter", lambda _: initial_adapter)
+    created = client.post(
+        f"/api/admin/bugs/{bug['id']}/external-sync/create",
+        headers=_auth_header(token),
+        json={"confirm_external_sync": True},
+    )
+    assert created.status_code == 200
+    closed = client.patch(
+        f"/api/admin/bugs/{bug['id']}",
+        headers=_auth_header(token),
+        json={"status": "closed"},
+    )
+    assert closed.status_code == 200
+
+    wrong_state_adapter = _WrongStateReceiptAdapter()
+    monkeypatch.setattr(admin_endpoint, "build_issue_provider_adapter", lambda _: wrong_state_adapter)
+    synced = client.post(
+        f"/api/admin/bugs/{bug['id']}/external-sync/status",
+        headers=_auth_header(token),
+        json={"confirm_external_sync": True},
+    )
+    assert synced.status_code == 409
+    assert synced.json()["detail"]["code"] == "external_issue_response_state_mismatch"
+    assert synced.json()["detail"]["ambiguous"] is True
+
+    with get_session_factory(get_settings().database_url)() as db:
+        stored_bug = db.get(BugRecord, bug["id"])
+        operation = db.scalar(
+            select(BugExternalSyncOperation)
+            .where(BugExternalSyncOperation.operation == "status")
+            .order_by(BugExternalSyncOperation.id.desc())
+        )
+        assert stored_bug.external_issue_state == "open"
+        assert operation.status == "ambiguous"
+        assert operation.last_error_code == "external_issue_response_state_mismatch"
 
 
 def test_github_provider_uses_versioned_authenticated_contract_without_local_sensitive_fields(monkeypatch):

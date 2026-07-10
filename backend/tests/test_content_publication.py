@@ -50,6 +50,12 @@ def _register_and_login(client, username: str, role: str) -> tuple[int, str]:
     return register.json()["id"], login.json()["access_token"]
 
 
+def _login(client, username: str) -> str:
+    response = client.post("/api/auth/login", json={"username": username, "password": "secret123"})
+    assert response.status_code == 200
+    return response.json()["access_token"]
+
+
 def _draft_payload(slug: str, *, title: str, allow_script: bool = False) -> dict:
     script_props = {
         "scriptPath": "drafts/custom-publish.js",
@@ -535,6 +541,7 @@ def test_script_draft_requires_approved_review_before_publish(client):
         json={"role": "admin"},
     )
     assert promote_second_admin.status_code == 200
+    second_admin_token = _login(client, "admin_publish_second")
     _, teacher_token = _register_and_login(client, "teacher_script_publish", "teacher")
     slug = "physics/script-publish"
 
@@ -591,6 +598,7 @@ def test_allowlisted_external_script_asset_requires_review_before_publish(client
         json={"role": "admin"},
     )
     assert promote_second_admin.status_code == 200
+    second_admin_token = _login(client, "admin_external_script_second")
     _, teacher_token = _register_and_login(client, "teacher_external_script_publish", "teacher")
     slug = "physics/external-script-publish"
     asset_bytes = b"console.log('external script publish');\n"
@@ -725,6 +733,7 @@ def test_blocked_content_script_host_policy_rejects_review_and_publish(client, m
         json={"role": "admin"},
     )
     assert promote_second_admin.status_code == 200
+    second_admin_token = _login(client, "admin_blocked_host_second")
     _, teacher_token = _register_and_login(client, "teacher_blocked_host", "teacher")
     slug = "physics/external-script-blocked-host"
     asset_bytes = b"console.log('blocked host asset');\n"
@@ -790,6 +799,7 @@ def test_external_script_asset_publish_rechecks_current_sri_bytes(client, monkey
         json={"role": "admin"},
     )
     assert promote_second_admin.status_code == 200
+    second_admin_token = _login(client, "admin_external_script_drift_second")
     _, teacher_token = _register_and_login(client, "teacher_external_script_drift", "teacher")
     slug = "physics/external-script-drift"
     asset_bytes = b"console.log('approved asset');\n"
@@ -853,6 +863,7 @@ def test_external_script_asset_policy_rechecks_current_allowlist_before_publish(
         json={"role": "admin"},
     )
     assert promote_second_admin.status_code == 200
+    second_admin_token = _login(client, "admin_external_script_context_second")
     _, teacher_token = _register_and_login(client, "teacher_external_script_context", "teacher")
     slug = "physics/external-script-context"
     asset_bytes = b"console.log('external script context');\n"
@@ -908,6 +919,7 @@ def test_scripted_content_version_requires_new_review_before_rollback(client):
         json={"role": "admin"},
     )
     assert promote_second_admin.status_code == 200
+    second_admin_token = _login(client, "admin_script_rollback_second")
     _, teacher_token = _register_and_login(client, "teacher_script_rollback", "teacher")
     slug = "physics/script-rollback"
 

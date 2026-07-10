@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import AuditArchiveAnchor, AuditLog, BackgroundTask, BackgroundTaskAttempt
+from app.models import AuditArchiveAnchor, AuditLog, BackgroundTask, BackgroundTaskAttempt, User
 from app.services import audit_anchor_delivery
 from app.services.audit import audit_log_chain_hash
 from app.services.audit_anchor_delivery import (
@@ -64,6 +64,16 @@ def _session_factory():
     return get_session_factory(get_settings().database_url)
 
 
+def _bootstrap_admin_id(client, username: str) -> int:
+    created = client.post(
+        "/api/admin/bootstrap",
+        json={"username": username, "password": "secret123", "display_name": "Anchor Admin"},
+    )
+    assert created.status_code == 201
+    with _session_factory()() as db:
+        return int(db.scalar(select(User.id).where(User.username == username)))
+
+
 @pytest.fixture()
 def anchor_output_dir():
     root = Path.cwd() / ".tmp-test-audit-anchor"
@@ -103,12 +113,18 @@ def _archive_for_anchor(output_dir: Path) -> tuple[Path, int, str]:
 
 
 def test_audit_anchor_staging_worker_sends_hash_only_envelope_and_recovers(anchor_output_dir, client):
+    actor_id = _bootstrap_admin_id(client, "audit_anchor_staging_admin")
     manifest_path, log_id, original_hash = _archive_for_anchor(anchor_output_dir)
     settings = get_settings().model_copy(deep=True)
     settings.background_task_worker_audit_anchor_enabled = True
     settings.background_task_worker_batch_size = 1
     with _session_factory()() as db:
-        queued = enqueue_audit_archive_anchor(db, manifest_path=manifest_path, settings=settings)
+        queued = enqueue_audit_archive_anchor(
+            db,
+            manifest_path=manifest_path,
+            settings=settings,
+            created_by_user_id=actor_id,
+        )
         db.commit()
         anchor_id = queued.anchor.id
         task_id = queued.task_result.task.id
@@ -150,6 +166,7 @@ def test_audit_anchor_staging_worker_sends_hash_only_envelope_and_recovers(ancho
             source_type="audit_archive_anchor",
             source_id=anchor_id,
             payload={"anchor_id": anchor_id, "manifest_path": str(manifest_path.resolve())},
+            created_by_user_id=actor_id,
         )
         db.commit()
         recovery_task_id = recovery.task.id
@@ -163,13 +180,19 @@ def test_audit_anchor_staging_worker_sends_hash_only_envelope_and_recovers(ancho
 
 
 def test_audit_anchor_failure_records_retry_and_eventual_receipt(anchor_output_dir, client):
+    actor_id = _bootstrap_admin_id(client, "audit_anchor_retry_admin")
     manifest_path, _, _ = _archive_for_anchor(anchor_output_dir)
     settings = get_settings().model_copy(deep=True)
     settings.background_task_worker_audit_anchor_enabled = True
     settings.background_task_worker_batch_size = 1
     settings.background_task_worker_base_backoff_seconds = 1
     with _session_factory()() as db:
-        queued = enqueue_audit_archive_anchor(db, manifest_path=manifest_path, settings=settings)
+        queued = enqueue_audit_archive_anchor(
+            db,
+            manifest_path=manifest_path,
+            settings=settings,
+            created_by_user_id=actor_id,
+        )
         db.commit()
         anchor_id = queued.anchor.id
         task_id = queued.task_result.task.id
@@ -214,13 +237,25 @@ def test_audit_anchor_failure_records_retry_and_eventual_receipt(anchor_output_d
 
 
 def test_audit_anchor_cli_requires_confirmation_and_enqueue_is_idempotent(anchor_output_dir, client):
+    actor_id = _bootstrap_admin_id(client, "audit_anchor_cli_admin")
     manifest_path, _, _ = _archive_for_anchor(anchor_output_dir)
     denied = run_anchor_request(manifest_path=manifest_path, confirm_external_anchor=False)
     assert denied["ok"] is False
     assert denied["status"] == "confirmation_required"
 
-    first = run_anchor_request(manifest_path=manifest_path, confirm_external_anchor=True)
-    second = run_anchor_request(manifest_path=manifest_path, confirm_external_anchor=True)
+    unauthorized = run_anchor_request(manifest_path=manifest_path, confirm_external_anchor=True)
+    assert unauthorized["ok"] is False
+    assert unauthorized["error_code"] == "audit_anchor_actor_unauthorized"
+    first = run_anchor_request(
+        manifest_path=manifest_path,
+        confirm_external_anchor=True,
+        actor_user_id=actor_id,
+    )
+    second = run_anchor_request(
+        manifest_path=manifest_path,
+        confirm_external_anchor=True,
+        actor_user_id=actor_id,
+    )
     assert first["ok"] is True
     assert first["anchor_created"] is True
     assert first["task_created"] is True

@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory
-from app.models import ContentDraft, ContentPageRecord
+from app.models import ContentDraft, ContentPageRecord, User
 
 
 def _auth_header(token: str) -> dict:
@@ -40,6 +40,12 @@ def _register_and_login(client, username: str, role: str) -> tuple[int, str]:
     login = client.post("/api/auth/login", json={"username": username, "password": "secret123"})
     assert login.status_code == 200
     return register.json()["id"], login.json()["access_token"]
+
+
+def _login(client, username: str) -> str:
+    response = client.post("/api/auth/login", json={"username": username, "password": "secret123"})
+    assert response.status_code == 200
+    return response.json()["access_token"]
 
 
 def _draft_payload(slug: str, *, allow_script: bool = False) -> dict:
@@ -568,6 +574,7 @@ def test_admin_reviews_script_draft_and_records_audit(client):
         json={"role": "admin"},
     )
     assert promote_second_admin.status_code == 200
+    second_admin_token = _login(client, "admin_content_second")
     teacher_id, teacher_token = _register_and_login(client, "teacher_script_draft", "teacher")
     _, student_token = _register_and_login(client, "student_script_draft", "student")
 
@@ -702,6 +709,69 @@ def test_admin_cannot_review_own_script_draft(client):
         json={"status": "approved", "note": "own script"},
     )
     assert review.status_code == 403
+
+
+def test_script_review_is_bound_to_last_editor_and_exact_schema_hash(client):
+    first_admin_token = _bootstrap_admin(client, username="admin_review_binding_first")
+    second_admin_id, _ = _register_and_login(client, "admin_review_binding_second", "teacher")
+    promoted = client.patch(
+        f"/api/admin/users/{second_admin_id}",
+        headers=_auth_header(first_admin_token),
+        json={"role": "admin"},
+    )
+    assert promoted.status_code == 200
+    second_admin_token = _login(client, "admin_review_binding_second")
+    _, teacher_token = _register_and_login(client, "teacher_review_binding", "teacher")
+    slug = "physics/review-binding"
+    create_payload = _draft_payload(slug, allow_script=True)
+    created = client.post("/api/content/drafts", headers=_auth_header(teacher_token), json=create_payload)
+    assert created.status_code == 201
+    draft_id = created.json()["id"]
+
+    edited_schema = create_payload["schema"]
+    edited_schema["title"] = "Admin Edited Script Draft"
+    edited = client.patch(
+        f"/api/content/drafts/{draft_id}",
+        headers=_auth_header(first_admin_token),
+        json={"schema": edited_schema, "allow_script": True, "note": "administrative correction"},
+    )
+    assert edited.status_code == 200
+    with get_session_factory(get_settings().database_url)() as db:
+        first_admin = db.scalar(select(User).where(User.username == "admin_review_binding_first"))
+        assert edited.json()["last_editor_user_id"] == first_admin.id
+
+    self_review = client.patch(
+        f"/api/content/drafts/{draft_id}/script-review",
+        headers=_auth_header(first_admin_token),
+        json={"status": "approved", "note": "must be rejected"},
+    )
+    assert self_review.status_code == 403
+
+    approved = client.patch(
+        f"/api/content/drafts/{draft_id}/script-review",
+        headers=_auth_header(second_admin_token),
+        json={"status": "approved", "note": "independent review"},
+    )
+    assert approved.status_code == 200
+    assert approved.json()["script_reviewed_schema_hash"] == approved.json()["schema_hash"]
+    submitted = client.post(
+        f"/api/content/drafts/{draft_id}/submit",
+        headers=_auth_header(teacher_token),
+        json={},
+    )
+    assert submitted.status_code == 200
+
+    with get_session_factory(get_settings().database_url)() as db:
+        draft = db.get(ContentDraft, draft_id)
+        draft.schema_hash = "0" * 64
+        db.commit()
+    publish = client.post(
+        f"/api/content/drafts/{draft_id}/publish",
+        headers=_auth_header(first_admin_token),
+        json={"note": "stale reviewed hash"},
+    )
+    assert publish.status_code == 409
+    assert publish.json()["detail"] == "Content draft script review does not match the current schema"
 
 
 def _table_count(model) -> int:

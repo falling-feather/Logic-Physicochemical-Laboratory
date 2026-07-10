@@ -1,4 +1,4 @@
-const CACHE_NAME = 'astra-static-v20260710v6653PermissionMatrixP1';
+const CACHE_NAME = 'astra-static-v20260710v6659SecurityFreeze';
 const APP_SHELL = [
   './',
   './index.html',
@@ -58,7 +58,11 @@ self.addEventListener('fetch', (event) => {
   // Let the browser honor backend no-store headers; never provide CacheStorage fallback.
   if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return;
 
-  if (/^\/(?:(?:doc|muban|server|tools)(?:\/|$)|(?:.*\/)?README\.md$|\.(?:git|github|vscode|agents|codex)(?:\/|$))/i.test(url.pathname)) {
+  const publicPath = url.pathname === '/'
+    || url.pathname === '/index.html'
+    || url.pathname === '/sw.js'
+    || /^\/(?:pages|shared|UI|codevis)(?:\/|$)/.test(url.pathname);
+  if (!publicPath) {
     event.respondWith(new Response('Not Found', {
       status: 404,
       headers: { 'Content-Type': 'text/plain; charset=utf-8' }

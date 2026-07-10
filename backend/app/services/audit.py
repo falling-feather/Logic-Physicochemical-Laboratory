@@ -68,6 +68,24 @@ _SENSITIVE_AUDIT_FIELD_PREFIXES = (
     "secret_",
     "token_",
 )
+_SENSITIVE_AUDIT_VALUE_MARKERS = (
+    "password=",
+    "passwd=",
+    "pwd=",
+    "token=",
+    "secret=",
+    "api_key=",
+    "apikey=",
+    "authorization:",
+    "bearer ",
+    "set-cookie",
+    "cookie:",
+    "session=",
+    "access_token",
+    "refresh_token",
+    "client_secret",
+    "private_key",
+)
 
 
 def record_audit_log(
@@ -139,6 +157,8 @@ def _redact_audit_value(value: Any) -> Any:
         }
     if isinstance(value, list):
         return [_redact_audit_value(item) for item in value]
+    if isinstance(value, str) and _audit_value_is_sensitive(value):
+        return dict(_AUDIT_REDACTION)
     return value
 
 
@@ -149,6 +169,11 @@ def _audit_field_is_sensitive(key: str) -> bool:
     if normalized.startswith(_SENSITIVE_AUDIT_FIELD_PREFIXES):
         return True
     return normalized.endswith(_SENSITIVE_AUDIT_FIELD_SUFFIXES)
+
+
+def _audit_value_is_sensitive(value: str) -> bool:
+    lowered = value.lower()
+    return any(marker in lowered for marker in _SENSITIVE_AUDIT_VALUE_MARKERS)
 
 
 def audit_log_chain_hash(audit_log: AuditLog) -> str:
