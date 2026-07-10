@@ -134,6 +134,23 @@ function isLocalUrl(url) {
   }
 }
 
+function isHttpUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function urlOrigin(url) {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return '';
+  }
+}
+
 function isBenignMissingResource(entry) {
   return /\/favicon\.ico(?:$|\?)/.test(entry.url);
 }
@@ -148,6 +165,165 @@ async function waitForContentFrame(iframeHandle, timeoutMs) {
   return null;
 }
 
+async function waitForSandboxTerminalState(page, timeoutMs) {
+  await page.waitForFunction(() => {
+    const card = document.querySelector('[data-backend-sandbox-card]');
+    return card && card.dataset && ['ready', 'timeout', 'error'].includes(card.dataset.state);
+  }, undefined, { timeout: timeoutMs });
+  return page.evaluate(() => {
+    const card = document.querySelector('[data-backend-sandbox-card]');
+    return {
+      state: card ? card.dataset.state || '' : '',
+      status: card ? (card.querySelector('[data-backend-sandbox-status]')?.textContent || '') : '',
+      message: card ? (card.querySelector('[data-backend-sandbox-message]')?.textContent || '') : '',
+    };
+  });
+}
+
+async function inspectEnergySandbox(frame) {
+  return frame.evaluate(() => {
+    const requiredIds = [
+      'energy-canvas',
+      'energy-friction',
+      'energy-play',
+      'energy-reset',
+      'energy-info',
+    ];
+    const root = document.getElementById('astra-sandbox-root');
+    const nodes = Object.fromEntries(requiredIds.map((id) => [id, document.getElementById(id)]));
+    const canvas = nodes['energy-canvas'];
+    const rect = canvas ? canvas.getBoundingClientRect() : null;
+    const runtime = window.EnergyConservation || null;
+    return {
+      requiredIds,
+      missingIds: requiredIds.filter((id) => !nodes[id]),
+      rootOwnsAll: Boolean(root) && requiredIds.every((id) => root.contains(nodes[id])),
+      canvas: canvas ? {
+        bitmapWidth: canvas.width,
+        bitmapHeight: canvas.height,
+        clientWidth: rect ? rect.width : 0,
+        clientHeight: rect ? rect.height : 0,
+        hasContext: Boolean(canvas.getContext && canvas.getContext('2d')),
+      } : null,
+      frictionValue: nodes['energy-friction'] ? nodes['energy-friction'].value : '',
+      playText: nodes['energy-play'] ? nodes['energy-play'].textContent || '' : '',
+      resetText: nodes['energy-reset'] ? nodes['energy-reset'].textContent || '' : '',
+      infoTextLength: nodes['energy-info'] ? (nodes['energy-info'].textContent || '').trim().length : 0,
+      runtime: runtime ? {
+        rootMatches: runtime.root === root,
+        canvasMatches: runtime.canvas === canvas,
+        running: runtime.running === true,
+        width: Number(runtime.W || 0),
+        height: Number(runtime.H || 0),
+      } : null,
+    };
+  });
+}
+
+async function exerciseEnergySandbox(frame, frictionValue) {
+  return frame.evaluate((requestedFriction) => {
+    const slider = document.getElementById('energy-friction');
+    const output = document.getElementById('energy-friction-value');
+    const play = document.getElementById('energy-play');
+    const reset = document.getElementById('energy-reset');
+    const info = document.getElementById('energy-info');
+    const runtime = window.EnergyConservation || null;
+    if (!slider || !play || !reset || !info || !runtime) {
+      return {
+        ok: false,
+        missing: {
+          slider: !slider,
+          play: !play,
+          reset: !reset,
+          info: !info,
+          runtime: !runtime,
+        },
+      };
+    }
+
+    const initialRunning = runtime.running === true;
+    slider.value = String(requestedFriction);
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    slider.dispatchEvent(new Event('change', { bubbles: true }));
+    const frictionApplied = Math.abs(Number(runtime.friction) - Number(requestedFriction)) < 0.0001;
+    const outputUpdated = Boolean(output) && output.textContent.trim() === Number(requestedFriction).toFixed(2);
+    const infoUpdated = info.textContent.includes(Number(requestedFriction).toFixed(2));
+
+    play.click();
+    const paused = runtime.running === false;
+    const pausedText = play.textContent || '';
+    const pausedLabelUpdated = pausedText.includes('播放');
+    play.click();
+    const resumed = runtime.running === true;
+    const resumedText = play.textContent || '';
+    const resumedLabelUpdated = resumedText.includes('暂停');
+
+    runtime.ballPos = 0.42;
+    runtime.ballSpeed = 2;
+    runtime.internalEnergy = 3;
+    reset.click();
+    const resetApplied = Number(runtime.ballPos) < 0.01
+      && Number(runtime.internalEnergy) < 0.01
+      && runtime.running === true;
+
+    return {
+      ok: initialRunning && frictionApplied && outputUpdated && infoUpdated
+        && paused && pausedLabelUpdated && resumed && resumedLabelUpdated && resetApplied,
+      initialRunning,
+      frictionApplied,
+      outputUpdated,
+      infoUpdated,
+      runtimeFriction: Number(runtime.friction),
+      outputText: output ? output.textContent || '' : '',
+      paused,
+      pausedText,
+      pausedLabelUpdated,
+      resumed,
+      resumedText,
+      resumedLabelUpdated,
+      resetApplied,
+      resetState: {
+        ballPos: Number(runtime.ballPos),
+        internalEnergy: Number(runtime.internalEnergy),
+        running: runtime.running === true,
+      },
+    };
+  }, frictionValue);
+}
+
+async function inspectCacheStorage(page) {
+  return page.evaluate(async () => {
+    if (!('caches' in window)) {
+      return { supported: false, cacheNames: [], entries: [], apiEntries: [] };
+    }
+    const cacheNames = await caches.keys();
+    const entries = [];
+    for (const cacheName of cacheNames) {
+      const cache = await caches.open(cacheName);
+      const requests = await cache.keys();
+      for (const request of requests) {
+        entries.push({ cacheName, url: request.url, method: request.method });
+      }
+    }
+    const apiEntries = entries.filter((entry) => {
+      try {
+        return /^\/api(?:\/|$)/.test(new URL(entry.url).pathname);
+      } catch {
+        return false;
+      }
+    });
+    return { supported: true, cacheNames, entries, apiEntries };
+  });
+}
+
+async function settleCaptureTasks(tasks) {
+  let observed = -1;
+  while (observed !== tasks.length) {
+    observed = tasks.length;
+    await Promise.allSettled(tasks.slice());
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const apiBase = stripTrailingSlash(args.api || args['api-base'] || process.env.ASTRA_BROWSER_DRILL_API || 'http://127.0.0.1:8000');
@@ -159,12 +335,13 @@ async function main() {
   const encodedSlug = encodeSlug(slug);
   const renderUrl = `${apiBase}/api/render/page/${encodedSlug}`;
   const generatedAt = new Date().toISOString();
+  const allowedOrigins = new Set([apiBase, webBase, appUrl].map(urlOrigin).filter(Boolean));
 
   await fs.mkdir(outDir, { recursive: true });
 
   const report = {
     ok: false,
-    phase: 'V6.6.48',
+    phase: 'V6.6.52',
     generatedAt,
     appUrl,
     apiBase,
@@ -178,6 +355,9 @@ async function main() {
     requestFailures: [],
     screenshots: {},
     failClosed: {},
+    energy: {},
+    parentDom: {},
+    cacheStorage: {},
   };
 
   const render = await fetchJson(renderUrl);
@@ -257,6 +437,7 @@ async function main() {
       ignoreHTTPSErrors: true,
     });
     const page = await context.newPage();
+    const responseCaptureTasks = [];
 
     page.on('console', (message) => {
       report.console.push({
@@ -280,14 +461,27 @@ async function main() {
     });
     page.on('response', (response) => {
       const url = response.url();
-      if (!isLocalUrl(url) && !url.startsWith('data:')) return;
-      report.network.push({
-        url,
-        status: response.status(),
-        contentType: response.headers()['content-type'] || '',
-        cacheControl: response.headers()['cache-control'] || '',
-        csp: response.headers()['content-security-policy'] || '',
-      });
+      if (!isHttpUrl(url)) return;
+      const capture = Promise.resolve(response.headers())
+        .then((headers) => {
+          report.network.push({
+            url,
+            origin: urlOrigin(url),
+            status: response.status(),
+            contentType: headers['content-type'] || '',
+            cacheControl: headers['cache-control'] || '',
+            csp: headers['content-security-policy'] || '',
+          });
+        })
+        .catch((error) => {
+          report.network.push({
+            url,
+            origin: urlOrigin(url),
+            status: response.status(),
+            headerCaptureError: error && error.message ? error.message : String(error),
+          });
+        });
+      responseCaptureTasks.push(capture);
     });
 
     await page.goto(appUrl, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
@@ -298,8 +492,8 @@ async function main() {
       document.body.setAttribute('data-astra-parent-secret', 'parent-dom-secret');
     });
 
-    const iframeHandle = await page.waitForSelector('[data-backend-sandbox-frame]', { timeout: timeoutMs });
-    const iframeAttrs = await iframeHandle.evaluate((iframe) => ({
+    let activeIframeHandle = await page.waitForSelector('[data-backend-sandbox-frame]', { timeout: timeoutMs });
+    const iframeAttrs = await activeIframeHandle.evaluate((iframe) => ({
       sandbox: iframe.getAttribute('sandbox') || '',
       src: iframe.src,
       referrerPolicy: iframe.referrerPolicy || '',
@@ -313,30 +507,39 @@ async function main() {
       && !iframeAttrs.sandbox.includes('allow-same-origin')
       && iframeAttrs.referrerPolicy === 'no-referrer', iframeAttrs);
 
-    const frame = await waitForContentFrame(iframeHandle, timeoutMs);
-    assertCheck(report, 'browser exposes loaded sandbox frame', Boolean(frame), {
-      frameUrl: frame ? frame.url() : '',
+    let activeFrame = await waitForContentFrame(activeIframeHandle, timeoutMs);
+    assertCheck(report, 'browser exposes loaded sandbox frame', Boolean(activeFrame), {
+      frameUrl: activeFrame ? activeFrame.url() : '',
     });
-    if (!frame) {
+    if (!activeFrame) {
       throw new Error('Sandbox iframe frame was not available.');
     }
-    await frame.waitForLoadState('domcontentloaded', { timeout: timeoutMs });
-    await page.waitForFunction(() => {
-      const card = document.querySelector('[data-backend-sandbox-card]');
-      return card && card.dataset && ['bootstrapping', 'assets', 'ready', 'timeout', 'error'].includes(card.dataset.state);
-    }, { timeout: timeoutMs });
+    await activeFrame.waitForLoadState('domcontentloaded', { timeout: timeoutMs });
+    const cardState = await waitForSandboxTerminalState(page, timeoutMs);
+    assertCheck(report, 'parent adapter reaches the ready sandbox state', cardState.state === 'ready', cardState);
 
-    const cardState = await page.evaluate(() => {
-      const card = document.querySelector('[data-backend-sandbox-card]');
-      return {
-        state: card ? card.dataset.state || '' : '',
-        status: card ? (card.querySelector('[data-backend-sandbox-status]')?.textContent || '') : '',
-        message: card ? (card.querySelector('[data-backend-sandbox-message]')?.textContent || '') : '',
-      };
-    });
-    assertCheck(report, 'parent adapter reaches a non-loading sandbox state', ['bootstrapping', 'assets', 'ready', 'timeout'].includes(cardState.state), cardState);
+    const initialEnergy = await inspectEnergySandbox(activeFrame);
+    report.energy.initial = initialEnergy;
+    const initialCanvas = initialEnergy.canvas || {};
+    const initialRuntime = initialEnergy.runtime || {};
+    assertCheck(report, 'sandbox document renders complete energy DOM and a sized canvas', initialEnergy.missingIds.length === 0
+      && initialEnergy.rootOwnsAll
+      && initialCanvas.hasContext === true
+      && initialCanvas.bitmapWidth > 0
+      && initialCanvas.bitmapHeight > 0
+      && initialCanvas.clientWidth > 0
+      && initialCanvas.clientHeight > 0
+      && initialEnergy.infoTextLength > 0
+      && initialRuntime.rootMatches === true
+      && initialRuntime.canvasMatches === true
+      && initialRuntime.width > 0
+      && initialRuntime.height > 0, initialEnergy);
 
-    const isolation = await frame.evaluate(() => {
+    const initialInteraction = await exerciseEnergySandbox(activeFrame, 0.23);
+    report.energy.initialInteraction = initialInteraction;
+    assertCheck(report, 'sandbox energy slider, playback, and reset controls are interactive', initialInteraction.ok === true, initialInteraction);
+
+    const isolation = await activeFrame.evaluate(() => {
       const attempt = (label, fn) => {
         try {
           const value = fn();
@@ -361,8 +564,18 @@ async function main() {
           parentSessionStorage: attempt('parentSessionStorage', () => window.parent.sessionStorage.getItem('__astra_parent_session_secret')),
           parentCookie: attempt('parentCookie', () => window.parent.document.cookie),
           topLocation: attempt('topLocation', () => window.top.location.href),
-          ownLocalStorage: attempt('ownLocalStorage', () => localStorage.getItem('__astra_parent_local_secret')),
-          ownCookie: attempt('ownCookie', () => document.cookie),
+          ownLocalStorage: attempt('ownLocalStorage', () => {
+            localStorage.setItem('__astra_sandbox_local_probe', 'sandbox-local-secret');
+            return localStorage.getItem('__astra_sandbox_local_probe');
+          }),
+          ownSessionStorage: attempt('ownSessionStorage', () => {
+            sessionStorage.setItem('__astra_sandbox_session_probe', 'sandbox-session-secret');
+            return sessionStorage.getItem('__astra_sandbox_session_probe');
+          }),
+          ownCookie: attempt('ownCookie', () => {
+            document.cookie = '__astra_sandbox_cookie_probe=sandbox-cookie-secret; path=/; SameSite=Lax';
+            return document.cookie;
+          }),
         },
       };
     });
@@ -378,20 +591,118 @@ async function main() {
       globalOrigin: isolation.globalOrigin,
       attempts: parentAttempts,
     });
+    const ownStorageAttempts = [
+      isolation.attempts.ownLocalStorage,
+      isolation.attempts.ownSessionStorage,
+    ];
+    const ownCookieAttempt = isolation.attempts.ownCookie;
+    assertCheck(report, 'opaque sandbox cannot use its own persistent storage or cookie jar', isolation.globalOrigin === 'null'
+      && ownStorageAttempts.every((item) => item && item.ok === false)
+      && ownCookieAttempt
+      && (ownCookieAttempt.ok === false || !String(ownCookieAttempt.value || '').includes('sandbox-cookie-secret')), {
+      globalOrigin: isolation.globalOrigin,
+      storageAttempts: ownStorageAttempts,
+      cookieAttempt: ownCookieAttempt,
+    });
     assertCheck(report, 'sandbox document root and metadata are present', isolation.hasSandboxRoot && isolation.sandboxId === manifest.sandboxId, {
       hasSandboxRoot: isolation.hasSandboxRoot,
       sandboxId: isolation.sandboxId,
       expectedSandboxId: manifest && manifest.sandboxId,
     });
 
-    const seriousConsole = report.console.filter((item) => item.type === 'error' && !/favicon\.ico/i.test(item.text));
+    await activeIframeHandle.evaluate((iframe) => {
+      iframe.dataset.astraProofGeneration = 'initial';
+    });
+    const parentDom = await page.evaluate(() => {
+      const ids = ['energy-canvas', 'energy-friction', 'energy-play', 'energy-reset', 'energy-info'];
+      const beforeIds = ids.filter((id) => Boolean(document.getElementById(id)));
+      ids.forEach((id) => {
+        const node = document.getElementById(id);
+        if (node) node.remove();
+      });
+      const remainingIds = ids.filter((id) => Boolean(document.getElementById(id)));
+      const refresh = document.querySelector('[data-backend-sandbox-refresh]');
+      if (refresh) refresh.click();
+      return {
+        requiredIds: ids,
+        beforeIds,
+        removedIds: beforeIds.filter((id) => !remainingIds.includes(id)),
+        remainingIds,
+        refreshClicked: Boolean(refresh),
+      };
+    });
+    report.parentDom = parentDom;
+    assertCheck(report, 'parent energy DOM is removed before sandbox remount', parentDom.beforeIds.length === parentDom.requiredIds.length
+      && parentDom.removedIds.length === parentDom.requiredIds.length
+      && parentDom.remainingIds.length === 0
+      && parentDom.refreshClicked, parentDom);
+
+    activeIframeHandle = await page.waitForSelector(
+      '[data-backend-sandbox-frame]:not([data-astra-proof-generation="initial"])',
+      { state: 'attached', timeout: timeoutMs },
+    );
+    activeFrame = await waitForContentFrame(activeIframeHandle, timeoutMs);
+    assertCheck(report, 'browser exposes remounted sandbox frame after parent DOM removal', Boolean(activeFrame), {
+      frameUrl: activeFrame ? activeFrame.url() : '',
+    });
+    if (!activeFrame) {
+      throw new Error('Remounted sandbox iframe frame was not available.');
+    }
+    await activeFrame.waitForLoadState('domcontentloaded', { timeout: timeoutMs });
+    const remountedCardState = await waitForSandboxTerminalState(page, timeoutMs);
+    assertCheck(report, 'sandbox remount reaches ready without parent energy DOM', remountedCardState.state === 'ready', remountedCardState);
+
+    const remountedParentIds = await page.evaluate(() => (
+      ['energy-canvas', 'energy-friction', 'energy-play', 'energy-reset', 'energy-info']
+        .filter((id) => Boolean(document.getElementById(id)))
+    ));
+    const remountedEnergy = await inspectEnergySandbox(activeFrame);
+    const remountedInteraction = await exerciseEnergySandbox(activeFrame, 0.07);
+    report.energy.remounted = remountedEnergy;
+    report.energy.remountedInteraction = remountedInteraction;
+    const remountedCanvas = remountedEnergy.canvas || {};
+    const remountedRuntime = remountedEnergy.runtime || {};
+    assertCheck(report, 'remounted sandbox remains self-contained and interactive', remountedParentIds.length === 0
+      && remountedEnergy.missingIds.length === 0
+      && remountedEnergy.rootOwnsAll
+      && remountedCanvas.hasContext === true
+      && remountedCanvas.bitmapWidth > 0
+      && remountedCanvas.bitmapHeight > 0
+      && remountedCanvas.clientWidth > 0
+      && remountedCanvas.clientHeight > 0
+      && remountedRuntime.rootMatches === true
+      && remountedRuntime.canvasMatches === true
+      && remountedInteraction.ok === true, {
+      parentIds: remountedParentIds,
+      energy: remountedEnergy,
+      interaction: remountedInteraction,
+    });
+
+    await page.waitForTimeout(150);
+    const cacheStorage = await inspectCacheStorage(page);
+    report.cacheStorage = cacheStorage;
+    assertCheck(report, 'CacheStorage contains no API request entries', cacheStorage.supported === true
+      && cacheStorage.apiEntries.length === 0, {
+      supported: cacheStorage.supported,
+      cacheNames: cacheStorage.cacheNames,
+      totalEntries: cacheStorage.entries.length,
+      apiEntries: cacheStorage.apiEntries,
+    });
+
+    await settleCaptureTasks(responseCaptureTasks);
+    const seriousConsole = report.console.filter((item) => ['error', 'warning', 'warn'].includes(item.type)
+      && !/favicon\.ico/i.test(item.text));
     const badNetwork = report.network.filter((item) => item.status >= 400 && !isBenignMissingResource(item));
-    const unexpectedExternal = report.network.filter((item) => !isLocalUrl(item.url) && !item.url.startsWith('data:'));
-    assertCheck(report, 'browser console has no severe errors', seriousConsole.length === 0 && report.pageErrors.length === 0, {
-      severeConsoleCount: seriousConsole.length,
+    const unexpectedExternal = report.network.filter((item) => isHttpUrl(item.url) && !allowedOrigins.has(item.origin));
+    assertCheck(report, 'browser console has no warnings or errors', seriousConsole.length === 0 && report.pageErrors.length === 0, {
+      warningOrErrorCount: seriousConsole.length,
+      warningOrErrors: seriousConsole,
       pageErrorCount: report.pageErrors.length,
     });
-    assertCheck(report, 'browser network stays local and executable resources load', badNetwork.length === 0 && unexpectedExternal.length === 0 && report.requestFailures.length === 0, {
+    assertCheck(report, 'browser network stays within configured origins and executable resources load', badNetwork.length === 0
+      && unexpectedExternal.length === 0
+      && report.requestFailures.length === 0, {
+      allowedOrigins: Array.from(allowedOrigins),
       badNetwork,
       unexpectedExternal,
       requestFailures: report.requestFailures,
@@ -401,7 +712,7 @@ async function main() {
     await page.screenshot({ path: pageScreenshot, fullPage: true });
     report.screenshots.page = pageScreenshot;
 
-    const box = await iframeHandle.boundingBox();
+    const box = await activeIframeHandle.boundingBox();
     if (box) {
       const iframeScreenshot = path.join(outDir, 'script-sandbox-isolation-iframe.png');
       await page.screenshot({ path: iframeScreenshot, clip: box });
@@ -427,7 +738,8 @@ async function main() {
 }
 
 main().catch(async (error) => {
-  const outDir = path.resolve(path.join('test-screenshots', 'browser-isolation'));
+  const crashArgs = parseArgs(process.argv.slice(2));
+  const outDir = path.resolve(String(crashArgs.out || path.join('test-screenshots', 'browser-isolation')));
   await fs.mkdir(outDir, { recursive: true }).catch(() => {});
   const reportPath = path.join(outDir, 'script-sandbox-isolation-crash.json');
   const payload = {

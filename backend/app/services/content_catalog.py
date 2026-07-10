@@ -12,6 +12,10 @@ from app.schemas.content import ContentPage
 from app.services.audit import record_audit_log
 from app.services.content_identity import content_stable_identity_errors, content_stable_identity_snapshot
 from app.services.content_script_policy import analyze_content_script_policy, public_content_page_schema
+from app.services.content_script_sandbox_templates import (
+    ENERGY_CONSERVATION_TEMPLATE_ID,
+    SCRIPT_SANDBOX_DOCUMENT_CONTRACT_VERSION,
+)
 
 
 ENERGY_CONSERVATION_PAGE = ContentPage(
@@ -21,7 +25,7 @@ ENERGY_CONSERVATION_PAGE = ContentPage(
     title="机械能守恒",
     layout="experiment-page",
     status="published",
-    version="2026.07-v6.5-schema.2",
+    version="2026.07-v6.6-sandbox-dom.1",
     summary="以物理能量守恒实验为后端内容协议第一试点，保留现有实验交互并由后端提供页面结构。",
     sections=[
         {
@@ -53,6 +57,11 @@ ENERGY_CONSERVATION_PAGE = ContentPage(
                     "mode": "isolated-iframe",
                     "network": "same-origin",
                     "storage": "none",
+                    "document": {
+                        "contractVersion": SCRIPT_SANDBOX_DOCUMENT_CONTRACT_VERSION,
+                        "templateId": ENERGY_CONSERVATION_TEMPLATE_ID,
+                        "config": {"defaultFriction": 0.1},
+                    },
                 },
                 "defaultFriction": 0.1,
                 "fallbackHash": "#physics/energy-conservation",

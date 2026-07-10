@@ -666,19 +666,7 @@ def test_allowlisted_external_script_asset_requires_review_before_publish(client
             "requiredContentSecurityPolicy": props_after_publish["scriptManifest"]["sandbox"]["csp"],
             "sandboxOrigin": "opaque",
         }
-        embed = props_after_publish["scriptManifest"]["embed"]
-        assert embed["descriptorVersion"] == "astra-script-sandbox-embed-v1"
-        assert embed["status"] == "embeddable"
-        assert embed["sandboxId"] == props_after_publish["scriptManifest"]["sandboxId"]
-        assert embed["iframe"]["src"] == (
-            f"/api/render/script-sandboxes/{props_after_publish['scriptManifest']['sandboxId']}/page/{slug}"
-        )
-        assert embed["iframe"]["sandbox"] == "allow-scripts"
-        assert embed["iframe"]["referrerPolicy"] == "no-referrer"
-        assert embed["originModel"] == "opaque"
-        assert embed["assetCount"] == 1
-        assert "cdn.example.test" not in json.dumps(embed, sort_keys=True)
-        assert "/assets/" not in json.dumps(embed, sort_keys=True)
+        assert "embed" not in props_after_publish["scriptManifest"]
         public_reference = props_after_publish["scriptManifest"]["references"][0]
         assert len(public_reference["valueSha256"]) == 64
         assert "value" not in public_reference
@@ -703,8 +691,6 @@ def test_allowlisted_external_script_asset_requires_review_before_publish(client
         sandbox = client.get(
             f"/api/render/script-sandboxes/{props_after_publish['scriptManifest']['sandboxId']}/page/{slug}"
         )
-        assert sandbox.status_code == 200
-        assert "https://cdn.example.test/tool.js" not in sandbox.text
         bootstrap_url = (
             f"/api/render/script-sandboxes/{props_after_publish['scriptManifest']['sandboxId']}/bootstrap/page/{slug}"
         )
@@ -712,12 +698,12 @@ def test_allowlisted_external_script_asset_requires_review_before_publish(client
             f"/api/render/script-sandboxes/{props_after_publish['scriptManifest']['sandboxId']}"
             f"/assets/{public_reference['valueSha256']}/page/{slug}"
         )
-        assert bootstrap_url in sandbox.text
+        assert sandbox.status_code == 409
+        assert sandbox.json()["detail"]["code"] == "content_script_sandbox_document_missing"
 
         bootstrap = client.get(bootstrap_url)
-        assert bootstrap.status_code == 200
-        assert asset_url in bootstrap.text
-        assert "https://cdn.example.test/tool.js" not in bootstrap.text
+        assert bootstrap.status_code == 409
+        assert bootstrap.json()["detail"]["code"] == "content_script_sandbox_document_missing"
 
         asset = client.get(asset_url)
         assert asset.status_code == 200

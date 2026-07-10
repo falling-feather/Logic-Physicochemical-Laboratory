@@ -12,9 +12,13 @@ from urllib.parse import unquote, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from app.schemas.content import ContentPage
+from app.services.content_script_sandbox_templates import (
+    ScriptSandboxDocumentError,
+    resolve_script_sandbox_document,
+)
 
 
-SCRIPT_POLICY_VERSION = "2026-07-07.5"
+SCRIPT_POLICY_VERSION = "2026-07-10.1"
 MAX_FINDINGS = 50
 MAX_EXTERNAL_SCRIPT_BYTES = 1_000_000
 EXTERNAL_SCRIPT_FETCH_TIMEOUT_SECONDS = 10
@@ -39,6 +43,13 @@ BLOCKED_SANDBOX_CAPABILITIES = {
     "allowTopNavigation": "Script sandboxes cannot navigate the top-level browsing context.",
     "allowPopups": "Script sandboxes cannot open popups in the first content protocol phase.",
     "allowDownloads": "Script sandboxes cannot trigger downloads in the first content protocol phase.",
+}
+SCRIPT_SANDBOX_ALLOWED_FIELDS = {
+    "mode",
+    "network",
+    "storage",
+    "document",
+    *BLOCKED_SANDBOX_CAPABILITIES,
 }
 ExternalScriptFetcher = Callable[[str], bytes]
 
@@ -575,6 +586,18 @@ def _scan_script_sandbox_contract(
             )
         )
         return
+    for unsupported_field in _unsupported_script_sandbox_fields(sandbox):
+        findings.append(
+            _finding(
+                code="script_sandbox_unsupported_field",
+                severity="blocked",
+                path=f"{sandbox_path}.{unsupported_field}",
+                key=unsupported_field,
+                value=sandbox.get(unsupported_field),
+                message="scriptSandbox contains an unsupported field; executable markup and entry points must use a registered document template.",
+                omit_preview=True,
+            )
+        )
     mode = sandbox.get("mode")
     if mode != SCRIPT_SANDBOX_MODE:
         findings.append(
@@ -623,6 +646,21 @@ def _scan_script_sandbox_contract(
                 message="scriptSandbox.storage must be none for reviewed content scripts.",
             )
         )
+    if "document" in sandbox:
+        try:
+            resolve_script_sandbox_document(sandbox.get("document"))
+        except ScriptSandboxDocumentError as exc:
+            findings.append(
+                _finding(
+                    code=exc.code,
+                    severity="blocked",
+                    path=f"{sandbox_path}.document",
+                    key="document",
+                    value=sandbox.get("document"),
+                    message=exc.message,
+                    omit_preview=True,
+                )
+            )
 
 
 def _script_sandbox_contract(container: dict[str, Any]) -> tuple[str | None, Any]:
@@ -799,6 +837,8 @@ def _public_script_reference(key: str, value: Any) -> dict[str, Any]:
 def _public_sandbox_manifest(sandbox: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(sandbox, dict) or sandbox.get("mode") != SCRIPT_SANDBOX_MODE:
         return {"status": "blocked"}
+    if _unsupported_script_sandbox_fields(sandbox):
+        return {"status": "blocked", "code": "script_sandbox_unsupported_field"}
     network = sandbox.get("network", "none")
     if (
         any(_is_enabled(sandbox.get(capability)) for capability in BLOCKED_SANDBOX_CAPABILITIES)
@@ -808,7 +848,7 @@ def _public_sandbox_manifest(sandbox: dict[str, Any] | None) -> dict[str, Any]:
         return {"status": "blocked"}
     effective_network = network
     csp = _script_sandbox_csp(effective_network)
-    return {
+    manifest = {
         "status": "isolated",
         "mode": SCRIPT_SANDBOX_MODE,
         "iframeSandbox": SCRIPT_SANDBOX_IFRAME_DIRECTIVE,
@@ -831,12 +871,23 @@ def _public_sandbox_manifest(sandbox: dict[str, Any] | None) -> dict[str, Any]:
             "storage": "none",
         },
     }
+    if "document" in sandbox:
+        try:
+            document = resolve_script_sandbox_document(sandbox.get("document"))
+        except ScriptSandboxDocumentError as exc:
+            return {"status": "blocked", "code": exc.code}
+        manifest["document"] = document.public_contract()
+    return manifest
 
 
 def _script_sandbox_csp(network: str) -> str:
     if network == "same-origin":
         return SCRIPT_SANDBOX_SAME_ORIGIN_CSP
     return SCRIPT_SANDBOX_CSP
+
+
+def _unsupported_script_sandbox_fields(sandbox: dict[str, Any]) -> list[str]:
+    return sorted(str(key) for key in sandbox if key not in SCRIPT_SANDBOX_ALLOWED_FIELDS)
 
 
 def _script_reference_finding(path: str, key: str, value: Any, normalized_key: str) -> ScriptPolicyFinding:

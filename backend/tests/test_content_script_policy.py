@@ -7,6 +7,10 @@ from app.services.content_script_policy import (
     public_content_page_schema,
     script_policy_result_from_json,
 )
+from app.services.content_script_sandbox_templates import (
+    ENERGY_CONSERVATION_TEMPLATE_ID,
+    SCRIPT_SANDBOX_DOCUMENT_CONTRACT_VERSION,
+)
 
 
 def test_script_policy_accepts_clean_schema():
@@ -51,6 +55,107 @@ def test_script_policy_marks_local_script_reference_with_sandbox_for_review():
     assert result.has_blocking_findings is False
     assert result.findings[0].code == "script_reference"
     assert result.findings[0].path == "$.sections[0].props.scriptPath"
+
+
+def test_registered_sandbox_document_is_public_and_participates_in_manifest_identity():
+    def page(default_friction):
+        return _page_payload(
+            {
+                "scriptPath": "pages/physics/energy-conservation.js",
+                "scriptSandbox": {
+                    "mode": "isolated-iframe",
+                    "network": "same-origin",
+                    "storage": "none",
+                    "document": _sandbox_document(default_friction),
+                },
+            }
+        )
+
+    result = analyze_content_script_policy(page(0.1))
+    first = public_content_page_schema(page(0.1)).model_dump(mode="json")["sections"][0]["props"]["scriptManifest"]
+    second = public_content_page_schema(page(0.2)).model_dump(mode="json")["sections"][0]["props"]["scriptManifest"]
+
+    assert result.status == "review_required"
+    assert result.has_blocking_findings is False
+    assert first["sandbox"]["document"] == _sandbox_document(0.1)
+    assert "initializer" not in first["sandbox"]["document"]
+    assert "html" not in first["sandbox"]["document"]
+    assert first["sandboxId"] != second["sandboxId"]
+
+
+def test_script_policy_blocks_unregistered_or_raw_sandbox_document_contracts():
+    documents = [
+        {
+            "contractVersion": SCRIPT_SANDBOX_DOCUMENT_CONTRACT_VERSION,
+            "templateId": "physics-unregistered-template-v1",
+            "config": {},
+        },
+        {
+            **_sandbox_document(0.1),
+            "html": "<main>unreviewed</main>",
+        },
+        {
+            **_sandbox_document(0.1),
+            "initializer": "runArbitraryGlobal",
+        },
+    ]
+
+    results = [
+        analyze_content_script_policy(
+            _page_payload(
+                {
+                    "scriptPath": "pages/physics/energy-conservation.js",
+                    "scriptSandbox": {
+                        "mode": "isolated-iframe",
+                        "network": "same-origin",
+                        "storage": "none",
+                        "document": document,
+                    },
+                }
+            )
+        )
+        for document in documents
+    ]
+
+    assert all(result.status == "blocked" for result in results)
+    assert "content_script_sandbox_template_unsupported" in {finding.code for finding in results[0].findings}
+    for result in results[1:]:
+        assert "content_script_sandbox_document_invalid" in {finding.code for finding in result.findings}
+
+
+def test_script_policy_blocks_raw_execution_fields_beside_registered_document():
+    results = []
+    for field, value in [
+        ("html", "<main>unreviewed</main>"),
+        ("entry", "runArbitraryGlobal"),
+        ("initializer", "runArbitraryGlobal"),
+    ]:
+        payload = _page_payload(
+            {
+                "scriptPath": "pages/physics/energy-conservation.js",
+                "scriptSandbox": {
+                    "mode": "isolated-iframe",
+                    "network": "same-origin",
+                    "storage": "none",
+                    "document": _sandbox_document(0.1),
+                    field: value,
+                },
+            }
+        )
+        result = analyze_content_script_policy(payload)
+        manifest = public_content_page_schema(payload).model_dump(mode="json")["sections"][0]["props"]["scriptManifest"]
+        results.append((field, result, manifest))
+
+    for field, result, manifest in results:
+        finding = next(item for item in result.findings if item.code == "script_sandbox_unsupported_field")
+        assert result.status == "blocked"
+        assert result.has_blocking_findings is True
+        assert finding.path == f"$.sections[0].props.scriptSandbox.{field}"
+        assert finding.value_preview is None
+        assert manifest["sandbox"] == {
+            "status": "blocked",
+            "code": "script_sandbox_unsupported_field",
+        }
 
 
 def test_script_policy_flags_external_script_url_as_high_risk_without_query_preview():
@@ -449,6 +554,14 @@ def _page_payload(props: dict | None = None) -> dict:
             }
         ],
         "sources": [],
+    }
+
+
+def _sandbox_document(default_friction: float) -> dict:
+    return {
+        "contractVersion": SCRIPT_SANDBOX_DOCUMENT_CONTRACT_VERSION,
+        "templateId": ENERGY_CONSERVATION_TEMPLATE_ID,
+        "config": {"defaultFriction": default_friction},
     }
 
 

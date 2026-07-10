@@ -4,14 +4,20 @@ from uuid import uuid4
 
 from alembic import command
 from alembic.config import Config
+from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory, make_engine, reset_database_state
+from app.main import create_app
 from app.models import ContentDraft, ContentPageRecord, ContentPageVersion, User
 from app.models.base import utc_now
 from app.schemas.content import ContentPage
 from app.services.content_catalog import ensure_seed_pages
+from app.services.content_script_sandbox_templates import (
+    ENERGY_CONSERVATION_TEMPLATE_ID,
+    SCRIPT_SANDBOX_DOCUMENT_CONTRACT_VERSION,
+)
 from scripts.init_content_pages import main as init_content_pages_main
 from scripts.init_content_pages import run_content_initialization
 
@@ -204,6 +210,23 @@ def test_init_content_pages_upgrade_existing_appends_version(monkeypatch):
         assert version.previous_version_id == previous_version_id
         assert version.schema_hash == item["seed_schema_hash"]
         assert _table_count(database_url, ContentPageVersion) == 2
+
+        with TestClient(create_app()) as client:
+            render = client.get("/api/render/page/physics/energy-conservation")
+            assert render.status_code == 200
+            manifest = render.json()["sections"][2]["props"]["scriptManifest"]
+            assert manifest["sandbox"]["document"] == {
+                "contractVersion": SCRIPT_SANDBOX_DOCUMENT_CONTRACT_VERSION,
+                "templateId": ENERGY_CONSERVATION_TEMPLATE_ID,
+                "config": {"defaultFriction": 0.1},
+            }
+            assert manifest["embed"]["document"] == {
+                "contractVersion": SCRIPT_SANDBOX_DOCUMENT_CONTRACT_VERSION,
+                "templateId": ENERGY_CONSERVATION_TEMPLATE_ID,
+            }
+            sandbox = client.get(manifest["embed"]["iframe"]["src"])
+            assert sandbox.status_code == 200
+            assert sandbox.headers["X-Astra-Content-Script-Template-Id"] == ENERGY_CONSERVATION_TEMPLATE_ID
     finally:
         _dispose_and_remove(database_url, database_path)
 

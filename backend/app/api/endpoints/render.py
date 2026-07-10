@@ -16,6 +16,11 @@ from app.models import ContentPageRecord, ContentScriptAsset, ContentScriptHostP
 from app.schemas.content import ContentPage
 from app.services.content_script_assets import get_bound_content_script_asset
 from app.services.content_script_policy import collect_content_script_manifests, public_content_page_schema
+from app.services.content_script_sandbox_templates import (
+    ResolvedScriptSandboxDocument,
+    ScriptSandboxDocumentError,
+    resolve_script_sandbox_document,
+)
 
 
 router = APIRouter()
@@ -39,16 +44,18 @@ def render_script_sandbox_document(sandbox_id: str, slug: str, response: Respons
     references = _script_manifest_references(manifest)
     for reference in references:
         _script_asset_binding(db, page_record, sandbox_id, reference)
+    document = _script_sandbox_document_contract(manifest)
     nonce = _script_sandbox_nonce()
     csp = _harden_sandbox_csp(str(sandbox["csp"]), nonce=nonce, frame_ancestors=_sandbox_frame_ancestors())
     response.headers["Content-Security-Policy"] = csp
     response.headers["X-Astra-Content-Script-Sandbox-Id"] = sandbox_id
     response.headers["X-Astra-Content-Script-Iframe-Sandbox"] = str(sandbox["iframeSandbox"])
     response.headers["X-Astra-Content-Script-Reference-Count"] = str(len(references))
+    response.headers["X-Astra-Content-Script-Template-Id"] = document.template_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Cache-Control"] = "no-store"
-    return _script_sandbox_html(slug=page.slug, sandbox_id=sandbox_id, nonce=nonce)
+    return _script_sandbox_html(slug=page.slug, sandbox_id=sandbox_id, nonce=nonce, document=document)
 
 
 @router.get("/script-sandboxes/{sandbox_id}/bootstrap/page/{slug:path}")
@@ -66,15 +73,22 @@ def render_script_sandbox_bootstrap(
     references = _script_manifest_references(manifest)
     for reference in references:
         _script_asset_binding(db, page_record, sandbox_id, reference)
+    document = _script_sandbox_document_contract(manifest)
     asset_urls = [
         _script_sandbox_asset_url(slug=page.slug, sandbox_id=sandbox_id, asset_sha256=str(reference["valueSha256"]))
         for reference in references
     ]
-    payload = _script_sandbox_bootstrap_js(slug=page.slug, sandbox_id=sandbox_id, asset_urls=asset_urls)
+    payload = _script_sandbox_bootstrap_js(
+        slug=page.slug,
+        sandbox_id=sandbox_id,
+        asset_urls=asset_urls,
+        document=document,
+    )
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Astra-Content-Script-Sandbox-Id"] = sandbox_id
     response.headers["X-Astra-Content-Script-Bootstrap-Version"] = "bootstrap-v1"
     response.headers["X-Astra-Content-Script-Asset-Count"] = str(len(asset_urls))
+    response.headers["X-Astra-Content-Script-Template-Id"] = document.template_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
     response.headers["Referrer-Policy"] = "no-referrer"
@@ -219,6 +233,10 @@ def _script_sandbox_iframe_descriptor(
         return None
     if not all(isinstance(reference, dict) and _is_valid_sha256(reference.get("valueSha256")) for reference in references):
         return None
+    try:
+        document = resolve_script_sandbox_document(sandbox.get("document"))
+    except ScriptSandboxDocumentError:
+        return None
     capabilities = sandbox.get("capabilities") if isinstance(sandbox.get("capabilities"), dict) else {}
     system_message_types = [
         "bootstrap-ready",
@@ -248,6 +266,10 @@ def _script_sandbox_iframe_descriptor(
             "systemMessageTypes": system_message_types,
         },
         "assetCount": len(references),
+        "document": {
+            "contractVersion": document.contract_version,
+            "templateId": document.template_id,
+        },
     }
 
 
@@ -310,6 +332,11 @@ def _find_script_sandbox_manifest(page: ContentPage, sandbox_id: str) -> dict[st
     manifest = manifests[0]
     sandbox = manifest.get("sandbox")
     if not isinstance(sandbox, dict) or sandbox.get("status") != "isolated":
+        if isinstance(sandbox, dict) and isinstance(sandbox.get("code"), str):
+            raise HTTPException(
+                status_code=409,
+                detail={"code": sandbox["code"], "message": "Script sandbox document contract is not executable"},
+            )
         raise HTTPException(status_code=409, detail="Script sandbox manifest is not executable")
     if not isinstance(sandbox.get("csp"), str) or not isinstance(sandbox.get("iframeSandbox"), str):
         raise HTTPException(status_code=409, detail="Script sandbox manifest is incomplete")
@@ -317,6 +344,18 @@ def _find_script_sandbox_manifest(page: ContentPage, sandbox_id: str) -> dict[st
     if not isinstance(references, list) or not references:
         raise HTTPException(status_code=409, detail="Script sandbox manifest has no executable references")
     return manifest
+
+
+def _script_sandbox_document_contract(manifest: dict[str, Any]) -> ResolvedScriptSandboxDocument:
+    sandbox = manifest.get("sandbox")
+    value = sandbox.get("document") if isinstance(sandbox, dict) else None
+    try:
+        return resolve_script_sandbox_document(value)
+    except ScriptSandboxDocumentError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": exc.code, "message": exc.message},
+        ) from exc
 
 
 def _published_content_page_record(db: Session, slug: str) -> ContentPageRecord | None:
@@ -573,7 +612,13 @@ def _script_sandbox_nonce() -> str:
     return secrets.token_urlsafe(24)
 
 
-def _script_sandbox_html(*, slug: str, sandbox_id: str, nonce: str) -> str:
+def _script_sandbox_html(
+    *,
+    slug: str,
+    sandbox_id: str,
+    nonce: str,
+    document: ResolvedScriptSandboxDocument,
+) -> str:
     bootstrap_url = _script_sandbox_bootstrap_url(slug=slug, sandbox_id=sandbox_id)
     return (
         "<!doctype html>\n"
@@ -583,21 +628,36 @@ def _script_sandbox_html(*, slug: str, sandbox_id: str, nonce: str) -> str:
         '    <meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f'    <meta name="astra-content-slug" content="{escape(slug, quote=True)}">\n'
         f'    <meta name="astra-script-sandbox-id" content="{escape(sandbox_id, quote=True)}">\n'
+        f'    <meta name="astra-script-sandbox-template-id" content="{escape(document.template_id, quote=True)}">\n'
         "    <title>Astra Script Sandbox</title>\n"
+        f"    <style>{document.stylesheet}</style>\n"
         "  </head>\n"
         "  <body>\n"
         f'    <div id="astra-sandbox-root" data-slug="{escape(slug, quote=True)}" '
-        f'data-sandbox-id="{escape(sandbox_id, quote=True)}"></div>\n'
+        f'data-sandbox-id="{escape(sandbox_id, quote=True)}" '
+        f'data-template-id="{escape(document.template_id, quote=True)}">\n'
+        f"{document.body_html}"
+        "    </div>\n"
         f'    <script src="{escape(bootstrap_url, quote=True)}" nonce="{escape(nonce, quote=True)}" defer></script>\n'
         "  </body>\n"
         "</html>\n"
     )
 
 
-def _script_sandbox_bootstrap_js(*, slug: str, sandbox_id: str, asset_urls: list[str]) -> str:
+def _script_sandbox_bootstrap_js(
+    *,
+    slug: str,
+    sandbox_id: str,
+    asset_urls: list[str],
+    document: ResolvedScriptSandboxDocument,
+) -> str:
     slug_literal = _js_string_literal(slug)
     sandbox_id_literal = _js_string_literal(sandbox_id)
     asset_urls_literal = json.dumps(asset_urls)
+    template_id_literal = _js_string_literal(document.template_id)
+    contract_version_literal = _js_string_literal(document.contract_version)
+    initializer_literal = _js_string_literal(document.initializer)
+    config_literal = json.dumps(document.config, ensure_ascii=False, separators=(",", ":"))
     return (
         "(() => {\n"
         '  "use strict";\n'
@@ -606,8 +666,13 @@ def _script_sandbox_bootstrap_js(*, slug: str, sandbox_id: str, asset_urls: list
         f"    slug: {slug_literal},\n"
         f"    sandboxId: {sandbox_id_literal},\n"
         f"    assetCount: {len(asset_urls)},\n"
+        f"    documentContractVersion: {contract_version_literal},\n"
+        f"    templateId: {template_id_literal},\n"
         "  });\n"
         f"  const assetUrls = Object.freeze({asset_urls_literal});\n"
+        f"  const documentConfig = Object.freeze({config_literal});\n"
+        f"  const initializerName = {initializer_literal};\n"
+        '  const root = document.getElementById("astra-sandbox-root");\n'
         "  const nonce = document.currentScript && document.currentScript.nonce ? document.currentScript.nonce : \"\";\n"
         "  const post = (type, payload = {}) => {\n"
         "    if (window.parent === window) return;\n"
@@ -619,9 +684,16 @@ def _script_sandbox_bootstrap_js(*, slug: str, sandbox_id: str, asset_urls: list
         "    if (value && typeof value.message === \"string\") return value.message.slice(0, 500);\n"
         "    return String(value).slice(0, 500);\n"
         "  };\n"
+        "  const isBenignResizeObserverError = (value) => {\n"
+        "    const message = normalizeError(value);\n"
+        "    return message === \"ResizeObserver loop limit exceeded\"\n"
+        "      || message === \"ResizeObserver loop completed with undelivered notifications.\";\n"
+        "  };\n"
         "  window.__ASTRA_SCRIPT_SANDBOX__ = Object.freeze({\n"
         "    metadata,\n"
         "    assetUrls,\n"
+        "    documentConfig,\n"
+        "    root,\n"
         "    nonce,\n"
         "    ready(payload = {}) { post(\"ready\", payload); },\n"
         "    error(payload = {}) { post(\"error\", payload); },\n"
@@ -641,7 +713,17 @@ def _script_sandbox_bootstrap_js(*, slug: str, sandbox_id: str, asset_urls: list
         "      await loadAsset(url);\n"
         "    }\n"
         "  };\n"
+        "  const initializeDocument = async () => {\n"
+        "    if (!root) throw new Error(\"Sandbox root is missing.\");\n"
+        "    const initializer = window[initializerName];\n"
+        "    if (typeof initializer !== \"function\") throw new Error(\"Registered sandbox initializer is unavailable.\");\n"
+        "    const result = await initializer({ root, config: documentConfig, metadata });\n"
+        "    const ready = result === true || (result && result.ready === true);\n"
+        "    if (!ready) throw new Error(\"Registered sandbox initializer did not confirm readiness.\");\n"
+        "    return result;\n"
+        "  };\n"
         "  window.addEventListener(\"error\", (event) => {\n"
+        "    if (isBenignResizeObserverError(event.message)) return;\n"
         "    post(\"error\", {\n"
         "      message: normalizeError(event.message),\n"
         "      filename: event.filename || \"\",\n"
@@ -654,8 +736,12 @@ def _script_sandbox_bootstrap_js(*, slug: str, sandbox_id: str, asset_urls: list
         "  });\n"
         "  post(\"bootstrap-ready\");\n"
         "  loadAssets()\n"
-        "    .then(() => post(\"assets-ready\", { assetCount: assetUrls.length }))\n"
-        "    .catch((error) => post(\"error\", { message: normalizeError(error) }));\n"
+        "    .then(() => {\n"
+        "      post(\"assets-ready\", { assetCount: assetUrls.length });\n"
+        "      return initializeDocument();\n"
+        "    })\n"
+        "    .then(() => post(\"ready\", { templateId: metadata.templateId }))\n"
+        "    .catch((error) => post(\"error\", { code: \"content_script_sandbox_bootstrap_failed\", message: normalizeError(error) }));\n"
         "})();\n"
     )
 

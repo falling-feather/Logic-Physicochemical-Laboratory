@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -11,7 +12,7 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0-v6.5"
     environment: str = "development"
     api_prefix: str = "/api"
-    api_cache_control: str = "no-store"
+    api_cache_control: Literal["no-store"] = "no-store"
     auto_create_tables: bool = False
     session_cookie_name: str = "astra_session"
     session_days: int = 7

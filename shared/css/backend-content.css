@@ -47,6 +47,23 @@
     font-size: 0.78rem;
 }
 
+.backend-learning-card--error {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(224, 108, 117, 0.45), rgba(229, 192, 123, 0.26));
+}
+
+.backend-learning-card--error .backend-learning-card__body {
+    min-width: 0;
+}
+
+.backend-learning-card--error > .backend-sandbox-card__refresh {
+    margin-right: 0.7rem;
+}
+
 .backend-sandbox-card {
     margin: 0 0 1rem;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -154,9 +171,17 @@
     display: block;
     width: 100%;
     min-height: 240px;
+    height: 560px;
     border: 0;
     color-scheme: dark;
     background: #060912;
+}
+
+.backend-sandbox-runtime-active > .demo-section,
+.backend-sandbox-runtime-active > .experiment-container,
+.backend-sandbox-runtime-active > .physics-canvas-wrap,
+.backend-sandbox-runtime-active > .lab-shell {
+    display: none !important;
 }
 
 .backend-sandbox-card__message {
@@ -190,5 +215,15 @@
     .backend-sandbox-card__frame-wrap,
     .backend-sandbox-card__frame {
         min-height: 210px;
+        height: 660px;
+    }
+
+    .backend-learning-card--error {
+        grid-template-columns: 1fr;
+    }
+
+    .backend-learning-card--error > .backend-sandbox-card__refresh {
+        width: calc(100% - 1.4rem);
+        margin: 0 0.7rem 0.7rem;
     }
 }

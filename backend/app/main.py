@@ -1,9 +1,11 @@
 from contextlib import asynccontextmanager
+import logging
 from uuid import uuid4
 
 from fastapi import Request
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
 from app.core.config import get_settings
@@ -11,6 +13,9 @@ from app.db.session import get_session_factory, init_db
 from app.services.content_catalog import ensure_seed_pages
 from app.services.content_script_asset_scan_scheduler import scheduler_from_settings as content_script_scheduler_from_settings
 from app.services.knowledge_snapshot_scheduler import scheduler_from_settings
+
+
+logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
@@ -28,17 +33,6 @@ def create_app() -> FastAPI:
         with session_factory() as db:
             ensure_seed_pages(db)
 
-    @app.middleware("http")
-    async def attach_request_id(request: Request, call_next):
-        request_id = _request_id_from_header(request.headers.get("x-request-id"))
-        request.state.request_id = request_id
-        response = await call_next(request)
-        response.headers["X-Request-ID"] = request_id
-        if request.url.path.startswith(settings.api_prefix):
-            response.headers["Cache-Control"] = settings.api_cache_control
-            response.headers["Pragma"] = "no-cache"
-        return response
-
     if settings.cors_origin_list:
         app.add_middleware(
             CORSMiddleware,
@@ -55,6 +49,33 @@ def create_app() -> FastAPI:
             ],
             expose_headers=["X-Request-ID"],
         )
+
+    @app.middleware("http")
+    async def attach_request_id_and_api_cache_policy(request: Request, call_next):
+        request_id = _request_id_from_header(request.headers.get("x-request-id"))
+        request.state.request_id = request_id
+        is_api = _is_api_path(request.url.path, settings.api_prefix)
+        try:
+            response = await call_next(request)
+        except Exception:
+            if not is_api:
+                raise
+            logger.exception("Unhandled API error request_id=%s path=%s", request_id, request.url.path)
+            response = JSONResponse(
+                status_code=500,
+                content={"detail": "Internal server error"},
+            )
+            origin = request.headers.get("origin", "")
+            if origin in settings.cors_origin_list:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                response.headers["Access-Control-Expose-Headers"] = "X-Request-ID"
+                response.headers["Vary"] = "Origin"
+        response.headers["X-Request-ID"] = request_id
+        if is_api:
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Pragma"] = "no-cache"
+        return response
     app.include_router(api_router, prefix=settings.api_prefix)
     return app
 
@@ -86,6 +107,11 @@ def _request_id_from_header(value: str | None) -> str:
     if not request_id:
         return uuid4().hex
     return request_id[:64]
+
+
+def _is_api_path(path: str, api_prefix: str) -> bool:
+    prefix = api_prefix.rstrip("/") or "/api"
+    return path == prefix or path.startswith(f"{prefix}/")
 
 
 app = create_app()

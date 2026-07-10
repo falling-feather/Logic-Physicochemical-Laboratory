@@ -2,7 +2,7 @@
 
 本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、脚本资产 allowlist/SRI 静态门禁、脚本资产下载校验证据、发布版本绑定的外部脚本资产镜像、管理端脚本资产供应链清单、内容脚本镜像一致性审计、内容脚本远端漂移扫描、内容脚本扫描 run 台账与远端漂移告警候选摘要、内容脚本远端漂移扫描调度/CLI observe-only 首轮、内容脚本扫描 run 健康/队列摘要、内容脚本远端漂移告警 outbox 人工复核入队与状态流转、内容脚本 CDN host 信任治理首轮、公开 render 脚本 manifest 脱敏、sandbox embed 描述符与沙箱执行契约头、浏览器自动化隔离证明、稳定 `sectionId/sourceId` 内容身份、草稿编辑、提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 敏感预览脱敏与带显式稳定 ID 字段的 semantic 富语义摘要、登录、密码策略、登录失败锁定、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、用户自助密码重置令牌、密码重置 token 留存清理脚本、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、跨班级提交唯一性、学生资源状态可见性、学生侧作业历史/复盘只读入口、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端知识快照运行列表/健康摘要、协作式取消、手动 requeue、调度积压摘要、告警候选摘要与告警 outbox 人工复核台账、状态流转、队列摘要、批量复核、dispatch dry-run、执行计划台账与再校验、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、中文路径/中文 slug 回归、待批改队列、缺陷记录外部 issue 链接、审计元数据、认证事件审计、审计日志链式哈希、审计链完整性校验、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要、审计留存预检、本地审计归档包导出/Manifest 校验和导出/摘要行为审计留痕等能力。
 
-V6.6.51 已补齐学生作业中心后端契约：`GET /api/classes?mine=true` 返回本人 active 班级，分页 `GET /api/assignments/me` 按班级展开课程、单元、作业、提交与复盘状态；多班级复盘要求显式 `class_id`，重复提交冲突统一返回 `409`。
+V6.6.52 已冻结前端 API 与内容脚本运行边界：浏览器端统一使用 HttpOnly Cookie、`credentials=include` 和 `cache=no-store`，不发送或持久化 Bearer token；FastAPI 对 `/api` 与 `/api/*` 的成功、错误和预检响应统一返回 `no-store`；内置能量守恒脚本只在后端 allowlist DOM 模板和受控 document contract 下生成可执行 embed，未知模板 fail closed。
 
 ## 本地启动
 
@@ -87,7 +87,7 @@ python -m scripts.backend_stage_gate --require-mysql \
 | 方法 | 路径 | 说明 |
 | ---- | ---- | ---- |
 | POST | `/api/auth/register` | 本地账号注册；用户名会修剪并小写落库，重复校验大小写不敏感；拒绝短密码、纯数字/纯字母、常见弱口令和包含用户名的密码 |
-| POST | `/api/auth/login` | 登录并返回 Bearer token，同时写入 HttpOnly cookie；生产环境 cookie 预期带 `Secure/HttpOnly/SameSite=Lax`，前端不得把 session/bearer token 写入 localStorage/sessionStorage；用户名按规范化值大小写不敏感匹配，连续失败达到阈值返回 `429` 与 `Retry-After`；成功登录会记录 best-effort 设备标识、登录 user-agent、`last_seen_at` 和 IP 哈希；成功、失败和锁定事件写入审计 |
+| POST | `/api/auth/login` | 登录响应保留 API 兼容 token，同时写入 HttpOnly cookie；浏览器三端必须采用 cookie-only，不读取、发送或持久化响应中的 Bearer token。生产环境 cookie 预期带 `Secure/HttpOnly/SameSite=Lax`；用户名按规范化值大小写不敏感匹配，连续失败达到阈值返回 `429` 与 `Retry-After`；成功登录会记录 best-effort 设备标识、登录 user-agent、`last_seen_at` 和 IP 哈希；成功、失败和锁定事件写入审计 |
 | POST | `/api/auth/logout` | 注销当前用户所有活动会话，并写入审计 |
 | POST | `/api/auth/password-reset/request` | 用户自助密码重置请求；响应始终泛化为 `ok`，active 用户会生成哈希存储的一次性 token，并按账号哈希/IP 哈希冷却；生产环境不返回 token，本地调试也必须显式开启 `ASTRA_PASSWORD_RESET_RETURN_TOKEN_FOR_DEV=true` |
 | POST | `/api/auth/password-reset/confirm` | 使用一次性 token 重置密码；行锁消费 token，复用密码强度策略，成功后撤销用户未撤销会话、清理登录失败桶，并写入不含明文密码或 token 的 `auth.password_reset.*` 审计 |
@@ -189,9 +189,17 @@ python -m scripts.backend_stage_gate --require-mysql \
 | PATCH | `/api/content/drafts/{id}/script-review` | 管理员审核允许脚本的草稿；作者不能自审，阻断级脚本策略结果不可审核通过 |
 | POST | `/api/content/page-versions/{id}/rollback` | 管理员按历史版本追加式回滚，生成新的当前版本；版本唯一冲突会返回 `409` |
 | GET | `/api/render/page/{slug}` | 前端可渲染页面结构；公开响应会移除原始脚本引用，仅保留带稳定 `sandboxId` 的 `scriptManifest`，并在可执行且唯一的 manifest 中提供脱敏 `embed` 描述符（iframe src/sandbox/referrerPolicy/messageProtocol/capabilities），同时返回 `X-Astra-Content-Script-*` 沙箱契约头 |
-| GET | `/api/render/script-sandboxes/{sandbox_id}/page/{slug}` | 按已发布私有 schema 生成内容脚本 sandbox HTML；每次响应生成运行时 CSP nonce，`script-src` 与 bootstrap `<script nonce>` 同步绑定，`frame-ancestors` 只允许 `'self'` 和 `ASTRA_CORS_ORIGINS` 中合法 origin，脚本标签只引用后端 bootstrap 端点，blocked/歧义/缺失镜像资产 fail closed |
-| GET | `/api/render/script-sandboxes/{sandbox_id}/bootstrap/page/{slug}` | 返回 sandbox 内后端受控 bootstrap JS；按 published slug + sandboxId 生成受控资产 URL 列表，提供 `bootstrap-v1`、ready/error/postMessage 契约，并通过 `document.currentScript.nonce` 继承 HTML nonce 给动态资产脚本；响应 `application/javascript`、`no-store`、`nosniff`、`no-referrer` 和 `Cross-Origin-Resource-Policy: cross-origin` |
+| GET | `/api/render/script-sandboxes/{sandbox_id}/page/{slug}` | 按已发布私有 schema 和后端模板注册表生成内容脚本 sandbox HTML；document contract 必须匹配 `astra-sandbox-dom-v1`、已登记 templateId 和受控 config。每次响应生成运行时 CSP nonce，`script-src` 与 bootstrap `<script nonce>` 同步绑定，`frame-ancestors` 只允许 `'self'` 和 `ASTRA_CORS_ORIGINS` 中合法 origin；blocked、歧义、缺失镜像、缺失/未知模板 fail closed |
+| GET | `/api/render/script-sandboxes/{sandbox_id}/bootstrap/page/{slug}` | 返回 sandbox 内后端受控 bootstrap JS；按 published slug + sandboxId 生成受控资产 URL 列表，顺序加载资产并调用 allowlist initializer，只有 initializer 显式返回 `{ready:true}` 才发送 ready；postMessage 同时绑定 `bootstrap-v1`、templateId 和 document contract。响应 `application/javascript`、`no-store`、`nosniff`、`no-referrer` 和 `Cross-Origin-Resource-Policy: cross-origin` |
 | GET | `/api/render/script-sandboxes/{sandbox_id}/assets/{asset_sha256}/page/{slug}` | 按 published slug + sandboxId + 脚本引用 SHA-256 读取受控 JS 资产；本地资产仅允许 `pages/`、`shared/js/`、`codevis/shared/js/` 和 `drafts/` 根内 `.js` 文件，外部脚本只返回当前发布版本绑定的镜像字节；响应 `application/javascript`、引用 hash、镜像字节 hash、`no-store`、`nosniff`、`no-referrer` 和 `Cross-Origin-Resource-Policy: cross-origin` |
+
+## V6.6.52 浏览器 API 与离线契约
+
+- `shared/js/api-client.js` 是管理、教师、学生三端和后端 schema adapter 的统一请求入口。它只接受同源、显式配置的精确 HTTP(S) origin 或本地开发 origin，拒绝路径、query、fragment、userinfo 与 HTTPS 降级；无效非空配置不会静默回退同源。
+- 浏览器鉴权只使用 HttpOnly Cookie。统一 client 强制删除调用方 `Authorization`，并在模块加载、主应用启动和三端进入时幂等清理已知历史 token key；token、提交正文、成绩、反馈、学习事件、知识状态和快照不得进入 localStorage/sessionStorage。
+- GET 只做一次权威读取，不使用持久化 API 缓存；写请求不自动重试。发送后发生超时、取消或网络错误时标记结果未知，UI 必须锁定相关写入口并通过权威 GET 对账；收到 HTTP 状态或成功响应后 body/protocol 失败不应伪装为“可以安全重试”。
+- 未登录、无权限、服务端错误、超时、离线和网络故障使用稳定产品文案；失去认证或实时连接时立即清空内存数据和 dashboard DOM，不能把旧数据伪装为实时状态。恢复在线后只允许重新读取，不自动重放写入。
+- Service Worker 在导航和扩展名判断之前旁路精确 `/api` 与 `/api/*`，不调用 `respondWith`、CacheStorage 或离线 fallback；FastAPI 外层中间件为 API 的 2xx/4xx/5xx/OPTIONS 统一补 `Cache-Control: no-store`、`Pragma: no-cache` 和 `X-Request-ID`。
 
 ## V6.6.51 学生端消费契约
 
@@ -201,7 +209,7 @@ python -m scripts.backend_stage_gate --require-mysql \
 - 同一作业对学生存在多个 eligible class 时，`GET /api/assignments/{id}/review` 必须携带 `class_id`；遗漏返回 `422`。`due_at` 当前只用于显示，提交权限以 review 的可提交状态和服务端写入校验为准。
 - 同一 `assignment/student/class` 重复提交统一返回 `409`。提交请求出现超时或其他未知网络结果时，客户端必须先重新读取 review / 作业中心核对服务端状态，不得自动重发。
 - 个人 progress、points、knowledge 和 snapshots 可用于规则式补强建议；首轮不伪装 AI 推断，也不自动触发 snapshot rebuild。认证 token、提交正文、成绩、反馈、事件、知识状态和快照不得写入 localStorage/sessionStorage。
-- 完整错误态、离线与缓存硬化留给 V6.6.52；细粒度统计、复杂权限和扩展画像留给 V6.6.53。
+- 统一错误态、离线与缓存硬化已由 V6.6.52 完成；细粒度统计、复杂权限和扩展画像留给 V6.6.53。
 
 ## 前端 schema smoke
 
@@ -217,9 +225,9 @@ node server/dev-static-server.mjs --port 8766
 http://localhost:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#physics/energy-conservation
 ```
 
-`backendSchema=1` 打开试点 adapter，`apiBase=` 指向本地 FastAPI。也可用 `CONFIG.backend.apiBaseUrl` 或 localStorage `astra-api-base` 设置 API 地址。默认静态页面保持回退，不依赖后端可用。
+`backendSchema=1` 打开试点 adapter，`apiBase=` 指向本地 FastAPI。也可用 `CONFIG.backend.apiBaseUrl` 或 localStorage `astra-api-base` 设置 API origin；V6.6.52 起只接受受信精确 origin，不接受路径/query/fragment/userinfo 或 HTTPS 降级。默认静态页面保持回退，不依赖后端可用。
 
-V6.6.47 起，试点 adapter 会在学习任务卡之后消费 `scriptManifest.embed` 并创建 iframe sandbox 状态卡。`embed.iframe.src` 若为相对 `/api/...` 路径，会按当前 `apiBase` 解析；父页只监听 `source=astra-content-script-sandbox`、匹配 `sandboxId` 和 `bootstrap-v1` 的 postMessage，并区分 loading、bootstrapping、assets、ready、error、timeout、blocked。当前内置旧实验脚本仍依赖原页面 DOM，尚未完成 sandbox root 模板化；因此本地 smoke 可验证 iframe 编排与状态流转，但不代表旧实验交互已完整迁入 iframe。
+V6.6.52 起，试点 adapter 只接受严格 `scriptManifest.embed` 描述符和精确 sandbox URL，父页校验 iframe source、opaque `origin=null`、sandboxId、`bootstrap-v1`、templateId 与 `astra-sandbox-dom-v1`。内置能量守恒实验由后端模板注册表生成独立 controls/canvas/info DOM，脚本只查询传入 root；终态 error/timeout 会卸载 iframe、忽略迟到 ready 并恢复静态实验。未知模板、非法 config 或缺失 document contract 不生成可执行 embed。
 
 V6.6.48 起，可从仓库根目录运行本地浏览器隔离证明：
 
@@ -237,7 +245,7 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 | ---- | ------ | ---- |
 | `ASTRA_ENVIRONMENT` | `development` | 运行环境 |
 | `ASTRA_API_PREFIX` | `/api` | API 前缀 |
-| `ASTRA_API_CACHE_CONTROL` | `no-store` | API 响应默认缓存策略；业务 JSON 默认不进入浏览器或中间层缓存 |
+| `ASTRA_API_CACHE_CONTROL` | `no-store` | API 响应固定缓存策略；配置模型只接受 `no-store`，业务 JSON 不进入浏览器或中间层缓存 |
 | `ASTRA_AUTO_CREATE_TABLES` | `false` | 是否启动时自动建表，开发临时可用，正式迁移应使用 Alembic |
 | `ASTRA_SESSION_COOKIE_NAME` | `astra_session` | 登录会话 cookie 名称 |
 | `ASTRA_SESSION_DAYS` | `7` | 登录会话有效天数 |
@@ -296,7 +304,8 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 - `app.api.deps.auth.get_current_auth_context()` 会在有效鉴权后按 `ASTRA_SESSION_LAST_SEEN_UPDATE_SECONDS` 刷新当前 `AuthSession.last_seen_at` 和 `last_seen_ip_hash`；默认 300 秒内同一 IP 哈希不重复写库，窗口过期、IP 哈希变化或配置为 `0` 时刷新。该机制只降低 last_seen 写放大，不等同强设备绑定或长期会话风控。
 - `/api/auth/password-reset/request` 与 `/api/auth/password-reset/confirm` 只提供本地账号自助重置 token 能力；邮件/短信/MFA 投递暂列 `P4 / 最低优先级 / 暂缓`。请求审计使用账号哈希作为 `resource_id`，不记录明文用户名或 token；确认阶段会对 token 行加锁并一次性消费。`app.services.password_reset_tokens` 与 `scripts.cleanup_password_reset_tokens` 提供过期/已用 token 的离线清理入口，默认 dry-run，显式 `--apply` 才删除，摘要不返回用户名、IP 哈希、user-agent 或 token hash。
 - `app.services.auth_sessions` 与 `scripts.cleanup_auth_sessions` 提供过期认证会话离线撤销入口；默认 dry-run，显式 `--apply` 才为 expired+unrevoked 会话写入 `revoked_at`，不删除会话行，摘要不返回 token hash、IP hash、user-agent 或明文 token。`scripts.auth_security_drill` 用于输出认证生产姿态报告，覆盖 admin bootstrap token、cookie、password reset、localStorage、审计盐和清理命令入口，报告不回显 secret。
-- `app.services.content_catalog` 负责内容页 seed、正式内容初始化、已发布 schema 读取和内容页摘要；`/api/content/pages*` 与 `/api/render/page/*` 查询只读 published 当前记录，不在 GET 路径隐式写库，公开响应会剥离原始脚本引用、SRI/crossorigin 元数据和 sandbox 原始字段，只保留带稳定 `sandboxId` 的 `scriptManifest`；manifest 会返回沙箱 enforcement/capabilities，`/api/render/page/{slug}` 会额外返回 `X-Astra-Content-Script-Sandbox`、`X-Astra-Content-Script-Manifest-Count`、`X-Astra-Content-Script-Iframe-Sandbox` 和 `X-Astra-Content-Script-CSP` 稳定契约头，并为可执行且全页唯一的 sandbox manifest 注入 `embed` 描述符。`embed` 只包含前端 iframe 编排所需的同源 sandbox document `src`、`sandbox=allow-scripts`、`referrerPolicy=no-referrer`、消息协议、能力摘要和资产数量，不包含原始脚本 URL/路径值、SRI、crossorigin、nonce、bootstrap/asset URL、镜像表 metadata 或数据库 id；blocked/ambiguous manifest 不生成可执行 embed。`/api/render/script-sandboxes/{sandbox_id}/page/{slug}` 会读取已发布私有 schema 生成 sandbox HTML，运行时 CSP nonce 只存在于单次 HTML 响应，不进入公开 manifest、sandboxId 或 policy hash；`frame-ancestors` 保留 `'self'` 并只追加 `ASTRA_CORS_ORIGINS` 中合法 `http/https` origin；脚本标签只引用 `/api/render/script-sandboxes/{sandbox_id}/bootstrap/page/{slug}`；bootstrap 端点生成受控资产 URL 列表并顺序加载 `/api/render/script-sandboxes/{sandbox_id}/assets/{asset_sha256}/page/{slug}`，bootstrap/asset 可执行资源显式允许 opaque sandbox 以 `Cross-Origin-Resource-Policy: cross-origin` 加载，资产端点会重新绑定 published slug、当前 page version、sandboxId 和脚本引用 hash，本地脚本读受控根，外部脚本读发布事务写入的镜像资产，不在 GET 路径联网或写库；正式初始化会显式创建/修复内置内容页版本，默认不覆盖已有差异版本。
+- `app.services.content_catalog` 负责内容页 seed、正式内容初始化、已发布 schema 读取和内容页摘要；`/api/content/pages*` 与 `/api/render/page/*` 查询只读 published 当前记录，不在 GET 路径隐式写库，公开响应会剥离原始脚本引用、SRI/crossorigin 元数据和 sandbox 原始字段，只保留带稳定 `sandboxId` 的 `scriptManifest`；manifest 会返回沙箱 enforcement/capabilities，`/api/render/page/{slug}` 会额外返回 `X-Astra-Content-Script-Sandbox`、`X-Astra-Content-Script-Manifest-Count`、`X-Astra-Content-Script-Iframe-Sandbox` 和 `X-Astra-Content-Script-CSP` 稳定契约头，并只为 document contract 通过后端模板注册表校验、可执行且全页唯一的 sandbox manifest 注入 `embed` 描述符。`embed` 只包含前端 iframe 编排所需的同源 sandbox document `src`、`sandbox=allow-scripts`、`referrerPolicy=no-referrer`、消息协议、template/document contract、能力摘要和资产数量，不包含原始脚本 URL/路径值、SRI、crossorigin、nonce、bootstrap/asset URL、镜像表 metadata 或数据库 id；blocked/ambiguous/unknown-template manifest 不生成可执行 embed。sandbox document 从注册模板生成独立 DOM/CSS，bootstrap 顺序加载受控资产并调用 allowlist initializer，只有显式 readiness 才发送 ready；运行时 CSP nonce 只存在于单次 HTML 响应，opaque sandbox、CORP、no-store 和受控资产绑定保持不变。
+- `app.services.content_script_sandbox_templates` 是可执行 sandbox DOM/initializer 的后端 allowlist 注册表。当前只登记 `physics-energy-conservation-v1`，document contract 固定为 `astra-sandbox-dom-v1`，只接收受控 config；raw HTML、任意 initializer、未知模板和非法配置全部拒绝。
 - `app.services.content_lifecycle_drill` 与 `scripts.content_lifecycle_drill` 提供内容发布/初始化/回滚生产演练前后的只读姿态报告；检查 current 指针、schema hash、版本链、active 草稿、脚本镜像、API no-store、可选 render URL 和静态 fallback，不执行发布/回滚、不联网下载脚本、不写库，也不返回完整 schema、原始 CDN URL、完整 SRI、镜像字节或 `content_bytes`。`--require-mysql` 用于防止把 SQLite 回归误判为真实 MySQL 演练。
 - `app.services.content_identity` 负责内容协议稳定身份契约：历史 schema 读取仍允许缺失 `sectionId/sourceId`，但新建/编辑/发布草稿和内置内容初始化要求每个 section/source 带稳定 ID，并拒绝重复 ID 或与 `props.sectionId/props.id` 冲突的章节身份。
 - `app.services.content_script_policy` 负责内容草稿脚本静态分析、脚本资产 allowlist/SRI 静态门禁、后端下载校验、public manifest 与 sandbox 契约；当前识别脚本引用、外链脚本、事件处理器、阻断协议、路径穿越、内联 `<script>` 和不安全 sandbox 能力。外部 `scriptUrl/scriptSrc` 默认阻断，只有 host 出现在 `ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS` 且 URL 为显式 `https://`、无 query/fragment、声明合法 SRI 与 `crossorigin=anonymous` 时才可进入 high-risk 管理员审核；管理员批准外部脚本和发布已审核草稿时会下载资产并按声明 SRI 比对字节，下载失败、SRI mismatch、host policy blocked 或发布前 CDN 字节漂移会阻断流程，默认下载器不跟随重定向。下载校验 finding 会通过 metadata 保留资产 SHA-256、字节大小、SRI token 数量和匹配算法；公开 `scriptManifest.sandbox` 会按 `network=none/same-origin` 派生稳定 CSP、显式返回 enforcement/capabilities，并对 unsafe sandbox 防御性降级为 blocked；sandbox HTML 响应会按单次请求生成 nonce，把响应级 `script-src` 收紧为 nonce source，并强制 `Content-Security-Policy`、`X-Content-Type-Options: nosniff` 和 `Referrer-Policy: no-referrer`，本地 JS 资产必须位于受控根且通过 bootstrap + `asset_sha256` 端点加载；外部脚本发布成功后由 `app.services.content_script_assets` 写入 `content_script_assets`，render 阶段只读取当前 published version 绑定的镜像字节，不联网、不代理任意 CDN、不暴露原始 URL。管理端 `GET /api/admin/content/script-assets` 可分页审计这些镜像资产，`GET /api/admin/content/script-assets/mirror-audit` 可离线复核当前 published schema 与镜像表绑定、本地字节 hash/大小/SRI 和重复引用，`POST /api/admin/content/script-assets/remote-drift-scan` 可在 admin 显式确认后小批量触发远端漂移扫描并写入 run 台账，`GET /api/admin/content/script-assets/remote-drift-alerts` 可从 run 台账、failed run 与 stale running run 派生只读告警候选，`GET/PATCH /api/admin/content/script-host-policies` 可维护 host 评审状态并用 `blocked` 作为发布链路 fail-closed 门禁；响应与审计都不返回原始 CDN URL、完整 SRI、远端字节或 `content_bytes`。分析结果带 `policy_context_hash`，allowlist 配置变化会触发发布/审核前重分析。当前仍不承担实时监控、外部告警投递或自动信任/封禁策略；前端 iframe 生命周期首轮和浏览器自动化隔离证明已由 opt-in adapter 与 V6.6.48 drill 覆盖。

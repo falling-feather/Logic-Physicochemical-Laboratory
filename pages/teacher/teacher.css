@@ -160,7 +160,8 @@
 }
 
 .teacher-dashboard[hidden],
-.teacher-flash[hidden] {
+.teacher-flash[hidden],
+.teacher-write-lock[hidden] {
     display: none !important;
 }
 
@@ -185,6 +186,47 @@
 .teacher-flash--error {
     border-color: rgba(232, 133, 108, 0.52);
     background: rgba(92, 35, 29, 0.5);
+}
+
+.teacher-flash--warning,
+.teacher-write-lock {
+    border-color: rgba(226, 178, 80, 0.5);
+    background: rgba(96, 67, 18, 0.52);
+}
+
+.teacher-write-lock {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 12px 0;
+    padding: 13px 14px;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 8px;
+    color: #f7e3a5;
+}
+
+.teacher-write-lock > svg {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
+}
+
+.teacher-write-lock div {
+    display: grid;
+    gap: 4px;
+}
+
+.teacher-write-lock strong {
+    color: #fff1bf;
+    font-size: 0.86rem;
+}
+
+.teacher-write-lock span {
+    color: #dfcc91;
+    font-size: 0.76rem;
+    line-height: 1.55;
 }
 
 .teacher-kpi-grid {

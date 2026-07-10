@@ -1,14 +1,8 @@
 (function () {
     'use strict';
 
-    const ADMIN_ASSET_VERSION = '20260709v6649AdminMvpP1';
+    const ADMIN_ASSET_VERSION = '20260710v6652FrontendHardeningP1';
     const API_BASE_STORAGE_KEY = 'astra-admin-api-base';
-    const TOKEN_STORAGE_KEYS = [
-        'astra-access-token',
-        'englab-access-token',
-        'access_token',
-        'auth_token'
-    ];
 
     const state = {
         root: null,
@@ -16,6 +10,15 @@
         user: null,
         busy: false,
         initialized: false,
+        active: false,
+        online: navigator.onLine !== false,
+        runtimeBound: false,
+        lifecycleController: null,
+        requestGeneration: 0,
+        panelGenerations: Object.create(null),
+        onOnline: null,
+        onOffline: null,
+        onAuthRequired: null,
         panels: {},
         panelData: {},
         summaryData: {}
@@ -341,6 +344,9 @@
     function initAdmin() {
         state.root = document.querySelector('[data-admin-governance]');
         if (!state.root) return;
+        state.active = true;
+        state.online = navigator.onLine !== false;
+        if (window.AstraApiClient) AstraApiClient.scrubLegacyTokens();
         state.apiBase = resolveApiBase();
         initializePanelState();
         renderShell();
@@ -348,7 +354,85 @@
             bindEvents();
             state.initialized = true;
         }
+        bindRuntimeEvents();
+        if (!state.online) {
+            renderAuthError(AstraApiClient.offlineError());
+            refreshIcons();
+            return;
+        }
         refreshAll();
+    }
+
+    function destroyAdmin() {
+        state.active = false;
+        invalidateRequests();
+        unbindRuntimeEvents();
+        state.user = null;
+        state.busy = false;
+        state.panelData = {};
+        state.summaryData = {};
+        const dashboard = getDashboard();
+        if (dashboard) dashboard.hidden = true;
+        if (state.root) {
+            state.root.innerHTML = `
+                <div class="admin-loading">
+                    <i data-lucide="loader-circle"></i>
+                    <span>管理端已离开</span>
+                </div>
+            `;
+        }
+    }
+
+    function bindRuntimeEvents() {
+        if (state.runtimeBound) return;
+        state.onOnline = () => {
+            state.online = true;
+            if (state.active) refreshAll();
+        };
+        state.onOffline = () => {
+            state.online = false;
+            invalidateRequests();
+            setBusy(false);
+            state.user = null;
+            state.panelData = {};
+            state.summaryData = {};
+            clearDashboardDom();
+            const dashboard = getDashboard();
+            if (dashboard) dashboard.hidden = true;
+            if (state.active) {
+                renderAuthError(AstraApiClient.offlineError());
+                refreshIcons();
+            }
+        };
+        state.onAuthRequired = () => {
+            invalidateRequests();
+            setBusy(false);
+            state.user = null;
+            state.panelData = {};
+            state.summaryData = {};
+            clearDashboardDom();
+            const dashboard = getDashboard();
+            if (dashboard) dashboard.hidden = true;
+            if (state.active) {
+                renderAuthError(new AstraApiClient.Error('登录状态已失效', { status: 401, code: 'unauthorized' }));
+                refreshIcons();
+            }
+        };
+        window.addEventListener('online', state.onOnline);
+        window.addEventListener('offline', state.onOffline);
+        window.addEventListener('astra:api-auth-required', state.onAuthRequired);
+        state.runtimeBound = true;
+    }
+
+    function unbindRuntimeEvents() {
+        if (!state.runtimeBound) return;
+        window.removeEventListener('online', state.onOnline);
+        window.removeEventListener('offline', state.onOffline);
+        window.removeEventListener('astra:api-auth-required', state.onAuthRequired);
+        state.onOnline = null;
+        state.onOffline = null;
+        state.onAuthRequired = null;
+        state.runtimeBound = false;
     }
 
     function initializePanelState() {
@@ -517,13 +601,25 @@
     }
 
     async function refreshAll() {
-        if (!state.root) return;
+        if (!state.root || !state.active) return;
+        const generation = beginRequestGeneration();
         setBusy(true);
+        state.user = null;
+        state.panelData = {};
+        state.summaryData = {};
+        clearDashboardDom();
         renderAuthState('checking');
         const dashboard = getDashboard();
         if (dashboard) dashboard.hidden = true;
+        if (!state.online) {
+            renderAuthError(AstraApiClient.offlineError());
+            setBusy(false);
+            refreshIcons();
+            return;
+        }
         try {
             const user = await fetchJson('/api/users/me');
+            if (!isCurrentRequest(generation)) return;
             state.user = user;
             if (user.role !== 'admin') {
                 renderAuthState('forbidden', user);
@@ -532,37 +628,45 @@
             renderAuthState('ready', user);
             if (dashboard) dashboard.hidden = false;
             await Promise.all([
-                refreshStats(),
-                refreshSummaries(),
-                ...PANEL_CONFIGS.map((config) => refreshPanel(config.id))
+                refreshStats(generation),
+                refreshSummaries(generation),
+                ...PANEL_CONFIGS.map((config) => refreshPanel(config.id, generation))
             ]);
         } catch (error) {
+            if (AstraApiClient.isCancelled(error) || !isCurrentRequest(generation)) return;
             renderAuthError(error);
         } finally {
-            setBusy(false);
-            refreshIcons();
+            if (isCurrentRequest(generation)) {
+                setBusy(false);
+                refreshIcons();
+            }
         }
     }
 
-    async function refreshStats() {
+    async function refreshStats(generation) {
+        const requestGeneration = generation || state.requestGeneration;
         const container = state.root.querySelector('[data-admin-stats]');
         if (!container) return;
         container.innerHTML = renderLoading('统计加载中');
         try {
             const stats = await fetchJson('/api/admin/stats');
+            if (!isCurrentRequest(requestGeneration)) return;
             container.innerHTML = renderStats(stats);
         } catch (error) {
+            if (AstraApiClient.isCancelled(error) || !isCurrentRequest(requestGeneration)) return;
             container.innerHTML = renderError(error, '统计读取失败');
         }
     }
 
-    async function refreshSummaries() {
+    async function refreshSummaries(generation) {
+        const requestGeneration = generation || state.requestGeneration;
         const container = state.root.querySelector('[data-admin-summary]');
         if (!container) return;
         container.innerHTML = SUMMARY_CONFIGS.map((config) => renderSummaryCard(config, null, true)).join('');
         const settled = await Promise.allSettled(
             SUMMARY_CONFIGS.map((config) => fetchJson(config.path))
         );
+        if (!isCurrentRequest(requestGeneration)) return;
         settled.forEach((result, index) => {
             state.summaryData[SUMMARY_CONFIGS[index].id] = result;
         });
@@ -575,7 +679,10 @@
         }).join('');
     }
 
-    async function refreshPanel(panelId) {
+    async function refreshPanel(panelId, generation) {
+        const requestGeneration = generation || state.requestGeneration;
+        const panelGeneration = (state.panelGenerations[panelId] || 0) + 1;
+        state.panelGenerations[panelId] = panelGeneration;
         const config = PANEL_CONFIGS.find((item) => item.id === panelId);
         const body = state.root && state.root.querySelector(`[data-admin-panel-body="${panelId}"]`);
         const meta = state.root && state.root.querySelector(`[data-admin-panel-meta="${panelId}"]`);
@@ -589,10 +696,14 @@
                 offset: panelState.offset
             });
             const data = await fetchJson(config.path, params);
+            if (!isCurrentRequest(requestGeneration) || state.panelGenerations[panelId] !== panelGeneration) return;
             state.panelData[panelId] = data;
             body.innerHTML = renderPanelData(config, data);
             if (meta) meta.textContent = `共 ${formatNumber(data.total || 0)} 条`;
         } catch (error) {
+            if (AstraApiClient.isCancelled(error)
+                || !isCurrentRequest(requestGeneration)
+                || state.panelGenerations[panelId] !== panelGeneration) return;
             body.innerHTML = renderError(error, '队列读取失败');
             if (meta) meta.textContent = '读取失败';
         } finally {
@@ -639,12 +750,14 @@
     function renderAuthError(error) {
         const container = state.root.querySelector('[data-admin-auth-state]');
         if (!container) return;
-        const isAuth = error && (error.status === 401 || error.status === 403);
+        const isUnauthenticated = error && error.status === 401;
+        const isForbidden = error && error.status === 403;
+        const isOffline = error && error.code === 'offline';
         container.innerHTML = `
             <div class="admin-auth-card admin-auth-card--blocked">
-                <i data-lucide="${isAuth ? 'lock' : 'server-off'}"></i>
+                <i data-lucide="${isUnauthenticated ? 'lock' : isForbidden ? 'shield-x' : isOffline ? 'wifi-off' : 'server-off'}"></i>
                 <div>
-                    <strong>${isAuth ? '需要管理员会话' : '后端连接失败'}</strong>
+                    <strong>${isUnauthenticated ? '需要管理员会话' : isForbidden ? '当前账号无管理权限' : isOffline ? '当前处于离线状态' : '后端连接失败'}</strong>
                     <span>${escapeHtml(errorMessage(error))}</span>
                 </div>
             </div>
@@ -787,42 +900,37 @@
     }
 
     async function fetchJson(path, params) {
-        const url = buildUrl(path, params);
-        const headers = { Accept: 'application/json' };
-        const token = readStoredToken();
-        if (token) headers.Authorization = `Bearer ${token}`;
-        const response = await fetch(url, {
-            method: 'GET',
-            credentials: 'include',
-            headers
+        return AstraApiClient.request(path, {
+            baseUrl: state.apiBase,
+            params,
+            signal: state.lifecycleController && state.lifecycleController.signal
         });
-        const text = await response.text();
-        let payload = null;
-        if (text) {
-            try {
-                payload = JSON.parse(text);
-            } catch (error) {
-                payload = { detail: text };
-            }
-        }
-        if (!response.ok) {
-            const error = new Error(extractDetail(payload) || response.statusText || 'Request failed');
-            error.status = response.status;
-            error.payload = payload;
-            throw error;
-        }
-        return payload || {};
     }
 
-    function buildUrl(path, params) {
-        const base = normalizeApiBase(state.apiBase);
-        const url = new URL(`${base}${path}`, window.location.origin);
-        Object.entries(params || {}).forEach(([key, value]) => {
-            if (value !== undefined && value !== null && String(value).trim() !== '') {
-                url.searchParams.set(key, String(value).trim());
-            }
-        });
-        return url.toString();
+    function beginRequestGeneration() {
+        if (state.lifecycleController && !state.lifecycleController.signal.aborted) {
+            state.lifecycleController.abort();
+        }
+        state.lifecycleController = new AbortController();
+        state.requestGeneration += 1;
+        return state.requestGeneration;
+    }
+
+    function invalidateRequests() {
+        state.requestGeneration += 1;
+        if (state.lifecycleController && !state.lifecycleController.signal.aborted) {
+            state.lifecycleController.abort();
+        }
+        state.lifecycleController = null;
+    }
+
+    function isCurrentRequest(generation) {
+        return Boolean(
+            state.active
+            && generation === state.requestGeneration
+            && state.lifecycleController
+            && !state.lifecycleController.signal.aborted
+        );
     }
 
     function resolveApiBase() {
@@ -842,15 +950,7 @@
     }
 
     function normalizeApiBase(value) {
-        return String(value || '').trim().replace(/\/+$/, '');
-    }
-
-    function readStoredToken() {
-        for (const key of TOKEN_STORAGE_KEYS) {
-            const value = localStorage.getItem(key) || sessionStorage.getItem(key);
-            if (value) return value;
-        }
-        return '';
+        return AstraApiClient.normalizeBaseUrl(value);
     }
 
     function renderLoading(text) {
@@ -873,17 +973,7 @@
     }
 
     function errorMessage(error) {
-        if (!error) return '未知错误';
-        const prefix = error.status ? `${error.status} ` : '';
-        return `${prefix}${error.message || extractDetail(error.payload) || String(error)}`;
-    }
-
-    function extractDetail(payload) {
-        if (!payload) return '';
-        if (typeof payload.detail === 'string') return payload.detail;
-        if (Array.isArray(payload.detail)) return payload.detail.map((item) => item.msg || item.message || JSON.stringify(item)).join('; ');
-        if (payload.message) return payload.message;
-        return '';
+        return AstraApiClient.message(error);
     }
 
     function valueAt(item, key) {
@@ -948,6 +1038,20 @@
         return state.root && state.root.querySelector('[data-admin-dashboard]');
     }
 
+    function clearDashboardDom() {
+        if (!state.root) return;
+        const stats = state.root.querySelector('[data-admin-stats]');
+        const summary = state.root.querySelector('[data-admin-summary]');
+        if (stats) stats.innerHTML = '';
+        if (summary) summary.innerHTML = '';
+        state.root.querySelectorAll('[data-admin-panel-body]').forEach((body) => {
+            body.innerHTML = renderLoading('等待权威刷新');
+        });
+        state.root.querySelectorAll('[data-admin-panel-meta]').forEach((meta) => {
+            meta.textContent = '--';
+        });
+    }
+
     function setBusy(value) {
         state.busy = value;
         if (state.root) state.root.classList.toggle('is-busy', value);
@@ -975,6 +1079,7 @@
     }
 
     window.initAdmin = initAdmin;
+    window.destroyAdmin = destroyAdmin;
     window.initAdminGovernance = initAdmin;
     window.AdminGovernance = {
         version: ADMIN_ASSET_VERSION,

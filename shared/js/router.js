@@ -82,9 +82,9 @@ const Router = {
         engineering: 'pages/engineering/bridge-truss.js?v=20260630mainV64',
         license: 'pages/about/about.js?v=20260630mainV64',
         changelog: 'pages/about/about.js?v=20260630mainV64',
-        student: 'pages/student/student.js?v=20260710v6651StudentMvpP1',
-        teacher: 'pages/teacher/teacher.js?v=20260710v6651StudentMvpP1',
-        admin: 'pages/admin/admin.js?v=20260710v6651StudentMvpP1'
+        student: 'pages/student/student.js?v=20260710v6652FrontendHardeningP1',
+        teacher: 'pages/teacher/teacher.js?v=20260710v6652FrontendHardeningP1',
+        admin: 'pages/admin/admin.js?v=20260710v6652FrontendHardeningP1'
     },
     pageReadyChecks: {
         home: () => typeof window.initHome === 'function',
@@ -1072,6 +1072,10 @@ const Router = {
             if (typeof destroyBridgeTruss === 'function') destroyBridgeTruss();
         } else if (page === 'student') {
             if (typeof destroyStudent === 'function') destroyStudent();
+        } else if (page === 'teacher') {
+            if (typeof destroyTeacher === 'function') destroyTeacher();
+        } else if (page === 'admin') {
+            if (typeof destroyAdmin === 'function') destroyAdmin();
         } else {
             // v4.2.3 Bug3 淇锛氬厛璋冪敤 closeModule 闅愯棌鍏ㄩ儴娴姩鎺т欢
             // 锛圗xperimentExport / ExperimentQuiz / ExperimentFavorites / ExperimentRating /

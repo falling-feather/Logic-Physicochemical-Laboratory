@@ -1,21 +1,24 @@
 (function () {
     'use strict';
 
-    const TEACHER_ASSET_VERSION = '20260709v6650TeacherMvpP1';
+    const TEACHER_ASSET_VERSION = '20260710v6652FrontendHardeningP1';
     const API_BASE_STORAGE_KEY = 'astra-teacher-api-base';
-    const TOKEN_STORAGE_KEYS = [
-        'astra-access-token',
-        'englab-access-token',
-        'access_token',
-        'auth_token'
-    ];
 
     const state = {
         root: null,
         apiBase: '',
         initialized: false,
+        active: false,
+        online: navigator.onLine !== false,
+        runtimeBound: false,
+        lifecycleController: null,
+        requestGeneration: 0,
+        onOnline: null,
+        onOffline: null,
+        onAuthRequired: null,
         busy: false,
         user: null,
+        writeLock: null,
         selected: {
             schoolId: '',
             classId: '',
@@ -50,13 +53,82 @@
     function initTeacher() {
         state.root = document.querySelector('[data-teacher-workbench]');
         if (!state.root) return;
+        state.active = true;
+        state.online = navigator.onLine !== false;
+        if (window.AstraApiClient) AstraApiClient.scrubLegacyTokens();
         state.apiBase = resolveApiBase();
         renderShell();
         if (!state.initialized) {
             bindEvents();
             state.initialized = true;
         }
+        bindRuntimeEvents();
+        if (!state.online) {
+            renderAuthError(AstraApiClient.offlineError());
+            refreshIcons();
+            return;
+        }
         refreshAll();
+    }
+
+    function destroyTeacher() {
+        state.active = false;
+        invalidateRequests();
+        unbindRuntimeEvents();
+        clearWorkspace();
+        state.busy = false;
+        state.flash = null;
+        if (state.root) {
+            state.root.innerHTML = `
+                <div class="teacher-empty">
+                    <i data-lucide="loader-circle"></i>
+                    <span>教师端已离开</span>
+                </div>
+            `;
+        }
+    }
+
+    function bindRuntimeEvents() {
+        if (state.runtimeBound) return;
+        state.onOnline = () => {
+            state.online = true;
+            if (state.active) refreshAll();
+        };
+        state.onOffline = () => {
+            state.online = false;
+            invalidateRequests();
+            setBusy(false);
+            clearWorkspace();
+            if (state.active) {
+                renderAuthError(AstraApiClient.offlineError());
+                setFlash('warning', '已隐藏旧教学数据；恢复网络后将重新读取后端状态');
+                renderWorkspace();
+            }
+        };
+        state.onAuthRequired = () => {
+            invalidateRequests();
+            setBusy(false);
+            clearWorkspace();
+            if (state.active) {
+                renderAuthError(new AstraApiClient.Error('登录状态已失效', { status: 401, code: 'unauthorized' }));
+                renderWorkspace();
+            }
+        };
+        window.addEventListener('online', state.onOnline);
+        window.addEventListener('offline', state.onOffline);
+        window.addEventListener('astra:api-auth-required', state.onAuthRequired);
+        state.runtimeBound = true;
+    }
+
+    function unbindRuntimeEvents() {
+        if (!state.runtimeBound) return;
+        window.removeEventListener('online', state.onOnline);
+        window.removeEventListener('offline', state.onOffline);
+        window.removeEventListener('astra:api-auth-required', state.onAuthRequired);
+        state.onOnline = null;
+        state.onOffline = null;
+        state.onAuthRequired = null;
+        state.runtimeBound = false;
     }
 
     function renderShell() {
@@ -81,6 +153,7 @@
                 </div>
             </header>
             <div class="teacher-auth-state" data-teacher-auth-state></div>
+            <div class="teacher-write-lock" data-teacher-write-lock hidden role="alert"></div>
             <div class="teacher-flash" data-teacher-flash hidden></div>
             <div class="teacher-dashboard" data-teacher-dashboard hidden>
                 <section class="teacher-kpi-grid" data-teacher-kpis></section>
@@ -97,7 +170,8 @@
             if (!(target instanceof Element)) return;
             const refreshButton = target.closest('[data-teacher-action="refresh"]');
             if (refreshButton) {
-                refreshAll();
+                if (state.busy) return;
+                refreshAll({ clearWriteLock: true });
                 return;
             }
             const memberButton = target.closest('[data-teacher-member-status]');
@@ -131,27 +205,36 @@
                 return;
             }
             if (target.matches('[data-teacher-api-base]')) {
-                state.apiBase = target.value.trim();
-                persistApiBase();
+                applyApiBaseChange(target);
             }
         });
 
         state.root.addEventListener('blur', (event) => {
             const target = event.target;
             if (target instanceof HTMLInputElement && target.matches('[data-teacher-api-base]')) {
-                state.apiBase = target.value.trim();
-                persistApiBase();
+                applyApiBaseChange(target);
             }
         }, true);
     }
 
-    async function refreshAll() {
-        if (!state.root) return;
+    async function refreshAll(options) {
+        if (!state.root || !state.active) return;
+        const request = options || {};
+        const generation = beginRequestGeneration();
         setBusy(true);
+        state.user = null;
         renderAuthState('checking');
         hideDashboard();
+        if (!state.online) {
+            renderAuthError(AstraApiClient.offlineError());
+            clearWorkspace();
+            setBusy(false);
+            renderWorkspace();
+            return;
+        }
         try {
             const user = await fetchJson('/api/users/me');
+            if (!isCurrentRequest(generation)) return;
             state.user = user;
             if (!['teacher', 'admin'].includes(user.role)) {
                 renderAuthState('forbidden', user);
@@ -159,34 +242,51 @@
                 return;
             }
             renderAuthState('ready', user);
-            await loadSchools();
+            await loadSchools(undefined, generation);
+            if (!isCurrentRequest(generation)) return;
+            if (request.clearWriteLock) {
+                if (hasWorkspaceErrors()) {
+                    setFlash('warning', '权威数据尚未完整读取，写操作继续锁定；请恢复服务后再次刷新核对');
+                } else {
+                    state.writeLock = null;
+                }
+            }
             showDashboard();
         } catch (error) {
+            if (AstraApiClient.isCancelled(error) || !isCurrentRequest(generation)) return;
             renderAuthError(error);
             clearWorkspace();
         } finally {
-            setBusy(false);
-            refreshIcons();
+            if (isCurrentRequest(generation)) {
+                setBusy(false);
+                renderWorkspace();
+                refreshIcons();
+            }
         }
     }
 
-    async function loadSchools(preferredId) {
-        state.errors.schools = null;
+    async function loadSchools(preferredId, generation = state.requestGeneration) {
+        if (!isCurrentRequest(generation)) return;
+        let schools = [];
+        let requestError = null;
         try {
-            state.data.schools = await fetchJson('/api/schools');
+            schools = await fetchJson('/api/schools');
         } catch (error) {
-            state.data.schools = [];
-            state.errors.schools = error;
+            requestError = error;
         }
+        if (!isCurrentRequest(generation)) return;
+        state.data.schools = requestError ? [] : schools;
+        state.errors.schools = requestError;
         const schoolId = preferredId || state.selected.schoolId;
         state.selected.schoolId = normalizeSelectedId(schoolId, state.data.schools);
         if (!state.selected.schoolId && state.data.schools.length) {
             state.selected.schoolId = String(state.data.schools[0].id);
         }
-        await loadSchoolScope();
+        await loadSchoolScope(generation);
     }
 
-    async function loadSchoolScope() {
+    async function loadSchoolScope(generation = state.requestGeneration) {
+        if (!isCurrentRequest(generation)) return;
         resetBelow('school');
         if (!state.selected.schoolId) {
             renderWorkspace();
@@ -199,6 +299,7 @@
             fetchJson('/api/classes', { params: { school_id: schoolId } }),
             fetchJson('/api/courses', { params: { school_id: schoolId } })
         ]);
+        if (!isCurrentRequest(generation)) return;
         if (classesResult.status === 'fulfilled') {
             state.data.classes = classesResult.value;
         } else {
@@ -215,11 +316,13 @@
         state.selected.courseId = normalizeSelectedId(state.selected.courseId, state.data.courses);
         if (!state.selected.classId && state.data.classes.length) state.selected.classId = String(state.data.classes[0].id);
         if (!state.selected.courseId && state.data.courses.length) state.selected.courseId = String(state.data.courses[0].id);
-        await Promise.all([loadClassScope(), loadCourseScope()]);
+        await Promise.all([loadClassScope(generation), loadCourseScope(generation)]);
+        if (!isCurrentRequest(generation)) return;
         renderWorkspace();
     }
 
-    async function loadClassScope() {
+    async function loadClassScope(generation = state.requestGeneration) {
+        if (!isCurrentRequest(generation)) return;
         state.data.members = [];
         state.data.submissions = [];
         state.data.knowledge = null;
@@ -248,6 +351,7 @@
             fetchJson('/api/admin/submissions/pending', { params: submissionParams }),
             fetchJson(`/api/classes/${classId}/knowledge`, { params: knowledgeParams })
         ]);
+        if (!isCurrentRequest(generation)) return;
         if (membersResult.status === 'fulfilled') {
             state.data.members = membersResult.value;
             state.selected.studentId = normalizeSelectedId(state.selected.studentId, state.data.members.filter((item) => item.role === 'student'));
@@ -269,23 +373,30 @@
         } else {
             state.errors.knowledge = knowledgeResult.reason;
         }
-        await loadStudentProgress();
+        await loadStudentProgress(generation);
     }
 
-    async function loadStudentProgress() {
+    async function loadStudentProgress(generation = state.requestGeneration) {
+        if (!isCurrentRequest(generation)) return;
         state.data.progress = null;
         state.errors.progress = null;
         if (!state.selected.classId || !state.selected.studentId) return;
+        let progress = null;
+        let requestError = null;
         try {
-            state.data.progress = await fetchJson(`/api/progress/users/${state.selected.studentId}`, {
+            progress = await fetchJson(`/api/progress/users/${state.selected.studentId}`, {
                 params: { class_id: state.selected.classId }
             });
         } catch (error) {
-            state.errors.progress = error;
+            requestError = error;
         }
+        if (!isCurrentRequest(generation)) return;
+        state.data.progress = requestError ? null : progress;
+        state.errors.progress = requestError;
     }
 
-    async function loadCourseScope() {
+    async function loadCourseScope(generation = state.requestGeneration) {
+        if (!isCurrentRequest(generation)) return;
         state.data.units = [];
         state.data.assignments = [];
         state.data.assignmentSubmissions = [];
@@ -303,6 +414,7 @@
             fetchJson(`/api/courses/${courseId}/assignments`),
             fetchJson(`/api/courses/${courseId}/collaborators`, { params: { status: 'all' } })
         ]);
+        if (!isCurrentRequest(generation)) return;
         if (unitsResult.status === 'fulfilled') {
             state.data.units = unitsResult.value;
         } else {
@@ -324,10 +436,11 @@
         if (!state.selected.assignmentId && state.data.assignments.length) {
             state.selected.assignmentId = String(state.data.assignments[0].id);
         }
-        await loadAssignmentScope();
+        await loadAssignmentScope(generation);
     }
 
-    async function loadAssignmentScope() {
+    async function loadAssignmentScope(generation = state.requestGeneration) {
+        if (!isCurrentRequest(generation)) return;
         state.data.assignmentSubmissions = [];
         state.data.pointRule = null;
         state.errors.assignmentSubmissions = null;
@@ -338,6 +451,7 @@
             fetchJson(`/api/assignments/${state.selected.assignmentId}/submissions`, { params }),
             fetchJson(`/api/points/assignments/${state.selected.assignmentId}/rule`)
         ]);
+        if (!isCurrentRequest(generation)) return;
         if (submissionsResult.status === 'fulfilled') {
             state.data.assignmentSubmissions = submissionsResult.value;
         } else {
@@ -352,12 +466,47 @@
 
     function renderWorkspace() {
         renderFlash();
+        renderWriteLock();
         const dashboard = getDashboard();
         if (dashboard) dashboard.hidden = !state.user || !['teacher', 'admin'].includes(state.user.role);
         renderKpis();
         renderScope();
         renderPanels();
+        applyWriteAvailability();
         refreshIcons();
+    }
+
+    function renderWriteLock() {
+        const container = state.root && state.root.querySelector('[data-teacher-write-lock]');
+        if (!container) return;
+        if (!state.writeLock) {
+            container.hidden = true;
+            container.innerHTML = '';
+            return;
+        }
+        const requestHint = state.writeLock.requestId
+            ? `请求标识 ${state.writeLock.requestId.slice(0, 12)}…`
+            : '未取得请求标识';
+        const confirmed = state.writeLock.confirmed === true;
+        container.hidden = false;
+        container.innerHTML = `
+            <i data-lucide="shield-alert"></i>
+            <div>
+                <strong>${confirmed ? '写入已确认，刷新待完成' : '写操作已暂停'}</strong>
+                <span>${confirmed
+                    ? '服务器已确认上一次写入，但权威数据刷新失败。系统不会重复发送；请点击顶部刷新完成核对后继续。'
+                    : `上一次写入结果无法确认（${escapeHtml(requestHint)}）。系统不会自动重试；请先核对数据，再点击顶部刷新解除。`}</span>
+            </div>
+        `;
+    }
+
+    function applyWriteAvailability() {
+        const blocked = Boolean(state.writeLock || !state.online || state.busy);
+        state.root.querySelectorAll(
+            '[data-teacher-form] button[type="submit"], [data-teacher-member-status], [data-teacher-collaborator-status]'
+        ).forEach((control) => {
+            if (blocked) control.disabled = true;
+        });
     }
 
     function renderKpis() {
@@ -434,7 +583,7 @@
             <article class="teacher-panel teacher-panel--wide">
                 <header class="teacher-panel__header">
                     <h2><i data-lucide="layout-dashboard"></i>主路径</h2>
-                    <span class="teacher-status-pill teacher-status-pill--readonly">V6.6.50</span>
+                    <span class="teacher-status-pill teacher-status-pill--readonly">V6.6.52</span>
                 </header>
                 <div class="teacher-form-grid">
                     <form class="teacher-form" data-teacher-form="school">
@@ -690,6 +839,7 @@
 
     async function handleFormSubmit(form) {
         const formType = form.dataset.teacherForm;
+        if (!canStartMutation(formType)) return;
         try {
             setBusy(true);
             if (formType === 'school') await createSchool(form);
@@ -703,7 +853,7 @@
             if (formType === 'grade') await gradeSubmission(form);
             form.reset();
         } catch (error) {
-            setFlash('error', errorMessage(error));
+            await handleMutationFailure(error, formType || 'teacher-write');
         } finally {
             setBusy(false);
             renderWorkspace();
@@ -718,7 +868,7 @@
         });
         setFlash('success', '学校已创建');
         state.selected.schoolId = String(school.id);
-        await loadSchools(school.id);
+        await reconcileConfirmedWrite('创建学校', () => loadSchools(school.id));
     }
 
     async function createClass(form) {
@@ -734,7 +884,7 @@
         });
         setFlash('success', '班级已创建');
         state.selected.classId = String(classGroup.id);
-        await loadSchoolScope();
+        await reconcileConfirmedWrite('创建班级', () => loadSchoolScope());
     }
 
     async function createCourse(form) {
@@ -750,7 +900,7 @@
         });
         setFlash('success', '课程已创建');
         state.selected.courseId = String(course.id);
-        await loadSchoolScope();
+        await reconcileConfirmedWrite('创建课程', () => loadSchoolScope());
     }
 
     async function attachCourseToClass() {
@@ -759,7 +909,7 @@
             body: { class_id: Number(state.selected.classId) }
         });
         setFlash('success', '课程已挂接班级');
-        await loadClassScope();
+        await reconcileConfirmedWrite('挂接课程与班级', () => loadClassScope());
     }
 
     async function createUnit(form) {
@@ -775,7 +925,7 @@
         });
         setFlash('success', '单元已创建');
         state.selected.unitId = String(unit.id);
-        await loadCourseScope();
+        await reconcileConfirmedWrite('创建单元', () => loadCourseScope());
     }
 
     async function createAssignment(form) {
@@ -793,7 +943,7 @@
         });
         setFlash('success', '作业已创建');
         state.selected.assignmentId = String(assignment.id);
-        await loadCourseScope();
+        await reconcileConfirmedWrite('创建作业', () => loadCourseScope());
     }
 
     async function updatePointRule(form) {
@@ -809,7 +959,7 @@
         });
         setFlash('success', '积分规则已保存');
         state.selected.assignmentId = String(assignmentId);
-        await loadAssignmentScope();
+        await reconcileConfirmedWrite('保存积分规则', () => loadAssignmentScope());
     }
 
     async function createCollaborator(form) {
@@ -819,7 +969,7 @@
             body: { user_id: Number(data.user_id), role: 'editor' }
         });
         setFlash('success', '协作者已添加');
-        await loadCourseScope();
+        await reconcileConfirmedWrite('添加协作者', () => loadCourseScope());
     }
 
     async function gradeSubmission(form) {
@@ -833,10 +983,14 @@
             }
         });
         setFlash('success', '评分已提交');
-        await Promise.all([loadClassScope(), loadAssignmentScope()]);
+        await reconcileConfirmedWrite(
+            '提交评分',
+            () => Promise.all([loadClassScope(), loadAssignmentScope()])
+        );
     }
 
     async function updateMemberStatus(button) {
+        if (!canStartMutation('member-status')) return;
         try {
             setBusy(true);
             await fetchJson(`/api/classes/${state.selected.classId}/members/${button.dataset.membershipId}`, {
@@ -844,9 +998,9 @@
                 body: { status: button.dataset.teacherMemberStatus, note: null }
             });
             setFlash('success', '成员状态已更新');
-            await loadClassScope();
+            await reconcileConfirmedWrite('更新成员状态', () => loadClassScope());
         } catch (error) {
-            setFlash('error', errorMessage(error));
+            await handleMutationFailure(error, 'member-status');
         } finally {
             setBusy(false);
             renderWorkspace();
@@ -854,6 +1008,7 @@
     }
 
     async function updateCollaboratorStatus(button) {
+        if (!canStartMutation('collaborator-status')) return;
         try {
             setBusy(true);
             await fetchJson(`/api/courses/${state.selected.courseId}/collaborators/${button.dataset.collaboratorId}`, {
@@ -861,16 +1016,88 @@
                 body: { status: button.dataset.teacherCollaboratorStatus }
             });
             setFlash('success', '协作者状态已更新');
-            await loadCourseScope();
+            await reconcileConfirmedWrite('更新协作者状态', () => loadCourseScope());
         } catch (error) {
-            setFlash('error', errorMessage(error));
+            await handleMutationFailure(error, 'collaborator-status');
         } finally {
             setBusy(false);
             renderWorkspace();
         }
     }
 
+    function canStartMutation(label) {
+        if (!state.online) {
+            setFlash('error', '当前处于离线状态，写操作已停用');
+            renderWorkspace();
+            return false;
+        }
+        if (state.writeLock) {
+            setFlash('warning', '上一次写入结果尚未确认；请先点击顶部刷新并核对状态');
+            renderWorkspace();
+            return false;
+        }
+        if (state.busy) return false;
+        return Boolean(label);
+    }
+
+    async function handleMutationFailure(error, label) {
+        if (error && error.confirmed) {
+            try { await refreshAll(); } catch (refreshError) {}
+            if (state.active) lockConfirmedWrite(label, error);
+            return;
+        }
+        if (!AstraApiClient.isAmbiguousMutation(error)) {
+            setFlash('error', errorMessage(error));
+            return;
+        }
+        state.writeLock = {
+            label: String(label || 'teacher-write'),
+            requestId: String(error.requestId || ''),
+            lockedAt: Date.now()
+        };
+        try { await refreshAll(); } catch (refreshError) {}
+        const requestHint = state.writeLock.requestId ? `（请求 ${state.writeLock.requestId.slice(0, 12)}…）` : '';
+        setFlash('warning', `写入结果尚未确认${requestHint}，系统未自动重试；写操作已锁定，请核对后点击顶部刷新解除`);
+    }
+
+    async function reconcileConfirmedWrite(label, loader) {
+        let refreshError = null;
+        try {
+            await loader();
+        } catch (error) {
+            refreshError = error;
+        }
+        if (!state.active) return false;
+        const workspaceError = refreshError || Object.values(state.errors).find(Boolean) || null;
+        const authorityUnavailable = !state.online
+            || !state.user
+            || !['teacher', 'admin'].includes(state.user.role)
+            || !state.lifecycleController
+            || state.lifecycleController.signal.aborted;
+        if (!workspaceError && !authorityUnavailable) return true;
+        lockConfirmedWrite(label, workspaceError || AstraApiClient.offlineError());
+        return false;
+    }
+
+    function lockConfirmedWrite(label, error) {
+        state.writeLock = {
+            label: String(label || 'teacher-write'),
+            requestId: String((error && error.requestId) || ''),
+            lockedAt: Date.now(),
+            confirmed: true
+        };
+        const detail = error ? `：${errorMessage(error)}` : '';
+        setFlash(
+            'warning',
+            `${label || '写入'}已由服务器确认，但权威数据刷新失败${detail}。系统不会重复发送；请点击顶部刷新完成核对后继续`
+        );
+    }
+
     async function handleScopeChange(target) {
+        if (state.busy) {
+            renderWorkspace();
+            return;
+        }
         const key = target.dataset.teacherScope;
         state.selected[key] = target.value;
         setBusy(true);
@@ -891,6 +1118,10 @@
     }
 
     async function handleFilterChange(target) {
+        if (state.busy) {
+            renderWorkspace();
+            return;
+        }
         const key = target.dataset.teacherFilter;
         if (key === 'memberRole') state.filters.memberRole = target.value;
         if (key === 'memberStatus') state.filters.memberStatus = target.value;
@@ -942,12 +1173,14 @@
     function renderAuthError(error) {
         const container = state.root.querySelector('[data-teacher-auth-state]');
         if (!container) return;
-        const isAuth = error && (error.status === 401 || error.status === 403);
+        const isUnauthenticated = error && error.status === 401;
+        const isForbidden = error && error.status === 403;
+        const isOffline = error && error.code === 'offline';
         container.innerHTML = `
             <div class="teacher-auth-card teacher-auth-card--blocked">
-                <i data-lucide="${isAuth ? 'lock' : 'server-off'}"></i>
+                <i data-lucide="${isUnauthenticated ? 'lock' : isForbidden ? 'shield-x' : isOffline ? 'wifi-off' : 'server-off'}"></i>
                 <div>
-                    <strong>${isAuth ? '需要教师会话' : '后端连接失败'}</strong>
+                    <strong>${isUnauthenticated ? '需要教师会话' : isForbidden ? '当前账号无教师权限' : isOffline ? '当前处于离线状态' : '后端连接失败'}</strong>
                     <span>${escapeHtml(errorMessage(error))}</span>
                 </div>
             </div>
@@ -1043,8 +1276,13 @@
         }
         container.hidden = false;
         container.className = `teacher-flash teacher-flash--${state.flash.type}`;
+        const icon = state.flash.type === 'success'
+            ? 'circle-check'
+            : state.flash.type === 'warning'
+                ? 'shield-alert'
+                : 'triangle-alert';
         container.innerHTML = `
-            <i data-lucide="${state.flash.type === 'success' ? 'circle-check' : 'triangle-alert'}"></i>
+            <i data-lucide="${icon}"></i>
             <span>${escapeHtml(state.flash.message)}</span>
         `;
     }
@@ -1149,6 +1387,7 @@
 
     function clearWorkspace() {
         state.user = null;
+        state.errors = {};
         Object.keys(state.data).forEach((key) => {
             state.data[key] = Array.isArray(state.data[key]) ? [] : null;
         });
@@ -1173,77 +1412,92 @@
     function setBusy(value) {
         state.busy = Boolean(value);
         if (state.root) state.root.classList.toggle('is-busy', state.busy);
+        if (state.root) {
+            state.root.querySelectorAll('[data-teacher-action="refresh"], [data-teacher-api-base]').forEach((control) => {
+                control.disabled = state.busy;
+            });
+        }
+        if (state.root && state.busy) applyWriteAvailability();
     }
 
     async function fetchJson(path, options) {
         const request = options || {};
-        const url = buildUrl(path, request.params);
-        const headers = new Headers(request.headers || {});
-        headers.set('Accept', 'application/json');
-        if (request.body !== undefined) headers.set('Content-Type', 'application/json');
-        const token = readBearerToken();
-        if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
-        const response = await fetch(url.toString(), {
-            method: request.method || 'GET',
-            headers,
-            credentials: 'include',
-            body: request.body !== undefined ? JSON.stringify(request.body) : undefined
+        return AstraApiClient.request(path, {
+            baseUrl: state.apiBase,
+            params: request.params,
+            method: request.method,
+            headers: request.headers,
+            body: request.body,
+            timeoutMs: request.timeoutMs,
+            signal: state.lifecycleController && state.lifecycleController.signal
         });
-        if (!response.ok) {
-            let message = response.statusText || 'Request failed';
-            try {
-                const payload = await response.json();
-                message = payload.detail || payload.message || message;
-            } catch (e) {}
-            const error = new Error(message);
-            error.status = response.status;
-            throw error;
-        }
-        if (response.status === 204) return null;
-        return response.json();
     }
 
-    function buildUrl(path, params) {
-        const base = state.apiBase ? state.apiBase.replace(/\/$/, '') : '';
-        const url = new URL(`${base}${path}`, window.location.origin);
-        Object.entries(params || {}).forEach(([key, value]) => {
-            if (value !== undefined && value !== null && value !== '') {
-                url.searchParams.set(key, value);
-            }
-        });
-        return url;
+    function beginRequestGeneration() {
+        if (state.lifecycleController && !state.lifecycleController.signal.aborted) {
+            state.lifecycleController.abort();
+        }
+        state.lifecycleController = new AbortController();
+        state.requestGeneration += 1;
+        state.errors = {};
+        return state.requestGeneration;
+    }
+
+    function invalidateRequests() {
+        state.requestGeneration += 1;
+        if (state.lifecycleController && !state.lifecycleController.signal.aborted) {
+            state.lifecycleController.abort();
+        }
+        state.lifecycleController = null;
+    }
+
+    function isCurrentRequest(generation) {
+        return Boolean(
+            state.active
+            && generation === state.requestGeneration
+            && state.lifecycleController
+            && !state.lifecycleController.signal.aborted
+        );
+    }
+
+    function hasWorkspaceErrors() {
+        return Object.values(state.errors).some(Boolean);
     }
 
     function resolveApiBase() {
         try {
             const queryBase = new URLSearchParams(location.search).get('apiBase');
-            if (queryBase) return queryBase.replace(/\/$/, '');
+            if (queryBase) return AstraApiClient.normalizeBaseUrl(queryBase);
         } catch (e) {}
         try {
             const stored = localStorage.getItem(API_BASE_STORAGE_KEY);
-            if (stored) return stored.replace(/\/$/, '');
+            if (stored) return AstraApiClient.normalizeBaseUrl(stored);
         } catch (e) {}
         if (window.CONFIG && CONFIG.backend && CONFIG.backend.apiBaseUrl) {
-            return String(CONFIG.backend.apiBaseUrl).replace(/\/$/, '');
+            return AstraApiClient.normalizeBaseUrl(CONFIG.backend.apiBaseUrl);
         }
         return '';
     }
 
     function persistApiBase() {
         try {
+            state.apiBase = AstraApiClient.normalizeBaseUrl(state.apiBase);
             if (state.apiBase) localStorage.setItem(API_BASE_STORAGE_KEY, state.apiBase);
             else localStorage.removeItem(API_BASE_STORAGE_KEY);
+            const input = state.root && state.root.querySelector('[data-teacher-api-base]');
+            if (input) input.value = state.apiBase;
         } catch (e) {}
     }
 
-    function readBearerToken() {
-        for (const key of TOKEN_STORAGE_KEYS) {
-            try {
-                const token = localStorage.getItem(key) || sessionStorage.getItem(key);
-                if (token) return token;
-            } catch (e) {}
+    function applyApiBaseChange(input) {
+        if (state.busy) {
+            input.value = state.apiBase;
+            return;
         }
-        return '';
+        const previous = state.apiBase;
+        state.apiBase = AstraApiClient.normalizeBaseUrl(input.value);
+        persistApiBase();
+        if (state.apiBase !== previous) refreshAll();
     }
 
     function findById(items, id) {
@@ -1251,9 +1505,7 @@
     }
 
     function errorMessage(error) {
-        if (!error) return '未知错误';
-        const status = error.status ? `${error.status} ` : '';
-        return `${status}${error.message || error.detail || '请求失败'}`;
+        return AstraApiClient.message(error);
     }
 
     function formatNumber(value) {
@@ -1298,6 +1550,14 @@
     }
 
     window.initTeacher = initTeacher;
+    window.destroyTeacher = destroyTeacher;
     window.initTeacherWorkbench = initTeacher;
     window.TEACHER_WORKBENCH_VERSION = TEACHER_ASSET_VERSION;
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = {
+            state,
+            reconcileConfirmedWrite,
+            lockConfirmedWrite
+        };
+    }
 })();

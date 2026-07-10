@@ -1,6 +1,9 @@
 // ===== Main Application Bootstrap =====
 
 function initApp() {
+    if (window.AstraApiClient && typeof window.AstraApiClient.scrubLegacyTokens === 'function') {
+        window.AstraApiClient.scrubLegacyTokens();
+    }
     if (window.__loadProgress) window.__loadProgress(30);
 
     // 1. Initialize legacy card system when it is available.
@@ -221,7 +224,7 @@ function updateFooterVisibility() {
 
 window.updateFooterVisibility = updateFooterVisibility;
 
-const ENGLAB_ASSET_VERSION = '20260710v6651StudentMvpP1';
+const ENGLAB_ASSET_VERSION = '20260710v6652FrontendHardeningP1';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',
@@ -233,6 +236,7 @@ const CORE_HTTP_FALLBACK_ASSETS = [
     './shared/css/responsive.css?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/lucide.min.js?v=20260417d',
     './shared/js/config.js?v=' + ENGLAB_ASSET_VERSION,
+    './shared/js/api-client.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/router.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/main.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/backend-content.js?v=' + ENGLAB_ASSET_VERSION,

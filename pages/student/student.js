@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    const STUDENT_ASSET_VERSION = '20260710v6651StudentMvpP1';
+    const STUDENT_ASSET_VERSION = '20260710v6652FrontendHardeningP1';
     const API_BASE_STORAGE_KEY = 'astra-student-api-base';
     const REQUEST_TIMEOUT_MS = 12000;
     const ASSIGNMENT_PAGE_LIMIT = 8;
@@ -37,6 +37,7 @@
         busy: false,
         loadingScope: false,
         joining: false,
+        uncertainJoinClassId: '',
         scopeGeneration: 0,
         lifecycleController: null,
         scopeController: null,
@@ -57,24 +58,9 @@
         flash: null,
         data: emptyData(),
         onOnline: null,
-        onOffline: null
+        onOffline: null,
+        onAuthRequired: null
     };
-
-    class RequestCancelled extends Error {
-        constructor() {
-            super('Request cancelled');
-            this.name = 'RequestCancelled';
-            this.cancelled = true;
-        }
-    }
-
-    class ApiRequestError extends Error {
-        constructor(message, details) {
-            super(message);
-            this.name = 'ApiRequestError';
-            Object.assign(this, details || {});
-        }
-    }
 
     function initStudent() {
         state.root = document.querySelector('[data-student-workbench]');
@@ -82,7 +68,9 @@
 
         state.active = true;
         state.online = navigator.onLine !== false;
+        if (window.AstraApiClient) AstraApiClient.scrubLegacyTokens();
         state.apiBase = resolveApiBase();
+        abortController(state.lifecycleController);
         state.lifecycleController = new AbortController();
         renderShell();
 
@@ -108,6 +96,7 @@
         state.busy = false;
         state.loadingScope = false;
         state.joining = false;
+        state.uncertainJoinClassId = '';
         state.selected = { classId: '', courseId: '', assignmentId: '' };
         state.pagination.assignmentOffset = 0;
         state.pendingSubmissions.clear();
@@ -267,16 +256,55 @@
         if (state.runtimeBound) return;
         state.onOnline = () => {
             state.online = true;
-            renderNetworkState();
-            renderWorkspace();
+            if (state.active) refreshAll();
         };
         state.onOffline = () => {
             state.online = false;
-            renderNetworkState();
-            renderWorkspace();
+            abortController(state.scopeController);
+            state.user = null;
+            state.authorized = false;
+            state.busy = false;
+            state.loadingScope = false;
+            state.data = emptyData();
+            state.answers = Object.create(null);
+            clearDashboardDom();
+            hideDashboard();
+            if (state.active) {
+                renderAuthError(AstraApiClient.offlineError());
+                setFlash('warning', '已隐藏旧学习数据；恢复网络后将重新读取后端状态');
+                renderNetworkState();
+                renderFlash();
+                renderHeaderControls();
+                refreshIcons();
+            }
+        };
+        state.onAuthRequired = () => {
+            state.scopeGeneration += 1;
+            abortController(state.scopeController);
+            abortController(state.lifecycleController);
+            state.scopeController = null;
+            state.lifecycleController = new AbortController();
+            state.user = null;
+            state.authorized = false;
+            state.busy = false;
+            state.loadingScope = false;
+            state.joining = false;
+            state.pendingSubmissions.clear();
+            state.data = emptyData();
+            state.answers = Object.create(null);
+            state.uncertainSubmissions.clear();
+            state.uncertainJoinClassId = '';
+            clearDashboardDom();
+            hideDashboard();
+            if (state.active) {
+                renderAuthError(new AstraApiClient.Error('登录状态已失效', { status: 401, code: 'unauthorized' }));
+                renderFlash();
+                refreshIcons();
+            }
         };
         window.addEventListener('online', state.onOnline);
         window.addEventListener('offline', state.onOffline);
+        window.addEventListener('astra:api-auth-required', state.onAuthRequired);
         state.runtimeBound = true;
     }
 
@@ -284,23 +312,25 @@
         if (!state.runtimeBound) return;
         window.removeEventListener('online', state.onOnline);
         window.removeEventListener('offline', state.onOffline);
+        window.removeEventListener('astra:api-auth-required', state.onAuthRequired);
         state.onOnline = null;
         state.onOffline = null;
+        state.onAuthRequired = null;
         state.runtimeBound = false;
     }
 
     async function refreshAll() {
         if (!state.root || !state.active) return;
         const scope = beginScopeRequest();
+        const previousUserId = state.user && state.user.id;
         state.busy = true;
         state.errors = {};
         state.flash = null;
         state.authorized = false;
         state.user = null;
         state.data = emptyData();
-        state.answers = Object.create(null);
-        state.uncertainSubmissions.clear();
         state.selected.assignmentId = '';
+        clearDashboardDom();
         hideDashboard();
         renderAuthState('checking');
         renderFlash();
@@ -310,7 +340,13 @@
             const user = await requestJson('/api/users/me', { signal: scope.signal });
             if (!isCurrentScope(scope)) return;
             state.user = user;
+            if (previousUserId && String(previousUserId) !== String(user && user.id)) {
+                state.answers = Object.create(null);
+                state.uncertainSubmissions.clear();
+                state.uncertainJoinClassId = '';
+            }
             if (!user || user.role !== 'student') {
+                state.answers = Object.create(null);
                 renderAuthState('forbidden', user || {});
                 return;
             }
@@ -323,6 +359,17 @@
             });
             if (!isCurrentScope(scope)) return;
             state.data.classes = normalizeList(classPayload);
+            if (state.uncertainJoinClassId) {
+                const pendingClassId = state.uncertainJoinClassId;
+                const joined = state.data.classes.some((item) => String(entityId(item)) === String(pendingClassId));
+                updateJoinReconciliationLock(pendingClassId, joined);
+                setFlash(
+                    joined ? 'success' : 'warning',
+                    joined
+                        ? '已通过权威读取确认班级加入成功'
+                        : '权威班级列表尚未显示已确认的加入结果，入口继续锁定；请稍后刷新对账'
+                );
+            }
             state.selected.classId = normalizeEntityId(state.selected.classId, state.data.classes);
             if (!state.selected.classId && state.data.classes.length) {
                 state.selected.classId = String(entityId(state.data.classes[0]));
@@ -509,7 +556,13 @@
     }
 
     async function handleDirectJoin(form) {
-        if (state.joining || !state.online) return;
+        if (state.joining || state.uncertainJoinClassId || !state.online) {
+            if (state.uncertainJoinClassId) {
+                setFlash('warning', '上一次加入结果尚未确认，请先刷新完成对账');
+                renderFlash();
+            }
+            return;
+        }
         const formData = new FormData(form);
         const classId = Number(formData.get('class_id'));
         if (!Number.isInteger(classId) || classId < 1) {
@@ -525,16 +578,55 @@
                 method: 'POST',
                 body: { role: 'student' }
             });
-            setFlash('success', '已加入班级，正在刷新学习范围');
+            state.uncertainJoinClassId = String(classId);
             await refreshAll();
+            const joined = state.data.classes.some((item) => String(entityId(item)) === String(classId));
+            updateJoinReconciliationLock(classId, joined);
+            setFlash(
+                joined ? 'success' : 'warning',
+                joined
+                    ? '服务器已确认加入班级，学习范围已刷新'
+                    : '服务器已确认加入请求；权威列表暂未显示该班级，入口保持锁定且不会重复发送'
+            );
         } catch (error) {
-            if (!isCancelled(error)) {
+            if (isCancelled(error) && !AstraApiClient.isAmbiguousMutation(error)) return;
+            if (error.confirmed || AstraApiClient.isAmbiguousMutation(error)) {
+                state.uncertainJoinClassId = String(classId);
+                if (!state.active) return;
+                const outcome = await reconcileJoin(classId);
+                if (outcome.found) {
+                    updateJoinReconciliationLock(classId, true);
+                    setFlash('success', '已通过本人班级列表确认加入成功，未重复发送');
+                } else if (outcome.refreshed) {
+                    updateJoinReconciliationLock(classId, false);
+                    setFlash('warning', '加入请求未自动重试；权威班级列表暂未显示结果，入口继续锁定，请稍后刷新对账');
+                } else {
+                    setFlash('error', '加入结果尚未确认，系统未自动重试；当前加入入口已锁定，请恢复网络后刷新对账');
+                }
+            } else {
                 setFlash('error', errorMessage(error));
-                renderFlash();
             }
+            renderFlash();
         } finally {
             state.joining = false;
             renderWorkspace();
+        }
+    }
+
+    async function reconcileJoin(classId) {
+        try {
+            const payload = await requestJson('/api/classes', { params: { mine: true } });
+            const classes = normalizeList(payload);
+            state.data.classes = classes;
+            const found = classes.some((item) => String(entityId(item)) === String(classId));
+            if (found) {
+                state.selected.classId = String(classId);
+                await refreshAll();
+            }
+            return { refreshed: true, found };
+        } catch (error) {
+            if (!isCancelled(error)) state.errors.classes = error;
+            return { refreshed: false, found: false };
         }
     }
 
@@ -563,20 +655,26 @@
                     content: { answer }
                 }
             });
+            updateSubmissionReconciliationLock(assignmentId, false);
             applyConfirmedSubmission(assignmentId, createdSubmission);
             delete state.answers[assignmentId];
             const outcome = await reconcileSubmission(assignmentId, classId, courseId);
+            const confirmedInAuthority = updateSubmissionReconciliationLock(assignmentId, outcome.found);
             setFlash(
-                'success',
-                outcome.refreshed
+                confirmedInAuthority ? 'success' : 'warning',
+                confirmedInAuthority
                     ? '作业已提交，提交记录已刷新'
-                    : '服务器已确认提交；列表刷新失败，当前作业已按确认结果锁定，请稍后刷新'
+                    : outcome.refreshed
+                        ? '服务器已确认提交；权威列表暂未显示记录，当前作业保持锁定且不会重复发送'
+                        : '服务器已确认提交；列表刷新失败，当前作业保持锁定，请稍后刷新对账'
             );
         } catch (error) {
-            if (isCancelled(error)) return;
-            if (error.status === 409 || error.ambiguous) {
+            if (isCancelled(error) && !AstraApiClient.isAmbiguousMutation(error)) return;
+            if (error.status === 409 || error.confirmed || error.ambiguous) {
                 state.uncertainSubmissions.add(assignmentId);
+                if (!state.active) return;
                 const outcome = await reconcileSubmission(assignmentId, classId, courseId);
+                updateSubmissionReconciliationLock(assignmentId, outcome.found);
                 if (outcome.found) {
                     delete state.answers[assignmentId];
                     setFlash('success', '已确认服务器存在本次提交，未重复发送');
@@ -644,12 +742,33 @@
             item.read_only = true;
             item.submit_block_reason = 'already_submitted';
         });
-        state.uncertainSubmissions.delete(String(assignmentId));
+    }
+
+    function updateJoinReconciliationLock(classId, found) {
+        if (found) {
+            state.uncertainJoinClassId = '';
+            return true;
+        }
+        state.uncertainJoinClassId = String(classId || '');
+        return false;
+    }
+
+    function updateSubmissionReconciliationLock(assignmentId, found) {
+        const normalizedId = String(assignmentId || '');
+        if (!normalizedId) return false;
+        if (found) {
+            state.uncertainSubmissions.delete(normalizedId);
+            return true;
+        }
+        state.uncertainSubmissions.add(normalizedId);
+        return false;
     }
 
     function clearSubmissionUncertainty(items) {
         (items || []).forEach((item) => {
-            state.uncertainSubmissions.delete(String(assignmentIdOf(item)));
+            if (submissionOf(item)) {
+                state.uncertainSubmissions.delete(String(assignmentIdOf(item)));
+            }
         });
     }
 
@@ -764,12 +883,24 @@
     function renderAuthError(error) {
         const container = state.root && state.root.querySelector('[data-student-auth-state]');
         if (!container) return;
-        const isAuth = error && (error.status === 401 || error.status === 403);
+        const isUnauthenticated = error && error.status === 401;
+        const isForbidden = error && error.status === 403;
+        const isOffline = error && error.code === 'offline';
+        const greeting = state.root && state.root.querySelector('[data-student-greeting]');
+        if (greeting) {
+            greeting.textContent = isUnauthenticated
+                ? '学习会话需要重新登录'
+                : isForbidden
+                    ? '当前账号无学生权限'
+                    : isOffline
+                        ? '当前离线，实时数据已停止'
+                        : '暂时无法连接学习服务';
+        }
         container.innerHTML = `
             <div class="student-auth-card student-auth-card--blocked">
-                <i data-lucide="${isAuth ? 'lock' : 'server-off'}"></i>
+                <i data-lucide="${isUnauthenticated ? 'lock' : isForbidden ? 'shield-x' : isOffline ? 'wifi-off' : 'server-off'}"></i>
                 <div>
-                    <strong>${isAuth ? '需要有效的学生会话' : '后端连接失败'}</strong>
+                    <strong>${isUnauthenticated ? '需要有效的学生会话' : isForbidden ? '当前账号无学生权限' : isOffline ? '当前处于离线状态' : '后端连接失败'}</strong>
                     <span>${escapeHtml(errorMessage(error))}</span>
                 </div>
             </div>
@@ -783,7 +914,7 @@
         container.hidden = state.online;
         container.textContent = state.online
             ? ''
-            : '当前离线：页面中的已有数据可能已过期，提交操作已停用，恢复联网后请刷新。';
+            : '当前离线：旧学习数据已隐藏，所有写操作已停用；恢复联网后会重新校验会话与数据。';
     }
 
     function renderFlash() {
@@ -812,9 +943,9 @@
                         <span>班级 ID</span>
                         <input name="class_id" type="number" inputmode="numeric" min="1" required autocomplete="off" placeholder="例如 1024">
                     </label>
-                    <button type="submit" class="student-button student-button--primary"${state.joining || !state.online ? ' disabled' : ''}>
+                    <button type="submit" class="student-button student-button--primary"${state.joining || state.uncertainJoinClassId || !state.online ? ' disabled' : ''}>
                         <i data-lucide="log-in"></i>
-                        <span>${state.joining ? '正在加入' : '加入班级'}</span>
+                        <span>${state.joining ? '正在加入' : state.uncertainJoinClassId ? '等待对账' : '加入班级'}</span>
                     </button>
                 </form>
             </div>
@@ -1169,6 +1300,25 @@
         if (dashboard) dashboard.hidden = true;
     }
 
+    function clearDashboardDom() {
+        if (!state.root) return;
+        const controls = state.root.querySelector('[data-student-controls]');
+        if (controls) controls.hidden = true;
+        state.root.querySelectorAll('[data-student-scope]').forEach((select) => {
+            select.innerHTML = '';
+        });
+        const joinState = state.root.querySelector('[data-student-join-state]');
+        const layout = state.root.querySelector('[data-student-layout]');
+        if (joinState) {
+            joinState.hidden = true;
+            joinState.innerHTML = '';
+        }
+        if (layout) layout.hidden = true;
+        state.root.querySelectorAll('[data-student-panel]').forEach((panel) => {
+            panel.innerHTML = '';
+        });
+    }
+
     function getDashboard() {
         return state.root && state.root.querySelector('[data-student-dashboard]');
     }
@@ -1426,87 +1576,15 @@
 
     async function requestJson(path, options) {
         const request = options || {};
-        const method = String(request.method || 'GET').toUpperCase();
-        const url = buildUrl(path, request.params);
-        const headers = new Headers(request.headers || {});
-        headers.set('Accept', 'application/json');
-        if (request.body !== undefined) headers.set('Content-Type', 'application/json');
-        if (method !== 'GET' && method !== 'HEAD') headers.set('X-Request-ID', createRequestId());
-
-        const localController = new AbortController();
-        const signals = [
-            state.lifecycleController && state.lifecycleController.signal,
-            request.signal
-        ].filter(Boolean);
-        const forwardAbort = () => localController.abort();
-        signals.forEach((signal) => {
-            if (signal.aborted) localController.abort();
-            else signal.addEventListener('abort', forwardAbort, { once: true });
+        return AstraApiClient.request(path, {
+            baseUrl: state.apiBase,
+            params: request.params,
+            method: request.method,
+            headers: request.headers,
+            body: request.body,
+            timeoutMs: request.timeout || REQUEST_TIMEOUT_MS,
+            signal: request.signal || (state.lifecycleController && state.lifecycleController.signal)
         });
-
-        let timedOut = false;
-        const timer = window.setTimeout(() => {
-            timedOut = true;
-            localController.abort();
-        }, Number(request.timeout || REQUEST_TIMEOUT_MS));
-
-        try {
-            const response = await fetch(url.toString(), {
-                method,
-                headers,
-                credentials: 'include',
-                cache: 'no-store',
-                signal: localController.signal,
-                body: request.body !== undefined ? JSON.stringify(request.body) : undefined
-            });
-            const requestId = response.headers.get('X-Request-ID') || '';
-            const text = await response.text();
-            let payload = null;
-            if (text) {
-                try {
-                    payload = JSON.parse(text);
-                } catch (error) {
-                    payload = { detail: text };
-                }
-            }
-            if (!response.ok) {
-                throw new ApiRequestError(extractDetail(payload) || response.statusText || '请求失败', {
-                    status: response.status,
-                    payload,
-                    requestId,
-                    ambiguous: false
-                });
-            }
-            if (response.status === 204) return null;
-            return payload === null ? {} : payload;
-        } catch (error) {
-            if (error instanceof ApiRequestError) throw error;
-            if (signals.some((signal) => signal.aborted)) throw new RequestCancelled();
-            if (timedOut) {
-                throw new ApiRequestError('请求超时', {
-                    code: 'timeout',
-                    ambiguous: method !== 'GET' && method !== 'HEAD'
-                });
-            }
-            throw new ApiRequestError('网络连接失败', {
-                code: 'network',
-                ambiguous: method !== 'GET' && method !== 'HEAD'
-            });
-        } finally {
-            window.clearTimeout(timer);
-            signals.forEach((signal) => signal.removeEventListener('abort', forwardAbort));
-        }
-    }
-
-    function buildUrl(path, params) {
-        const base = state.apiBase ? state.apiBase.replace(/\/$/, '') : '';
-        const url = new URL(`${base}${path}`, window.location.origin);
-        Object.entries(params || {}).forEach(([key, value]) => {
-            if (value !== undefined && value !== null && value !== '') {
-                url.searchParams.set(key, String(value));
-            }
-        });
-        return url;
     }
 
     function resolveApiBase() {
@@ -1528,50 +1606,15 @@
     }
 
     function normalizeApiBase(value) {
-        const text = String(value || '').trim().replace(/\/+$/, '');
-        if (!text) return '';
-        try {
-            const url = new URL(text, window.location.origin);
-            if (!['http:', 'https:'].includes(url.protocol)) return '';
-            return url.toString().replace(/\/+$/, '');
-        } catch (error) {
-            return '';
-        }
-    }
-
-    function createRequestId() {
-        if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
-        return `student-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    }
-
-    function extractDetail(payload) {
-        if (!payload) return '';
-        if (typeof payload.detail === 'string') return payload.detail;
-        if (Array.isArray(payload.detail)) {
-            return payload.detail.map((item) => item.msg || item.message || String(item)).join('；');
-        }
-        if (payload.message) return String(payload.message);
-        return '';
+        return AstraApiClient.normalizeBaseUrl(value);
     }
 
     function errorMessage(error) {
-        if (!error) return '未知错误';
-        if (error.code === 'timeout') return '请求超时，请检查网络后重试';
-        if (error.code === 'network') return state.online ? '无法连接后端服务' : '当前处于离线状态';
-        const statusMessages = {
-            401: '会话已失效，请重新登录',
-            403: '没有访问当前学习范围的权限',
-            404: '学习资源已不存在',
-            429: '请求过于频繁，请稍后再试',
-            500: '服务暂时不可用'
-        };
-        if (statusMessages[error.status]) return statusMessages[error.status];
-        const detail = error.message || extractDetail(error.payload) || '请求失败';
-        return error.status ? `${error.status} ${detail}` : detail;
+        return AstraApiClient.message(error);
     }
 
     function isCancelled(error) {
-        return Boolean(error && (error.cancelled || error.name === 'RequestCancelled'));
+        return AstraApiClient.isCancelled(error);
     }
 
     function setFlash(type, message) {
@@ -1642,4 +1685,12 @@
         refresh: refreshAll,
         destroy: destroyStudent
     };
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = {
+            state,
+            applyConfirmedSubmission,
+            updateJoinReconciliationLock,
+            updateSubmissionReconciliationLock
+        };
+    }
 })();

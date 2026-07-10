@@ -8,11 +8,11 @@
 
 星序总览页负责承载一级星系入口；进入某个星系后，才显示该星系自己的二级学科或知识目录。内置 C++ httplib 后端服务器，支持静态文件托管。
 
-> **当前状态**: v6.5（2026-07-03 起）— `houduan` 分支已接入 Python 后端骨架、健康检查、部署预检、部署 smoke 门禁、API no-store 缓存边界、工科试验室内容协议持久化样例、内容 seed 启动初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、脚本资产 allowlist/SRI 静态门禁、脚本资产下载/SRI 哈希校验与校验证据、公开 render 脚本 manifest 脱敏和沙箱执行契约头、浏览器自动化隔离证明、稳定 `sectionId/sourceId` 新写入契约、草稿编辑、草稿提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 敏感预览脱敏与富语义摘要、本地账号认证安全基线、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、用户自助密码重置令牌、密码重置 token 留存清理脚本、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校/班级最小闭环与加入申请审批、课程/作业/学习事件/提交批改/作业只读复盘/跨班级提交唯一性/学生资源状态可见性/积分统计、知识状态/班级规则统计、个人/班级知识快照、知识快照周期重算脚本、运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端知识快照运行列表/健康摘要、协作式取消、手动 requeue 与调度积压摘要、管理端 API、缺陷记录外部 issue 链接、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、待批改队列、审计元数据与认证事件审计、审计日志链式哈希、审计链完整性校验、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要、审计留存预检、本地审计归档包导出/Manifest 校验与导出/摘要行为审计留痕、学校/班级/课程访问控制服务层、跨范围权限矩阵测试，以及前端 opt-in schema 渲染试点
+> **当前状态**: V6.6.52（2026-07-10）— `houduan` 分支已进入后端阶段收束，管理、教师、学生三端首轮入口和统一 API 失败/离线/缓存边界已经落地；真实 MySQL、真实反向代理、复杂权限与统计、外部治理和发布候选门禁仍按 [`doc/09-后端阶段收束小版本开发安排.md`](doc/09-后端阶段收束小版本开发安排.md) 推进。
 > **Review 回流状态**: 2026-07-06，`review` 分支已交付代码审查报告（审查基线 `V6.5.23 Review 前基线快照`，范围 `re1` 至 `re17`）。本 `houduan` 分支未合并 review 代码修复；后续仅按 `02` / `07` 中记录的优先级在 `houduan` 上选择性吸收。
-> **最新治理**: 2026-07-09，`houduan` 已补齐 BE-09/V6.6.48 浏览器隔离证明首轮：`scriptManifest.embed` 会由 opt-in 前端创建 iframe sandbox，后端 sandbox HTML 的 `frame-ancestors` 只吸收受信 CORS origin，bootstrap/asset 可执行资源支持 opaque sandbox 加载。
-> **最新回归**: 2026-07-09，`tools/browser/script-sandbox-isolation-proof.cjs` 已用 Edge/Playwright 覆盖 iframe sandbox 属性、opaque origin、父页 DOM/storage/cookie/top location 越权阻断、unknown sandbox/asset fail closed、console/network 和截图留证；旧实验脚本 sandbox DOM 模板化仍属后续。
-> **最新产品化**: 2026-07-10，V6.6.51 已完成学生端学习闭环首轮：主站新增 `#student`，后端补齐本人班级与分页作业中心契约；三端首轮入口现已齐备，错误/离线/缓存硬化和复杂统计权限继续进入 V6.6.52-V6.6.53。
+> **最新治理**: 2026-07-10，V6.6.52 新增浏览器统一 API client：cookie-only、`credentials=include`、`cache=no-store`、严格 API origin、稳定 401/403/5xx/超时/网络错误和写入结果未知语义；三端不会自动重放写操作，必须以权威 GET 对账。
+> **最新隔离**: `physics/energy-conservation` 已迁入后端 allowlist sandbox DOM 模板与 root-scoped initializer，继续保持 `sandbox="allow-scripts"`、opaque origin、CSP nonce、静态回退和 opt-in 接入；未知模板或非法 document contract fail closed。
+> **最新缓存边界**: `/api` 与 `/api/*` 由 FastAPI 全状态 `no-store`，Service Worker 在路由最前面直接旁路 API；安装失败不再激活不完整静态缓存。桌面登录态/真实写入和外部 Chrome 390×844 的三端门禁、sandbox 交互、网络失败/恢复均已回归。
 > **下一阶段规划**: Python + MySQL 后端化、内容协议、登录用户体系与管理员 / 教师 / 学生三端平台设计，详见 [`doc/07-后端优化与设计.md`](doc/07-后端优化与设计.md)
 > **当前分支**: `houduan` — 后端化设计与重构开发分支；`main` 保持主线维护
 > **v6.4 主线**：未来星系产品内容保留，比赛提交/评审/截图临时层清理 + `20260630mainV64` 资产版本同步
@@ -24,7 +24,7 @@
 
 | 版本 | 发布日期 | 主题 | 详情 |
 |------|---------|------|------|
-| **v6.6.51（houduan）** | 2026-07-10 | 学生端学习闭环首轮，管理 / 教师 / 学生三端入口齐备 | [→](doc/09-后端阶段收束小版本开发安排.md) |
+| **v6.6.52（houduan）** | 2026-07-10 | 三端 API 失败、离线、缓存和 sandbox DOM 硬化 | [→](doc/09-后端阶段收束小版本开发安排.md) |
 | **v6.5（规划中）** | 2026-07-03 起 | Python + MySQL 后端化 + 三端教学平台设计 | [→](doc/07-后端优化与设计.md) |
 | **v6.4.0** | 2026-06-30 | 已结束赛事材料清理 + future 分支主线合并 + 底栏恢复 + 缓存版本同步 | [→](#v640--2026-06-30) |
 | **v6.1 ~ v6.2** | 2026-05-26 ~ 2026-06 | 工科试验室内容扩充、未来星系 MVP 接入、可信学习框架推进 | [→](doc/03-发布历史.md) |
