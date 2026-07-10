@@ -390,6 +390,7 @@ def _start_run(
             class_snapshot_count=0,
             metadata_json={"trigger_source": trigger_source, "scheduler_lease_owner": scheduler_lease_owner},
         )
+        .execution_options(synchronize_session=False)
     )
     if result.rowcount != 1:
         db.rollback()
@@ -441,6 +442,7 @@ def _finish_run_success(
             scheduler_heartbeat_at=None,
             metadata_json=metadata_json,
         )
+        .execution_options(synchronize_session=False)
     )
     if result.rowcount != 1:
         raise SnapshotRunLeaseLost("knowledge snapshot run lease was lost or expired before success")
@@ -490,6 +492,7 @@ def _finish_run_failure(
             scheduler_heartbeat_at=None,
             metadata_json={"trigger_source": trigger_source},
         )
+        .execution_options(synchronize_session=False)
     )
     if result.rowcount != 1:
         raise SnapshotRunLeaseLost("knowledge snapshot run lease was lost or expired before failure")

@@ -12,6 +12,7 @@ from app.core.config import get_settings
 from app.db.session import get_session_factory, init_db
 from app.services.content_catalog import ensure_seed_pages
 from app.services.content_script_asset_scan_scheduler import scheduler_from_settings as content_script_scheduler_from_settings
+from app.services.background_task_worker import worker_from_settings
 from app.services.knowledge_snapshot_scheduler import scheduler_from_settings
 
 
@@ -85,17 +86,24 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     scheduler = None
     content_script_scheduler = None
-    if settings.knowledge_snapshot_scheduler_enabled:
+    background_task_worker = None
+    if settings.background_task_worker_enabled:
+        background_task_worker = worker_from_settings(settings)
+        app.state.background_task_worker = background_task_worker
+        background_task_worker.start()
+    if settings.knowledge_snapshot_scheduler_enabled and not settings.background_task_worker_enabled:
         scheduler = scheduler_from_settings(settings)
         app.state.knowledge_snapshot_scheduler = scheduler
         scheduler.start()
-    if settings.content_script_remote_drift_scheduler_enabled:
+    if settings.content_script_remote_drift_scheduler_enabled and not settings.background_task_worker_enabled:
         content_script_scheduler = content_script_scheduler_from_settings(settings)
         app.state.content_script_remote_drift_scheduler = content_script_scheduler
         content_script_scheduler.start()
     try:
         yield
     finally:
+        if background_task_worker is not None:
+            await background_task_worker.stop()
         if content_script_scheduler is not None:
             await content_script_scheduler.stop()
         if scheduler is not None:

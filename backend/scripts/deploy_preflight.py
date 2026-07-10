@@ -70,6 +70,19 @@ def _configuration_report(settings: Any, *, require_mysql: bool) -> dict[str, An
         "expected_auto_create_tables": False,
         "auto_create_tables_policy": "must_be_false_when_require_mysql",
         "alert_delivery": delivery_posture,
+        "background_task_worker": {
+            "enabled": settings.background_task_worker_enabled,
+            "queue_backend": "database",
+            "execution_mode": "hybrid_domain_ledgers",
+            "interval_seconds": settings.background_task_worker_interval_seconds,
+            "lease_seconds": settings.background_task_worker_lease_seconds,
+            "batch_size": settings.background_task_worker_batch_size,
+            "base_backoff_seconds": settings.background_task_worker_base_backoff_seconds,
+            "max_backoff_seconds": settings.background_task_worker_max_backoff_seconds,
+            "content_scan_enabled": settings.background_task_worker_content_scan_enabled,
+            "payload_returned": False,
+            "lease_token_returned": False,
+        },
     }
 
 

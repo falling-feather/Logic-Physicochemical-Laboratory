@@ -1180,6 +1180,104 @@ class AdminAlertOutboxWriteResponse(BaseModel):
     items: list[AdminAlertOutboxEntryRead]
 
 
+BackgroundTaskStatus = Literal[
+    "pending",
+    "leased",
+    "retry_wait",
+    "succeeded",
+    "dead_letter",
+    "cancelled",
+]
+
+
+class AdminBackgroundTaskRead(BaseModel):
+    id: int
+    task_type: str
+    source_type: str
+    source_id: int | None = None
+    status: BackgroundTaskStatus
+    priority: int
+    idempotency_key_prefix: str
+    payload_redacted: bool = True
+    result_summary: dict[str, Any]
+    available_at: datetime
+    attempt_count: int
+    max_attempts: int
+    last_error_code: str | None = None
+    lease_owner: str | None = None
+    lease_active: bool
+    lease_expires_at: datetime | None = None
+    heartbeat_at: datetime | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    created_by_user_id: int | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminBackgroundTaskPage(BaseModel):
+    items: list[AdminBackgroundTaskRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class AdminBackgroundTaskAttemptRead(BaseModel):
+    id: int
+    task_id: int
+    attempt_number: int
+    worker_id: str
+    status: str
+    started_at: datetime
+    finished_at: datetime | None = None
+    error_code: str | None = None
+    retryable: bool | None = None
+    result_summary: dict[str, Any]
+
+
+class AdminBackgroundTaskQueueReport(BaseModel):
+    generated_at: datetime
+    total_count: int
+    ready_count: int
+    leased_count: int
+    retry_wait_count: int
+    succeeded_count: int
+    dead_letter_count: int
+    cancelled_count: int
+    stale_lease_count: int
+    by_task_type: dict[str, int]
+    by_status: dict[str, int]
+    oldest_ready_at: datetime | None = None
+    next_available_at: datetime | None = None
+    next_lease_expires_at: datetime | None = None
+    policy: dict[str, Any]
+
+
+class AdminBackgroundTaskActionRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)
+    confirm_action: bool = False
+
+
+class AdminBackgroundTaskEnqueueRequest(BaseModel):
+    priority: int = Field(default=0, ge=-100, le=100)
+    max_attempts: int = Field(default=3, ge=1, le=20)
+    confirm_enqueue: bool = False
+
+
+class AdminKnowledgeSnapshotTaskEnqueueRequest(AdminBackgroundTaskEnqueueRequest):
+    granularity: Literal["day", "week"]
+    reference_date: date
+
+
+class AdminContentScriptScanTaskEnqueueRequest(AdminBackgroundTaskEnqueueRequest):
+    request_key: str = Field(min_length=1, max_length=64)
+    slug: str | None = Field(default=None, max_length=240)
+    source_host: str | None = Field(default=None, max_length=240)
+    scan_limit: int = Field(default=25, ge=1, le=200)
+    scan_offset: int = Field(default=0, ge=0, le=100000)
+
+
 class AuditLogRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -401,6 +401,7 @@ def heartbeat_content_script_asset_scan_job_lease(
             scheduler_lease_expires_at=lease_expires_at,
             scheduler_heartbeat_at=now_value,
         )
+        .execution_options(synchronize_session=False)
     )
     db.commit()
     return result.rowcount == 1
@@ -489,6 +490,7 @@ def _claim_existing_content_script_asset_scan_job_lease(
             alert_status="ok",
             error_message=None,
         )
+        .execution_options(synchronize_session=False)
     )
     db.commit()
     if result.rowcount != 1:

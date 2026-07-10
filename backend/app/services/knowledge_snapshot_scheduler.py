@@ -371,6 +371,7 @@ def _claim_existing_snapshot_job_lease(
             scheduler_heartbeat_at=now,
             metadata_json={"trigger_source": trigger_source, "scheduler_lease_owner": lease_owner},
         )
+        .execution_options(synchronize_session=False)
     )
     db.commit()
     if result.rowcount != 1:
@@ -407,6 +408,7 @@ def heartbeat_snapshot_job_lease(
             scheduler_lease_expires_at=lease_expires_at,
             scheduler_heartbeat_at=now_value,
         )
+        .execution_options(synchronize_session=False)
     )
     db.commit()
     return result.rowcount == 1

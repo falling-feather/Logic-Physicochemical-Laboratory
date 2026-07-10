@@ -1,5 +1,12 @@
 from app.models.base import Base
-from app.models.admin import AdminAlertOutboxDispatchPlan, AdminAlertOutboxEntry, AuditLog, BugRecord
+from app.models.admin import (
+    AdminAlertOutboxDispatchPlan,
+    AdminAlertOutboxEntry,
+    AuditLog,
+    BackgroundTask,
+    BackgroundTaskAttempt,
+    BugRecord,
+)
 from app.models.content import (
     ContentDraft,
     ContentPageRecord,
@@ -31,6 +38,8 @@ __all__ = [
     "AdminAlertOutboxDispatchPlan",
     "AdminAlertOutboxEntry",
     "AuditLog",
+    "BackgroundTask",
+    "BackgroundTaskAttempt",
     "AuthSession",
     "Base",
     "BugRecord",

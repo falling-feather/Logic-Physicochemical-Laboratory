@@ -101,3 +101,47 @@ class AdminAlertOutboxEntry(TimestampMixin, Base):
     reviewed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
     review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class BackgroundTask(TimestampMixin, Base):
+    __tablename__ = "background_tasks"
+    __table_args__ = (UniqueConstraint("idempotency_key", name="uq_background_tasks_idempotency_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    task_type: Mapped[str] = mapped_column(String(80), index=True, nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(80), index=True, nullable=False)
+    source_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="pending", index=True, nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    payload_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    result_summary_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
+    last_error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    lease_owner: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    lease_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+
+
+class BackgroundTaskAttempt(TimestampMixin, Base):
+    __tablename__ = "background_task_attempts"
+    __table_args__ = (
+        UniqueConstraint("task_id", "attempt_number", name="uq_background_task_attempts_task_number"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("background_tasks.id"), index=True, nullable=False)
+    attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    worker_id: Mapped[str] = mapped_column(String(160), index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="running", index=True, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    retryable: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    result_summary_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)

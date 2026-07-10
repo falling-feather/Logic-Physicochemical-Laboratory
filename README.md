@@ -8,11 +8,12 @@
 
 星序总览页负责承载一级星系入口；进入某个星系后，才显示该星系自己的二级学科或知识目录。内置 C++ httplib 后端服务器，支持静态文件托管。
 
-> **当前状态**: V6.6.54（2026-07-10）— `houduan` 分支已完成默认关闭的显式 HTTPS Webhook 告警投递代码闭环：plan 再校验、dispatching/delivered/failed、稳定幂等键、脱敏审计和人工重试已落地；V6.6.55 起按 [`doc/09-后端阶段收束小版本开发安排.md`](doc/09-后端阶段收束小版本开发安排.md) 推进统一任务执行治理、长期可信归档、性能、安全和 RC 门禁。
+> **当前状态**: V6.6.55（2026-07-10）— `houduan` 分支已完成 DB-backed 控制面 + 领域 run 台账的混合任务治理：告警 plan、知识快照和内容脚本扫描统一具备持久化入队、租约、attempt、退避、dead-letter、人工重试/取消与重启恢复；下一版本按 [`doc/09-后端阶段收束小版本开发安排.md`](doc/09-后端阶段收束小版本开发安排.md) 推进 V6.6.56 审计外部锚定和长期可信归档。
 > **Review 回流状态**: 2026-07-06，`review` 分支已交付代码审查报告（审查基线 `V6.5.23 Review 前基线快照`，范围 `re1` 至 `re17`）。本 `houduan` 分支未合并 review 代码修复；后续仅按 `02` / `07` 中记录的优先级在 `houduan` 上选择性吸收。
 > **最新治理**: 2026-07-10，V6.6.53 将班级与课程权限拆成独立授权轴：学生软移除/双范围转班/逐项批量导入，`editor/content_editor/assessment_editor/viewer` 协作者和批量 upsert，以及班级 assignment/积分覆盖均有审计、幂等和越权回归；管理端加入审批使用内联二次确认、写入不重试并同步对账列表与 KPI。
 > **最新学习分析**: `rule_version=v2` 以 effective active assignment-class pair 为分母，按提交/评分/事件/积分自身时间戳稳定输出 course/unit/knowledge_point/assignment 维度；hidden/draft/archived/closed/unassigned 资源不进入当前统计，v1 历史快照保持兼容读取。
 > **最新外部治理**: 外部告警默认关闭，只在 admin 显式确认、plan/hash/due/expiry 再校验通过且 HTTPS URL/SecretStr token 安全注入后发送脱敏信封；真实 staging 目标、出口网络、接收端验签/幂等与回执仍待部署留证。
+> **最新任务治理**: `background_tasks/background_task_attempts` 保存统一任务控制面，worker 以数据库租约竞争并复用知识快照/脚本扫描领域 run 去重；管理端只返回脱敏摘要，可查看队列和尝试记录并显式 retry/cancel。内容脚本 worker 的外网执行仍默认关闭，真实 MySQL 多进程竞争证据保留到 RC 门禁。
 > **最新隔离**: `physics/energy-conservation` 已迁入后端 allowlist sandbox DOM 模板与 root-scoped initializer，继续保持 `sandbox="allow-scripts"`、opaque origin、CSP nonce、静态回退和 opt-in 接入；未知模板或非法 document contract fail closed。
 > **最新缓存边界**: `/api` 与 `/api/*` 由 FastAPI 全状态 `no-store`，Service Worker 在路由最前面直接旁路 API；安装失败不再激活不完整静态缓存。桌面登录态/真实写入和外部 Chrome 390×844 的三端门禁、sandbox 交互、网络失败/恢复均已回归。
 > **下一阶段规划**: Python + MySQL 后端化、内容协议、登录用户体系与管理员 / 教师 / 学生三端平台设计，详见 [`doc/07-后端优化与设计.md`](doc/07-后端优化与设计.md)
@@ -26,6 +27,7 @@
 
 | 版本 | 发布日期 | 主题 | 详情 |
 |------|---------|------|------|
+| **v6.6.55（houduan）** | 2026-07-10 | DB-backed 任务控制面、租约重试、dead-letter 与领域幂等恢复 | [→](doc/09-后端阶段收束小版本开发安排.md) |
 | **v6.6.54（houduan）** | 2026-07-10 | 默认关闭的 Webhook 告警投递、状态机、幂等与审计 | [→](doc/09-后端阶段收束小版本开发安排.md) |
 | **v6.6.53（houduan）** | 2026-07-10 | 复杂权限矩阵、班级作业策略与 v2 多维学习分析 | [→](doc/09-后端阶段收束小版本开发安排.md) |
 | **v6.5（规划中）** | 2026-07-03 起 | Python + MySQL 后端化 + 三端教学平台设计 | [→](doc/07-后端优化与设计.md) |
@@ -190,13 +192,14 @@ node server/dev-static-server.mjs --port 8766
 - **Canvas 2D API** — 可视化渲染（ResizeObserver + DPR 适配）
 - **cpp-httplib 0.18.3** — C++ HTTP 服务器
 - **CMake 3.14+** — C++ 构建系统
-- **Python 3 / FastAPI / SQLAlchemy** — v6.5 业务后端骨架、API、MySQL 连接、部署预检、部署 smoke、API no-store 缓存边界、内容协议、内容 seed 初始化与只读查询边界、正式内容初始化入口、ContentDraft 草稿与脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、脚本资产 allowlist/SRI 静态门禁、脚本资产下载/SRI 哈希校验、公开 render 脚本 manifest 脱敏、浏览器自动化隔离证明、稳定 `sectionId/sourceId` 内容身份、草稿编辑、active 草稿数据库唯一约束、内容发布/版本记录/追加式回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、管理端版本 JSON path diff 敏感预览脱敏与富语义摘要、本地认证安全基线、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、用户自助密码重置令牌、禁用用户会话撤销、用户名大小写规范化与 normalized key 数据库唯一约束、必填文本修剪后校验、学校/班级加入申请审批、学校/班级/课程访问控制服务层、作业提交/批改/学生侧只读复盘、跨班级提交唯一性、学生资源状态可见性、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端知识快照运行列表/健康摘要、协作式取消、手动 requeue 与调度积压摘要、管理端学校/班级统计、加入申请治理、列表分页搜索、内容页数据库侧分页、待批改队列、缺陷记录外部 issue 链接、审计元数据、审计日志链式哈希、审计链完整性校验、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要、审计留存预检、本地审计归档包导出/Manifest 校验和导出/摘要行为审计留痕
+- **Python 3 / FastAPI / SQLAlchemy** — v6.5/v6.6 业务后端骨架、连续 Alembic/MySQL 门禁、内容/认证/教学/三端治理 API、脚本隔离与供应链观察、v2 学习分析、知识快照与告警 outbox、默认关闭的 Webhook 投递，以及 V6.6.55 DB-backed 统一后台任务控制面；任务具备租约、attempt、退避、dead-letter、人工恢复和领域 run 幂等，审计与 API 响应继续执行 payload/token 脱敏。
 
 ## 📝 更新日志
 
 > 完整的细碎微版本详见 [doc/03-发布历史.md](doc/03-发布历史.md)。当前主线在 `main` 分支维护。
 
 ### v6.5 — 2026-07-05（houduan）
+- 2026-07-10 已在 `houduan` 落地 V6.6.55 统一任务执行治理：`background_tasks/background_task_attempts` 覆盖告警 plan、知识快照和内容脚本扫描，支持调度入队、优先级、数据库租约、指数退避、dead-letter、显式 retry/cancel、attempt 历史和重启接管；worker 默认关闭，脚本扫描外网执行另设 opt-in，管理 API 不返回 payload 或 lease token。
 - 2026-07-09 已在 `houduan` 落地 BE-09/V6.6.48 浏览器隔离证明首轮：新增 Playwright/Edge drill，验证 iframe opaque origin 无法读取父页 DOM/storage/cookie，unknown sandbox/asset fail closed，sandbox HTML 的 `frame-ancestors` 和可执行资源 CORP 口径已同步收束。
 - 2026-07-07 已在 `houduan` 落地 BE-02 内容脚本沙箱执行契约：公开 `scriptManifest.sandbox` 返回 enforcement/capabilities，按 `network=none/same-origin` 派生 CSP，unsafe sandbox 防御性降级为 blocked，render API 返回 `X-Astra-Content-Script-*` 契约头。
 - 2026-07-07 已在 `houduan` 落地 BE-02 内容脚本资产校验证据：`script_integrity_verified` 与 `script_integrity_mismatch` finding 会携带资产 SHA-256、字节大小、SRI token 数量和匹配算法，用于管理员审核响应、stored analysis 和后续供应链审计。
@@ -240,7 +243,7 @@ node server/dev-static-server.mjs --port 8766
 - 2026-07-06 已在 `houduan` 落地 closed/archived 作业学生侧只读复盘入口：学生可继续查看题目、本人提交、成绩和反馈，但不可再次提交；教师/admin 提交列表与批改视角保持不变。
 - 2026-07-06 已在 `houduan` 落地 active 草稿数据库级抗并发：新增 `active_key` 与唯一约束，同作者同目标页只能有一个 active 草稿，撤回/发布后可重新创建。
 - 2026-07-06 已读取 `review` 分支代码审查报告并回流规划：本次只同步文档和后续任务，不合并 review 分支代码；后续开发继续在 `houduan` 上推进。
-- 已保存 review 前基线快照：`houduan@c9a2b41` 工作区干净，可作为团队整体代码 review 的冻结点；剩余大块集中在真实 MySQL/部署、脚本真实运行隔离、三端 UI、知识快照告警/外部任务队列/队列执行治理和审计治理。
+- 已保存 review 前基线快照：`houduan@c9a2b41` 工作区干净，可作为团队整体代码 review 的冻结点；统一任务执行代码已在 V6.6.55 收束，剩余大块集中在真实 MySQL/部署与多进程留证、脚本真实外网观察、审计外部锚定、外部 issue 同步、性能、安全和 RC 总验收。
 - 正式内容初始化新增 `scripts.init_content_pages`，迁移和部署预检通过后可显式创建/修复内置内容页版本，并要求管理员归因与脚本引用确认；当前回归已覆盖中文数据库路径和中文 URL slug。
 - 内容草稿已支持管理员发布到公开 `content_pages`、写入不可变 `content_page_versions`、按历史版本追加式回滚，并保留审计与 schema hash。
 - 内容版本生命周期已补齐 `content_pages.current_version_id`、草稿 `base_version_id/base_schema_hash` 和版本 `previous_version_id`，发布/回滚不再只依赖时间顺序推断当前态。

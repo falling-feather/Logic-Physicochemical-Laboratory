@@ -58,6 +58,13 @@ class Settings(BaseSettings):
     alert_delivery_timeout_seconds: int = Field(default=5, ge=1, le=30)
     alert_delivery_retry_delay_seconds: int = Field(default=300, ge=30, le=24 * 60 * 60)
     alert_delivery_batch_limit: int = Field(default=10, ge=1, le=100)
+    background_task_worker_enabled: bool = False
+    background_task_worker_interval_seconds: int = Field(default=5, ge=1, le=3600)
+    background_task_worker_lease_seconds: int = Field(default=300, ge=30, le=24 * 60 * 60)
+    background_task_worker_batch_size: int = Field(default=10, ge=1, le=100)
+    background_task_worker_base_backoff_seconds: int = Field(default=30, ge=1, le=3600)
+    background_task_worker_max_backoff_seconds: int = Field(default=3600, ge=30, le=24 * 60 * 60)
+    background_task_worker_content_scan_enabled: bool = False
     database_url: str = Field(
         default="mysql+pymysql://astra:astra@127.0.0.1:3306/astra?charset=utf8mb4",
         description="SQLAlchemy database URL. MySQL is the production target.",

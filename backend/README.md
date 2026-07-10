@@ -4,6 +4,8 @@
 
 V6.6.54 已在本地 outbox/dispatch plan 基座上增加默认关闭的 Webhook 外部告警适配器。只有 admin 显式确认、计划再校验通过且 `ASTRA_ALERT_DELIVERY_ENABLED=true`、HTTPS URL 和 SecretStr token 均已通过环境/安全配置注入时才会外发；条目按 `queued -> dispatching -> delivered/failed` 流转，失败可人工重新排队，重试沿用稳定幂等键。外发信封、响应和审计不包含原始 `payload_json`、source key、Webhook URL、token 或异常正文。
 
+V6.6.55 已增加 `background_tasks/background_task_attempts` DB-backed 控制面和统一 worker。告警 plan、知识快照、内容脚本扫描共享幂等入队、优先级、租约、attempt、指数退避、dead-letter 与人工 retry/cancel；知识快照和脚本扫描继续以领域 run 为权威记录，避免控制面完成写入中断后重复副作用。worker 与内容脚本外网执行分别默认关闭，管理 API 只返回脱敏摘要，不返回任务 payload 或 lease token。
+
 ## 本地启动
 
 ```bash
@@ -129,6 +131,13 @@ python -m scripts.backend_stage_gate --require-mysql \
 | GET | `/api/admin/alert-outbox/dispatch-plans/{id}` | 管理端告警 outbox 执行计划详情；按计划 ID 读取脱敏 ledger 摘要，供后续队列执行治理和审计复核使用 |
 | POST | `/api/admin/alert-outbox/dispatch-plans/{id}/validate` | 管理端告警 outbox 执行计划再校验；请求体需 `confirm_validate_plan=true`，按计划 ready ID 重新检查 entry 存在、状态、due/expired、delivery 边界和 payload hash 快照，只写脱敏审计，不写 outbox 状态、不增加 attempt、不接 broker、不投递外部告警 |
 | POST | `/api/admin/alert-outbox/dispatch-plans/{id}/dispatch` | V6.6.54 显式外部投递；请求体需 `confirm_external_dispatch=true`，默认关闭，配置完整后才把校验通过的 queued 项逐项投递到 HTTPS Webhook。状态写为 dispatching/delivered/failed，逐项增加 attempt、写脱敏审计；失败项可人工重新排队且不会回滚或阻塞告警来源业务事务 |
+| POST | `/api/admin/background-tasks/alert-dispatch-plans/{id}` | 把 created 告警 dispatch plan 幂等写入统一任务控制面；需 `confirm_enqueue=true`，不直接外发 |
+| POST | `/api/admin/background-tasks/knowledge-snapshots` | 按 day/week + reference date 幂等入队知识快照任务；需显式确认 |
+| POST | `/api/admin/background-tasks/content-script-scans` | 按 request key 与脱敏筛选入队内容脚本扫描；入队不等于允许外网，worker 还需独立网络 opt-in |
+| GET | `/api/admin/background-tasks` | 统一任务分页列表，可按 type/status/source 过滤；只返回幂等键前缀和结果摘要，不返回 payload/lease token |
+| GET | `/api/admin/background-tasks/queue` | pending/leased/retry_wait/succeeded/dead_letter/cancelled、stale lease 与下一可用时间的只读摘要 |
+| GET | `/api/admin/background-tasks/{id}`、`/{id}/attempts` | 单任务和逐次 attempt 历史；token/payload 保持隐藏 |
+| POST | `/api/admin/background-tasks/{id}/retry`、`/{id}/cancel` | admin 显式确认的人工恢复；retry 仅作用于 dead-letter/cancelled，cancel 为协作式状态收口 |
 | PATCH | `/api/admin/alert-outbox/reviews` | 管理端告警 outbox 批量人工复核；请求体需显式列出 `entry_ids`、目标状态和 `confirm_manual_review=true`，最多 100 条，all-or-nothing 更新状态/复核人/复核时间/备注；响应和审计只返回瘦身条目与聚合计数，不返回 payload 或备注正文 |
 | PATCH | `/api/admin/alert-outbox/{id}` | 管理端告警 outbox 人工复核状态流转；请求体需 `confirm_manual_review=true`，可将条目标记为 `pending_review/planned/queued/suppressed/cancelled` 并记录 `reviewed_by_user_id/reviewed_at/review_note`；响应只返回 `review_note_present`，不回显备注正文、payload、dedupe key 或完整 payload hash，审计只记录脱敏状态摘要 |
 | POST | `/api/admin/knowledge-snapshot-runs/{id}/cancel` | 管理端协作式取消 pending 或带 scheduler lease 的 running 知识快照 run；标记 `cancelled`、清空租约并写入 `admin.knowledge_snapshot_run.cancel` 审计 |
@@ -289,6 +298,13 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 | `ASTRA_KNOWLEDGE_SNAPSHOT_WEEKLY_WEEKDAY` | `0` | 每周重算星期，0 表示周一 |
 | `ASTRA_KNOWLEDGE_SNAPSHOT_WEEKLY_HOUR` | `4` | 每周重算在配置星期达到该小时后重算上一自然周 |
 | `ASTRA_KNOWLEDGE_SNAPSHOT_RETRY_ATTEMPTS` | `3` | 失败窗口在调度器中允许的最大尝试次数 |
+| `ASTRA_BACKGROUND_TASK_WORKER_ENABLED` | `false` | 是否随 FastAPI lifespan 启动统一 worker；独立 worker 服务模式下 API 进程保持关闭 |
+| `ASTRA_BACKGROUND_TASK_WORKER_INTERVAL_SECONDS` | `5` | worker 空闲轮询秒数 |
+| `ASTRA_BACKGROUND_TASK_WORKER_LEASE_SECONDS` | `300` | 统一任务租约秒数，最低 30 |
+| `ASTRA_BACKGROUND_TASK_WORKER_BATCH_SIZE` | `10` | 单轮最大任务数，范围 1-100 |
+| `ASTRA_BACKGROUND_TASK_WORKER_BASE_BACKOFF_SECONDS` | `30` | 首次可重试失败的退避秒数 |
+| `ASTRA_BACKGROUND_TASK_WORKER_MAX_BACKOFF_SECONDS` | `3600` | 指数退避上限秒数 |
+| `ASTRA_BACKGROUND_TASK_WORKER_CONTENT_SCAN_ENABLED` | `false` | 是否允许统一 worker 执行外网内容脚本扫描；独立默认关闭 |
 | `ASTRA_DATABASE_URL` | `mysql+pymysql://astra:astra@127.0.0.1:3306/astra?charset=utf8mb4` | MySQL 连接字符串 |
 
 可从 `.env.example` 复制本地配置；真实密码不要提交到仓库。
@@ -341,7 +357,8 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 - `app.services.knowledge_snapshot_runs` 与 `app.services.knowledge_snapshot_scheduler` 负责知识快照窗口重算、运行记录、进程内调度、数据库租约防重入、长重算自动心跳、健康摘要、调度积压摘要、告警候选摘要、协作式取消和手动 requeue；同一 `run_key` 通过 scheduler lease owner/token/expires/heartbeat 元数据抢占，调度器与 CLI 会把 token-guard heartbeat callback 注入重算循环，开始重算前用 `id/status/owner/token` 再确认租约仍有效，完成或失败释放使用 token guard，失去租约或被 admin 取消的旧 worker 会中止而不覆盖新状态；requeue 会把 failed、cancelled 或过期带租约 running run 重置为 pending，调度器会扫描 pending run 并重新抢占执行；积压摘要会显式区分 scheduler 实际会处理的 dispatchable now 和仅符合租约抢占规则的 claimable by lease rule，告警候选摘要会从 health/queue 派生 severity/action hint，管理端响应不返回 `scheduler_lease_token` 或 `metadata_json`。
 - `app.services.knowledge_snapshot_scheduler_drill` 与 `scripts.knowledge_snapshot_scheduler_drill` 提供知识快照调度器生产演练前后的只读姿态报告；检查 scheduler 配置、run ledger、lease/heartbeat、due/pending 队列、快照输出计数和真实 MySQL 待留证项，不执行 rebuild、不抢租约、不取消、不重排，也不返回 `scheduler_lease_token`、`metadata_json`、异常原文或 secret。`--require-mysql` 用于防止把 SQLite 回归误判为真实 MySQL 演练，`--expect-scheduler-enabled` 用于生产调度器启用门禁。
 - `app.services.admin_alert_outbox` 负责把管理端告警候选写入本地 outbox 人工复核台账；当前承接知识快照告警候选和内容脚本远端漂移告警候选，分别以 `knowledge_snapshot_run_alert`、`content_script_asset_scan_run_alert` 写入 `admin_alert_outbox_entries`，按 source/run/code/action 与 host/hash/asset hash 定位信息生成 dedupe key，重复入队只刷新 `last_seen_at/seen_count/payload_hash`，且不会覆盖已经人工复核为 `planned/queued/suppressed/cancelled` 的状态。outbox payload 只保存脱敏运行摘要，不保存 scheduler lease token、metadata、原始 CDN URL、完整 SRI、远端字节、异常原文、`content_bytes` 或重排原因；普通列表、入队响应和单条复核响应统一使用安全摘要，不返回 dedupe key、完整 payload hash、payload JSON 或复核备注正文，只返回 `payload_hash_prefix`、状态字段和 `review_note_present`；`GET /api/admin/alert-outbox/queue` 只读派生队列摘要、状态 bucket、stale pending review 和 due planned/queued，用 `admin.alert_outbox.queue_report` 记录聚合审计且不返回 payload 或备注正文；`POST /api/admin/alert-outbox/dispatch-dry-run` 只读生成 queued due 执行预检，按 blocker/expired/not due 分类并写入 `admin.alert_outbox.dispatch_dry_run` 聚合审计，不修改 `status/attempt_count/last_error_code/reviewed_*`；`POST/GET /api/admin/alert-outbox/dispatch-plans` 会把显式 ID 的执行预检结果持久化为 `admin_alert_outbox_dispatch_plans` 脱敏 ledger，只保存筛选、policy、计数、有限 ready ID、ready entry payload hash 快照和 blocker 原因计数；`POST /api/admin/alert-outbox/dispatch-plans/{id}/validate` 会基于计划快照重新校验 entry 存在、状态、due/expired、delivery 边界和 payload hash 漂移，并以 `admin.alert_outbox.dispatch_plan.validate` 写入脱敏审计，不返回完整 hash、payload 或备注正文；单条与批量复核分别通过 `PATCH /api/admin/alert-outbox/{id}` 和 `PATCH /api/admin/alert-outbox/reviews` 记录 `reviewed_by_user_id/reviewed_at/review_note`，批量路径必须显式列出 ID 且 all-or-nothing，响应使用不含 payload/备注正文的瘦身条目；`external_delivery=false`、`dispatch_mode=manual_review`，当前不发送邮件/短信/Webhook、不接入 broker、不自动处置 run。
-- `app.services.alert_delivery` 负责 V6.6.54 外部告警通道抽象与 Webhook 第一适配器。配置默认关闭，只接受 HTTPS 目标和 SecretStr token；请求使用 Bearer、HMAC-SHA256 签名与稳定 Idempotency-Key。外发信封不含原始 payload；显式 plan dispatch 先提交 `dispatching`，再逐项写 `delivered/failed` 与脱敏审计。HTTP 5xx/429/网络错误可由管理员把 failed 项重新排队并用同一幂等键重试。上一条 outbox 说明中的 `external_delivery=false` 是入队和计划阶段默认值，不再表示系统完全没有显式外发能力；自动调度、broker 和进程中断统一恢复仍归 V6.6.55。
+- `app.services.alert_delivery` 负责 V6.6.54 外部告警通道抽象与 Webhook 第一适配器。配置默认关闭，只接受 HTTPS 目标和 SecretStr token；显式或 worker plan dispatch 使用 Bearer、HMAC-SHA256 与稳定 Idempotency-Key，外发信封不含原始 payload。
+- `app.services.background_tasks` 是 V6.6.55 DB-backed 控制面，负责入队、原子 claim、租约/heartbeat、attempt、退避、dead-letter、retry/cancel；`app.services.background_task_worker` 负责调度生产和三类领域 handler。告警歧义 plan fail closed，知识快照/脚本扫描以领域 run success 恢复控制面，均不盲目重复副作用。
 - `POST /api/assignments/{id}/submissions` 的提交唯一性按 `assignment_id + student_id + class_id` 收口；同一共享作业可在不同班级各提交一次，同班重复提交返回 `409`。提交、学习事件、作业中心、复盘、批改、积分、进度和知识统计都按班级 effective policy 复核：课程/单元须 published，班级须被分配，effective status 须 active；closed/archived 只保留受权历史复盘与教师治理视角。班级成员采用软停用保留历史，学生转班要求源/目标双 teacher scope，批量导入只接纳 active 同校 student membership。课程协作者支持 `editor/content_editor/assessment_editor/viewer` 与 owner/admin 批量 upsert；课程角色不会自动授予班级成员、提交、评分或学情权限。全局积分规则由 owner、editor、assessment_editor 或 admin 维护；班级覆盖规则还要求操作者同时具备目标班级 teacher scope。教师查询学习事件、积分、进度、提交和班级知识统计始终按本班 scope 收束。
 - `GET /api/assignments/me` 是学生侧分页作业聚合入口，按 active membership 与 published 课程/单元展开 `all/active/feedback/history`；响应中的 `can_submit/read_only/submit_block_reason` 用于前端展示与入口状态，实际提交仍由服务端复核。`GET /api/assignments/{id}/review` 是单项复盘入口：只允许 student 访问自己的提交历史，多班级可见时必须显式提供 `class_id`；published 课程/单元内 closed / archived 作业不允许再次提交但仍返回题目、成绩和反馈，`due_at` 当前只作展示；教师和管理员继续使用 submissions 列表与批改接口。
 
@@ -351,15 +368,16 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 python -m pytest backend
 ```
 
-V6.6.54 基线为 291 项全量 pytest；权限/班级策略/统计及外部投递专项可运行：
+V6.6.55 基线为 303 项全量 pytest；权限/班级策略/统计、外部投递和统一任务专项可运行：
 
 ```bash
 python -m pytest backend/tests/test_school_classes.py backend/tests/test_access_control.py backend/tests/test_course_learning_loop.py -q
 python -m pytest backend/tests/test_alert_delivery.py -q
+python -m pytest backend/tests/test_background_tasks.py backend/tests/test_background_task_api_worker.py -q
 node tools/tests/v6653-permission-analytics-contract.cjs
 ```
 
-迁移最低门禁需验证 `upgrade head -> downgrade 20260708_0037 -> upgrade head`，最终 `alembic current` 必须为 `20260710_0039`；SQLite 往返只证明迁移结构可执行，真实 MySQL 仍归 V6.6.54+ 部署门禁。
+迁移最低门禁需验证 `upgrade head -> downgrade 20260710_0039 -> upgrade head`，最终 `alembic current` 必须为 `20260710_0040`；SQLite 往返只证明迁移结构可执行，真实 MySQL 仍归 V6.6.60 RC 部署门禁。
 
 权限范围回归可单独运行：
 
@@ -375,7 +393,7 @@ $env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
 python -m alembic upgrade head
 ```
 
-当前 Alembic head：`20260710_0039`。`0038` 新增 `assignments.audience_mode` 与 `assignment_class_policies`；`0039` 新增 `learning_events.knowledge_code`。旧 assignment 自动使用 `all_attached_classes`，旧知识快照保持 v1 可读，新重算写入 v2。
+当前 Alembic head：`20260710_0040`。`0038` 新增 `assignments.audience_mode` 与 `assignment_class_policies`，`0039` 新增 `learning_events.knowledge_code`，`0040` 新增统一任务与 attempt 台账。旧 assignment 自动使用 `all_attached_classes`，旧知识快照保持 v1 可读，新重算写入 v2；回滚 0040 会删除任务恢复证据，必须先停 worker、清空或归档队列并备份。
 
 内容脚本远端漂移 CLI：
 
@@ -398,7 +416,18 @@ python -m scripts.rebuild_knowledge_snapshots --granularity week --date 2026-07-
 
 脚本按日或自然周对齐窗口，先抢占 `knowledge_snapshot_runs` 数据库租约，再重算活跃班级已挂接课程的个人/班级快照；学生 user snapshot 跳过 unpublished 课程并按学生可见性过滤单元/作业，class snapshot 保持教师/管理聚合口径；重算长循环会按 `ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_HEARTBEAT_SECONDS` 自动续租，租约不可用时输出 `status=skipped`，失去租约或失败时输出 JSON 并返回非零退出码。
 
-知识快照进程内调度器默认关闭。生产启用时应先完成 Alembic 迁移和部署预检，再设置 `ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_ENABLED=true`；调度器与周期重算 CLI 已通过数据库租约和自动心跳降低多 worker/多副本重复执行风险，过期 running 窗口可被抢占，开始重算前会再次确认 `id/status/owner/token`，成功/失败释放使用 token guard，心跳失败会让旧 worker 中止。管理员可通过 `/api/admin/knowledge-snapshot-runs` 查看 run，通过 `/health` 汇总 stale running、即将过期 lease、claimable 和失败重试状态，通过 `/queue` 区分 dispatchable now、manual requeue 和 blocked backlog，通过 `/alerts` 获取只读告警候选 severity/action hint，通过 `/alerts/outbox` 将候选显式写入本地人工复核 outbox，通过 `/api/admin/alert-outbox/queue` 汇总待复核、已计划、待执行和终态项，通过 `/api/admin/alert-outbox/dispatch-dry-run` 只读预检 queued due 项、blocked/expired/not due 分类和脱敏 delivery key，通过 `/api/admin/alert-outbox/dispatch-plans` 按显式 ID 固化脱敏执行计划 ledger，通过 `/api/admin/alert-outbox/dispatch-plans/{id}/validate` 在计划执行前重新校验 entry 当前状态、payload hash 快照、过期时间和 delivery 边界，通过 `/api/admin/alert-outbox/reviews` 批量人工复核显式 ID，通过 `/api/admin/alert-outbox/{id}` 人工复核单条 planned/queued/suppressed/cancelled，通过 `/cancel` 对 `pending` 或带 scheduler lease 的 `running` run 做协作式取消，并通过 `/requeue` 将 failed、cancelled 或过期带租约 running run 重置为 pending；取消不是强杀线程，而是清空租约并让旧 worker 在下一次 start/heartbeat/finish guard 处停止写回。`python -m scripts.knowledge_snapshot_scheduler_drill --require-mysql --expect-scheduler-enabled` 可在演练前后输出只读姿态报告。当前仍不是完整任务队列，drill、`/alerts/outbox`、outbox 队列摘要、dispatch dry-run、dispatch plan ledger/validation 与 outbox 复核也不是正式外部告警投递或自动处置系统；外部告警、外部队列和真实 MySQL 并发取消/重排演练仍是后续部署增强项。
+知识快照和内容脚本 scheduler 默认关闭。V6.6.55 后，统一 worker 关闭时保留旧 lifespan 调度器兼容行为；统一 worker 启用时，相同 scheduler 开关改为生成持久化任务，不再并行启动旧调度器。知识快照和内容脚本领域 run 的 owner/token/expiry/heartbeat guard 继续生效，控制面 lease 负责跨进程 claim、attempt/退避/dead-letter 与重启接管。真实 MySQL 多进程、锁等待和长任务强杀仍是 RC 部署证据，不由 SQLite 回归替代。
+
+统一 worker 本地入口：
+
+```bash
+cd backend
+python -m scripts.run_background_tasks --once
+python -m scripts.run_background_tasks
+python -m scripts.run_background_tasks --enable-content-scan  # 仅在外网访问评审后
+```
+
+生产只选择“FastAPI lifespan 内 worker”或“独立 worker 服务”之一。独立服务可使用进程专属环境开启知识/脚本 scheduler 生产者，API 服务保持对应旧 scheduler 关闭。worker 中断后等待 lease 到期再接管；告警 plan 若停在 `dispatching`，先核对接收端幂等账本，已接收项人工 suppressed/cancelled，确认未接收项才重新 queued 并创建新 plan，禁止直接 retry 盲发。
 
 审计归档候选导出：
 

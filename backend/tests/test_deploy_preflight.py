@@ -35,6 +35,10 @@ def test_deploy_preflight_reports_migrated_database(monkeypatch):
         assert report["configuration"]["status"] == "ready"
         assert report["configuration"]["auto_create_tables"] is False
         assert report["configuration"]["expected_auto_create_tables"] is False
+        assert report["configuration"]["background_task_worker"]["enabled"] is False
+        assert report["configuration"]["background_task_worker"]["queue_backend"] == "database"
+        assert report["configuration"]["background_task_worker"]["payload_returned"] is False
+        assert report["configuration"]["background_task_worker"]["lease_token_returned"] is False
         assert report["database"]["ok"] is True
         assert report["migrations"]["status"] == "up_to_date"
         assert report["migrations"]["current"] == report["migrations"]["heads"]
@@ -72,6 +76,7 @@ def test_deploy_preflight_can_require_mysql(monkeypatch):
         assert report["configuration"]["status"] == "ready"
         assert report["configuration"]["auto_create_tables"] is False
         assert report["configuration"]["require_mysql"] is True
+        assert report["configuration"]["background_task_worker"]["execution_mode"] == "hybrid_domain_ledgers"
         assert report["database"]["ok"] is True
         assert report["migrations"]["status"] == "up_to_date"
         assert report["compatibility"]["ok"] is False
