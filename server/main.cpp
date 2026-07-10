@@ -124,18 +124,6 @@ int main(int argc, char* argv[]) {
     server.Get("/api/health", [](const httplib::Request&, httplib::Response& response) {
         response.set_content(R"({"status":"ok","server":"englab-cpp"})", "application/json");
     });
-    server.Get("/api/info", [](const httplib::Request&, httplib::Response& response) {
-        std::ostringstream body;
-        body << R"({"server":"EngLab C++ Server","version":"1.1.0",)"
-             << R"("time":")" << now_iso() << R"("})";
-        response.set_content(body.str(), "application/json");
-    });
-    server.Post("/api/eval", [](const httplib::Request&, httplib::Response& response) {
-        response.set_content(
-            R"({"result":null,"message":"Math eval endpoint - to be implemented with safe parser"})",
-            "application/json"
-        );
-    });
 
     // Do not mount the repository root. Only these reviewed browser artifacts are public.
     for (const auto* directory : {"pages", "shared", "UI", "codevis"}) {

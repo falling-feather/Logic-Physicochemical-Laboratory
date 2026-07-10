@@ -59,25 +59,25 @@ async function main() {
 
     let staticPromise = null;
     handlers.fetch({
-        request: { method: 'GET', mode: 'cors', url: 'https://astra.test/apiary/app.js' },
+        request: { method: 'GET', mode: 'cors', url: 'https://astra.test/pages/apiary/app.js' },
         respondWith(value) { staticPromise = value; }
     });
-    assert.ok(staticPromise, '/apiary must not be mistaken for /api');
+    assert.ok(staticPromise, '/pages/apiary must not be mistaken for /api');
     await staticPromise;
     assert.equal(fetchCalls, 1);
-    assert.deepEqual(cachedPuts, ['https://astra.test/apiary/app.js']);
+    assert.deepEqual(cachedPuts, ['https://astra.test/pages/apiary/app.js']);
 
     let navigationPromise = null;
     handlers.fetch({
-        request: { method: 'GET', mode: 'navigate', url: 'https://astra.test/dashboard' },
+        request: { method: 'GET', mode: 'navigate', url: 'https://astra.test/' },
         respondWith(value) { navigationPromise = value; }
     });
     assert.ok(navigationPromise, 'normal SPA navigation should keep network-first shell behavior');
     await navigationPromise;
     assert.equal(fetchCalls, 2);
     assert.deepEqual(cachedPuts, [
-        'https://astra.test/apiary/app.js',
-        'https://astra.test/dashboard'
+        'https://astra.test/pages/apiary/app.js',
+        'https://astra.test/'
     ]);
 
     process.stdout.write('service-worker-cache-boundary: ok\n');

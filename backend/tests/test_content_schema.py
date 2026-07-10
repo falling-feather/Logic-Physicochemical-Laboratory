@@ -190,6 +190,7 @@ def test_render_script_sandbox_document_serves_isolated_html(client):
     assert asset.headers["X-Astra-Content-Script-Asset-Sha256"] == asset_sha256
     assert asset.headers["X-Content-Type-Options"] == "nosniff"
     assert asset.headers["Cache-Control"] == "no-store"
+    assert asset.headers["Access-Control-Allow-Origin"] == "*"
     assert asset.headers["Cross-Origin-Resource-Policy"] == "cross-origin"
     assert asset.headers["Referrer-Policy"] == "no-referrer"
     assert "const EnergyConservation" in asset.text

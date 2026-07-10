@@ -1,6 +1,6 @@
-# 工科实验室 · C++ 后端服务器
+# 工科实验室 · C++ 静态服务器
 
-> v6.5 起，新增业务后端位于 `../backend/`。本目录继续保留为 C++ 静态托管与历史 API 服务，不再扩展用户、课程、作业、学习事件等业务能力。V6.6.59 起不再挂载仓库根目录，只公开 `index.html`、`sw.js`、`pages/`、`shared/`、`UI/`、`codevis/`。
+> v6.5 起，新增业务后端位于 `../backend/`。本目录只保留 C++ 静态托管与内部存活探针，不承载用户、课程、作业、学习事件或求值等业务能力。V6.6.59 起不再挂载仓库根目录，只公开 `index.html`、`sw.js`、`pages/`、`shared/`、`UI/`、`codevis/`；V6.6.60 删除旧 `/api/info` 与占位 `/api/eval`，避免反向代理误配时形成第二套业务 API。
 
 ## 构建要求
 - CMake ≥ 3.14
@@ -31,9 +31,7 @@ cmake --build build --config Release
 
 | 端点 | 方法 | 描述 |
 |------|------|------|
-| `/api/health` | GET | 健康检查 |
-| `/api/info` | GET | 服务器信息 |
-| `/api/eval` | POST | 数学表达式求值 (待扩展) |
+| `/api/health` | GET | 仅供本机/服务守护探测 C++ 静态进程；公网 `/api/*` 必须由反向代理转发到 FastAPI |
 
 ## 依赖
 - [cpp-httplib](https://github.com/yhirose/cpp-httplib) v0.18.3 (通过 CMake FetchContent 自动下载)

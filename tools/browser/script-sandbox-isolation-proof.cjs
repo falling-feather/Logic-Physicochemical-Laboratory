@@ -155,16 +155,6 @@ function isBenignMissingResource(entry) {
   return /\/favicon\.ico(?:$|\?)/.test(entry.url);
 }
 
-async function waitForContentFrame(iframeHandle, timeoutMs) {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    const frame = await iframeHandle.contentFrame();
-    if (frame) return frame;
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  return null;
-}
-
 async function waitForSandboxTerminalState(page, timeoutMs) {
   await page.waitForFunction(() => {
     const card = document.querySelector('[data-backend-sandbox-card]');
@@ -178,6 +168,34 @@ async function waitForSandboxTerminalState(page, timeoutMs) {
       message: card ? (card.querySelector('[data-backend-sandbox-message]')?.textContent || '') : '',
     };
   });
+}
+
+async function waitForReadySandboxFrame(page, timeoutMs, selector = '[data-backend-sandbox-frame]') {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const remaining = Math.max(1, timeoutMs - (Date.now() - started));
+    await page.waitForFunction((iframeSelector) => {
+      const iframe = document.querySelector(iframeSelector);
+      const card = iframe && iframe.closest('[data-backend-sandbox-card]');
+      return Boolean(iframe && card && card.dataset && card.dataset.state === 'ready');
+    }, selector, { timeout: remaining });
+    const iframeHandle = await page.$(selector);
+    const frame = iframeHandle ? await iframeHandle.contentFrame() : null;
+    const state = await page.evaluate((iframeSelector) => {
+      const iframe = document.querySelector(iframeSelector);
+      const card = iframe && iframe.closest('[data-backend-sandbox-card]');
+      return {
+        state: card && card.dataset ? card.dataset.state || '' : '',
+        status: card ? (card.querySelector('[data-backend-sandbox-status]')?.textContent || '') : '',
+        message: card ? (card.querySelector('[data-backend-sandbox-message]')?.textContent || '') : '',
+      };
+    }, selector);
+    if (iframeHandle && frame && state.state === 'ready') {
+      return { iframeHandle, frame, state };
+    }
+    await page.waitForTimeout(50);
+  }
+  return null;
 }
 
 async function inspectEnergySandbox(frame) {
@@ -341,7 +359,7 @@ async function main() {
 
   const report = {
     ok: false,
-    phase: 'V6.6.59',
+    phase: 'V6.6.60',
     generatedAt,
     appUrl,
     apiBase,
@@ -358,6 +376,7 @@ async function main() {
     energy: {},
     parentDom: {},
     cacheStorage: {},
+    mobile: {},
   };
 
   const render = await fetchJson(renderUrl);
@@ -515,7 +534,12 @@ async function main() {
       document.body.setAttribute('data-astra-parent-secret', 'parent-dom-secret');
     });
 
-    let activeIframeHandle = await page.waitForSelector('[data-backend-sandbox-frame]', { timeout: timeoutMs });
+    const initialReady = await waitForReadySandboxFrame(page, timeoutMs);
+    if (!initialReady) {
+      throw new Error('Sandbox iframe did not reach a stable ready state.');
+    }
+    const cardState = initialReady.state;
+    let activeIframeHandle = initialReady.iframeHandle;
     const iframeAttrs = await activeIframeHandle.evaluate((iframe) => ({
       sandbox: iframe.getAttribute('sandbox') || '',
       src: iframe.src,
@@ -530,7 +554,7 @@ async function main() {
       && !iframeAttrs.sandbox.includes('allow-same-origin')
       && iframeAttrs.referrerPolicy === 'no-referrer', iframeAttrs);
 
-    let activeFrame = await waitForContentFrame(activeIframeHandle, timeoutMs);
+    let activeFrame = initialReady.frame;
     assertCheck(report, 'browser exposes loaded sandbox frame', Boolean(activeFrame), {
       frameUrl: activeFrame ? activeFrame.url() : '',
     });
@@ -538,7 +562,6 @@ async function main() {
       throw new Error('Sandbox iframe frame was not available.');
     }
     await activeFrame.waitForLoadState('domcontentloaded', { timeout: timeoutMs });
-    const cardState = await waitForSandboxTerminalState(page, timeoutMs);
     assertCheck(report, 'parent adapter reaches the ready sandbox state', cardState.state === 'ready', cardState);
 
     const initialEnergy = await inspectEnergySandbox(activeFrame);
@@ -660,11 +683,13 @@ async function main() {
       && parentDom.remainingIds.length === 0
       && parentDom.refreshClicked, parentDom);
 
-    activeIframeHandle = await page.waitForSelector(
+    const remountedReady = await waitForReadySandboxFrame(
+      page,
+      timeoutMs,
       '[data-backend-sandbox-frame]:not([data-astra-proof-generation="initial"])',
-      { state: 'attached', timeout: timeoutMs },
     );
-    activeFrame = await waitForContentFrame(activeIframeHandle, timeoutMs);
+    activeIframeHandle = remountedReady && remountedReady.iframeHandle;
+    activeFrame = remountedReady && remountedReady.frame;
     assertCheck(report, 'browser exposes remounted sandbox frame after parent DOM removal', Boolean(activeFrame), {
       frameUrl: activeFrame ? activeFrame.url() : '',
     });
@@ -672,7 +697,7 @@ async function main() {
       throw new Error('Remounted sandbox iframe frame was not available.');
     }
     await activeFrame.waitForLoadState('domcontentloaded', { timeout: timeoutMs });
-    const remountedCardState = await waitForSandboxTerminalState(page, timeoutMs);
+    const remountedCardState = remountedReady ? remountedReady.state : { state: '', status: '', message: '' };
     assertCheck(report, 'sandbox remount reaches ready without parent energy DOM', remountedCardState.state === 'ready', remountedCardState);
 
     const remountedParentIds = await page.evaluate(() => (
@@ -742,8 +767,30 @@ async function main() {
       report.screenshots.iframe = iframeScreenshot;
     }
 
-    await activeFrame.evaluate(() => window.location.replace('about:blank')).catch(() => {});
-    const navigationState = await waitForSandboxTerminalState(page, timeoutMs);
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: timeoutMs });
+    const navigationReady = await waitForReadySandboxFrame(page, timeoutMs);
+    const navigationReadyState = navigationReady ? navigationReady.state : { state: '', status: '', message: '' };
+    const navigationFrame = navigationReady && navigationReady.frame;
+    if (!navigationFrame) {
+      throw new Error('Reloaded sandbox iframe frame was not available.');
+    }
+    await navigationFrame.waitForLoadState('domcontentloaded', { timeout: timeoutMs });
+    assertCheck(report, 'sandbox reload restores the static fallback prerequisite', navigationReadyState.state === 'ready', {
+      navigationReadyState,
+    });
+    await navigationFrame.evaluate(() => window.location.replace('about:blank')).catch(() => {});
+    await page.waitForFunction(() => {
+      const card = document.querySelector('[data-backend-sandbox-card]');
+      return card && card.dataset && card.dataset.state === 'error';
+    }, undefined, { timeout: timeoutMs });
+    const navigationState = await page.evaluate(() => {
+      const card = document.querySelector('[data-backend-sandbox-card]');
+      return {
+        state: card ? card.dataset.state || '' : '',
+        status: card ? (card.querySelector('[data-backend-sandbox-status]')?.textContent || '') : '',
+        message: card ? (card.querySelector('[data-backend-sandbox-message]')?.textContent || '') : '',
+      };
+    });
     const navigationFallback = await page.evaluate(() => {
       const card = document.querySelector('[data-backend-sandbox-card]');
       const iframe = card && card.querySelector('[data-backend-sandbox-frame]');
@@ -766,6 +813,70 @@ async function main() {
     });
 
     await context.close();
+
+    const mobileContext = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      ignoreHTTPSErrors: true,
+    });
+    const mobilePage = await mobileContext.newPage();
+    const mobileConsole = [];
+    const mobilePageErrors = [];
+    mobilePage.on('console', (message) => {
+      if (['error', 'warning', 'warn'].includes(message.type())) {
+        mobileConsole.push({ type: message.type(), text: message.text().slice(0, 1000) });
+      }
+    });
+    mobilePage.on('pageerror', (error) => {
+      mobilePageErrors.push({ name: error.name, message: error.message.slice(0, 1000) });
+    });
+    await mobilePage.goto(appUrl, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+    await mobilePage.waitForSelector('[data-backend-sandbox-frame]', { timeout: timeoutMs });
+    const mobileSandboxState = await waitForSandboxTerminalState(mobilePage, timeoutMs);
+    const mobileGuideButton = mobilePage.getByRole('button', { name: '知道了，开始探索' });
+    const mobileGuideCount = await mobileGuideButton.count();
+    let mobileGuideDismissed = false;
+    if (mobileGuideCount === 1 && await mobileGuideButton.isVisible()) {
+      await mobileGuideButton.click();
+      await mobileGuideButton.waitFor({ state: 'hidden', timeout: timeoutMs });
+      mobileGuideDismissed = true;
+    }
+    const mobileLayout = await mobilePage.evaluate(() => {
+      const target = document.querySelector('#page-physics [data-module="energy-conservation"]');
+      const card = target && target.querySelector('[data-backend-sandbox-card]');
+      const iframe = card && card.querySelector('[data-backend-sandbox-frame]');
+      const rect = card ? card.getBoundingClientRect() : null;
+      return {
+        innerWidth: window.innerWidth,
+        innerHeight: window.innerHeight,
+        documentWidth: document.documentElement.scrollWidth,
+        horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+        cardWithinViewport: Boolean(rect) && rect.left >= -1 && rect.right <= window.innerWidth + 1,
+        cardRect: rect ? { left: rect.left, right: rect.right, width: rect.width } : null,
+        sandboxState: card && card.dataset ? card.dataset.state || '' : '',
+        iframeSandbox: iframe ? iframe.getAttribute('sandbox') || '' : '',
+      };
+    });
+    const mobileScreenshot = path.join(outDir, 'script-sandbox-isolation-mobile.png');
+    await mobilePage.screenshot({ path: mobileScreenshot, fullPage: false });
+    report.screenshots.mobile = mobileScreenshot;
+    report.mobile = {
+      viewport: { width: 390, height: 844 },
+      guideDismissed: mobileGuideDismissed,
+      sandbox: mobileSandboxState,
+      layout: mobileLayout,
+      console: mobileConsole,
+      pageErrors: mobilePageErrors,
+    };
+    assertCheck(report, 'mobile viewport keeps the sandbox ready without horizontal overflow', mobileSandboxState.state === 'ready'
+      && mobileLayout.innerWidth === 390
+      && mobileLayout.innerHeight === 844
+      && mobileLayout.horizontalOverflow === false
+      && mobileLayout.cardWithinViewport === true
+      && mobileLayout.sandboxState === 'ready'
+      && mobileLayout.iframeSandbox === 'allow-scripts'
+      && mobileConsole.length === 0
+      && mobilePageErrors.length === 0, report.mobile);
+    await mobileContext.close();
   } finally {
     if (browser) await browser.close();
   }

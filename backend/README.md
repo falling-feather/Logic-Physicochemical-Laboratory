@@ -8,11 +8,13 @@ V6.6.55 已增加 `background_tasks/background_task_attempts` DB-backed 控制�
 
 V6.6.56 选择默认关闭的 HTTPS hash 回执作为审计外部锚定方案。`audit_chain_heads` 在 MySQL 通过 `SELECT ... FOR UPDATE` 串行化链尾，SQLite 本地回归使用事务级进程锁；归档 Manifest v2 记录范围、archive hash、导出人、导出时间和删除/脱敏/恢复审批策略。`audit_archive_anchors` 保存回执状态，锚定任务复用统一 worker 的 attempt/退避/dead-letter；外发信封只包含 manifest/archive hash、链边界和范围摘要，不包含审计正文、快照、文件路径、URL 或 token。
 
-V6.6.57 已新增外部 issue provider 协议与首个 GitHub REST 适配器。管理员可沿用 `BugRecord.external_issue_provider/id/url` 手工绑定，也可显式确认创建 issue、同步本地状态和发送单条安全评论；`bug_external_sync_operations` 以稳定操作键记录 create/status/comment 的 attempt、成功、失败或 ambiguous 状态，成功操作可恢复读取，创建和评论的未知结果禁止盲重试。系统不自动接收外部状态，不让外部 issue 覆盖本地字段；自动创建只发送本地编号、分类、严重度、状态和本地权威声明，不发送 evidence、notes、source、URL 或凭据。当前只有 GitHub 可执行，Gitee/Jira 仅保留 provider 扩展位；真实 GitHub staging 和凭据/限流证据归 V6.6.60。
+V6.6.57 已新增外部 issue provider 协议与首个 GitHub REST 适配器。管理员可沿用 `BugRecord.external_issue_provider/id/url` 手工绑定，也可显式确认创建 issue、同步本地状态和发送单条安全评论；`bug_external_sync_operations` 以稳定操作键记录 create/status/comment 的 attempt、成功、失败或 ambiguous 状态，成功操作可恢复读取，创建和评论的未知结果禁止盲重试。系统不自动接收外部状态，不让外部 issue 覆盖本地字段；自动创建只发送本地编号、分类、严重度、状态和本地权威声明，不发送 evidence、notes、source、URL 或凭据。当前只有 GitHub 可执行，Gitee/Jira 仅保留 provider 扩展位；功能默认关闭，只有被选入 RC 时才在 V6.6.63 补真实 staging 和凭据/限流证据。
 
 V6.6.58 已新增 `app.services.backend_performance`、`scripts.backend_performance_drill` 与管理端性能报告。11 个 query profile 覆盖审计、知识快照 run、脚本扫描 run、待批改、任务 claim、Bug 和外部同步账本；Alembic 0043 新增 10 个复合索引，并复用 0040 既有任务 claim 索引。报告可执行 EXPLAIN 和 3 轮最多 50 行的有界基准，只返回索引/访问方式/耗时/行数摘要，不返回 SQL、参数、结果值或数据库 URL。API 返回 `Server-Timing`，慢 API 只记录 request id/方法/路由模板/状态/耗时，慢 SQL 只记录语句 hash/操作/方言/耗时。MySQL 配置显式定义 pool size、overflow、等待/回收和 connect/read/write timeout；`pool_pre_ping` 与 LIFO 保留，事务写入不自动重试，worker 推荐独立服务。
 
 V6.6.59 已完成安全、隐私和发布冻结：非本地环境 bootstrap/cookie fail closed，CORS 只接受精确 origin；全局角色与 scoped authority 联动，角色变化撤销会话并清理不兼容权限，admin 控制面使用数据库锁串行化。内容审核绑定最后编辑者和精确 schema hash，schema 有界；外部脚本统一走公网 HTTPS pinned fetch，sandbox 资产按 hash CSP/SRI 执行且导航 fail closed。后台外部副作用要求活动 admin actor/有效租约，浏览器敏感学习状态不落普通 storage，静态服务只公开显式前端资源。Alembic head 为 0045。
+
+V6.6.60 已完成本地发布候选总验收并判定延期：opaque sandbox 的 SRI 资产端点增加仅资源级、无凭据的匿名 CORS，外部 Edge 桌面/390×844 proof 27/27；SQLite 空库迁移、preflight/smoke 和 MySQL-required fail-closed 通过。真实 MySQL、反向代理/服务注册和合格 C++17 构建仍为 P1，分别进入 V6.6.61-V6.6.62；默认关闭的外部 provider 只有被选入 RC 时才在 V6.6.63 补 staging。
 
 ## 本地启动
 
@@ -220,7 +222,7 @@ python -m scripts.backend_stage_gate --require-mysql \
 | GET | `/api/render/page/{slug}` | 前端可渲染页面结构；公开响应会移除原始脚本引用，仅保留带稳定 `sandboxId` 的 `scriptManifest`，并在可执行且唯一的 manifest 中提供脱敏 `embed` 描述符（iframe src/sandbox/referrerPolicy/messageProtocol/capabilities），同时返回 `X-Astra-Content-Script-*` 沙箱契约头 |
 | GET | `/api/render/script-sandboxes/{sandbox_id}/page/{slug}` | 按已发布私有 schema 和后端模板生成 sandbox HTML；nonce 只启动受信 bootstrap，资产脚本按服务端字节 SHA-256 CSP/SRI 授权且不继承 nonce；`frame-ancestors` 只允许 `'self'` 和精确 CORS origin，blocked/歧义/缺镜像/未知模板 fail closed |
 | GET | `/api/render/script-sandboxes/{sandbox_id}/bootstrap/page/{slug}` | 返回 sandbox 内后端受控 bootstrap JS；按 published slug + sandboxId 生成受控资产 URL 列表，顺序加载资产并调用 allowlist initializer，只有 initializer 显式返回 `{ready:true}` 才发送 ready；postMessage 同时绑定 `bootstrap-v1`、templateId 和 document contract。响应 `application/javascript`、`no-store`、`nosniff`、`no-referrer` 和 `Cross-Origin-Resource-Policy: cross-origin` |
-| GET | `/api/render/script-sandboxes/{sandbox_id}/assets/{asset_sha256}/page/{slug}` | 按 published slug + sandboxId + 脚本引用 SHA-256 读取受控 JS 资产；本地资产仅允许 `pages/`、`shared/js/`、`codevis/shared/js/` 和 `drafts/` 根内 `.js` 文件，外部脚本只返回当前发布版本绑定的镜像字节；响应 `application/javascript`、引用 hash、镜像字节 hash、`no-store`、`nosniff`、`no-referrer` 和 `Cross-Origin-Resource-Policy: cross-origin` |
+| GET | `/api/render/script-sandboxes/{sandbox_id}/assets/{asset_sha256}/page/{slug}` | 按 published slug + sandboxId + 脚本引用 SHA-256 读取受控 JS 资产；本地资产仅允许 `pages/`、`shared/js/`、`codevis/shared/js/` 和 `drafts/` 根内 `.js` 文件，外部脚本只返回当前发布版本绑定的镜像字节；响应 `application/javascript`、引用 hash、镜像字节 hash、`no-store`、`nosniff`、`no-referrer`、`Cross-Origin-Resource-Policy: cross-origin` 和资源级 `Access-Control-Allow-Origin: *`。该 wildcard 只为 opaque iframe 的匿名 SRI 请求服务，不接受凭据且不改变全局 API CORS |
 
 ## V6.6.52 浏览器 API 与离线契约
 
@@ -264,7 +266,7 @@ V6.6.48 起，可从仓库根目录运行本地浏览器隔离证明：
 node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:8000 --web http://127.0.0.1:8766 --channel msedge --out test-screenshots/browser-isolation
 ```
 
-该脚本需要当前 Node 环境能 `require('playwright')`，会打开本地试点页面，检查 iframe sandbox 属性、sandbox CSP/no-store/nosniff/no-referrer、unknown sandbox/asset fail closed、父页面 DOM/localStorage/sessionStorage/cookie/top location 越权失败、console/network 和截图证据。报告和截图写入 `test-screenshots/browser-isolation/`。
+该脚本需要当前 Node 环境能 `require('playwright')`，会打开本地试点页面，检查 iframe sandbox 属性、sandbox CSP/SRI/no-store/nosniff/no-referrer、unknown sandbox/asset fail closed、父页面隔离、交互/重挂载、异常导航后静态恢复、CacheStorage API 空集、console/network，以及真实 390×844 无横向溢出与截图证据。V6.6.60 外部 Edge 最终 27/27；报告和截图默认写入 `test-screenshots/browser-isolation/`，正式验收建议用 `--out` 指向受控临时/证据目录。
 
 ## 配置
 
@@ -424,7 +426,7 @@ python -m pytest backend/tests/test_backend_performance.py backend/tests/test_ap
 node tools/tests/v6653-permission-analytics-contract.cjs
 ```
 
-迁移最低门禁需验证 `upgrade 20260710_0043 -> upgrade head -> downgrade 20260710_0043 -> upgrade head`，最终 `alembic current` 必须为 `20260710_0045`；0044 绑定最后编辑者/审核 schema hash，0045 串行化 admin 安全控制面。SQLite 往返只证明 DDL 合同，真实 MySQL 建表/行锁证据仍归 V6.6.60 RC 部署门禁。
+迁移最低门禁需验证 `upgrade 20260710_0043 -> upgrade head -> downgrade 20260710_0043 -> upgrade head`，最终 `alembic current` 必须为 `20260710_0045`；0044 绑定最后编辑者/审核 schema hash，0045 串行化 admin 安全控制面。SQLite 往返只证明 DDL 合同，真实 MySQL 建表/行锁证据归 V6.6.61 发布阻断门禁。
 
 权限范围回归可单独运行：
 

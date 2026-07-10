@@ -34,6 +34,8 @@ async function main() {
   const cppSource = fs.readFileSync(path.join(repoRoot, 'server', 'main.cpp'), 'utf8');
   assert.doesNotMatch(cppSource, /set_mount_point\(\s*["']\/["']\s*,/, 'C++ server must not mount the repository root');
   assert.doesNotMatch(cppSource, /Access-Control-Allow-Origin["']\s*,\s*["']\*/, 'C++ server must not emit wildcard CORS');
+  assert.doesNotMatch(cppSource, /server\.(?:Get|Post)\(["']\/api\/(?:info|eval)["']/, 'C++ static server must not expose legacy business-shaped APIs');
+  assert.match(cppSource, /server\.Get\(["']\/api\/health["']/, 'C++ static server must keep an internal liveness endpoint');
   assert.match(cppSource, /std::string host = "127\.0\.0\.1"/);
   for (const publicDirectory of ['pages', 'shared', 'UI', 'codevis']) {
     assert.match(cppSource, new RegExp(`"${publicDirectory}"`));

@@ -130,6 +130,12 @@ def render_script_sandbox_asset(
     response.headers["X-Astra-Content-Script-Reference-Sha256"] = asset_sha256
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Cache-Control"] = "no-store"
+    # A sandboxed iframe without allow-same-origin has an opaque origin. SRI
+    # therefore requires an anonymous CORS response even when the asset URL is
+    # hosted by the same API that served the iframe document. This endpoint is
+    # a public, hash-bound executable asset and never accepts credentials, so a
+    # resource-local wildcard is safe without relaxing credentialed API CORS.
+    response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
     response.headers["Referrer-Policy"] = "no-referrer"
     return Response(
