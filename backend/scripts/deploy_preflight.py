@@ -14,6 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import get_settings
 from app.db.session import check_database, make_engine
+from app.services.alert_delivery import alert_delivery_posture
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -47,7 +48,11 @@ def run_preflight(
 
 def _configuration_report(settings: Any, *, require_mysql: bool) -> dict[str, Any]:
     auto_create_tables = bool(settings.auto_create_tables)
-    if require_mysql and auto_create_tables:
+    delivery_posture = alert_delivery_posture(settings)
+    if delivery_posture["enabled"] and not delivery_posture["configured"]:
+        status = "alert_delivery_not_configured"
+        ok = False
+    elif require_mysql and auto_create_tables:
         status = "auto_create_tables_enabled"
         ok = False
     elif auto_create_tables:
@@ -64,6 +69,7 @@ def _configuration_report(settings: Any, *, require_mysql: bool) -> dict[str, An
         "auto_create_tables": auto_create_tables,
         "expected_auto_create_tables": False,
         "auto_create_tables_policy": "must_be_false_when_require_mysql",
+        "alert_delivery": delivery_posture,
     }
 
 

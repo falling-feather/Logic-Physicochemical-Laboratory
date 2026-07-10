@@ -114,6 +114,9 @@ from app.schemas.admin import (
     AdminAlertOutboxDispatchPlanRead,
     AdminAlertOutboxDispatchPlanValidateRequest,
     AdminAlertOutboxDispatchPlanValidationReport,
+    AdminAlertOutboxExternalDispatchItem,
+    AdminAlertOutboxExternalDispatchReport,
+    AdminAlertOutboxExternalDispatchRequest,
     AdminAlertOutboxEntryRead,
     AdminAlertOutboxPage,
     AdminAlertOutboxQueueItem,
@@ -148,6 +151,12 @@ from app.services.admin_alert_outbox import (
     admin_alert_outbox_write_snapshot,
     enqueue_content_script_remote_drift_alert_outbox,
     enqueue_knowledge_snapshot_alert_outbox,
+)
+from app.services.alert_delivery import (
+    AlertDeliveryError,
+    alert_delivery_posture,
+    build_alert_delivery_adapter,
+    build_alert_delivery_envelope,
 )
 from app.services.access_control import (
     require_class_teacher_or_admin_by_id,
@@ -2256,6 +2265,251 @@ def validate_admin_alert_outbox_dispatch_plan(
     return report
 
 
+@router.post(
+    "/alert-outbox/dispatch-plans/{plan_id}/dispatch",
+    response_model=AdminAlertOutboxExternalDispatchReport,
+)
+def dispatch_admin_alert_outbox_plan(
+    plan_id: int,
+    request_body: AdminAlertOutboxExternalDispatchRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AdminAlertOutboxExternalDispatchReport:
+    _require_admin(current_user)
+    if not request_body.confirm_external_dispatch:
+        raise HTTPException(status_code=422, detail="confirm_external_dispatch must be true")
+    plan = db.get(AdminAlertOutboxDispatchPlan, plan_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Alert outbox dispatch plan not found")
+    if plan.plan_status != "created":
+        raise HTTPException(
+            status_code=409,
+            detail={"message": "Alert outbox dispatch plan is not dispatchable", "plan_status": plan.plan_status},
+        )
+
+    settings = get_settings()
+    posture = alert_delivery_posture(settings)
+    try:
+        adapter = build_alert_delivery_adapter(settings)
+    except AlertDeliveryError as exc:
+        record_audit_log(
+            db,
+            actor=current_user,
+            action="admin.alert_outbox.external_dispatch.blocked",
+            resource_type="admin_alert_outbox_dispatch_plan",
+            resource_id=plan.id,
+            event_result="failure",
+            failure_reason=exc.code,
+            request=request,
+            snapshot={
+                "format": "admin_alert_outbox_external_dispatch_blocked",
+                "plan_id": plan.id,
+                "plan_key": plan.plan_key,
+                "plan_status": plan.plan_status,
+                "delivery_posture": posture,
+            },
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=409,
+            detail={"message": "External alert delivery is unavailable", "code": exc.code, "posture": posture},
+        ) from None
+
+    started_at = datetime.now(UTC)
+    validation = _admin_alert_outbox_dispatch_plan_validation_report(plan, db, started_at)
+    if validation.validation_status != "valid" or not validation.ready_entry_ids:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Alert outbox dispatch plan changed before dispatch",
+                "validation_status": validation.validation_status,
+                "blocked_reason_counts": validation.blocked_reason_counts,
+            },
+        )
+    if len(validation.ready_entry_ids) > settings.alert_delivery_batch_limit:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Alert outbox dispatch plan exceeds configured batch limit",
+                "ready_count": len(validation.ready_entry_ids),
+                "batch_limit": settings.alert_delivery_batch_limit,
+            },
+        )
+    entries = list(
+        db.scalars(
+            select(AdminAlertOutboxEntry)
+            .where(AdminAlertOutboxEntry.id.in_(validation.ready_entry_ids))
+            .order_by(AdminAlertOutboxEntry.id.asc())
+            .with_for_update()
+        ).all()
+    )
+    if [entry.id for entry in entries] != sorted(validation.ready_entry_ids):
+        raise HTTPException(status_code=409, detail="Alert outbox dispatch entries changed before claim")
+    db.refresh(plan)
+    planned_hashes = {str(key): str(value) for key, value in (plan.ready_entry_payload_hashes_json or {}).items()}
+    if plan.plan_status != "created" or any(
+        planned_hashes.get(str(entry.id)) != entry.payload_hash
+        or not _admin_alert_outbox_entry_dispatch_ready(entry, started_at)
+        for entry in entries
+    ):
+        raise HTTPException(status_code=409, detail="Alert outbox dispatch plan changed while claiming entries")
+
+    plan.plan_status = "dispatching"
+    for entry in entries:
+        entry.status = "dispatching"
+        entry.dispatch_mode = adapter.provider
+        entry.delivery_target = adapter.delivery_target
+        entry.external_delivery = True
+        entry.attempt_count += 1
+        entry.last_error_code = None
+    db.commit()
+
+    results: list[AdminAlertOutboxExternalDispatchItem] = []
+    delivered_count = 0
+    failed_count = 0
+    for entry in entries:
+        attempted_at = datetime.now(UTC)
+        idempotency_key = sha256(
+            f"astra-alert:{entry.id}:{entry.source_type}:{entry.event_code}:{entry.payload_hash}".encode("utf-8")
+        ).hexdigest()
+        try:
+            receipt = adapter.deliver(
+                build_alert_delivery_envelope(entry),
+                idempotency_key=idempotency_key,
+            )
+        except AlertDeliveryError as exc:
+            entry.status = "failed"
+            entry.last_error_code = exc.code
+            entry.available_at = (
+                attempted_at + timedelta(seconds=settings.alert_delivery_retry_delay_seconds)
+                if exc.retryable
+                else None
+            )
+            failed_count += 1
+            result = AdminAlertOutboxExternalDispatchItem(
+                entry_id=entry.id,
+                status="failed",
+                attempt_count=entry.attempt_count,
+                provider=adapter.provider,
+                retryable=exc.retryable,
+                last_error_code=exc.code,
+            )
+            record_audit_log(
+                db,
+                actor=current_user,
+                action="admin.alert_outbox.external_dispatch",
+                resource_type="admin_alert_outbox",
+                resource_id=entry.id,
+                event_result="failure",
+                failure_reason=exc.code,
+                request=request,
+                snapshot={
+                    "format": "admin_alert_outbox_external_dispatch_result",
+                    "plan_id": plan.id,
+                    "entry_id": entry.id,
+                    "status": "failed",
+                    "provider": adapter.provider,
+                    "delivery_target": adapter.delivery_target,
+                    "attempt_count": entry.attempt_count,
+                    "retryable": exc.retryable,
+                    "retry_available_at": entry.available_at.isoformat() if entry.available_at is not None else None,
+                    "payload_hash_prefix": entry.payload_hash[:12],
+                },
+            )
+        else:
+            entry.status = "delivered"
+            entry.last_error_code = None
+            entry.available_at = None
+            delivered_count += 1
+            result = AdminAlertOutboxExternalDispatchItem(
+                entry_id=entry.id,
+                status="delivered",
+                attempt_count=entry.attempt_count,
+                provider=receipt.provider,
+                retryable=False,
+                receipt_hash_prefix=receipt.receipt_hash[:12],
+            )
+            record_audit_log(
+                db,
+                actor=current_user,
+                action="admin.alert_outbox.external_dispatch",
+                resource_type="admin_alert_outbox",
+                resource_id=entry.id,
+                event_result="success",
+                request=request,
+                snapshot={
+                    "format": "admin_alert_outbox_external_dispatch_result",
+                    "plan_id": plan.id,
+                    "entry_id": entry.id,
+                    "status": "delivered",
+                    "provider": receipt.provider,
+                    "delivery_target": adapter.delivery_target,
+                    "attempt_count": entry.attempt_count,
+                    "http_status": receipt.status_code,
+                    "receipt_hash_prefix": receipt.receipt_hash[:12],
+                    "payload_hash_prefix": entry.payload_hash[:12],
+                },
+            )
+        db.commit()
+        results.append(result)
+
+    plan.plan_status = (
+        "delivered"
+        if delivered_count == len(entries)
+        else "failed"
+        if failed_count == len(entries)
+        else "partial_failed"
+    )
+    completed_at = datetime.now(UTC)
+    report = AdminAlertOutboxExternalDispatchReport(
+        generated_at=completed_at,
+        plan_id=plan.id,
+        plan_key=plan.plan_key,
+        plan_status=plan.plan_status,  # type: ignore[arg-type]
+        provider=adapter.provider,
+        delivery_target=adapter.delivery_target,
+        attempted_count=len(entries),
+        delivered_count=delivered_count,
+        failed_count=failed_count,
+        policy={
+            **posture,
+            "explicit_confirmation": True,
+            "automatic_dispatch": False,
+            "idempotency_key_sent": True,
+            "original_payload_included": False,
+            "failure_affects_source_transaction": False,
+            "failed_entry_manual_requeue": True,
+        },
+        items=results,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.alert_outbox.external_dispatch_plan",
+        resource_type="admin_alert_outbox_dispatch_plan",
+        resource_id=plan.id,
+        event_result="success" if failed_count == 0 else "failure",
+        failure_reason="partial_or_total_delivery_failure" if failed_count else None,
+        request=request,
+        snapshot={
+            "format": "admin_alert_outbox_external_dispatch_plan",
+            "plan_id": report.plan_id,
+            "plan_key": report.plan_key,
+            "plan_status": report.plan_status,
+            "provider": report.provider,
+            "delivery_target": report.delivery_target,
+            "attempted_count": report.attempted_count,
+            "delivered_count": report.delivered_count,
+            "failed_count": report.failed_count,
+            "entry_ids": [item.entry_id for item in report.items],
+            "policy": report.policy,
+        },
+    )
+    db.commit()
+    return report
+
+
 @router.patch("/alert-outbox/reviews", response_model=AdminAlertOutboxBulkReviewResponse)
 def review_admin_alert_outbox_entries(
     request_body: AdminAlertOutboxBulkReviewRequest,
@@ -2294,7 +2548,13 @@ def review_admin_alert_outbox_entries(
         source_type_counts[entry.source_type] = source_type_counts.get(entry.source_type, 0) + 1
         severity_counts[entry.severity] = severity_counts.get(entry.severity, 0) + 1
         event_code_counts[entry.event_code] = event_code_counts.get(entry.event_code, 0) + 1
+        if request_body.status == "queued" and entry.status == "failed":
+            entry.available_at = reviewed_at
         entry.status = request_body.status
+        if request_body.status in {"planned", "queued"}:
+            entry.dispatch_mode = "manual_review"
+            entry.delivery_target = "admin_outbox"
+            entry.external_delivery = False
         entry.reviewed_by_user_id = current_user.id
         entry.reviewed_at = reviewed_at
         entry.review_note = note
@@ -2359,7 +2619,13 @@ def review_admin_alert_outbox_entry(
     previous_status = entry.status
     reviewed_at = datetime.now(UTC)
     note = request_body.note.strip() if request_body.note is not None and request_body.note.strip() else None
+    if request_body.status == "queued" and previous_status == "failed":
+        entry.available_at = reviewed_at
     entry.status = request_body.status
+    if request_body.status in {"planned", "queued"}:
+        entry.dispatch_mode = "manual_review"
+        entry.delivery_target = "admin_outbox"
+        entry.external_delivery = False
     entry.reviewed_by_user_id = current_user.id
     entry.reviewed_at = reviewed_at
     entry.review_note = note
@@ -4485,6 +4751,9 @@ def _admin_alert_outbox_queue_report(
     pending_review = [entry for entry in entries if entry.status == "pending_review"]
     planned = [entry for entry in entries if entry.status == "planned"]
     queued = [entry for entry in entries if entry.status == "queued"]
+    dispatching = [entry for entry in entries if entry.status == "dispatching"]
+    delivered = [entry for entry in entries if entry.status == "delivered"]
+    failed = [entry for entry in entries if entry.status == "failed"]
     suppressed = [entry for entry in entries if entry.status == "suppressed"]
     cancelled = [entry for entry in entries if entry.status == "cancelled"]
     stale_pending_review = [
@@ -4493,17 +4762,26 @@ def _admin_alert_outbox_queue_report(
     due_planned = [entry for entry in planned if _admin_alert_outbox_entry_due(entry, generated_at)]
     due_queued = [entry for entry in queued if _admin_alert_outbox_entry_due(entry, generated_at)]
     ready_entries = _sort_admin_alert_outbox_queue_items(due_queued + due_planned)
-    active_count = len(pending_review) + len(planned) + len(queued)
-    terminal_count = len(suppressed) + len(cancelled)
-    if ready_entries:
+    active_count = len(pending_review) + len(planned) + len(queued) + len(dispatching) + len(failed)
+    terminal_count = len(delivered) + len(suppressed) + len(cancelled)
+    if ready_entries or dispatching:
         queue_status: Literal["empty", "review_required", "ready", "cleared"] = "ready"
-    elif pending_review:
+    elif pending_review or failed:
         queue_status = "review_required"
     elif entries:
         queue_status = "cleared"
     else:
         queue_status = "empty"
-    status_order = ["pending_review", "planned", "queued", "suppressed", "cancelled"]
+    status_order = [
+        "pending_review",
+        "planned",
+        "queued",
+        "dispatching",
+        "failed",
+        "delivered",
+        "suppressed",
+        "cancelled",
+    ]
     buckets = [
         _admin_alert_outbox_status_bucket(status, [entry for entry in entries if entry.status == status])
         for status in status_order
@@ -4513,7 +4791,11 @@ def _admin_alert_outbox_queue_report(
         generated_at=generated_at,
         filters=filtered_snapshot_filters,
         policy={
-            "external_delivery": False,
+            "external_delivery": bool(
+                alert_delivery_posture(get_settings())["enabled"]
+                and alert_delivery_posture(get_settings())["configured"]
+            ),
+            "delivery_posture": alert_delivery_posture(get_settings()),
             "automatic_actions": False,
             "dispatch_mode": "manual_review",
             "delivery_target": "admin_outbox",
@@ -4525,6 +4807,9 @@ def _admin_alert_outbox_queue_report(
         pending_review_count=len(pending_review),
         planned_count=len(planned),
         queued_count=len(queued),
+        dispatching_count=len(dispatching),
+        delivered_count=len(delivered),
+        failed_count=len(failed),
         suppressed_count=len(suppressed),
         cancelled_count=len(cancelled),
         terminal_count=terminal_count,
@@ -4539,12 +4824,12 @@ def _admin_alert_outbox_queue_report(
         status_buckets=buckets,
         pending_review_items=[
             _admin_alert_outbox_queue_item(entry)
-            for entry in _sort_admin_alert_outbox_queue_items(pending_review)[:item_limit]
+            for entry in _sort_admin_alert_outbox_queue_items(pending_review + failed)[:item_limit]
         ],
         ready_items=[_admin_alert_outbox_queue_item(entry) for entry in ready_entries[:item_limit]],
         terminal_items=[
             _admin_alert_outbox_queue_item(entry)
-            for entry in _sort_admin_alert_outbox_queue_items(suppressed + cancelled)[:item_limit]
+            for entry in _sort_admin_alert_outbox_queue_items(delivered + suppressed + cancelled)[:item_limit]
         ],
     )
 
@@ -4560,6 +4845,9 @@ def _admin_alert_outbox_queue_snapshot(report: AdminAlertOutboxQueueReport) -> d
         "pending_review_count": report.pending_review_count,
         "planned_count": report.planned_count,
         "queued_count": report.queued_count,
+        "dispatching_count": report.dispatching_count,
+        "delivered_count": report.delivered_count,
+        "failed_count": report.failed_count,
         "suppressed_count": report.suppressed_count,
         "cancelled_count": report.cancelled_count,
         "terminal_count": report.terminal_count,
@@ -4573,7 +4861,7 @@ def _admin_alert_outbox_queue_snapshot(report: AdminAlertOutboxQueueReport) -> d
         "oldest_due_at": report.oldest_due_at.isoformat() if report.oldest_due_at is not None else None,
         "status_buckets": {bucket.status: bucket.total for bucket in report.status_buckets},
         "automatic_actions": False,
-        "external_delivery": False,
+        "external_delivery": report.policy["external_delivery"],
     }
 
 
@@ -4585,9 +4873,11 @@ def _admin_alert_outbox_dispatch_dry_run_report(
     item_limit: int,
 ) -> AdminAlertOutboxDispatchDryRunReport:
     active_entries = [
-        entry for entry in entries if entry.status in {"pending_review", "planned", "queued"}
+        entry
+        for entry in entries
+        if entry.status in {"pending_review", "planned", "queued", "dispatching", "failed"}
     ]
-    terminal_entries = [entry for entry in entries if entry.status in {"suppressed", "cancelled"}]
+    terminal_entries = [entry for entry in entries if entry.status in {"delivered", "suppressed", "cancelled"}]
     expired_entries = [
         entry for entry in active_entries if _admin_alert_outbox_entry_expired(entry, generated_at)
     ]
@@ -5048,6 +5338,10 @@ def _admin_alert_outbox_dispatch_dry_run_item(
 def _admin_alert_outbox_dispatch_reason(entry: AdminAlertOutboxEntry, now_at: datetime) -> str:
     if _admin_alert_outbox_entry_expired(entry, now_at):
         return "expired"
+    if entry.status == "dispatching":
+        return "dispatch_in_progress"
+    if entry.status == "failed":
+        return "failed_requires_manual_requeue"
     if entry.external_delivery:
         return "external_delivery_disabled"
     if entry.dispatch_mode != "manual_review":
@@ -5102,7 +5396,16 @@ def _admin_alert_outbox_queue_item(entry: AdminAlertOutboxEntry) -> AdminAlertOu
 
 def _sort_admin_alert_outbox_queue_items(entries: list[AdminAlertOutboxEntry]) -> list[AdminAlertOutboxEntry]:
     severity_order = {"critical": 0, "warning": 1, "info": 2}
-    status_order = {"queued": 0, "planned": 1, "pending_review": 2, "suppressed": 3, "cancelled": 4}
+    status_order = {
+        "queued": 0,
+        "planned": 1,
+        "dispatching": 2,
+        "failed": 3,
+        "pending_review": 4,
+        "delivered": 5,
+        "suppressed": 6,
+        "cancelled": 7,
+    }
     return sorted(
         entries,
         key=lambda entry: (

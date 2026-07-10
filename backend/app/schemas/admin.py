@@ -451,7 +451,18 @@ class AdminContentScriptAssetScanAlertReport(BaseModel):
     candidates: list[AdminContentScriptAssetScanAlertCandidate]
 
 
-AdminAlertOutboxStatus = Literal["pending_review", "planned", "queued", "suppressed", "cancelled"]
+AdminAlertOutboxReviewStatus = Literal["pending_review", "planned", "queued", "suppressed", "cancelled"]
+AdminAlertOutboxStatus = Literal[
+    "pending_review",
+    "planned",
+    "queued",
+    "dispatching",
+    "delivered",
+    "failed",
+    "suppressed",
+    "cancelled",
+]
+AdminAlertOutboxDispatchPlanStatus = Literal["created", "dispatching", "delivered", "partial_failed", "failed"]
 
 
 class AdminContentScriptAssetScanAlertOutboxRequest(BaseModel):
@@ -460,7 +471,7 @@ class AdminContentScriptAssetScanAlertOutboxRequest(BaseModel):
     recent_run_limit: int = Field(default=20, ge=1, le=100)
     candidate_limit: int = Field(default=20, ge=0, le=100)
     now_at: datetime | None = None
-    status: AdminAlertOutboxStatus = "pending_review"
+    status: AdminAlertOutboxReviewStatus = "pending_review"
     confirm_observe_only: bool = False
 
 
@@ -874,19 +885,19 @@ class AdminKnowledgeSnapshotRunAlertOutboxRequest(BaseModel):
     now_at: datetime | None = None
     lease_expiring_seconds: int = Field(default=900, ge=0, le=24 * 60 * 60)
     candidate_limit: int = Field(default=20, ge=0, le=100)
-    status: AdminAlertOutboxStatus = "pending_review"
+    status: AdminAlertOutboxReviewStatus = "pending_review"
     confirm_observe_only: bool = False
 
 
 class AdminAlertOutboxReviewRequest(BaseModel):
-    status: AdminAlertOutboxStatus
+    status: AdminAlertOutboxReviewStatus
     note: str | None = Field(default=None, max_length=500)
     confirm_manual_review: bool = False
 
 
 class AdminAlertOutboxBulkReviewRequest(BaseModel):
     entry_ids: list[int] = Field(min_length=1, max_length=100)
-    status: AdminAlertOutboxStatus
+    status: AdminAlertOutboxReviewStatus
     note: str | None = Field(default=None, max_length=500)
     confirm_manual_review: bool = False
 
@@ -929,6 +940,9 @@ class AdminAlertOutboxQueueReport(BaseModel):
     pending_review_count: int
     planned_count: int
     queued_count: int
+    dispatching_count: int
+    delivered_count: int
+    failed_count: int
     suppressed_count: int
     cancelled_count: int
     terminal_count: int
@@ -946,7 +960,7 @@ class AdminAlertOutboxQueueReport(BaseModel):
 
 class AdminAlertOutboxBulkReviewResponse(BaseModel):
     generated_at: datetime
-    status: AdminAlertOutboxStatus
+    status: AdminAlertOutboxReviewStatus
     updated_count: int
     requested_count: int
     previous_status_counts: dict[str, int]
@@ -1023,7 +1037,7 @@ class AdminAlertOutboxDispatchPlanCreateRequest(BaseModel):
 class AdminAlertOutboxDispatchPlanRead(BaseModel):
     id: int
     plan_key: str
-    plan_status: Literal["created"]
+    plan_status: AdminAlertOutboxDispatchPlanStatus
     generated_at: datetime
     created_at: datetime
     updated_at: datetime
@@ -1063,7 +1077,7 @@ class AdminAlertOutboxDispatchPlanValidationReport(BaseModel):
     generated_at: datetime
     plan_id: int
     plan_key: str
-    plan_status: Literal["created"]
+    plan_status: AdminAlertOutboxDispatchPlanStatus
     validation_status: Literal["valid", "changed", "empty"]
     policy: dict[str, Any]
     planned_ready_count: int
@@ -1083,6 +1097,34 @@ class AdminAlertOutboxDispatchPlanValidationReport(BaseModel):
     expired_entry_ids: list[int]
     not_due_entry_ids: list[int]
     blocked_reason_counts: dict[str, int]
+
+
+class AdminAlertOutboxExternalDispatchRequest(BaseModel):
+    confirm_external_dispatch: bool = False
+
+
+class AdminAlertOutboxExternalDispatchItem(BaseModel):
+    entry_id: int
+    status: Literal["delivered", "failed"]
+    attempt_count: int
+    provider: str
+    retryable: bool
+    last_error_code: str | None = None
+    receipt_hash_prefix: str | None = None
+
+
+class AdminAlertOutboxExternalDispatchReport(BaseModel):
+    generated_at: datetime
+    plan_id: int
+    plan_key: str
+    plan_status: Literal["delivered", "partial_failed", "failed"]
+    provider: str
+    delivery_target: str
+    attempted_count: int
+    delivered_count: int
+    failed_count: int
+    policy: dict[str, Any]
+    items: list[AdminAlertOutboxExternalDispatchItem]
 
 
 class AdminAlertOutboxEntryRead(BaseModel):

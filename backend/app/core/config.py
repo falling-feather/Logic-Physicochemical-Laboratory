@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -51,6 +51,13 @@ class Settings(BaseSettings):
     content_script_remote_drift_scheduler_scan_limit: int = Field(default=25, ge=1, le=200)
     content_script_remote_drift_scheduler_source_host: str | None = None
     content_script_remote_drift_scheduler_slug: str | None = None
+    alert_delivery_enabled: bool = False
+    alert_delivery_provider: Literal["webhook"] = "webhook"
+    alert_delivery_webhook_url: str | None = None
+    alert_delivery_webhook_token: SecretStr | None = None
+    alert_delivery_timeout_seconds: int = Field(default=5, ge=1, le=30)
+    alert_delivery_retry_delay_seconds: int = Field(default=300, ge=30, le=24 * 60 * 60)
+    alert_delivery_batch_limit: int = Field(default=10, ge=1, le=100)
     database_url: str = Field(
         default="mysql+pymysql://astra:astra@127.0.0.1:3306/astra?charset=utf8mb4",
         description="SQLAlchemy database URL. MySQL is the production target.",

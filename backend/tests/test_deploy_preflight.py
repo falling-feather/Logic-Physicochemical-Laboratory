@@ -122,6 +122,39 @@ def test_deploy_preflight_require_mysql_accepts_disabled_auto_create(monkeypatch
     assert report["expected_auto_create_tables"] is False
 
 
+def test_deploy_preflight_rejects_enabled_but_incomplete_alert_delivery(monkeypatch):
+    monkeypatch.setenv("ASTRA_ALERT_DELIVERY_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_ALERT_DELIVERY_WEBHOOK_URL", "")
+    monkeypatch.setenv("ASTRA_ALERT_DELIVERY_WEBHOOK_TOKEN", "")
+    get_settings.cache_clear()
+
+    report = deploy_preflight._configuration_report(get_settings(), require_mysql=False)
+
+    assert report["ok"] is False
+    assert report["status"] == "alert_delivery_not_configured"
+    assert report["alert_delivery"]["enabled"] is True
+    assert report["alert_delivery"]["configured"] is False
+    assert "url" not in report["alert_delivery"]
+    assert "token" not in report["alert_delivery"]
+
+
+def test_deploy_preflight_accepts_complete_alert_delivery_without_leaking_credentials(monkeypatch):
+    monkeypatch.setenv("ASTRA_ALERT_DELIVERY_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_ALERT_DELIVERY_WEBHOOK_URL", "https://alerts.example.test/astra")
+    monkeypatch.setenv("ASTRA_ALERT_DELIVERY_WEBHOOK_TOKEN", "preflight-secret-token")
+    monkeypatch.setenv("ASTRA_AUTO_CREATE_TABLES", "false")
+    get_settings.cache_clear()
+
+    report = deploy_preflight._configuration_report(get_settings(), require_mysql=False)
+
+    assert report["ok"] is True
+    assert report["status"] == "ready"
+    assert report["alert_delivery"]["enabled"] is True
+    assert report["alert_delivery"]["configured"] is True
+    assert "alerts.example.test" not in str(report)
+    assert "preflight-secret-token" not in str(report)
+
+
 def test_deploy_preflight_mysql_compatibility_accepts_utf8mb4(monkeypatch):
     report = _mysql_compatibility_report(
         monkeypatch,
