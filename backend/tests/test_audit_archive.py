@@ -95,6 +95,7 @@ def test_audit_archive_writes_manifest_and_verifies_without_deleting(client, arc
         before_at=now - timedelta(days=30),
         action="archive.audit",
         include_snapshot=False,
+        exported_by="audit-operator-test",
     )
 
     assert report["ok"] is True
@@ -114,8 +115,19 @@ def test_audit_archive_writes_manifest_and_verifies_without_deleting(client, arc
         "delete": False,
         "purge": False,
         "worm": False,
-        "external_anchor": False,
+        "external_anchor": True,
     }
+    assert manifest["schema_version"] == 2
+    assert manifest["schema"] == "astra.audit-archive-manifest.v2"
+    assert manifest["exporter"]["version"] == "V6.6.56"
+    assert manifest["exporter"]["exported_at"] == manifest["generated_at"]
+    assert manifest["exporter"]["operator"] == "audit-operator-test"
+    assert manifest["exporter"]["operator_attributed"] is True
+    assert manifest["range"]["first_log_id"] == first_id
+    assert manifest["range"]["last_log_id"] == second_id
+    assert manifest["external_anchor"]["scheme"] == "https_hash_receipt"
+    assert manifest["lifecycle_policy"]["source_deletion"] == "prohibited_not_implemented"
+    assert manifest["lifecycle_policy"]["anchored_bytes_mutable"] is False
 
     archive_path = archive_output_dir / manifest["archive_file"]
     manifest_path = archive_output_dir / manifest["manifest_file"]
@@ -127,6 +139,7 @@ def test_audit_archive_writes_manifest_and_verifies_without_deleting(client, arc
     verified = verify_archive_manifest(manifest_path)
     assert verified["ok"] is True
     assert verified["status"] == "verified"
+    assert len(verified["manifest_sha256"]) == 64
     assert verified["exported_count"] == 2
     assert verified["archive_chain"]["status"] == "partial"
     assert verified["archive_chain"]["current_hash_recomputed"] is False
@@ -171,6 +184,17 @@ def test_audit_archive_verify_recomputes_jsonl_hash_with_snapshot(client, archiv
     assert verified["archive_chain"]["current_hash_recomputed"] is True
     assert verified["archive_chain"]["current_hash_mismatch_count"] == 0
     assert verified["archive_chain"]["prev_hash_mismatch_count"] == 0
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["first_id"] = int(manifest["first_id"]) + 1
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    mismatched = verify_archive_manifest(manifest_path)
+    assert mismatched["ok"] is False
+    assert mismatched["reason"] == "manifest_summary_mismatch"
+    assert mismatched["mismatched_fields"] == ["first_id"]
 
 
 def test_audit_archive_verify_detects_internal_chain_tamper_after_rehash(client, archive_output_dir):

@@ -21,7 +21,7 @@ from app.services.audit import audit_log_chain_hash
 from app.services.audit_chain import verify_audit_log_chain
 
 
-AUDIT_ARCHIVE_SCHEMA_VERSION = 1
+AUDIT_ARCHIVE_SCHEMA_VERSION = 2
 AUDIT_ARCHIVE_FIELDS = (
     "id",
     "actor_user_id",
@@ -69,6 +69,7 @@ def run_archive(
     from_at: datetime | None = None,
     to_at: datetime | None = None,
     require_mysql: bool = False,
+    exported_by: str | None = None,
 ) -> dict[str, Any]:
     if archive_format not in {"jsonl", "csv"}:
         raise ValueError("archive_format must be jsonl or csv")
@@ -78,6 +79,9 @@ def run_archive(
         raise ValueError("limit must be at least 1")
     if retention_days is not None and retention_days < 1:
         raise ValueError("retention_days must be at least 1")
+    normalized_exported_by = (exported_by or "").strip()
+    if len(normalized_exported_by) > 120:
+        raise ValueError("exported_by must be at most 120 characters")
     normalized_from_at = _ensure_utc(from_at) if from_at is not None else None
     normalized_to_at = _ensure_utc(to_at) if to_at is not None else None
     if normalized_from_at is not None and normalized_to_at is not None and normalized_from_at > normalized_to_at:
@@ -149,6 +153,7 @@ def run_archive(
         total_candidates=total_candidates,
         records=records,
         chain_report=verify_audit_log_chain(logs),
+        exported_by=normalized_exported_by or None,
     )
     if dry_run:
         return {
@@ -231,6 +236,21 @@ def verify_archive_manifest(manifest_path: Path) -> dict[str, Any]:
             "reason": "archive_records_unreadable",
             "error": exc.__class__.__name__,
         }
+    manifest_mismatches = _manifest_summary_mismatches(
+        manifest,
+        records=records,
+        archive_bytes=archive_path.stat().st_size,
+    )
+    if manifest_mismatches:
+        return {
+            "ok": False,
+            "status": "failed",
+            "reason": "manifest_summary_mismatch",
+            "mismatched_fields": manifest_mismatches,
+            "archive_file": str(archive_path),
+            "archive_sha256": actual_hash,
+            "exported_count": actual_count,
+        }
     if archive_chain["status"] == "invalid":
         return {
             "ok": False,
@@ -245,11 +265,74 @@ def verify_archive_manifest(manifest_path: Path) -> dict[str, Any]:
     return {
         "ok": True,
         "status": "verified",
+        "manifest_sha256": _sha256_file(manifest_path),
         "archive_file": str(archive_path),
         "archive_sha256": actual_hash,
         "exported_count": actual_count,
         "archive_chain": archive_chain,
     }
+
+
+def _manifest_summary_mismatches(
+    manifest: dict[str, Any],
+    *,
+    records: list[dict[str, Any]],
+    archive_bytes: int,
+) -> list[str]:
+    mismatches: list[str] = []
+    first = records[0] if records else None
+    last = records[-1] if records else None
+    expected = {
+        "archive_bytes": archive_bytes,
+        "first_id": first.get("id") if first is not None else None,
+        "last_id": last.get("id") if last is not None else None,
+        "oldest_created_at": first.get("created_at") if first is not None else None,
+        "newest_created_at": last.get("created_at") if last is not None else None,
+        "chain_start_prev_hash": first.get("prev_hash") if first is not None else None,
+        "chain_start_current_hash": first.get("current_hash") if first is not None else None,
+        "chain_end_current_hash": last.get("current_hash") if last is not None else None,
+    }
+    for field, expected_value in expected.items():
+        if _summary_token(manifest.get(field)) != _summary_token(expected_value):
+            mismatches.append(field)
+    try:
+        schema_version = int(manifest.get("schema_version") or 1)
+    except (TypeError, ValueError):
+        mismatches.append("schema_version")
+        schema_version = 1
+    if schema_version >= 2:
+        if manifest.get("schema") != "astra.audit-archive-manifest.v2":
+            mismatches.append("schema")
+        exporter = manifest.get("exporter")
+        if not isinstance(exporter, dict):
+            mismatches.append("exporter")
+        else:
+            if not str(exporter.get("operator") or "").strip():
+                mismatches.append("exporter.operator")
+            if _summary_token(exporter.get("exported_at")) != _summary_token(manifest.get("generated_at")):
+                mismatches.append("exporter.exported_at")
+        range_summary = manifest.get("range")
+        if not isinstance(range_summary, dict):
+            mismatches.append("range")
+        else:
+            for range_field, source_field in (
+                ("first_log_id", "first_id"),
+                ("last_log_id", "last_id"),
+                ("oldest_created_at", "oldest_created_at"),
+                ("newest_created_at", "newest_created_at"),
+            ):
+                if _summary_token(range_summary.get(range_field)) != _summary_token(expected[source_field]):
+                    mismatches.append(f"range.{range_field}")
+        lifecycle = manifest.get("lifecycle_policy")
+        if not isinstance(lifecycle, dict) or lifecycle.get("anchored_bytes_mutable") is not False:
+            mismatches.append("lifecycle_policy")
+    return sorted(set(mismatches))
+
+
+def _summary_token(value: Any) -> str | None:
+    if value is None or value == "":
+        return None
+    return str(value)
 
 
 def _resolve_cutoff(
@@ -359,19 +442,43 @@ def _archive_manifest(
     total_candidates: int,
     records: list[dict[str, Any]],
     chain_report: dict[str, Any],
+    exported_by: str | None,
 ) -> dict[str, Any]:
     first = records[0] if records else None
     last = records[-1] if records else None
     return {
         "schema_version": AUDIT_ARCHIVE_SCHEMA_VERSION,
+        "schema": "astra.audit-archive-manifest.v2",
         "generated_at": generated_at.isoformat(),
+        "exporter": {
+            "name": "Astra Backend",
+            "component": "scripts.archive_audit_logs",
+            "version": "V6.6.56",
+            "exported_at": generated_at.isoformat(),
+            "operator": exported_by or "local_operator_unattributed",
+            "operator_attributed": exported_by is not None,
+        },
         "format": archive_format,
         "include_snapshot": include_snapshot,
         "capabilities": {
             "delete": False,
             "purge": False,
             "worm": False,
-            "external_anchor": False,
+            "external_anchor": True,
+        },
+        "external_anchor": {
+            "scheme": "https_hash_receipt",
+            "status": "eligible",
+            "manifest_hash_algorithm": "sha256",
+            "archive_hash_algorithm": "sha256",
+            "manifest_mutated_after_anchor": False,
+        },
+        "lifecycle_policy": {
+            "source_deletion": "prohibited_not_implemented",
+            "redaction": "new_derived_archive_new_manifest_new_anchor",
+            "recovery": "verify_archive_chain_manifest_hash_and_external_receipt_before_approval",
+            "approval_boundary": "two_person_change_record_and_verified_backup_required",
+            "anchored_bytes_mutable": False,
         },
         "policy": {
             "source": cutoff_source,
@@ -390,6 +497,12 @@ def _archive_manifest(
         "chain_start_prev_hash": first["prev_hash"] if first is not None else None,
         "chain_start_current_hash": first["current_hash"] if first is not None else None,
         "chain_end_current_hash": last["current_hash"] if last is not None else None,
+        "range": {
+            "first_log_id": first["id"] if first is not None else None,
+            "last_log_id": last["id"] if last is not None else None,
+            "oldest_created_at": first["created_at"] if first is not None else None,
+            "newest_created_at": last["created_at"] if last is not None else None,
+        },
         "hash_chain": chain_report,
         "archive_file": None,
         "archive_sha256": None,
@@ -661,6 +774,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--require-mysql", action="store_true", help="Fail when the target database is not MySQL.")
     parser.add_argument("--verify", type=Path, default=None, help="Verify an existing manifest and archive file.")
     parser.add_argument("--actor-user-id", type=int, default=None)
+    parser.add_argument("--exported-by", default=None, help="Operator identity recorded in the manifest.")
     parser.add_argument("--action", default=None)
     parser.add_argument("--resource-type", default=None)
     parser.add_argument("--resource-id", default=None)
@@ -698,6 +812,7 @@ def main(argv: list[str] | None = None) -> int:
                 from_at=_parse_datetime(args.from_at) if args.from_at else None,
                 to_at=_parse_datetime(args.to_at) if args.to_at else None,
                 require_mysql=args.require_mysql,
+                exported_by=args.exported_by,
             )
         except (OSError, ValueError) as exc:
             report = {"ok": False, "status": "failed", "error": exc.__class__.__name__, "detail": str(exc)}

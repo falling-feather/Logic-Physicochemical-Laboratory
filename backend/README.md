@@ -6,6 +6,8 @@ V6.6.54 已在本地 outbox/dispatch plan 基座上增加默认关闭的 Webhook
 
 V6.6.55 已增加 `background_tasks/background_task_attempts` DB-backed 控制面和统一 worker。告警 plan、知识快照、内容脚本扫描共享幂等入队、优先级、租约、attempt、指数退避、dead-letter 与人工 retry/cancel；知识快照和脚本扫描继续以领域 run 为权威记录，避免控制面完成写入中断后重复副作用。worker 与内容脚本外网执行分别默认关闭，管理 API 只返回脱敏摘要，不返回任务 payload 或 lease token。
 
+V6.6.56 选择默认关闭的 HTTPS hash 回执作为审计外部锚定方案。`audit_chain_heads` 在 MySQL 通过 `SELECT ... FOR UPDATE` 串行化链尾，SQLite 本地回归使用事务级进程锁；归档 Manifest v2 记录范围、archive hash、导出人、导出时间和删除/脱敏/恢复审批策略。`audit_archive_anchors` 保存回执状态，锚定任务复用统一 worker 的 attempt/退避/dead-letter；外发信封只包含 manifest/archive hash、链边界和范围摘要，不包含审计正文、快照、文件路径、URL 或 token。
+
 ## 本地启动
 
 ```bash
@@ -273,6 +275,12 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 | `ASTRA_LOGIN_LOCKOUT_SECONDS` | `900` | 达到失败阈值后的锁定秒数 |
 | `ASTRA_LOGIN_ATTEMPT_WINDOW_SECONDS` | `900` | 统计连续失败的时间窗口 |
 | `ASTRA_AUDIT_LOG_RETENTION_DAYS` | `365` | 审计留存预检与 `scripts.archive_audit_logs` 默认保留天数；未传 `retention_days`、`--retention-days` 或 `before/--before` 时据此计算候选 cutoff |
+| `ASTRA_AUDIT_ANCHOR_ENABLED` | `false` | 外部审计 hash 回执总开关；默认关闭 |
+| `ASTRA_AUDIT_ANCHOR_PROVIDER` | `webhook` | 当前锚定 provider；仅支持 HTTPS Webhook 回执合同 |
+| `ASTRA_AUDIT_ANCHOR_WEBHOOK_URL` | 空 | 外部回执服务 HTTPS URL；报告与管理响应不回显 |
+| `ASTRA_AUDIT_ANCHOR_WEBHOOK_TOKEN` | 空 | 外部回执服务 SecretStr token；仅从环境或安全配置注入 |
+| `ASTRA_AUDIT_ANCHOR_TIMEOUT_SECONDS` | `5` | 单次锚定请求超时，范围 1-30 秒 |
+| `ASTRA_AUDIT_ANCHOR_MAX_ATTEMPTS` | `5` | 锚定任务进入 dead-letter 前的最大 attempt 数 |
 | `ASTRA_AUDIT_IP_HASH_SALT` | `astra-dev-audit-salt` | 审计中客户端 IP 哈希盐；生产环境应替换 |
 | `ASTRA_AUDIT_TRUST_FORWARDED_FOR` | `false` | 是否允许审计 IP 哈希读取 `X-Forwarded-For`；默认关闭，防止客户端伪造转发链 |
 | `ASTRA_AUDIT_TRUSTED_PROXY_HOSTS` | 空 | 可信反向代理连接来源，逗号分隔；只有开启 `ASTRA_AUDIT_TRUST_FORWARDED_FOR=true` 且 `request.client.host` 命中该列表时，才使用 `X-Forwarded-For` 首个 IP |
@@ -305,6 +313,7 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 | `ASTRA_BACKGROUND_TASK_WORKER_BASE_BACKOFF_SECONDS` | `30` | 首次可重试失败的退避秒数 |
 | `ASTRA_BACKGROUND_TASK_WORKER_MAX_BACKOFF_SECONDS` | `3600` | 指数退避上限秒数 |
 | `ASTRA_BACKGROUND_TASK_WORKER_CONTENT_SCAN_ENABLED` | `false` | 是否允许统一 worker 执行外网内容脚本扫描；独立默认关闭 |
+| `ASTRA_BACKGROUND_TASK_WORKER_AUDIT_ANCHOR_ENABLED` | `false` | 是否允许统一 worker 执行外部审计锚定；独立默认关闭 |
 | `ASTRA_DATABASE_URL` | `mysql+pymysql://astra:astra@127.0.0.1:3306/astra?charset=utf8mb4` | MySQL 连接字符串 |
 
 可从 `.env.example` 复制本地配置；真实密码不要提交到仓库。
@@ -335,7 +344,8 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 - `app.services.class_join_requests` 负责加入申请审批状态流转和成员关系补齐。
 - `POST /api/classes/{id}/join` 与 `POST /api/classes/{id}/join-requests` 长期并存：前者是保留给学生自助加入、admin 治理、受控导入/邀请码或旧 UI 的 direct join；teacher 角色的普通教师加入必须走后者，由教师/admin 审批后生成 teacher membership；前端不得把审批流表现为唯一加入路径，也不得让普通教师绕过审批自助成为班级 teacher。
 - 学生端不得依赖公共学校/班级发现：`GET /api/classes?mine=true` 只返回当前用户 active membership 对应班级；无班级学生只能使用教师提供的 `class_id` 走 direct join。学生作业中心必须按 `/api/assignments/me` 返回的 class-expanded 条目保留班级上下文。
-- `app.services.audit` 负责写入审计日志及 request_id、IP 哈希、user-agent 等请求元数据；新审计记录会以 `prev_hash/current_hash` 保存应用层 SHA-256 链式哈希，用于追踪篡改迹象，但不能替代备份、binlog、外部归档、WORM 或第三方时间戳；管理端 JSON/CSV 明细导出接口默认剥离 `snapshot_json`，需要审查内容快照时必须显式传入 `include_snapshot=true`，且导出完成后会以 `admin.audit.export` 记录筛选条件、导出格式、导出数量和截断状态，不记录导出条目明细；审计报表摘要以 `admin.audit.report` 留痕，只记录格式、筛选和 bucket 数量；审计留存预检以 `admin.audit.retention_plan` 留痕，只记录策略、候选数量、临期数量、bucket 数量和链边界，不记录候选明细或原始快照；`scripts.archive_audit_logs` 是离线只读归档包导出工具，会生成 JSONL/CSV 数据文件与 Manifest，并支持 SHA-256、记录数和归档文件内部链复验，默认不删除源数据、不写新的审计日志、不提供 WORM 或外部锚定；高频候选摘要以 `admin.audit.high_frequency` 留痕，只记录筛选、时间窗、阈值、总量和维度命中数，不记录候选明细、原始日志 id 或完整 IP 哈希清单。
+- `app.services.audit` 负责写入审计日志及请求元数据；新记录以 `prev_hash/current_hash` 保存应用层 SHA-256 链，并通过单例 `audit_chain_heads` 串行化并发链尾。MySQL 使用数据库行锁，SQLite 本地回归使用事务级进程锁；这仍不能替代备份、binlog 或独立保留的外部回执。管理端 JSON/CSV 明细导出默认剥离 `snapshot_json`，审计摘要不记录候选明细或秘密值。
+- `app.services.audit_archive_anchors` 与 `app.services.audit_anchor_delivery` 负责校验 Manifest/归档文件、创建幂等锚定账本并发送 `astra.audit-archive-anchor.v1` hash-only 信封。稳定 Idempotency-Key、HMAC-SHA256、no-redirect、严格回执 hash 匹配和统一任务重试用于 staging/生产接入；失败只更新独立账本，不改写 `audit_logs`、Manifest 或归档字节。
 - `app.services.audit_archive_drill` 与 `scripts.audit_archive_drill` 提供审计归档/留存生产演练前后的只读姿态报告；检查数据库方言、留存 cutoff、候选/保留/临期数量、归档预览、候选链完整性、敏感字段扫描、操作边界和真实 MySQL/WORM/外部锚定待留证项，不写文件、不写审计、不删除或移动 `audit_logs`，不返回密码、token、密钥、原始快照正文或复核备注。
 - `app.services.audit_chain` 负责复用型审计链校验：按传入顺序重算 `current_hash`、检查相邻记录 `prev_hash` 是否衔接上一条 `current_hash`，并把历史空 hash 作为 partial 状态暴露给 API 与归档 Manifest；它只报告 `current_hash_mismatch`、`prev_hash_mismatch` 和 `null_current_hash`，不执行修复、删除、回填或外部锚定。
 - `/api/admin/bugs` 负责缺陷与风险清单的最小维护；`external_issue_provider/external_issue_id/external_issue_url` 只是外部 issue 链接元数据，不代表已经实现外部平台自动创建或双向状态同步。
@@ -368,16 +378,17 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 python -m pytest backend
 ```
 
-V6.6.55 基线为 303 项全量 pytest；权限/班级策略/统计、外部投递和统一任务专项可运行：
+V6.6.56 基线为 311 项全量 pytest；权限/班级策略/统计、外部投递、统一任务和审计锚定专项可运行：
 
 ```bash
 python -m pytest backend/tests/test_school_classes.py backend/tests/test_access_control.py backend/tests/test_course_learning_loop.py -q
 python -m pytest backend/tests/test_alert_delivery.py -q
 python -m pytest backend/tests/test_background_tasks.py backend/tests/test_background_task_api_worker.py -q
+python -m pytest backend/tests/test_audit_archive.py backend/tests/test_audit_archive_anchor.py backend/tests/test_audit_chain_concurrency.py -q
 node tools/tests/v6653-permission-analytics-contract.cjs
 ```
 
-迁移最低门禁需验证 `upgrade head -> downgrade 20260710_0039 -> upgrade head`，最终 `alembic current` 必须为 `20260710_0040`；SQLite 往返只证明迁移结构可执行，真实 MySQL 仍归 V6.6.60 RC 部署门禁。
+迁移最低门禁需验证 `upgrade head -> downgrade 20260710_0040 -> upgrade head`，最终 `alembic current` 必须为 `20260710_0041`；SQLite 往返只证明迁移结构可执行，真实 MySQL 锁等待仍归 V6.6.60 RC 部署门禁。
 
 权限范围回归可单独运行：
 
@@ -393,7 +404,7 @@ $env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
 python -m alembic upgrade head
 ```
 
-当前 Alembic head：`20260710_0040`。`0038` 新增 `assignments.audience_mode` 与 `assignment_class_policies`，`0039` 新增 `learning_events.knowledge_code`，`0040` 新增统一任务与 attempt 台账。旧 assignment 自动使用 `all_attached_classes`，旧知识快照保持 v1 可读，新重算写入 v2；回滚 0040 会删除任务恢复证据，必须先停 worker、清空或归档队列并备份。
+当前 Alembic head：`20260710_0041`。`0040` 新增统一任务与 attempt 台账，`0041` 新增 `audit_chain_heads/audit_archive_anchors` 并以最新非空审计 hash 初始化单例链尾。回滚 0041 会删除外部回执账本和链尾互斥行，必须先停锚定 worker、导出回执证据并备份；再次升级会从最新审计行重建链尾。
 
 内容脚本远端漂移 CLI：
 
@@ -425,6 +436,7 @@ cd backend
 python -m scripts.run_background_tasks --once
 python -m scripts.run_background_tasks
 python -m scripts.run_background_tasks --enable-content-scan  # 仅在外网访问评审后
+python -m scripts.run_background_tasks --enable-audit-anchor  # 仅在外部回执服务评审后
 ```
 
 生产只选择“FastAPI lifespan 内 worker”或“独立 worker 服务”之一。独立服务可使用进程专属环境开启知识/脚本 scheduler 生产者，API 服务保持对应旧 scheduler 关闭。worker 中断后等待 lease 到期再接管；告警 plan 若停在 `dispatching`，先核对接收端幂等账本，已接收项人工 suppressed/cancelled，确认未接收项才重新 queued 并创建新 plan，禁止直接 retry 盲发。
@@ -435,11 +447,14 @@ python -m scripts.run_background_tasks --enable-content-scan  # 仅在外网访�
 cd backend
 python -m scripts.audit_archive_drill --require-mysql --retention-days 365
 python -m scripts.archive_audit_logs --require-mysql --retention-days 365 --output-dir audit-archives
-python -m scripts.archive_audit_logs --require-mysql --before 2026-07-01T00:00:00Z --format csv --include-snapshot --output-dir audit-archives
+python -m scripts.archive_audit_logs --require-mysql --before 2026-07-01T00:00:00Z --format jsonl --include-snapshot --exported-by <operator> --output-dir audit-archives
 python -m scripts.archive_audit_logs --verify audit-archives/audit-logs-archive-<stamp>.manifest.json
+python -m scripts.anchor_audit_archive --manifest audit-archives/audit-logs-archive-<stamp>.manifest.json --confirm-external-anchor
+python -m scripts.run_background_tasks --once --enable-audit-anchor
+python -m scripts.anchor_audit_archive --status <anchor_id>
 ```
 
-`audit_archive_drill` 默认只读，用于归档演练前后检查留存 cutoff、候选桶、归档预览、候选链完整性、敏感字段扫描和操作边界；它不写文件、不写审计、不删除或移动 `audit_logs`，报告不返回密码、token、密钥、原始快照正文或复核备注。`archive_audit_logs` 按 `created_at <= cutoff` 选择候选，支持 `--retention-days`、`--before`、`--action`、`--resource-type`、`--resource-id`、`--school-id`、`--class-id`、`--event-result`、`--failure-reason`、`--request-id`、`--from` 和 `--to` 过滤。输出 Manifest 记录策略、筛选、导出数量、截断状态、首尾候选、链边界、hash-chain 重算状态、归档文件 SHA-256 和字节数；`--verify` 会复验 SHA-256、记录数和归档文件内部相邻 hash 链，JSONL 且显式 `--include-snapshot` 时可重算 `current_hash`，未导出快照或 CSV 只声明 partial 复核能力。脚本默认不删除 `audit_logs`、不写 `admin.audit.*` 事件、不提供 WORM 或外部锚定。
+`audit_archive_drill` 默认只读。`archive_audit_logs` 输出的 Manifest v2 记录策略、筛选、导出器/导出时间、范围、链边界、hash-chain 状态、归档 SHA-256 和生命周期审批边界；`--verify` 复验文件 hash、记录数和内部相邻链，JSONL + `--include-snapshot` 可重算 `current_hash`，其余场景显式标记 partial。锚定必须在复验通过后显式 `--confirm-external-anchor` 入队，并且 provider 总开关、HTTPS URL/token 与 worker 锚定开关全部有效才会外发。源数据删除仍未实现且被禁止；脱敏必须生成新派生归档、新 Manifest 和新锚点；恢复必须先复验归档/Manifest/外部回执，再走双人变更单与已验证备份审批。
 
 密码重置 token 留存清理：
 

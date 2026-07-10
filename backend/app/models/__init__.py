@@ -2,6 +2,8 @@ from app.models.base import Base
 from app.models.admin import (
     AdminAlertOutboxDispatchPlan,
     AdminAlertOutboxEntry,
+    AuditArchiveAnchor,
+    AuditChainHead,
     AuditLog,
     BackgroundTask,
     BackgroundTaskAttempt,
@@ -37,6 +39,8 @@ __all__ = [
     "AssignmentClassPolicy",
     "AdminAlertOutboxDispatchPlan",
     "AdminAlertOutboxEntry",
+    "AuditArchiveAnchor",
+    "AuditChainHead",
     "AuditLog",
     "BackgroundTask",
     "BackgroundTaskAttempt",

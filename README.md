@@ -8,12 +8,13 @@
 
 星序总览页负责承载一级星系入口；进入某个星系后，才显示该星系自己的二级学科或知识目录。内置 C++ httplib 后端服务器，支持静态文件托管。
 
-> **当前状态**: V6.6.55（2026-07-10）— `houduan` 分支已完成 DB-backed 控制面 + 领域 run 台账的混合任务治理：告警 plan、知识快照和内容脚本扫描统一具备持久化入队、租约、attempt、退避、dead-letter、人工重试/取消与重启恢复；下一版本按 [`doc/09-后端阶段收束小版本开发安排.md`](doc/09-后端阶段收束小版本开发安排.md) 推进 V6.6.56 审计外部锚定和长期可信归档。
+> **当前状态**: V6.6.56（2026-07-10）— `houduan` 分支已完成审计链尾并发串行化、v2 归档 Manifest、默认关闭的 HTTPS hash 回执锚定、持久化失败/重试账本与归档生命周期审批边界；下一版本按 [`doc/09-后端阶段收束小版本开发安排.md`](doc/09-后端阶段收束小版本开发安排.md) 推进 V6.6.57 外部问题系统同步。
 > **Review 回流状态**: 2026-07-06，`review` 分支已交付代码审查报告（审查基线 `V6.5.23 Review 前基线快照`，范围 `re1` 至 `re17`）。本 `houduan` 分支未合并 review 代码修复；后续仅按 `02` / `07` 中记录的优先级在 `houduan` 上选择性吸收。
 > **最新治理**: 2026-07-10，V6.6.53 将班级与课程权限拆成独立授权轴：学生软移除/双范围转班/逐项批量导入，`editor/content_editor/assessment_editor/viewer` 协作者和批量 upsert，以及班级 assignment/积分覆盖均有审计、幂等和越权回归；管理端加入审批使用内联二次确认、写入不重试并同步对账列表与 KPI。
 > **最新学习分析**: `rule_version=v2` 以 effective active assignment-class pair 为分母，按提交/评分/事件/积分自身时间戳稳定输出 course/unit/knowledge_point/assignment 维度；hidden/draft/archived/closed/unassigned 资源不进入当前统计，v1 历史快照保持兼容读取。
 > **最新外部治理**: 外部告警默认关闭，只在 admin 显式确认、plan/hash/due/expiry 再校验通过且 HTTPS URL/SecretStr token 安全注入后发送脱敏信封；真实 staging 目标、出口网络、接收端验签/幂等与回执仍待部署留证。
 > **最新任务治理**: `background_tasks/background_task_attempts` 保存统一任务控制面，worker 以数据库租约竞争并复用知识快照/脚本扫描领域 run 去重；管理端只返回脱敏摘要，可查看队列和尝试记录并显式 retry/cancel。内容脚本 worker 的外网执行仍默认关闭，真实 MySQL 多进程竞争证据保留到 RC 门禁。
+> **最新审计可信边界**: `audit_chain_heads` 在 MySQL 使用行锁串行化链尾，SQLite 本地回归使用事务级进程锁；归档 Manifest v2 记录范围、文件 hash、导出人/导出时间和生命周期策略。外部锚定只发送 hash/范围摘要，失败进入统一任务退避且不改写审计链或归档原件；真实 staging 回执、真实 MySQL 锁等待和外部服务保留策略仍待 V6.6.60 留证。
 > **最新隔离**: `physics/energy-conservation` 已迁入后端 allowlist sandbox DOM 模板与 root-scoped initializer，继续保持 `sandbox="allow-scripts"`、opaque origin、CSP nonce、静态回退和 opt-in 接入；未知模板或非法 document contract fail closed。
 > **最新缓存边界**: `/api` 与 `/api/*` 由 FastAPI 全状态 `no-store`，Service Worker 在路由最前面直接旁路 API；安装失败不再激活不完整静态缓存。桌面登录态/真实写入和外部 Chrome 390×844 的三端门禁、sandbox 交互、网络失败/恢复均已回归。
 > **下一阶段规划**: Python + MySQL 后端化、内容协议、登录用户体系与管理员 / 教师 / 学生三端平台设计，详见 [`doc/07-后端优化与设计.md`](doc/07-后端优化与设计.md)
@@ -27,6 +28,7 @@
 
 | 版本 | 发布日期 | 主题 | 详情 |
 |------|---------|------|------|
+| **v6.6.56（houduan）** | 2026-07-10 | 审计链并发串行化、Manifest v2、HTTPS hash 回执锚定与生命周期审批边界 | [→](doc/09-后端阶段收束小版本开发安排.md) |
 | **v6.6.55（houduan）** | 2026-07-10 | DB-backed 任务控制面、租约重试、dead-letter 与领域幂等恢复 | [→](doc/09-后端阶段收束小版本开发安排.md) |
 | **v6.6.54（houduan）** | 2026-07-10 | 默认关闭的 Webhook 告警投递、状态机、幂等与审计 | [→](doc/09-后端阶段收束小版本开发安排.md) |
 | **v6.6.53（houduan）** | 2026-07-10 | 复杂权限矩阵、班级作业策略与 v2 多维学习分析 | [→](doc/09-后端阶段收束小版本开发安排.md) |

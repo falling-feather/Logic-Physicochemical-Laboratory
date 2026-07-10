@@ -15,6 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.core.config import get_settings
 from app.db.session import check_database, make_engine
 from app.services.alert_delivery import alert_delivery_posture
+from app.services.audit_anchor_delivery import audit_anchor_posture
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -49,8 +50,12 @@ def run_preflight(
 def _configuration_report(settings: Any, *, require_mysql: bool) -> dict[str, Any]:
     auto_create_tables = bool(settings.auto_create_tables)
     delivery_posture = alert_delivery_posture(settings)
+    anchor_posture = audit_anchor_posture(settings)
     if delivery_posture["enabled"] and not delivery_posture["configured"]:
         status = "alert_delivery_not_configured"
+        ok = False
+    elif anchor_posture["enabled"] and not anchor_posture["configured"]:
+        status = "audit_anchor_not_configured"
         ok = False
     elif require_mysql and auto_create_tables:
         status = "auto_create_tables_enabled"
@@ -70,6 +75,7 @@ def _configuration_report(settings: Any, *, require_mysql: bool) -> dict[str, An
         "expected_auto_create_tables": False,
         "auto_create_tables_policy": "must_be_false_when_require_mysql",
         "alert_delivery": delivery_posture,
+        "audit_anchor": anchor_posture,
         "background_task_worker": {
             "enabled": settings.background_task_worker_enabled,
             "queue_backend": "database",
@@ -80,6 +86,7 @@ def _configuration_report(settings: Any, *, require_mysql: bool) -> dict[str, An
             "base_backoff_seconds": settings.background_task_worker_base_backoff_seconds,
             "max_backoff_seconds": settings.background_task_worker_max_backoff_seconds,
             "content_scan_enabled": settings.background_task_worker_content_scan_enabled,
+            "audit_anchor_enabled": settings.background_task_worker_audit_anchor_enabled,
             "payload_returned": False,
             "lease_token_returned": False,
         },

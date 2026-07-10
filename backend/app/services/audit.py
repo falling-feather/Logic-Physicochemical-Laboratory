@@ -1,19 +1,23 @@
 import hashlib
 import json
 from datetime import UTC, datetime
+from threading import Lock
 from typing import Any
 
 from fastapi import Request
 from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 
-from app.models import AuditLog, User
+from app.models import AuditChainHead, AuditLog, User
 from app.models.base import utc_now
 from app.services.request_metadata import request_metadata
 
 
 _AUDIT_CHAIN_VERSION = 1
 _AUDIT_CHAIN_SESSION_KEY = "audit_chain_tail"
+_AUDIT_CHAIN_HEAD_SESSION_KEY = "audit_chain_head"
+_AUDIT_SQLITE_LOCK_SESSION_KEY = "audit_sqlite_chain_lock"
+_AUDIT_SQLITE_CHAIN_LOCK = Lock()
 _AUDIT_REDACTION = {"redacted": True, "reason": "audit_snapshot_policy"}
 _SENSITIVE_AUDIT_FIELD_NAMES = {
     "authorization",
@@ -109,7 +113,14 @@ def record_audit_log(
     )
     audit_log.current_hash = audit_log_chain_hash(audit_log)
     db.info[_AUDIT_CHAIN_SESSION_KEY] = audit_log.current_hash
+    chain_head = db.info.get(_AUDIT_CHAIN_HEAD_SESSION_KEY)
+    if isinstance(chain_head, AuditChainHead):
+        chain_head.current_hash = audit_log.current_hash
+        chain_head.current_audit_log_id = None
     db.add(audit_log)
+    db.flush([audit_log])
+    if isinstance(chain_head, AuditChainHead):
+        chain_head.current_audit_log_id = audit_log.id
     return audit_log
 
 
@@ -171,13 +182,37 @@ def _previous_hash(db: Session) -> str | None:
     in_session_hash = db.info.get(_AUDIT_CHAIN_SESSION_KEY)
     if isinstance(in_session_hash, str):
         return in_session_hash
+    if db.get_bind().dialect.name == "sqlite" and not db.info.get(_AUDIT_SQLITE_LOCK_SESSION_KEY):
+        _AUDIT_SQLITE_CHAIN_LOCK.acquire()
+        db.info[_AUDIT_SQLITE_LOCK_SESSION_KEY] = True
     with db.no_autoflush:
-        return db.scalar(
-            select(AuditLog.current_hash)
+        head = db.scalar(
+            select(AuditChainHead)
+            .where(AuditChainHead.id == 1)
+            .with_for_update()
+        )
+        latest = db.execute(
+            select(AuditLog.id, AuditLog.current_hash)
             .where(AuditLog.current_hash.is_not(None))
             .order_by(AuditLog.id.desc())
             .limit(1)
-        )
+            .with_for_update()
+        ).first()
+        latest_id = int(latest.id) if latest is not None else None
+        latest_hash = str(latest.current_hash) if latest is not None else None
+        if head is None:
+            head = AuditChainHead(
+                id=1,
+                current_audit_log_id=latest_id,
+                current_hash=latest_hash,
+            )
+            db.add(head)
+            db.flush()
+        elif head.current_audit_log_id != latest_id or head.current_hash != latest_hash:
+            head.current_audit_log_id = latest_id
+            head.current_hash = latest_hash
+        db.info[_AUDIT_CHAIN_HEAD_SESSION_KEY] = head
+        return latest_hash
 
 
 def _datetime_token(value: datetime | None) -> str | None:
@@ -192,3 +227,6 @@ def _datetime_token(value: datetime | None) -> str | None:
 def _clear_audit_chain_tail(session: Session, transaction: Any) -> None:
     if transaction.parent is None:
         session.info.pop(_AUDIT_CHAIN_SESSION_KEY, None)
+        session.info.pop(_AUDIT_CHAIN_HEAD_SESSION_KEY, None)
+        if session.info.pop(_AUDIT_SQLITE_LOCK_SESSION_KEY, False):
+            _AUDIT_SQLITE_CHAIN_LOCK.release()

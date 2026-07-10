@@ -39,6 +39,8 @@ def test_deploy_preflight_reports_migrated_database(monkeypatch):
         assert report["configuration"]["background_task_worker"]["queue_backend"] == "database"
         assert report["configuration"]["background_task_worker"]["payload_returned"] is False
         assert report["configuration"]["background_task_worker"]["lease_token_returned"] is False
+        assert report["configuration"]["audit_anchor"]["enabled"] is False
+        assert report["configuration"]["audit_anchor"]["payload_policy"] == "hashes_and_range_only"
         assert report["database"]["ok"] is True
         assert report["migrations"]["status"] == "up_to_date"
         assert report["migrations"]["current"] == report["migrations"]["heads"]
@@ -158,6 +160,31 @@ def test_deploy_preflight_accepts_complete_alert_delivery_without_leaking_creden
     assert report["alert_delivery"]["configured"] is True
     assert "alerts.example.test" not in str(report)
     assert "preflight-secret-token" not in str(report)
+
+
+def test_deploy_preflight_rejects_incomplete_audit_anchor_and_accepts_https_configuration(monkeypatch):
+    monkeypatch.setenv("ASTRA_AUDIT_ANCHOR_ENABLED", "true")
+    monkeypatch.setenv("ASTRA_AUDIT_ANCHOR_WEBHOOK_URL", "")
+    monkeypatch.setenv("ASTRA_AUDIT_ANCHOR_WEBHOOK_TOKEN", "")
+    get_settings.cache_clear()
+
+    incomplete = deploy_preflight._configuration_report(get_settings(), require_mysql=False)
+    assert incomplete["ok"] is False
+    assert incomplete["status"] == "audit_anchor_not_configured"
+    assert incomplete["audit_anchor"]["enabled"] is True
+    assert incomplete["audit_anchor"]["configured"] is False
+    assert "url" not in incomplete["audit_anchor"]
+    assert "token" not in incomplete["audit_anchor"]
+
+    monkeypatch.setenv("ASTRA_AUDIT_ANCHOR_WEBHOOK_URL", "https://anchor.example.test/v1/receipts")
+    monkeypatch.setenv("ASTRA_AUDIT_ANCHOR_WEBHOOK_TOKEN", "audit-anchor-secret-token")
+    get_settings.cache_clear()
+    complete = deploy_preflight._configuration_report(get_settings(), require_mysql=False)
+    assert complete["ok"] is True
+    assert complete["status"] == "ready"
+    assert complete["audit_anchor"]["configured"] is True
+    assert "anchor.example.test" not in str(complete)
+    assert "audit-anchor-secret-token" not in str(complete)
 
 
 def test_deploy_preflight_mysql_compatibility_accepts_utf8mb4(monkeypatch):
@@ -576,3 +603,60 @@ def _dispose_and_remove(database_url: str, database_path: Path) -> None:
     reset_database_state()
     if database_path.exists():
         database_path.unlink()
+
+
+def test_audit_archive_anchor_migration_round_trip_seeds_chain_head(monkeypatch):
+    backend_root = Path(__file__).resolve().parents[1]
+    runtime_dir = backend_root / "pytest-cache-files-preflight"
+    runtime_dir.mkdir(exist_ok=True)
+    database_path = runtime_dir / f"audit-anchor-{uuid4().hex}.db"
+    database_url = f"sqlite+pysqlite:///{database_path.as_posix()}"
+    try:
+        monkeypatch.setenv("ASTRA_DATABASE_URL", database_url)
+        get_settings.cache_clear()
+        reset_database_state()
+        config = Config(str(backend_root / "alembic.ini"))
+        config.set_main_option("script_location", str(backend_root / "alembic"))
+        command.upgrade(config, "20260710_0040")
+        audit_id = _insert_audit_log(database_url)
+        with make_engine(database_url).begin() as connection:
+            connection.execute(
+                text("UPDATE audit_logs SET current_hash = :current_hash WHERE id = :audit_id"),
+                {"current_hash": "c" * 64, "audit_id": audit_id},
+            )
+
+        command.upgrade(config, "head")
+        with make_engine(database_url).connect() as connection:
+            head = connection.execute(
+                text("SELECT id, current_audit_log_id, current_hash FROM audit_chain_heads")
+            ).mappings().one()
+            anchor_count = connection.execute(text("SELECT COUNT(*) FROM audit_archive_anchors")).scalar_one()
+        assert head["id"] == 1
+        assert head["current_audit_log_id"] == audit_id
+        assert head["current_hash"] == "c" * 64
+        assert anchor_count == 0
+
+        command.downgrade(config, "20260710_0040")
+        with make_engine(database_url).connect() as connection:
+            tables = {
+                row[0]
+                for row in connection.execute(
+                    text("SELECT name FROM sqlite_master WHERE type = 'table'")
+                ).all()
+            }
+        assert "audit_chain_heads" not in tables
+        assert "audit_archive_anchors" not in tables
+
+        command.upgrade(config, "head")
+        with make_engine(database_url).connect() as connection:
+            restored = connection.execute(
+                text("SELECT current_audit_log_id, current_hash FROM audit_chain_heads")
+            ).mappings().one()
+        assert restored["current_audit_log_id"] == audit_id
+        assert restored["current_hash"] == "c" * 64
+    finally:
+        make_engine(database_url).dispose()
+        get_settings.cache_clear()
+        reset_database_state()
+        if database_path.exists():
+            database_path.unlink()

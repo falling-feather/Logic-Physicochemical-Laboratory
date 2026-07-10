@@ -58,10 +58,14 @@ def test_audit_archive_drill_reports_ready_read_only_posture(client):
     assert report["archive_preview"]["include_snapshot_default"] is False
     assert report["archive_preview"]["chain_scope"] == "filtered_candidate_subset"
     assert report["archive_preview"]["counts"]["previewed_count"] == 2
+    assert report["archive_preview"]["capabilities"]["external_anchor"] is True
     assert report["chain_integrity"]["chain_status"] == "valid"
     assert report["chain_integrity"]["chain_scope"] == "filtered_candidate_subset"
     assert report["sensitive_field_scan"]["counts"]["issues"] == 0
     assert report["operation_boundaries"]["writes_audit_event"] is False
+    assert report["operation_boundaries"]["external_anchor"] is False
+    assert report["operation_boundaries"]["external_anchor_supported"] is True
+    assert report["operation_boundaries"]["external_anchor_posture"]["enabled"] is False
     assert report["sensitive_values_returned"] is False
     assert before_count == after_count
     assert not output_dir.exists()

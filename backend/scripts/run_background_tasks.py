@@ -19,12 +19,19 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Allow queued content script scans to perform external network requests.",
     )
+    parser.add_argument(
+        "--enable-audit-anchor",
+        action="store_true",
+        help="Allow queued audit archive anchors to call the configured external receipt service.",
+    )
     args = parser.parse_args(argv)
     settings = get_settings().model_copy(deep=True)
     if args.database_url:
         settings.database_url = args.database_url
     if args.enable_content_scan:
         settings.background_task_worker_content_scan_enabled = True
+    if args.enable_audit_anchor:
+        settings.background_task_worker_audit_anchor_enabled = True
     worker = BackgroundTaskWorker(settings=settings, worker_id=args.worker_id)
     if args.once:
         report = worker.run_once_sync().as_dict()

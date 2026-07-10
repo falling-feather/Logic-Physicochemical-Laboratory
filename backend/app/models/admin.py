@@ -46,6 +46,43 @@ class AuditLog(TimestampMixin, Base):
     snapshot_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
 
 
+class AuditChainHead(TimestampMixin, Base):
+    __tablename__ = "audit_chain_heads"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    current_audit_log_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    current_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class AuditArchiveAnchor(TimestampMixin, Base):
+    __tablename__ = "audit_archive_anchors"
+    __table_args__ = (UniqueConstraint("manifest_sha256", name="uq_audit_archive_anchors_manifest_sha256"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="pending", index=True, nullable=False)
+    manifest_schema_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    manifest_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    manifest_path_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    archive_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    evidence_level: Mapped[str] = mapped_column(String(32), nullable=False)
+    exported_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    first_log_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    last_log_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    oldest_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    newest_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    chain_start_prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    chain_end_current_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    anchored_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
+    external_receipt_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    external_anchored_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    receipt_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+
+
 class AdminAlertOutboxDispatchPlan(TimestampMixin, Base):
     __tablename__ = "admin_alert_outbox_dispatch_plans"
     __table_args__ = (UniqueConstraint("plan_key", name="uq_admin_alert_outbox_dispatch_plans_plan_key"),)

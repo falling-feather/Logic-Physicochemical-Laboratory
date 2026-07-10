@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import date
 import logging
 import os
+from pathlib import Path
 import socket
 from typing import Any, Callable
 from uuid import uuid4
@@ -19,6 +20,8 @@ from app.models.base import utc_now
 from app.services.alert_delivery import AlertDeliveryAdapter, build_alert_delivery_adapter
 from app.services.alert_dispatch_tasks import AlertDispatchTaskError, dispatch_alert_plan_from_background_task
 from app.services.audit import record_audit_log
+from app.services.audit_anchor_delivery import AuditAnchorAdapter, build_audit_anchor_adapter
+from app.services.audit_archive_anchors import AuditArchiveAnchorError, execute_audit_archive_anchor
 from app.services.background_tasks import (
     BackgroundTaskLease,
     claim_next_background_task,
@@ -53,6 +56,7 @@ BACKGROUND_TASK_TYPES = {
     "alert_outbox_dispatch_plan",
     "knowledge_snapshot_rebuild",
     "content_script_asset_scan",
+    "audit_archive_anchor",
 }
 logger = logging.getLogger(__name__)
 
@@ -100,10 +104,14 @@ class BackgroundTaskWorker:
         settings: Settings,
         worker_id: str | None = None,
         adapter_factory: Callable[[Settings], AlertDeliveryAdapter] = build_alert_delivery_adapter,
+        audit_anchor_adapter_factory: Callable[[Settings], AuditAnchorAdapter] = build_audit_anchor_adapter,
+        task_type_allowlist: set[str] | None = None,
     ) -> None:
         self.settings = settings
         self.worker_id = worker_id or _default_worker_id()
         self.adapter_factory = adapter_factory
+        self.audit_anchor_adapter_factory = audit_anchor_adapter_factory
+        self.task_type_allowlist = set(task_type_allowlist) if task_type_allowlist is not None else None
         self._stop_event: asyncio.Event | None = None
         self._task: asyncio.Task | None = None
 
@@ -380,6 +388,8 @@ class BackgroundTaskWorker:
             return self._execute_knowledge_snapshot(db, lease)
         if lease.task_type == "content_script_asset_scan":
             return self._execute_content_script_scan(db, lease, actor)
+        if lease.task_type == "audit_archive_anchor":
+            return self._execute_audit_archive_anchor(db, lease)
         raise BackgroundTaskExecutionError("unsupported_task_type", retryable=False)
 
     def _execute_alert_plan(
@@ -557,10 +567,38 @@ class BackgroundTaskWorker:
                 lease_seconds=self.settings.background_task_worker_lease_seconds,
             )
 
+    def _execute_audit_archive_anchor(
+        self,
+        db: Session,
+        lease: BackgroundTaskLease,
+    ) -> dict[str, Any]:
+        anchor_id = _positive_int(lease.payload.get("anchor_id"), "invalid_audit_anchor_payload")
+        if lease.source_id is not None and lease.source_id != anchor_id:
+            raise BackgroundTaskExecutionError("invalid_audit_anchor_payload", retryable=False)
+        manifest_path_value = _optional_string(lease.payload.get("manifest_path"))
+        if manifest_path_value is None:
+            raise BackgroundTaskExecutionError("invalid_audit_anchor_payload", retryable=False)
+        if not self._heartbeat(lease):
+            raise BackgroundTaskExecutionError("background_task_lease_lost", retryable=True)
+        try:
+            return execute_audit_archive_anchor(
+                db,
+                anchor_id=anchor_id,
+                manifest_path=Path(manifest_path_value),
+                settings=self.settings,
+                adapter_factory=self.audit_anchor_adapter_factory,
+            )
+        except AuditArchiveAnchorError as exc:
+            raise BackgroundTaskExecutionError(exc.code, retryable=exc.retryable) from None
+
     def _enabled_task_types(self) -> set[str]:
         task_types = set(BACKGROUND_TASK_TYPES)
         if not self.settings.background_task_worker_content_scan_enabled:
             task_types.remove("content_script_asset_scan")
+        if not self.settings.background_task_worker_audit_anchor_enabled:
+            task_types.remove("audit_archive_anchor")
+        if self.task_type_allowlist is not None:
+            task_types.intersection_update(self.task_type_allowlist)
         return task_types
 
 

@@ -12,6 +12,7 @@ from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import Session
 
 from app.models import AuditLog
+from app.services.audit_anchor_delivery import audit_anchor_posture
 from app.services.audit_chain import verify_audit_log_chain
 
 
@@ -122,7 +123,7 @@ def run_audit_archive_drill(
             "archive_preview": _not_run_section("invalid_arguments"),
             "chain_integrity": _not_run_section("invalid_arguments"),
             "sensitive_field_scan": _not_run_section("invalid_arguments"),
-            "operation_boundaries": _operation_boundaries_report(output_dir=output_dir),
+            "operation_boundaries": _operation_boundaries_report(output_dir=output_dir, settings=settings),
             "evidence_required": _evidence_required(),
             "sensitive_values_returned": False,
         }
@@ -190,7 +191,7 @@ def run_audit_archive_drill(
             scan_limit=limit,
             issue_limit=issue_limit,
         ),
-        "operation_boundaries": _operation_boundaries_report(output_dir=output_dir),
+        "operation_boundaries": _operation_boundaries_report(output_dir=output_dir, settings=settings),
     }
     ok = bool(database["ok"] and parameters["ok"] and all(section["ok"] for section in sections.values()))
     return {
@@ -339,7 +340,7 @@ def _archive_preview_report(
             "delete": False,
             "purge": False,
             "worm": False,
-            "external_anchor": False,
+            "external_anchor": True,
         },
     )
 
@@ -450,7 +451,7 @@ def _sensitive_field_scan_report(
     )
 
 
-def _operation_boundaries_report(*, output_dir: str | Path) -> dict[str, Any]:
+def _operation_boundaries_report(*, output_dir: str | Path, settings: Any) -> dict[str, Any]:
     return _section_report(
         status="ready",
         counts={"issues": 0},
@@ -465,13 +466,19 @@ def _operation_boundaries_report(*, output_dir: str | Path) -> dict[str, Any]:
         worm=False,
         external_timestamp=False,
         external_anchor=False,
+        external_anchor_supported=True,
+        external_anchor_posture=audit_anchor_posture(settings),
         restore_drill=False,
         cleanup_proof=False,
         policy={
             "archive_script": "scripts.archive_audit_logs",
             "archive_script_default_include_snapshot": False,
             "archive_script_verify_manifest": True,
+            "anchor_script": "scripts.anchor_audit_archive",
+            "anchor_requires_explicit_confirmation": True,
             "destructive_cleanup_supported": False,
+            "redaction_policy": "new_derived_archive_new_manifest_new_anchor",
+            "restore_policy": "verify_archive_manifest_receipt_then_two_person_approval",
         },
     )
 

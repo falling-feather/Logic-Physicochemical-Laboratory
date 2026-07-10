@@ -12,6 +12,7 @@ from app.db.session import get_session_factory
 from app.models import (
     AdminAlertOutboxDispatchPlan,
     AdminAlertOutboxEntry,
+    AuditChainHead,
     AuditLog,
     AuthSession,
     ContentPageRecord,
@@ -1211,6 +1212,45 @@ def test_audit_hash_chain_links_multiple_logs_in_one_transaction(client):
         original_second_hash = second.current_hash
         second.snapshot_json = {"value": "tampered"}
         assert audit_log_chain_hash(second) != original_second_hash
+
+
+def test_audit_hash_chain_head_tracks_commits_and_repairs_a_stale_tail(client):
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        first = record_audit_log(
+            db,
+            action="test.audit.chain_head.first",
+            resource_type="test_resource",
+            event_result="success",
+        )
+        db.commit()
+        first_id = first.id
+        first_hash = first.current_hash
+
+    with session_factory() as db:
+        head = db.get(AuditChainHead, 1)
+        assert head.current_audit_log_id == first_id
+        assert head.current_hash == first_hash
+        head.current_audit_log_id = 999999
+        head.current_hash = "f" * 64
+        db.commit()
+
+    with session_factory() as db:
+        second = record_audit_log(
+            db,
+            action="test.audit.chain_head.second",
+            resource_type="test_resource",
+            event_result="success",
+        )
+        assert second.prev_hash == first_hash
+        db.commit()
+        second_id = second.id
+        second_hash = second.current_hash
+
+    with session_factory() as db:
+        head = db.get(AuditChainHead, 1)
+        assert head.current_audit_log_id == second_id
+        assert head.current_hash == second_hash
 
 
 def test_admin_can_reset_user_password_and_revoke_sessions(client):
