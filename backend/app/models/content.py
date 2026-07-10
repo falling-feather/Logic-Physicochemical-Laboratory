@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -157,7 +157,11 @@ class ContentScriptHostPolicy(TimestampMixin, Base):
 
 class ContentScriptAssetScanRun(TimestampMixin, Base):
     __tablename__ = "content_script_asset_scan_runs"
-    __table_args__ = (UniqueConstraint("run_key", name="uq_content_script_asset_scan_runs_run_key"),)
+    __table_args__ = (
+        UniqueConstraint("run_key", name="uq_content_script_asset_scan_runs_run_key"),
+        Index("ix_script_scan_type_started", "scan_type", "started_at", "id"),
+        Index("ix_script_scan_status_started", "status", "started_at", "id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     run_key: Mapped[str] = mapped_column(String(160), index=True, nullable=False)

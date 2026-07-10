@@ -17,6 +17,7 @@ from app.db.session import check_database, make_engine
 from app.services.alert_delivery import alert_delivery_posture
 from app.services.audit_anchor_delivery import audit_anchor_posture
 from app.services.external_issue_providers import external_issue_sync_posture
+from app.services.backend_performance import performance_posture
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -82,6 +83,7 @@ def _configuration_report(settings: Any, *, require_mysql: bool) -> dict[str, An
         "alert_delivery": delivery_posture,
         "audit_anchor": anchor_posture,
         "external_issue_sync": issue_sync_posture,
+        "performance": performance_posture(settings),
         "background_task_worker": {
             "enabled": settings.background_task_worker_enabled,
             "queue_backend": "database",

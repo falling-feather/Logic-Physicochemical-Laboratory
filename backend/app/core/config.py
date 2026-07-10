@@ -81,6 +81,21 @@ class Settings(BaseSettings):
     background_task_worker_max_backoff_seconds: int = Field(default=3600, ge=30, le=24 * 60 * 60)
     background_task_worker_content_scan_enabled: bool = False
     background_task_worker_audit_anchor_enabled: bool = False
+    database_pool_size: int = Field(default=10, ge=1, le=100)
+    database_max_overflow: int = Field(default=10, ge=0, le=100)
+    database_pool_timeout_seconds: int = Field(default=30, ge=1, le=300)
+    database_pool_recycle_seconds: int = Field(default=1800, ge=30, le=24 * 60 * 60)
+    database_connect_timeout_seconds: int = Field(default=10, ge=1, le=60)
+    database_read_timeout_seconds: int = Field(default=30, ge=1, le=300)
+    database_write_timeout_seconds: int = Field(default=30, ge=1, le=300)
+    performance_slow_query_logging_enabled: bool = True
+    performance_slow_query_threshold_ms: int = Field(default=500, ge=1, le=60_000)
+    performance_slow_request_logging_enabled: bool = True
+    performance_slow_request_threshold_ms: int = Field(default=1000, ge=1, le=60_000)
+    performance_core_api_budget_ms: int = Field(default=500, ge=1, le=60_000)
+    performance_admin_api_budget_ms: int = Field(default=1000, ge=1, le=60_000)
+    performance_export_budget_ms: int = Field(default=5000, ge=1, le=120_000)
+    performance_probe_iterations: int = Field(default=3, ge=1, le=20)
     database_url: str = Field(
         default="mysql+pymysql://astra:astra@127.0.0.1:3306/astra?charset=utf8mb4",
         description="SQLAlchemy database URL. MySQL is the production target.",

@@ -10,6 +10,8 @@ V6.6.56 选择默认关闭的 HTTPS hash 回执作为审计外部锚定方案。
 
 V6.6.57 已新增外部 issue provider 协议与首个 GitHub REST 适配器。管理员可沿用 `BugRecord.external_issue_provider/id/url` 手工绑定，也可显式确认创建 issue、同步本地状态和发送单条安全评论；`bug_external_sync_operations` 以稳定操作键记录 create/status/comment 的 attempt、成功、失败或 ambiguous 状态，成功操作可恢复读取，创建和评论的未知结果禁止盲重试。系统不自动接收外部状态，不让外部 issue 覆盖本地字段；自动创建只发送本地编号、分类、严重度、状态和本地权威声明，不发送 evidence、notes、source、URL 或凭据。当前只有 GitHub 可执行，Gitee/Jira 仅保留 provider 扩展位；真实 GitHub staging 和凭据/限流证据归 V6.6.60。
 
+V6.6.58 已新增 `app.services.backend_performance`、`scripts.backend_performance_drill` 与管理端性能报告。11 个 query profile 覆盖审计、知识快照 run、脚本扫描 run、待批改、任务 claim、Bug 和外部同步账本；Alembic 0043 新增 10 个复合索引，并复用 0040 既有任务 claim 索引。报告可执行 EXPLAIN 和 3 轮最多 50 行的有界基准，只返回索引/访问方式/耗时/行数摘要，不返回 SQL、参数、结果值或数据库 URL。API 返回 `Server-Timing`，慢 API 只记录 request id/方法/路由模板/状态/耗时，慢 SQL 只记录语句 hash/操作/方言/耗时。MySQL 配置显式定义 pool size、overflow、等待/回收和 connect/read/write timeout；`pool_pre_ping` 与 LIFO 保留，事务写入不自动重试，worker 推荐独立服务。
+
 ## 本地启动
 
 ```bash
@@ -122,6 +124,7 @@ python -m scripts.backend_stage_gate --require-mysql \
 | POST | `/api/admin/content/script-assets/remote-drift-alerts/outbox` | 管理端内容脚本远端漂移告警 outbox 入队；请求体需 `confirm_observe_only=true`，按 `content_script_asset_scan_run_alert` source type 与候选 dedupe key 幂等创建或刷新 `pending_review` 人工复核项，不保存原始 CDN URL、完整 SRI、远端字节、异常明细或 `scheduler_lease_token`，不发送邮件/短信/Webhook、不自动封禁 host 或处置 run |
 | GET/PATCH | `/api/admin/content/script-host-policies` / `/api/admin/content/script-host-policies/{source_host}` | 管理端内容脚本 CDN host 信任治理；列表合并已观测 host、配置 allowlist host 和持久化 policy，更新支持 `trusted/watch/blocked` 状态与原因；`blocked` 会阻断草稿创建/编辑、脚本审核、发布和回滚，`trusted/watch` 不绕过 allowlist/SRI/审核/发布前下载校验 |
 | GET | `/api/admin/stats` | 管理端全站统计摘要；仅全局管理员读取 |
+| GET | `/api/admin/performance/report` | 管理端索引/EXPLAIN/有界基准报告；可关闭 explain/benchmark 或要求 MySQL，响应与审计不返回 SQL、参数、结果值或数据库 URL |
 | GET | `/api/admin/knowledge-snapshot-runs` | 管理端知识快照运行记录；支持 status/granularity/trigger_source/时间窗分页过滤，不返回 `scheduler_lease_token` |
 | GET | `/api/admin/knowledge-snapshot-runs/health` | 管理端知识快照运行健康摘要；汇总 stale running、lease expiring、claimable、retryable/exhausted failed、problem runs，不返回 lease token 或 metadata |
 | GET | `/api/admin/knowledge-snapshot-runs/queue` | 管理端知识快照调度积压摘要；区分 dispatchable now、claimable by lease rule、manual requeue 和 blocked runs，不返回 lease token 或 metadata |
@@ -329,6 +332,16 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 | `ASTRA_BACKGROUND_TASK_WORKER_MAX_BACKOFF_SECONDS` | `3600` | 指数退避上限秒数 |
 | `ASTRA_BACKGROUND_TASK_WORKER_CONTENT_SCAN_ENABLED` | `false` | 是否允许统一 worker 执行外网内容脚本扫描；独立默认关闭 |
 | `ASTRA_BACKGROUND_TASK_WORKER_AUDIT_ANCHOR_ENABLED` | `false` | 是否允许统一 worker 执行外部审计锚定；独立默认关闭 |
+| `ASTRA_DATABASE_POOL_SIZE` / `MAX_OVERFLOW` | `10` / `10` | MySQL 单进程常驻连接和临时溢出上限；API/独立 worker 分进程分别计算 |
+| `ASTRA_DATABASE_POOL_TIMEOUT_SECONDS` / `POOL_RECYCLE_SECONDS` | `30` / `1800` | 获取连接等待和连接回收秒数；继续启用 `pool_pre_ping` 与 LIFO |
+| `ASTRA_DATABASE_CONNECT_TIMEOUT_SECONDS` | `10` | PyMySQL 建连超时秒数 |
+| `ASTRA_DATABASE_READ_TIMEOUT_SECONDS` / `WRITE_TIMEOUT_SECONDS` | `30` / `30` | PyMySQL 单次读写超时；应用不自动重试业务写事务 |
+| `ASTRA_PERFORMANCE_SLOW_QUERY_LOGGING_ENABLED` / `THRESHOLD_MS` | `true` / `500` | 慢 SQL 指纹日志；只记录 hash/操作/方言/耗时，不记录 SQL 或参数 |
+| `ASTRA_PERFORMANCE_SLOW_REQUEST_LOGGING_ENABLED` / `THRESHOLD_MS` | `true` / `1000` | 慢 API 日志；只记录 request id、方法、路由模板、状态和耗时 |
+| `ASTRA_PERFORMANCE_CORE_API_BUDGET_MS` | `500` | 核心读取 API 预算基线 |
+| `ASTRA_PERFORMANCE_ADMIN_API_BUDGET_MS` | `1000` | 管理列表/query profile 单次预算基线 |
+| `ASTRA_PERFORMANCE_EXPORT_BUDGET_MS` | `5000` | 有界导出/性能报告总预算基线 |
+| `ASTRA_PERFORMANCE_PROBE_ITERATIONS` | `3` | 性能报告每个 query profile 的有界基准轮数，范围 1-20 |
 | `ASTRA_DATABASE_URL` | `mysql+pymysql://astra:astra@127.0.0.1:3306/astra?charset=utf8mb4` | MySQL 连接字符串 |
 
 可从 `.env.example` 复制本地配置；真实密码不要提交到仓库。
@@ -364,6 +377,7 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 - `app.services.audit_archive_drill` 与 `scripts.audit_archive_drill` 提供审计归档/留存生产演练前后的只读姿态报告；检查数据库方言、留存 cutoff、候选/保留/临期数量、归档预览、候选链完整性、敏感字段扫描、操作边界和真实 MySQL/WORM/外部锚定待留证项，不写文件、不写审计、不删除或移动 `audit_logs`，不返回密码、token、密钥、原始快照正文或复核备注。
 - `app.services.audit_chain` 负责复用型审计链校验：按传入顺序重算 `current_hash`、检查相邻记录 `prev_hash` 是否衔接上一条 `current_hash`，并把历史空 hash 作为 partial 状态暴露给 API 与归档 Manifest；它只报告 `current_hash_mismatch`、`prev_hash_mismatch` 和 `null_current_hash`，不执行修复、删除、回填或外部锚定。
 - `/api/admin/bugs` 仍以本地 `BugRecord` 为唯一权威；V6.6.57 支持手工绑定和显式 GitHub 创建/状态/评论出站同步，但不做自动入站或双向覆盖。`app.services.external_issue_providers` 负责 HTTPS provider 合同、回执校验和敏感文本门禁，`app.services.bug_external_sync` 负责稳定操作键、失败/歧义账本与本地成功提交；Gitee/Jira 尚未实现。
+- `app.services.backend_performance` 固化高频查询、必要索引、分页上限、响应预算、worker/连接池姿态和延期风险；性能报告只读执行 EXPLAIN/有界 SELECT，不执行写入、不回传 SQL/参数/结果值。SQLite 报告只能证明本地合同，真实 MySQL `EXPLAIN ANALYZE`、buffer pool、filesort、锁等待、深分页和 worker/API 并发必须在 RC 环境留证。
 - `app.services.request_metadata` 统一解析请求元数据；审计与会话治理共享 request_id、user-agent 和 IP 哈希口径。`AuthSession.device_label` 优先来自 `X-Device-Label` / `X-Device-Name`，缺省回退到登录 user-agent，因此只是 best-effort 设备摘要，不等同强设备绑定。
 - `app.api.deps.auth.get_current_auth_context()` 会在有效鉴权后按 `ASTRA_SESSION_LAST_SEEN_UPDATE_SECONDS` 刷新当前 `AuthSession.last_seen_at` 和 `last_seen_ip_hash`；默认 300 秒内同一 IP 哈希不重复写库，窗口过期、IP 哈希变化或配置为 `0` 时刷新。该机制只降低 last_seen 写放大，不等同强设备绑定或长期会话风控。
 - `/api/auth/password-reset/request` 与 `/api/auth/password-reset/confirm` 只提供本地账号自助重置 token 能力；邮件/短信/MFA 投递暂列 `P4 / 最低优先级 / 暂缓`。请求审计使用账号哈希作为 `resource_id`，不记录明文用户名或 token；确认阶段会对 token 行加锁并一次性消费。`app.services.password_reset_tokens` 与 `scripts.cleanup_password_reset_tokens` 提供过期/已用 token 的离线清理入口，默认 dry-run，显式 `--apply` 才删除，摘要不返回用户名、IP 哈希、user-agent 或 token hash。
@@ -393,7 +407,7 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 python -m pytest backend
 ```
 
-V6.6.57 基线为 317 项全量 pytest；权限/班级策略/统计、外部投递、统一任务、审计锚定和外部 issue 同步专项可运行：
+V6.6.58 基线为 322 项全量 pytest；权限/班级策略/统计、外部投递、统一任务、审计锚定、外部 issue 和性能专项可运行：
 
 ```bash
 python -m pytest backend/tests/test_school_classes.py backend/tests/test_access_control.py backend/tests/test_course_learning_loop.py -q
@@ -401,10 +415,11 @@ python -m pytest backend/tests/test_alert_delivery.py -q
 python -m pytest backend/tests/test_background_tasks.py backend/tests/test_background_task_api_worker.py -q
 python -m pytest backend/tests/test_audit_archive.py backend/tests/test_audit_archive_anchor.py backend/tests/test_audit_chain_concurrency.py -q
 python -m pytest backend/tests/test_bug_external_sync.py backend/tests/test_deploy_preflight.py -q
+python -m pytest backend/tests/test_backend_performance.py backend/tests/test_api_cache_policy.py -q
 node tools/tests/v6653-permission-analytics-contract.cjs
 ```
 
-迁移最低门禁需验证 `upgrade 20260710_0041 -> upgrade head -> downgrade 20260710_0041 -> upgrade head`，最终 `alembic current` 必须为 `20260710_0042`；SQLite 往返只证明迁移结构可执行，真实 MySQL 行锁、外网和凭据仍归 V6.6.60 RC 部署门禁。
+迁移最低门禁需验证 `upgrade 20260710_0042 -> upgrade head -> downgrade 20260710_0042 -> upgrade head`，最终 `alembic current` 必须为 `20260710_0043`；SQLite 往返只证明索引建撤合同，真实 MySQL 建索引时长、锁等待、空间和查询计划仍归 V6.6.60 RC 部署门禁。
 
 权限范围回归可单独运行：
 
@@ -420,7 +435,7 @@ $env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
 python -m alembic upgrade head
 ```
 
-当前 Alembic head：`20260710_0042`。`0041` 新增 `audit_chain_heads/audit_archive_anchors`；`0042` 为 `bug_records` 增加外部状态、最后同步时间和本地修订号，并新增 `bug_external_sync_operations` 操作账本。回滚 0042 前必须先关闭外部 issue 同步、导出未完成/ambiguous 操作证据并核对外部平台；回滚会删除同步账本和三个状态字段，但保留原有 provider/id/url 手工绑定字段。再次升级不会自动重建已删除的操作历史。
+当前 Alembic head：`20260710_0043`。`0042` 新增外部 issue 同步账本；`0043` 为审计时间线/资源线、Bug/同步账本、知识 run、脚本扫描 run 和待批改队列新增 10 个复合索引，任务 claim 继续复用 `0040` 已有索引。回滚 0043 只删除本版 10 个索引，不删除业务数据或既有 claim 索引；回滚前仍需评估真实 MySQL DDL 锁和性能退化窗口。
 
 内容脚本远端漂移 CLI：
 

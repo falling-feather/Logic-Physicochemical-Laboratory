@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -8,6 +8,7 @@ from app.models.base import Base, TimestampMixin
 
 class BugRecord(TimestampMixin, Base):
     __tablename__ = "bug_records"
+    __table_args__ = (Index("ix_bug_records_status_id", "status", "id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     title: Mapped[str] = mapped_column(String(240), nullable=False)
@@ -27,7 +28,10 @@ class BugRecord(TimestampMixin, Base):
 
 class BugExternalSyncOperation(TimestampMixin, Base):
     __tablename__ = "bug_external_sync_operations"
-    __table_args__ = (UniqueConstraint("operation_key", name="uq_bug_external_sync_operations_key"),)
+    __table_args__ = (
+        UniqueConstraint("operation_key", name="uq_bug_external_sync_operations_key"),
+        Index("ix_bug_external_sync_bug_id_id", "bug_record_id", "id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     bug_record_id: Mapped[int] = mapped_column(ForeignKey("bug_records.id"), index=True, nullable=False)
@@ -52,6 +56,10 @@ class BugExternalSyncOperation(TimestampMixin, Base):
 
 class AuditLog(TimestampMixin, Base):
     __tablename__ = "audit_logs"
+    __table_args__ = (
+        Index("ix_audit_logs_created_id", "created_at", "id"),
+        Index("ix_audit_logs_resource_created", "resource_type", "resource_id", "created_at", "id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     actor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
@@ -170,7 +178,10 @@ class AdminAlertOutboxEntry(TimestampMixin, Base):
 
 class BackgroundTask(TimestampMixin, Base):
     __tablename__ = "background_tasks"
-    __table_args__ = (UniqueConstraint("idempotency_key", name="uq_background_tasks_idempotency_key"),)
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_background_tasks_idempotency_key"),
+        Index("ix_background_tasks_claim", "status", "available_at", "priority", "id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     task_type: Mapped[str] = mapped_column(String(80), index=True, nullable=False)

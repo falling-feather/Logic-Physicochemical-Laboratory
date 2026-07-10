@@ -9,6 +9,7 @@ def _assert_api_security_headers(response) -> None:
     assert response.headers["Cache-Control"] == "no-store"
     assert response.headers["Pragma"] == "no-cache"
     assert response.headers["X-Request-ID"]
+    assert response.headers["Server-Timing"].startswith("app;dur=")
 
 
 @pytest.mark.parametrize("status_code", [200, 401, 403, 404, 409, 422, 429, 503])
@@ -46,7 +47,7 @@ def test_unhandled_api_error_is_sanitized_and_no_store(client):
     assert "database secret" not in response.text
     assert response.headers["X-Request-ID"] == "cache-boom"
     assert response.headers["Access-Control-Allow-Origin"] == "http://localhost:8766"
-    assert response.headers["Access-Control-Expose-Headers"] == "X-Request-ID"
+    assert response.headers["Access-Control-Expose-Headers"] == "X-Request-ID, Server-Timing"
     _assert_api_security_headers(response)
 
 

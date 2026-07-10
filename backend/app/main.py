@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 import logging
+from time import perf_counter
 from uuid import uuid4
 
 from fastapi import Request
@@ -48,11 +49,12 @@ def create_app() -> FastAPI:
                 "X-Device-Label",
                 "X-Device-Name",
             ],
-            expose_headers=["X-Request-ID"],
+            expose_headers=["X-Request-ID", "Server-Timing"],
         )
 
     @app.middleware("http")
     async def attach_request_id_and_api_cache_policy(request: Request, call_next):
+        request_started_at = perf_counter()
         request_id = _request_id_from_header(request.headers.get("x-request-id"))
         request.state.request_id = request_id
         is_api = _is_api_path(request.url.path, settings.api_prefix)
@@ -70,12 +72,28 @@ def create_app() -> FastAPI:
             if origin in settings.cors_origin_list:
                 response.headers["Access-Control-Allow-Origin"] = origin
                 response.headers["Access-Control-Allow-Credentials"] = "true"
-                response.headers["Access-Control-Expose-Headers"] = "X-Request-ID"
+                response.headers["Access-Control-Expose-Headers"] = "X-Request-ID, Server-Timing"
                 response.headers["Vary"] = "Origin"
+        duration_ms = (perf_counter() - request_started_at) * 1000
         response.headers["X-Request-ID"] = request_id
         if is_api:
             response.headers["Cache-Control"] = "no-store"
             response.headers["Pragma"] = "no-cache"
+            response.headers["Server-Timing"] = f"app;dur={duration_ms:.2f}"
+            if (
+                settings.performance_slow_request_logging_enabled
+                and duration_ms >= settings.performance_slow_request_threshold_ms
+            ):
+                route = request.scope.get("route")
+                route_template = getattr(route, "path", "unmatched")
+                logger.warning(
+                    "slow_api_request request_id=%s method=%s route=%s status=%s duration_ms=%.2f",
+                    request_id,
+                    request.method,
+                    route_template,
+                    response.status_code,
+                    duration_ms,
+                )
         return response
     app.include_router(api_router, prefix=settings.api_prefix)
     return app

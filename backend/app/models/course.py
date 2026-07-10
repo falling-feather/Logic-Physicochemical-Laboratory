@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, utc_now
@@ -94,6 +94,8 @@ class Submission(TimestampMixin, Base):
             "class_id",
             name="uq_submissions_assignment_student_class",
         ),
+        Index("ix_submissions_status_submitted_id", "status", "submitted_at", "id"),
+        Index("ix_submissions_class_status_submitted", "class_id", "status", "submitted_at", "id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -228,7 +230,11 @@ class UserKnowledgeSnapshot(TimestampMixin, Base):
 
 class KnowledgeSnapshotRun(TimestampMixin, Base):
     __tablename__ = "knowledge_snapshot_runs"
-    __table_args__ = (UniqueConstraint("run_key", name="uq_knowledge_snapshot_runs_run_key"),)
+    __table_args__ = (
+        UniqueConstraint("run_key", name="uq_knowledge_snapshot_runs_run_key"),
+        Index("ix_knowledge_runs_started_id", "started_at", "id"),
+        Index("ix_knowledge_runs_status_started", "status", "started_at", "id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     run_key: Mapped[str] = mapped_column(String(160), nullable=False)

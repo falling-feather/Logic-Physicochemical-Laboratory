@@ -191,6 +191,7 @@ from app.services.external_issue_providers import (
     build_issue_provider_adapter,
     external_issue_sync_posture,
 )
+from app.services.backend_performance import build_backend_performance_report
 from app.services.access_control import (
     require_class_teacher_or_admin_by_id,
     require_school_teacher_or_admin,
@@ -1486,6 +1487,47 @@ def read_admin_stats(
         open_bug_records=_count(db, BugRecord, BugRecord.status != "closed"),
         total_audit_logs=_count(db, AuditLog),
     )
+
+
+@router.get("/performance/report")
+def get_backend_performance_report(
+    request: Request,
+    include_explain: bool = Query(default=True),
+    include_benchmark: bool = Query(default=True),
+    require_mysql: bool = Query(default=False),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    _require_admin(current_user)
+    report = build_backend_performance_report(
+        db,
+        settings=get_settings(),
+        include_explain=include_explain,
+        include_benchmark=include_benchmark,
+        require_mysql=require_mysql,
+    )
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="admin.performance.report",
+        resource_type="backend_performance",
+        event_result="success" if report["ok"] else "failure",
+        failure_reason=None if report["ok"] else report["status"],
+        request=request,
+        snapshot={
+            "status": report["status"],
+            "dialect": report["dialect"],
+            "require_mysql": require_mysql,
+            "include_explain": include_explain,
+            "include_benchmark": include_benchmark,
+            "summary": report["summary"],
+            "deferred_risk_codes": [item["code"] for item in report["deferred_risks"]],
+            "sql_text_returned": False,
+            "database_url_returned": False,
+        },
+    )
+    db.commit()
+    return report
 
 
 @router.get("/knowledge-snapshot-runs", response_model=AdminKnowledgeSnapshotRunPage)

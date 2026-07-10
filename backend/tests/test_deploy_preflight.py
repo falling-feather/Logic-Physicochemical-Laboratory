@@ -43,6 +43,9 @@ def test_deploy_preflight_reports_migrated_database(monkeypatch):
         assert report["configuration"]["audit_anchor"]["payload_policy"] == "hashes_and_range_only"
         assert report["configuration"]["external_issue_sync"]["enabled"] is False
         assert report["configuration"]["external_issue_sync"]["local_authority"] is True
+        assert report["configuration"]["performance"]["database"]["pool_pre_ping"] is True
+        assert report["configuration"]["performance"]["database"]["database_url_returned"] is False
+        assert report["configuration"]["performance"]["slow_request"]["query_string_logged"] is False
         assert report["database"]["ok"] is True
         assert report["migrations"]["status"] == "up_to_date"
         assert report["migrations"]["current"] == report["migrations"]["heads"]
@@ -727,10 +730,24 @@ def test_bug_external_sync_migration_round_trip_preserves_local_bug(monkeypatch)
             operation_count = connection.execute(
                 text("SELECT COUNT(*) FROM bug_external_sync_operations")
             ).scalar_one()
+            performance_indexes = {
+                row[0]
+                for row in connection.execute(
+                    text(
+                        "SELECT name FROM sqlite_master "
+                        "WHERE type = 'index' AND name LIKE 'ix_%'"
+                    )
+                ).all()
+            }
         assert bug["external_issue_state"] is None
         assert bug["external_issue_synced_at"] is None
         assert bug["external_sync_revision"] == 1
         assert operation_count == 0
+        assert "ix_audit_logs_created_id" in performance_indexes
+        assert "ix_background_tasks_claim" in performance_indexes
+        assert "ix_submissions_status_submitted_id" in performance_indexes
+        assert "ix_knowledge_runs_started_id" in performance_indexes
+        assert "ix_script_scan_type_started" in performance_indexes
 
         command.downgrade(config, "20260710_0041")
         with make_engine(database_url).connect() as connection:
@@ -752,6 +769,64 @@ def test_bug_external_sync_migration_round_trip_preserves_local_bug(monkeypatch)
                 text("SELECT external_sync_revision FROM bug_records WHERE id = :bug_id"),
                 {"bug_id": bug_id},
             ).scalar_one()
+            restored_indexes = {
+                row[0]
+                for row in connection.execute(
+                    text(
+                        "SELECT name FROM sqlite_master "
+                        "WHERE type = 'index' AND name LIKE 'ix_%'"
+                    )
+                ).all()
+            }
         assert restored_revision == 1
+        assert "ix_audit_logs_created_id" in restored_indexes
+    finally:
+        _dispose_and_remove(database_url, database_path)
+
+
+def test_performance_index_migration_round_trip_preserves_existing_claim_index(monkeypatch):
+    backend_root = Path(__file__).resolve().parents[1]
+    database_path, database_url = _empty_sqlite_database(monkeypatch, backend_root)
+    config = _alembic_config(backend_root)
+    new_indexes = {
+        "ix_bug_records_status_id",
+        "ix_bug_external_sync_bug_id_id",
+        "ix_audit_logs_created_id",
+        "ix_audit_logs_resource_created",
+        "ix_submissions_status_submitted_id",
+        "ix_submissions_class_status_submitted",
+        "ix_knowledge_runs_started_id",
+        "ix_knowledge_runs_status_started",
+        "ix_script_scan_type_started",
+        "ix_script_scan_status_started",
+    }
+
+    def indexes() -> set[str]:
+        with make_engine(database_url).connect() as connection:
+            return {
+                row[0]
+                for row in connection.execute(
+                    text("SELECT name FROM sqlite_master WHERE type = 'index'")
+                ).all()
+            }
+
+    try:
+        command.upgrade(config, "20260710_0042")
+        before = indexes()
+        assert "ix_background_tasks_claim" in before
+        assert not new_indexes.intersection(before)
+
+        command.upgrade(config, "head")
+        assert new_indexes.issubset(indexes())
+
+        command.downgrade(config, "20260710_0042")
+        downgraded = indexes()
+        assert "ix_background_tasks_claim" in downgraded
+        assert not new_indexes.intersection(downgraded)
+
+        command.upgrade(config, "head")
+        restored = indexes()
+        assert "ix_background_tasks_claim" in restored
+        assert new_indexes.issubset(restored)
     finally:
         _dispose_and_remove(database_url, database_path)
