@@ -14,6 +14,8 @@ def test_health_reports_sqlite_test_database(client):
     assert payload["service"] == "astra-backend"
     assert payload["database"]["ok"] is True
     assert payload["database"]["status"] == "connected"
+    assert payload["database"]["url_returned"] is False
+    assert "url" not in payload["database"]
 
 
 def test_health_probe_reuses_the_application_connection_pool(client):

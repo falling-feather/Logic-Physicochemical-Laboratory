@@ -1,6 +1,6 @@
 import json
 
-from scripts.deploy_topology_drill import run_topology_drill
+from scripts.deploy_topology_drill import _parse_sc_service_outputs, run_topology_drill
 
 
 def test_deploy_topology_drill_reports_ready_topology_without_real_network():
@@ -46,11 +46,124 @@ def test_deploy_topology_drill_reports_ready_topology_without_real_network():
     assert report["proxied_api"]["cache_no_store_ok"] is True
     assert report["proxied_api"]["request_id_ok"] is True
     assert report["proxied_api"]["cors_ok"] is True
+    assert report["proxied_api"]["database_url_returned"] is False
     assert report["direct_api"]["direct_api_host_private_or_loopback"] is True
     assert report["public_exposure"]["status"] == "skipped_no_public_direct_api_url"
     assert report["service_plan"]["static_service_name"] == "EngLab"
     assert report["service_plan"]["api_service_name"] == "AstraApi"
+    assert report["service_plan"]["worker_service_name"] == "AstraWorker"
+    assert report["service_plan"]["proxy_service_name"] == "AstraProxy"
     assert report["service_plan"]["logs_configured"] is True
+    assert report["windows_services"]["status"] == "skipped_not_requested"
+
+
+def test_deploy_topology_drill_verifies_running_minimal_windows_services():
+    report = run_topology_drill(
+        static_url="https://astra.example/",
+        proxied_api_url="https://astra.example/api/health",
+        direct_api_url="http://127.0.0.1:8000/api/health",
+        request_id="drill-1",
+        fetcher=_ready_fetcher(),
+        verify_windows_services=True,
+        service_query=lambda names: {
+            "ok": True,
+            "services": {
+                name: {
+                    "state": "Running",
+                    "start_mode": "Auto",
+                    "account": "NT AUTHORITY\\LocalService",
+                    "process_id": index + 100,
+                }
+                for index, name in enumerate(names)
+            },
+        },
+    )
+
+    assert report["ok"] is True
+    assert report["windows_services"]["status"] == "ready"
+    assert len(report["windows_services"]["services"]) == 4
+    assert all(item["minimal_account"] for item in report["windows_services"]["services"])
+
+
+def test_deploy_topology_drill_rejects_stopped_or_system_windows_service():
+    def service_query(names):
+        services = {
+            name: {
+                "state": "Running",
+                "start_mode": "Auto",
+                "account": "NT AUTHORITY\\LocalService",
+                "process_id": index + 100,
+            }
+            for index, name in enumerate(names)
+        }
+        services["AstraWorker"]["state"] = "Stopped"
+        services["AstraProxy"]["account"] = "LocalSystem"
+        return {"ok": True, "services": services}
+
+    report = run_topology_drill(
+        static_url="https://astra.example/",
+        proxied_api_url="https://astra.example/api/health",
+        direct_api_url="http://127.0.0.1:8000/api/health",
+        request_id="drill-1",
+        fetcher=_ready_fetcher(),
+        verify_windows_services=True,
+        service_query=service_query,
+    )
+
+    assert report["ok"] is False
+    assert report["windows_services"]["status"] == "services_not_ready"
+    assert report["windows_services"]["unhealthy_services"] == ["AstraWorker", "AstraProxy"]
+
+
+def test_deploy_topology_drill_rejects_running_service_without_process_id():
+    def service_query(names):
+        return {
+            "ok": True,
+            "services": {
+                name: {
+                    "state": "Running",
+                    "start_mode": "Auto",
+                    "account": "NT AUTHORITY\\LocalService",
+                    "process_id": 0 if name == "AstraWorker" else index + 100,
+                }
+                for index, name in enumerate(names)
+            },
+        }
+
+    report = run_topology_drill(
+        static_url="https://astra.example/",
+        proxied_api_url="https://astra.example/api/health",
+        direct_api_url="http://127.0.0.1:8000/api/health",
+        request_id="drill-1",
+        fetcher=_ready_fetcher(),
+        verify_windows_services=True,
+        service_query=service_query,
+    )
+
+    assert report["ok"] is False
+    assert report["windows_services"]["unhealthy_services"] == ["AstraWorker"]
+    worker = next(item for item in report["windows_services"]["services"] if item["name"] == "AstraWorker")
+    assert worker["process_id_present"] is False
+
+
+def test_parse_sc_service_outputs_reads_scm_state_account_and_pid():
+    parsed = _parse_sc_service_outputs(
+        """SERVICE_NAME: AstraApi
+        STATE              : 4  RUNNING
+        PID                : 50740
+        """,
+        """SERVICE_NAME: AstraApi
+        START_TYPE         : 2   AUTO_START
+        SERVICE_START_NAME : NT AUTHORITY\\LocalService
+        """,
+    )
+
+    assert parsed == {
+        "state": "Running",
+        "start_mode": "Auto",
+        "account": "NT AUTHORITY\\LocalService",
+        "process_id": 50740,
+    }
 
 
 def test_deploy_topology_drill_flags_missing_api_no_store_and_request_id():
@@ -128,6 +241,35 @@ def test_deploy_topology_drill_rejects_legacy_cpp_health_response():
     assert report["proxied_api"]["ok"] is False
     assert report["proxied_api"]["service"] is None
     assert report["proxied_api"]["service_ok"] is False
+
+
+def test_deploy_topology_drill_rejects_public_health_database_url():
+    fetcher = _ready_fetcher()
+    fetcher.responses["https://astra.example/api/health"] = _response(
+        200,
+        {
+            "content-type": "application/json",
+            "cache-control": "no-store",
+            "x-request-id": "drill-1",
+        },
+        {
+            "status": "ok",
+            "service": "astra-backend",
+            "database": {"ok": True, "url": "mysql+pymysql://db.internal/astra"},
+        },
+    )
+
+    report = run_topology_drill(
+        static_url="https://astra.example/",
+        proxied_api_url="https://astra.example/api/health",
+        direct_api_url="http://127.0.0.1:8000/api/health",
+        request_id="drill-1",
+        fetcher=fetcher,
+    )
+
+    assert report["ok"] is False
+    assert report["proxied_api"]["database_url_returned"] is True
+    assert report["proxied_api"]["database_url_policy_ok"] is False
 
 
 def test_deploy_topology_drill_detects_direct_api_public_exposure():

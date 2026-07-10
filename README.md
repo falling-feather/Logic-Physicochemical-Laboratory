@@ -8,12 +8,12 @@
 
 星序总览页负责承载一级星系入口；进入某个星系后，才显示该星系自己的二级学科或知识目录。内置 C++ httplib 静态服务器负责静态文件托管，业务 API 由 Python/FastAPI 承担。
 
-> **当前状态**: V6.6.61（2026-07-10）— `houduan` 分支已在隔离、仅回环监听的 MySQL 8.0.46 环境关闭 `RC-MYSQL`：空库 0001→0046、preflight/smoke、内容/任务/调度/审计并发、代表性数据 EXPLAIN ANALYZE、连接池压力、0043 DDL 建撤和独立备份恢复均已实证。生产 stage gate 14 项中 13 项通过，当前按 [`doc/09-后端阶段收束小版本开发安排.md`](doc/09-后端阶段收束小版本开发安排.md) 推进 V6.6.62 的真实反代/服务注册、合格 C++17 构建和回滚证据。
+> **当前状态**: V6.6.62（2026-07-11）— `houduan` 分支已关闭 `RC-MYSQL`、`RC-TOPOLOGY` 与 `RC-CPP-BUILD`：真实 Caddy 分流、WinSW 四服务最小权限注册、API 故障静态回退、配置/服务/二进制回滚、MSVC 19.43 Release 构建和直连端口隔离均已实证。生产 stage gate 最终 14/14 通过；当前按 [`doc/09-后端阶段收束小版本开发安排.md`](doc/09-后端阶段收束小版本开发安排.md) 进入 V6.6.63，仅冻结首个 RC 的外部通道清单并收束长期证据，不重新打开已关闭范围。
 > **Review 回流状态**: 2026-07-06，`review` 分支已交付代码审查报告（审查基线 `V6.5.23 Review 前基线快照`，范围 `re1` 至 `re17`）。本 `houduan` 分支未合并 review 代码修复；后续仅按 `02` / `07` 中记录的优先级在 `houduan` 上选择性吸收。
 > **最新治理**: 2026-07-10，V6.6.53 将班级与课程权限拆成独立授权轴：学生软移除/双范围转班/逐项批量导入，`editor/content_editor/assessment_editor/viewer` 协作者和批量 upsert，以及班级 assignment/积分覆盖均有审计、幂等和越权回归；管理端加入审批使用内联二次确认、写入不重试并同步对账列表与 KPI。
 > **最新学习分析**: `rule_version=v2` 以 effective active assignment-class pair 为分母，按提交/评分/事件/积分自身时间戳稳定输出 course/unit/knowledge_point/assignment 维度；hidden/draft/archived/closed/unassigned 资源不进入当前统计，v1 历史快照保持兼容读取。
 > **最新外部治理**: 外部告警默认关闭，只在 admin 显式确认、plan/hash/due/expiry 再校验通过且 HTTPS URL/SecretStr token 安全注入后发送脱敏信封；真实 staging 目标、出口网络、接收端验签/幂等与回执仍待部署留证。
-> **最新任务治理**: `background_tasks/background_task_attempts` 保存统一任务控制面，worker 以数据库租约竞争并复用知识快照/脚本扫描领域 run 去重；管理端只返回脱敏摘要，可查看队列和尝试记录并显式 retry/cancel。V6.6.61 已用真实 MySQL 验证 lease/cancel/retry、重复副作用防护及 API/worker 并发；服务级进程强杀与重启恢复归 V6.6.62。
+> **最新任务治理**: `background_tasks/background_task_attempts` 保存统一任务控制面，worker 以数据库租约竞争并复用知识快照/脚本扫描领域 run 去重；管理端只返回脱敏摘要，可查看队列和尝试记录并显式 retry/cancel。V6.6.61 已用真实 MySQL 验证 lease/cancel/retry、重复副作用防护及 API/worker 并发；V6.6.62 已验证独立 `AstraWorker` 服务重启后的包装/业务 PID 更替与自动恢复，最小权限进程拒绝普通用户强制终止。
 > **最新审计可信边界**: `audit_chain_heads` 在 MySQL 使用行锁串行化链尾，SQLite 本地回归使用事务级进程锁；归档 Manifest v2 记录范围、文件 hash、导出人/导出时间和生命周期策略。V6.6.61 的 6 writer 实测无链分叉，并完成一致性备份和独立恢复；默认关闭的外部回执只有被选入 RC 时才在 V6.6.63 补 staging。
 > **最新外部问题治理**: GitHub 是首个可执行 provider，Gitee/Jira 通过协议接口预留但尚未实现。同步仅允许管理员显式确认，创建/评论结果不确定时不盲重试；外发内容不含 evidence、notes、source 或凭据，不接收外部反向写入，本地 `BugRecord` 始终为权威记录。功能默认关闭，只有被选入 RC 时才在 V6.6.63 补真实 staging、token 权限、限流和人工歧义证据。
 > **最新性能门禁**: `backend_performance_drill` 与管理端报告覆盖 11 个高频查询 profile，复核 10 个新增复合索引和既有任务 claim 索引；真实 MySQL 会执行不返回计划正文的 EXPLAIN ANALYZE，并输出 p50/p95/p99。V6.6.61 已完成代表性数据、0043 DDL、连接池耗尽恢复和 100 API + 100 worker 并发实证；深 offset、leading wildcard 和动态聚合继续作为已归属 P2。
@@ -61,7 +61,7 @@
 星序 Astra/
 ├── index.html              # 主站 SPA 入口（含所有页面结构）
 ├── sw.js                   # Service Worker（离线缓存 + stale-while-revalidate）
-├── deploy.ps1              # Windows 一键部署脚本
+├── deploy.ps1              # Windows 四服务演练包生成入口；不下载工具或安装服务
 ├── backend/                 # Python FastAPI 业务后端（v6.5 首切片）
 │   ├── app/                 # API、配置、数据库探针、内容协议与服务层
 │   └── tests/               # pytest 后端回归测试

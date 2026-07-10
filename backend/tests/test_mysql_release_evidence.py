@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, update
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 
 from app.core.config import Settings, get_settings
@@ -619,6 +619,67 @@ def test_mysql_representative_dataset_runs_all_explain_analyze_profiles(mysql_ur
         all(metric in item["benchmark"] for metric in ("p50_ms", "p95_ms", "p99_ms"))
         for item in report["profiles"]
     )
+
+    # The representative rows must not become delayed production blockers.
+    # Keep them for plan/row-count evidence, but terminalize synthetic active
+    # states after EXPLAIN/benchmark collection so a later stage gate does not
+    # correctly interpret expired drill leases as real stale work.
+    cleanup_at = utc_now().replace(microsecond=0)
+    with session_factory() as db:
+        scan_cleanup = db.execute(
+            update(ContentScriptAssetScanRun)
+            .where(
+                ContentScriptAssetScanRun.trigger_source == "mysql_release_evidence",
+                ContentScriptAssetScanRun.status == "running",
+            )
+            .values(
+                status="success",
+                finished_at=cleanup_at,
+                scheduler_lease_owner=None,
+                scheduler_lease_token=None,
+                scheduler_lease_expires_at=None,
+                scheduler_heartbeat_at=None,
+                error_message=None,
+            )
+        )
+        knowledge_cleanup = db.execute(
+            update(KnowledgeSnapshotRun)
+            .where(
+                KnowledgeSnapshotRun.trigger_source == "mysql_release_evidence",
+                KnowledgeSnapshotRun.status == "running",
+            )
+            .values(
+                status="success",
+                finished_at=cleanup_at,
+                scheduler_lease_owner=None,
+                scheduler_lease_token=None,
+                scheduler_lease_expires_at=None,
+                scheduler_heartbeat_at=None,
+                error_message=None,
+            )
+        )
+        task_cleanup = db.execute(
+            update(BackgroundTask)
+            .where(
+                BackgroundTask.source_type == "mysql_release_evidence",
+                BackgroundTask.task_type == "mysql_performance_probe",
+                BackgroundTask.status.in_(("pending", "leased", "retry_wait")),
+            )
+            .values(
+                status="succeeded",
+                finished_at=cleanup_at,
+                lease_owner=None,
+                lease_token=None,
+                lease_expires_at=None,
+                heartbeat_at=None,
+                last_error_code=None,
+                result_summary_json={"evidence_cleanup": True},
+            )
+        )
+        db.commit()
+    assert scan_cleanup.rowcount >= 63
+    assert knowledge_cleanup.rowcount >= 63
+    assert task_cleanup.rowcount >= 1000
 
 
 def test_mysql_connection_pool_timeout_is_bounded_and_recovers(mysql_url: str):

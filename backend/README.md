@@ -16,7 +16,9 @@ V6.6.59 已完成安全、隐私和发布冻结：非本地环境 bootstrap/cook
 
 V6.6.60 已完成本地发布候选总验收并判定延期：opaque sandbox 的 SRI 资产端点增加仅资源级、无凭据的匿名 CORS，外部 Edge 桌面/390×844 proof 27/27；SQLite 空库迁移、preflight/smoke 和 MySQL-required fail-closed 通过。真实 MySQL、反向代理/服务注册和合格 C++17 构建仍为 P1，分别进入 V6.6.61-V6.6.62；默认关闭的外部 provider 只有被选入 RC 时才在 V6.6.63 补 staging。
 
-V6.6.61 已在隔离、仅回环监听的 MySQL 8.0.46 上关闭 `RC-MYSQL`。空库 0001→0046、真实 preflight/smoke、内容 publish/rollback、知识快照/脚本扫描/统一任务 lease/cancel/retry、6 writer 审计链与安全控制锁均通过；代表性数据覆盖 11 个 EXPLAIN ANALYZE profile、0043 索引建撤、连接池耗尽恢复、100 API + 100 worker 并发和独立备份恢复。Alembic 0046 将知识快照窗口字段统一为 DATETIME(6)，并修复真实 MySQL 暴露的标识符长度、保留字、DATETIME(0) hash/窗口精度、0044 downgrade 外键顺序和 health 探针重复释放全局连接池问题。当前 stage gate 仅缺 V6.6.62 真实 topology。
+V6.6.61 已在隔离、仅回环监听的 MySQL 8.0.46 上关闭 `RC-MYSQL`。空库 0001→0046、真实 preflight/smoke、内容 publish/rollback、知识快照/脚本扫描/统一任务 lease/cancel/retry、6 writer 审计链与安全控制锁均通过；代表性数据覆盖 11 个 EXPLAIN ANALYZE profile、0043 索引建撤、连接池耗尽恢复、100 API + 100 worker 并发和独立备份恢复。Alembic 0046 将知识快照窗口字段统一为 DATETIME(6)，并修复真实 MySQL 暴露的标识符长度、保留字、DATETIME(0) hash/窗口精度、0044 downgrade 外键顺序和 health 探针重复释放全局连接池问题。该版本结束时 stage gate 仅缺 V6.6.62 真实 topology。
+
+V6.6.62 已关闭 `RC-TOPOLOGY` 与 `RC-CPP-BUILD`。新增 `scripts.windows_service_drill_bundle` 生成 Caddy + WinSW 四服务可逆包，`EngLab/AstraApi/AstraWorker/AstraProxy` 均以 `LocalService`、Automatic delayed start、滚动日志和失败重启运行；代理与上游不设 SCM 硬依赖，因此 API 停止时静态首页仍保持 200。`deploy_topology_drill --verify-windows-services` 会从 SCM 回读状态、启动类型、最小权限账号和 PID。MSVC 19.43 Release 构建、配置/服务定义/二进制回滚、直连端口隔离和最终 stage gate 14/14 均已实证。真实演练还发现并修复公开 health 返回数据库地址，以及代理依赖 API 导致静态回退同时停止的问题。
 
 ## 本地启动
 
@@ -30,6 +32,8 @@ python -m uvicorn app.main:app --reload --port 8000
 ```bash
 curl http://127.0.0.1:8000/api/health
 ```
+
+公开健康响应只返回数据库连接状态，不返回数据库 URL、主机、库名或本地文件路径；`database.url_returned=false` 是拓扑门禁的一部分。
 
 首个内容协议样例会在 `ASTRA_AUTO_CREATE_TABLES=true` 的开发/测试初始化阶段写入 `content_pages`，并经过 Pydantic schema 校验后返回。内置 seed 已升级到 `2026.07-v6.5-schema.2`，所有 section/source 都带稳定 `sectionId/sourceId`：
 
@@ -62,7 +66,7 @@ python -m scripts.content_lifecycle_drill --require-mysql \
 python -m scripts.knowledge_snapshot_scheduler_drill --require-mysql --expect-scheduler-enabled
 ```
 
-该报告检查 scheduler 配置、run ledger、lease/heartbeat、due/pending 队列、快照输出计数和真实 MySQL 待留证项；默认不执行 rebuild、不抢租约、不取消、不重排，不返回 `scheduler_lease_token`、`metadata_json`、异常原文或 secret。V6.6.61 已完成真实 MySQL lease/cancel/requeue/stale-token 与窗口精度证据；服务级进程强杀和重启接管留给 V6.6.62。
+该报告检查 scheduler 配置、run ledger、lease/heartbeat、due/pending 队列、快照输出计数和真实 MySQL 待留证项；默认不执行 rebuild、不抢租约、不取消、不重排，不返回 `scheduler_lease_token`、`metadata_json`、异常原文或 secret。V6.6.61 已完成真实 MySQL lease/cancel/requeue/stale-token 与窗口精度证据；V6.6.62 已完成独立 worker 服务重启、包装/业务 PID 更替和服务恢复证据。普通用户对 `LocalService` 子进程的强制终止被 Windows 拒绝，未为造证据抬高账号权限；租约过期接管继续由 V6.6.61 的真实 MySQL token guard 证明。
 
 内容脚本远端漂移观察只读演练报告：
 
@@ -87,6 +91,7 @@ python -m scripts.backend_stage_gate --require-mysql \
   --proxied-api-url https://your-domain.example/api/health \
   --direct-api-url http://127.0.0.1:8000/api/health \
   --public-direct-api-url http://your-public-ip:8000/api/health \
+  --verify-windows-services \
   --confirm-backend-tests-passed \
   --confirm-core-manual-paths \
   --confirm-deploy-docs-reviewed \
@@ -418,6 +423,8 @@ V6.6.58 基线为 322 项全量 pytest；权限/班级策略/统计、外部投�
 
 V6.6.61 基线收集 365 项：默认套件 360 项通过、5 项真实 MySQL 专项按显式环境门禁跳过；真实 MySQL 专项另行 5/5 通过。Alembic head 为 `20260710_0046`，新增知识快照窗口 DATETIME(6) 精度迁移、MySQL 发布证据、运行负载 drill 和 Windows legacy console 安全 JSON 输出回归。
 
+V6.6.62 基线收集 373 项：默认套件 368 项通过、5 项真实 MySQL 专项按显式环境门禁跳过；定向 23 项、PowerShell 语法、静态公开面合同、真实四服务 topology、MSVC Release 构建/回滚和生产 stage gate 14/14 通过。
+
 ```bash
 python -m pytest backend/tests/test_school_classes.py backend/tests/test_access_control.py backend/tests/test_course_learning_loop.py -q
 python -m pytest backend/tests/test_alert_delivery.py -q
@@ -553,10 +560,23 @@ python -m scripts.deploy_topology_drill \
   --direct-api-url http://127.0.0.1:8000/api/health \
   --public-direct-api-url http://your-public-ip:8000/api/health \
   --origin https://your-domain.example \
-  --api-bind-host 127.0.0.1
+  --api-bind-host 127.0.0.1 \
+  --verify-windows-services
 ```
 
-该脚本输出 JSON 报告，检查静态主站 HTML、经反向代理的 FastAPI `/api/health`、`Cache-Control: no-store`、`X-Request-ID`、CORS Origin、直连 FastAPI 主机是否为本机/内网、可选公网直连端口是否不可达，以及 `EngLab` / `AstraApi` 服务名、日志路径和重启命令计划。它不会配置真实反向代理或注册 Windows 服务；真实公网域名、安全组、服务重启恢复和回滚演练仍需在部署环境留证。
+该脚本输出 JSON 报告，检查静态主站 HTML、经反向代理的 FastAPI `/api/health`、`Cache-Control: no-store`、`X-Request-ID`、CORS Origin、公开 health 不回传数据库 URL、直连 FastAPI 主机是否为本机/内网、可选公网直连端口是否不可达，以及四个服务的日志和重启计划。`--verify-windows-services` 还会从 Windows SCM 回读 `EngLab/AstraApi/AstraWorker/AstraProxy` 是否已安装、自动启动、正在运行、使用最小权限内置账号且具有有效 PID。
+
+Windows 演练包应使用已单独下载并复核 hash 的 WinSW/Caddy 与合格 Release 构建产物生成；脚本不会联网下载、不会打开防火墙、不会安装或启动服务，也不会把 MySQL DSN 写进报告：
+
+```powershell
+.\deploy.ps1 `
+  -WinSwPath C:\staging\verified\WinSW-x64.exe `
+  -StaticExecutable C:\staging\build\englab_server.exe `
+  -CaddyExecutable C:\staging\verified\caddy.exe `
+  -OutputDir C:\englab\service-bundle
+```
+
+生成后先复核 JSON 中的 `artifact_hashes`、四份 XML 和 `config/Caddyfile`，再按 `commands.install/start/stop/uninstall` 操作。生产数据库连接只允许由服务账号环境或 secret store 提供；根脚本不再下载未校验 NSSM、不开放端口，也不再用 `sc.exe` 直接包装控制台程序。
 
 正式内容初始化：
 

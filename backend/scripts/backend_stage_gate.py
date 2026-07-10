@@ -123,6 +123,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--origin", default=None, help="Optional Origin header for CORS topology probe.")
     parser.add_argument("--api-bind-host", default=None, help="Expected FastAPI bind host for topology policy.")
     parser.add_argument("--api-bind-port", type=int, default=None, help="Expected FastAPI bind port for topology policy.")
+    parser.add_argument(
+        "--verify-windows-services",
+        action="store_true",
+        help="Require EngLab/AstraApi/AstraWorker/AstraProxy SCM evidence in the live topology drill.",
+    )
     parser.add_argument("--confirm-backend-tests-passed", action="store_true")
     parser.add_argument("--confirm-core-manual-paths", action="store_true")
     parser.add_argument("--confirm-deploy-docs-reviewed", action="store_true")
@@ -189,6 +194,7 @@ def _topology_options(args: argparse.Namespace) -> dict[str, Any]:
         "origin": "origin",
         "api_bind_host": "api_bind_host",
         "api_bind_port": "api_bind_port",
+        "verify_windows_services": "verify_windows_services",
     }.items():
         value = getattr(args, arg_name)
         if value is not None:
