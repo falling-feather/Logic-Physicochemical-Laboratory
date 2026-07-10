@@ -171,7 +171,9 @@ def main(argv: list[str] | None = None) -> int:
         upgrade_existing=args.upgrade_existing,
         allow_stale_drafts=args.allow_stale_drafts,
     )
-    print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+    # Keep Windows legacy consoles safe when MySQL/system metadata contains
+    # characters that cannot be encoded by the active OEM code page.
+    print(json.dumps(report, ensure_ascii=True, indent=2, sort_keys=True))
     return 0 if report["ok"] else 1
 
 

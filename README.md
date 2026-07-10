@@ -8,7 +8,7 @@
 
 星序总览页负责承载一级星系入口；进入某个星系后，才显示该星系自己的二级学科或知识目录。内置 C++ httplib 静态服务器负责静态文件托管，业务 API 由 Python/FastAPI 承担。
 
-> **当前状态**: V6.6.62（2026-07-11）— `houduan` 分支已关闭 `RC-MYSQL`、`RC-TOPOLOGY` 与 `RC-CPP-BUILD`：真实 Caddy 分流、WinSW 四服务最小权限注册、API 故障静态回退、配置/服务/二进制回滚、MSVC 19.43 Release 构建和直连端口隔离均已实证。生产 stage gate 最终 14/14 通过；当前按 [`doc/09-后端阶段收束小版本开发安排.md`](doc/09-后端阶段收束小版本开发安排.md) 进入 V6.6.63，仅冻结首个 RC 的外部通道清单并收束长期证据，不重新打开已关闭范围。
+> **当前状态**: V6.6.63（2026-07-11）— `houduan` 分支已完成 V6.6.37-V6.6.63 后端阶段收束。首个 RC 不选入 Webhook、GitHub issue sync 或 audit anchor，三者保持默认关闭；只读范围门禁证明零网络请求/零副作用，生产 stage gate 15/15 通过。后续外部集成和 WORM/RFC3161 等能力必须另行立项。
 > **Review 回流状态**: 2026-07-06，`review` 分支已交付代码审查报告（审查基线 `V6.5.23 Review 前基线快照`，范围 `re1` 至 `re17`）。本 `houduan` 分支未合并 review 代码修复；后续仅按 `02` / `07` 中记录的优先级在 `houduan` 上选择性吸收。
 > **最新治理**: 2026-07-10，V6.6.53 将班级与课程权限拆成独立授权轴：学生软移除/双范围转班/逐项批量导入，`editor/content_editor/assessment_editor/viewer` 协作者和批量 upsert，以及班级 assignment/积分覆盖均有审计、幂等和越权回归；管理端加入审批使用内联二次确认、写入不重试并同步对账列表与 KPI。
 > **最新学习分析**: `rule_version=v2` 以 effective active assignment-class pair 为分母，按提交/评分/事件/积分自身时间戳稳定输出 course/unit/knowledge_point/assignment 维度；hidden/draft/archived/closed/unassigned 资源不进入当前统计，v1 历史快照保持兼容读取。
@@ -30,6 +30,8 @@
 
 | 版本 | 发布日期 | 主题 | 详情 |
 |------|---------|------|------|
+| **v6.6.63（houduan）** | 2026-07-11 | 首个 RC 外部通道范围冻结、长期证据确认与后端阶段完成 | [→](doc/09-后端阶段收束小版本开发安排.md) |
+| **v6.6.62（houduan）** | 2026-07-11 | 真实反代、四服务、Release 构建与回滚实证 | [→](doc/09-后端阶段收束小版本开发安排.md) |
 | **v6.6.61（houduan）** | 2026-07-10 | 真实 MySQL 迁移、并发、性能、连接池与备份恢复实证 | [→](doc/09-后端阶段收束小版本开发安排.md) |
 | **v6.6.60（houduan）** | 2026-07-10 | 发布候选本地总验收、风险/回滚总账与 RC 延期决策 | [→](doc/09-后端阶段收束小版本开发安排.md) |
 | **v6.6.59（houduan）** | 2026-07-10 | 安全、隐私和发布冻结审查 | [→](doc/09-后端阶段收束小版本开发安排.md) |
@@ -210,6 +212,7 @@ node server/dev-static-server.mjs --port 8766
 > 完整的细碎微版本详见 [doc/03-发布历史.md](doc/03-发布历史.md)。当前主线在 `main` 分支维护。
 
 ### v6.5 — 2026-07-05（houduan）
+- 2026-07-11 已在 `houduan` 落地 V6.6.63 RC 范围冻结：首个 RC 不选入 Webhook/GitHub/audit anchor，新增只读范围门禁证明零网络请求/零副作用；最终 stage gate 15/15，全量后端 375 passed/5 skipped，V6.6.37-V6.6.63 后端阶段收束完成。
 - 2026-07-10 已在 `houduan` 落地 V6.6.61 真实 MySQL 实证：Alembic head 前进到 0046，完成空库迁移、preflight/smoke、内容/知识快照/脚本扫描/统一任务/审计并发、11 个 EXPLAIN ANALYZE profile、0043 DDL 建撤、连接池压力和独立备份恢复；修复 MySQL 标识符、保留字、DATETIME 精度、降级外键顺序与健康探针连接池泄漏等真实方言问题。
 - 2026-07-10 已在 `houduan` 落地 V6.6.55 统一任务执行治理：`background_tasks/background_task_attempts` 覆盖告警 plan、知识快照和内容脚本扫描，支持调度入队、优先级、数据库租约、指数退避、dead-letter、显式 retry/cancel、attempt 历史和重启接管；worker 默认关闭，脚本扫描外网执行另设 opt-in，管理 API 不返回 payload 或 lease token。
 - 2026-07-09 已在 `houduan` 落地 BE-09/V6.6.48 浏览器隔离证明首轮：新增 Playwright/Edge drill，验证 iframe opaque origin 无法读取父页 DOM/storage/cookie，unknown sandbox/asset fail closed，sandbox HTML 的 `frame-ancestors` 和可执行资源 CORP 口径已同步收束。

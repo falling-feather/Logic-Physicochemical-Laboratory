@@ -20,6 +20,8 @@ V6.6.61 已在隔离、仅回环监听的 MySQL 8.0.46 上关闭 `RC-MYSQL`。�
 
 V6.6.62 已关闭 `RC-TOPOLOGY` 与 `RC-CPP-BUILD`。新增 `scripts.windows_service_drill_bundle` 生成 Caddy + WinSW 四服务可逆包，`EngLab/AstraApi/AstraWorker/AstraProxy` 均以 `LocalService`、Automatic delayed start、滚动日志和失败重启运行；代理与上游不设 SCM 硬依赖，因此 API 停止时静态首页仍保持 200。`deploy_topology_drill --verify-windows-services` 会从 SCM 回读状态、启动类型、最小权限账号和 PID。MSVC 19.43 Release 构建、配置/服务定义/二进制回滚、直连端口隔离和最终 stage gate 14/14 均已实证。真实演练还发现并修复公开 health 返回数据库地址，以及代理依赖 API 导致静态回退同时停止的问题。
 
+V6.6.63 已冻结首个 RC 不选入任何外部通道。新增 `app.services.rc_external_scope` 与 `scripts.rc_external_scope_gate`，只读检查 Webhook/GitHub/audit anchor 的 selected/enabled/configured/readback，阻断未选能力启用或伪造读回确认；默认报告网络请求 0、无副作用且不返回 URL、owner/repo 或 token。`backend_stage_gate --run-rc-external-scope` 将其作为第 15 道门禁，最终 15/15 通过；V6.6.37-V6.6.63 后端阶段收束完成。
+
 ## 本地启动
 
 ```bash
@@ -92,6 +94,9 @@ python -m scripts.backend_stage_gate --require-mysql \
   --direct-api-url http://127.0.0.1:8000/api/health \
   --public-direct-api-url http://your-public-ip:8000/api/health \
   --verify-windows-services \
+  --run-rc-external-scope \
+  --confirm-database-restore-evidence \
+  --confirm-runtime-rollback-evidence \
   --confirm-backend-tests-passed \
   --confirm-core-manual-paths \
   --confirm-deploy-docs-reviewed \
@@ -99,7 +104,15 @@ python -m scripts.backend_stage_gate --require-mysql \
   --confirm-rollback-reviewed
 ```
 
-该总账聚合部署预检、smoke、拓扑、认证、内容、调度、脚本和审计演练报告，并输出 V6.6.44 的“通过 / 延期 / 带风险通过”建议。`--confirm-*` 只表示已有外部证据；未使用真实 MySQL、未跑真实拓扑或缺少人工确认时，报告会保持缺证延期。
+该总账聚合部署预检、smoke、拓扑、认证、内容、调度、脚本和审计演练报告。默认保持 V6.6.44/14 项兼容；增加 RC 范围门禁后输出 V6.6.63/15 项。“确认”参数只表示已有外部证据；未使用真实 MySQL、未跑真实拓扑或缺少人工确认时，报告会保持缺证延期。
+
+零外部通道 RC 的独立只读检查：
+
+```bash
+python -m scripts.rc_external_scope_gate \
+  --confirm-database-restore-evidence \
+  --confirm-runtime-rollback-evidence
+```
 
 本地账号与学校班级 API：
 
@@ -424,6 +437,8 @@ V6.6.58 基线为 322 项全量 pytest；权限/班级策略/统计、外部投�
 V6.6.61 基线收集 365 项：默认套件 360 项通过、5 项真实 MySQL 专项按显式环境门禁跳过；真实 MySQL 专项另行 5/5 通过。Alembic head 为 `20260710_0046`，新增知识快照窗口 DATETIME(6) 精度迁移、MySQL 发布证据、运行负载 drill 和 Windows legacy console 安全 JSON 输出回归。
 
 V6.6.62 基线收集 373 项：默认套件 368 项通过、5 项真实 MySQL 专项按显式环境门禁跳过；定向 23 项、PowerShell 语法、静态公开面合同、真实四服务 topology、MSVC Release 构建/回滚和生产 stage gate 14/14 通过。
+
+V6.6.63 基线收集 380 项：默认套件 375 项通过、5 项真实 MySQL 专项按显式环境门禁跳过；RC 范围门禁定向、中文路径 ASCII-safe 初始化 CLI、真实 MySQL 0046 preflight/smoke、拓扑 render 和最终生产 stage gate 15/15 通过。
 
 ```bash
 python -m pytest backend/tests/test_school_classes.py backend/tests/test_access_control.py backend/tests/test_course_learning_loop.py -q

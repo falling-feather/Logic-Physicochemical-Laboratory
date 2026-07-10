@@ -16,6 +16,7 @@ from scripts.deploy_preflight import BACKEND_ROOT, run_preflight
 from scripts.deploy_smoke import run_smoke
 from scripts.deploy_topology_drill import run_topology_drill
 from scripts.knowledge_snapshot_scheduler_drill import run_knowledge_snapshot_scheduler_drill_report
+from scripts.rc_external_scope_gate import run_rc_external_scope_gate
 
 
 def run_backend_stage_gate_report(
@@ -28,6 +29,11 @@ def run_backend_stage_gate_report(
     expect_knowledge_scheduler_enabled: bool = False,
     expect_content_script_scheduler_enabled: bool = False,
     run_topology_live: bool = False,
+    run_rc_external_scope: bool = False,
+    rc_selected_channels: tuple[str, ...] = (),
+    rc_staging_readback_confirmations: tuple[str, ...] = (),
+    confirm_database_restore_evidence: bool = False,
+    confirm_runtime_rollback_evidence: bool = False,
     topology_options: dict[str, Any] | None = None,
     render_url: str | None = None,
     static_url: str | None = None,
@@ -84,9 +90,20 @@ def run_backend_stage_gate_report(
             )
         ),
         "deploy_topology": None,
+        "rc_external_scope": None,
     }
     if run_topology_live:
         subreports["deploy_topology"] = _safe_report(lambda: run_topology_drill(**(topology_options or {})))
+    if run_rc_external_scope:
+        subreports["rc_external_scope"] = _safe_report(
+            lambda: run_rc_external_scope_gate(
+                selected_channels=rc_selected_channels,
+                staging_readback_confirmations=rc_staging_readback_confirmations,
+                confirm_database_restore_evidence=confirm_database_restore_evidence,
+                confirm_runtime_rollback_evidence=confirm_runtime_rollback_evidence,
+                generated_at=generated_at,
+            )
+        )
     return build_backend_stage_gate_report(
         subreports=subreports,
         confirmations={
@@ -99,11 +116,12 @@ def run_backend_stage_gate_report(
         require_mysql=require_mysql,
         generated_at=generated_at,
         topology_live_requested=run_topology_live,
+        rc_external_scope_requested=run_rc_external_scope,
     )
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Build the V6.6.44 backend stage-completion gate report.")
+    parser = argparse.ArgumentParser(description="Build the backend stage-completion gate report.")
     parser.add_argument("--database-url", default=None, help="Override ASTRA_DATABASE_URL for this run.")
     parser.add_argument("--require-mysql", action="store_true", help="Require real MySQL-compatible reports.")
     parser.add_argument("--require-production", action="store_true", help="Require production-like auth posture.")
@@ -115,6 +133,25 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expect-knowledge-scheduler-enabled", action="store_true")
     parser.add_argument("--expect-content-script-scheduler-enabled", action="store_true")
     parser.add_argument("--run-topology-live", action="store_true", help="Run live deploy_topology_drill probes.")
+    parser.add_argument(
+        "--run-rc-external-scope",
+        action="store_true",
+        help="Add the read-only V6.6.63 first-RC external-scope gate.",
+    )
+    parser.add_argument(
+        "--rc-select-channel",
+        action="append",
+        choices=("alert_webhook", "github_issue_sync", "audit_anchor"),
+        default=[],
+    )
+    parser.add_argument(
+        "--rc-confirm-staging-readback",
+        action="append",
+        choices=("alert_webhook", "github_issue_sync", "audit_anchor"),
+        default=[],
+    )
+    parser.add_argument("--confirm-database-restore-evidence", action="store_true")
+    parser.add_argument("--confirm-runtime-rollback-evidence", action="store_true")
     parser.add_argument("--static-url", default=None, help="Static site URL for content lifecycle and topology probes.")
     parser.add_argument("--render-url", default=None, help="Live /api/render/page/{slug} URL for content lifecycle.")
     parser.add_argument("--proxied-api-url", default=None, help="Proxied /api/health URL for topology probes.")
@@ -158,6 +195,11 @@ def main(argv: list[str] | None = None) -> int:
         expect_knowledge_scheduler_enabled=args.expect_knowledge_scheduler_enabled,
         expect_content_script_scheduler_enabled=args.expect_content_script_scheduler_enabled,
         run_topology_live=args.run_topology_live,
+        run_rc_external_scope=args.run_rc_external_scope,
+        rc_selected_channels=tuple(args.rc_select_channel),
+        rc_staging_readback_confirmations=tuple(args.rc_confirm_staging_readback),
+        confirm_database_restore_evidence=args.confirm_database_restore_evidence,
+        confirm_runtime_rollback_evidence=args.confirm_runtime_rollback_evidence,
         topology_options=topology_options,
         render_url=args.render_url,
         static_url=args.static_url,

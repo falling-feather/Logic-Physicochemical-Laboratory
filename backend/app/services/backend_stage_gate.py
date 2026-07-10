@@ -14,6 +14,7 @@ SUBREPORT_LABELS = {
     "content_script_remote_drift": "content_script_remote_drift_drill",
     "audit_archive": "audit_archive_drill",
     "deploy_topology": "deploy_topology_drill",
+    "rc_external_scope": "rc_external_scope_gate",
 }
 
 MANUAL_EVIDENCE = {
@@ -47,6 +48,7 @@ def build_backend_stage_gate_report(
     require_mysql: bool,
     generated_at: datetime | None = None,
     topology_live_requested: bool = False,
+    rc_external_scope_requested: bool = False,
 ) -> dict[str, Any]:
     generated = generated_at or datetime.now(UTC)
     gates: dict[str, dict[str, Any]] = {
@@ -71,6 +73,11 @@ def build_backend_stage_gate_report(
             evidence="run with --run-topology-live against the real proxy/service topology",
         )
     )
+    if rc_external_scope_requested:
+        gates["rc_external_scope"] = _subreport_gate(
+            "rc_external_scope",
+            subreports.get("rc_external_scope"),
+        )
     for key, meta in MANUAL_EVIDENCE.items():
         gates[key] = _manual_gate(key, confirmed=bool(confirmations.get(key)), meta=meta)
 
@@ -90,7 +97,7 @@ def build_backend_stage_gate_report(
     return {
         "ok": ok,
         "status": status,
-        "phase": "V6.6.44",
+        "phase": "V6.6.63" if rc_external_scope_requested else "V6.6.44",
         "generated_at": _datetime_value(generated),
         "mode": "read_only",
         "require_mysql": require_mysql,
@@ -100,7 +107,7 @@ def build_backend_stage_gate_report(
         "blockers": blockers,
         "missing_evidence": missing,
         "warnings": warning_gates,
-        "evidence_required": _evidence_required(),
+        "evidence_required": _evidence_required(rc_external_scope_requested=rc_external_scope_requested),
         "sensitive_fields_returned": sensitive_fields_returned,
         "sensitive_values_returned": sensitive_values_returned,
     }
@@ -259,8 +266,8 @@ def _decision(
     }
 
 
-def _evidence_required() -> list[str]:
-    return [
+def _evidence_required(*, rc_external_scope_requested: bool) -> list[str]:
+    evidence = [
         "desensitized MySQL DSN, Alembic current/head, deploy_preflight --require-mysql JSON",
         "deploy_smoke --require-mysql JSON including schema-column and /api/health checks",
         "full backend pytest output and exit code",
@@ -273,6 +280,12 @@ def _evidence_required() -> list[str]:
         "deployment docs, environment variables, rollback and recovery steps reviewed",
         "explicit conclusion: 通过 / 延期 / 带风险通过",
     ]
+    if rc_external_scope_requested:
+        evidence.insert(
+            -1,
+            "rc_external_scope_gate JSON with frozen first-RC channels and V6.6.61/V6.6.62 evidence confirmations",
+        )
+    return evidence
 
 
 def _datetime_value(value: datetime) -> str:

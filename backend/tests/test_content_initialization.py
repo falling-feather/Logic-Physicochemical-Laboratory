@@ -334,6 +334,7 @@ def test_init_content_pages_cli_handles_unicode_database_path(monkeypatch, capsy
         captured = capsys.readouterr()
         payload = json.loads(captured.out)
         assert exit_code == 0
+        assert "\\u4e2d\\u6587\\u8def\\u5f84" in captured.out
         assert payload["ok"] is True
         assert payload["content"]["publisher_user_id"] == admin_id
         assert payload["content"]["items"][0]["slug"] == "physics/energy-conservation"

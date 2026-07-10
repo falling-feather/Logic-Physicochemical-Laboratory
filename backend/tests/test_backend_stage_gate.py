@@ -94,6 +94,30 @@ def test_backend_stage_gate_blocks_on_sensitive_subreport(monkeypatch):
     assert blockers["audit_archive"]["reason"] == "sensitive_fields_returned"
 
 
+def test_backend_stage_gate_optionally_adds_v63_external_scope_as_fifteenth_gate(monkeypatch):
+    _patch_stage_gate_reports(monkeypatch)
+    monkeypatch.setattr(backend_stage_gate, "run_rc_external_scope_gate", lambda *args, **kwargs: _report())
+
+    report = backend_stage_gate.run_backend_stage_gate_report(
+        require_mysql=True,
+        run_topology_live=True,
+        run_rc_external_scope=True,
+        confirm_database_restore_evidence=True,
+        confirm_runtime_rollback_evidence=True,
+        confirm_backend_tests_passed=True,
+        confirm_core_manual_paths=True,
+        confirm_deploy_docs_reviewed=True,
+        confirm_admin_bootstrap_reviewed=True,
+        confirm_rollback_reviewed=True,
+    )
+
+    assert report["ok"] is True
+    assert report["phase"] == "V6.6.63"
+    assert report["counts"]["total_gates"] == 15
+    assert report["counts"]["passed"] == 15
+    assert report["gates"]["rc_external_scope"]["ok"] is True
+
+
 def test_backend_stage_gate_cli_returns_json_for_invalid_now(capsys):
     exit_code = backend_stage_gate.main(["--now", "not-a-date"])
     output = json.loads(capsys.readouterr().out)
