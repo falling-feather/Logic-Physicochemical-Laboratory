@@ -137,17 +137,19 @@ async function createRolePage(browser, report, webBase, apiBase, role, viewport 
   const page = await context.newPage();
   attachDiagnostics(page, report.browserIssues, role);
   await page.goto(roleUrl(webBase, apiBase, role), { waitUntil: 'domcontentloaded' });
-  await page.locator(`[data-auth-ui="gate"][data-auth-role="${role}"]`).waitFor({ state: 'visible' });
+  await page.locator('[data-app-auth-overlay]:not([hidden])').waitFor({ state: 'visible' });
+  await page.locator('[data-app-auth-form="login"]').waitFor({ state: 'visible' });
   return { context, page };
 }
 
 async function registerFromUi(page, role, account) {
-  const registerTab = page.locator('[data-auth-view="register"]');
+  const registerTab = page.locator('[data-app-auth-view="register"]');
   assert(await registerTab.count() === 1, `${role} registration tab must exist exactly once`);
   await registerTab.click();
-  const form = page.locator('[data-auth-form="register"]');
+  const form = page.locator('[data-app-auth-form="register"]');
   await form.locator('[name="username"]').fill(account.username);
   await form.locator('[name="display_name"]').fill(account.displayName);
+  await form.locator('[name="role"]').selectOption(role);
   await form.locator('[name="password"]').fill(account.password);
   await form.locator('[name="password_confirm"]').fill(account.password);
   await form.locator('button[type="submit"]').click();
@@ -155,7 +157,7 @@ async function registerFromUi(page, role, account) {
 }
 
 async function loginFromUi(page, role, account) {
-  const form = page.locator('[data-auth-form="login"]');
+  const form = page.locator('[data-app-auth-form="login"]');
   await form.locator('[name="username"]').fill(account.username);
   await form.locator('[name="password"]').fill(account.password);
   await form.locator('button[type="submit"]').click();
@@ -406,8 +408,11 @@ async function main() {
     record('outsider assignment denial', { status: outsiderReview.status });
 
     await studentRuntime.page.goto(roleUrl(webBase, apiBase, 'teacher'), { waitUntil: 'domcontentloaded' });
-    await studentRuntime.page.locator('[data-auth-ui="account"][data-auth-role="teacher"].astra-account--mismatch').waitFor({ state: 'visible' });
-    record('wrong-role route renders switch boundary');
+    await studentRuntime.page.waitForURL(/#student$/);
+    const deniedRoleScripts = await studentRuntime.page.locator('script[data-router-page-script="teacher"], script[data-router-page-script="admin"]').count();
+    assert(deniedRoleScripts === 0, 'Student must not load teacher or admin page scripts');
+    await studentRuntime.page.locator('[data-student-dashboard]:not([hidden])').waitFor({ state: 'visible' });
+    record('role shell redirects forbidden hash before protected script load');
     await studentRuntime.page.goto(roleUrl(webBase, apiBase, 'student'), { waitUntil: 'domcontentloaded' });
     await studentRuntime.page.locator('[data-auth-ui="account"][data-auth-role="student"]').waitFor({ state: 'visible' });
 

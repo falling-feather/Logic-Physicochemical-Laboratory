@@ -224,7 +224,7 @@ function updateFooterVisibility() {
 
 window.updateFooterVisibility = updateFooterVisibility;
 
-const ENGLAB_ASSET_VERSION = '20260710v6653PermissionMatrixP1';
+const ENGLAB_ASSET_VERSION = '20260711v740RoleShellP0';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',
@@ -237,10 +237,13 @@ const CORE_HTTP_FALLBACK_ASSETS = [
     './shared/js/lucide.min.js?v=20260417d',
     './shared/js/config.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/api-client.js?v=' + ENGLAB_ASSET_VERSION,
+    './shared/js/app-session.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/router.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/main.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/backend-content.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/css/backend-content.css?v=' + ENGLAB_ASSET_VERSION,
+    './shared/css/auth-ui.css?v=' + ENGLAB_ASSET_VERSION,
+    './shared/css/app-session.css?v=' + ENGLAB_ASSET_VERSION,
     './pages/admin/admin.css?v=' + ENGLAB_ASSET_VERSION,
     './pages/teacher/teacher.css?v=' + ENGLAB_ASSET_VERSION,
     './pages/student/student.css?v=' + ENGLAB_ASSET_VERSION
@@ -480,4 +483,15 @@ function registerServiceWorker() {
 
 // Launch immediately — DOM is ready (sync script at bottom of body).
 // Do NOT use DOMContentLoaded: deferred experiment scripts would delay it.
-initApp();
+(async function bootstrapApplication() {
+    if (!window.AstraApplicationSession) {
+        console.error('[App] session coordinator is unavailable');
+        return;
+    }
+    try {
+        await window.AstraApplicationSession.bootstrap();
+        initApp();
+    } catch (error) {
+        console.error('[App] authentication bootstrap failed', error);
+    }
+})();

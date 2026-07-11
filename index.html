@@ -57,10 +57,11 @@
     <link rel="stylesheet" href="pages/chemistry/chemistry.css?v=20260618ionP1">
     <link rel="stylesheet" href="pages/algorithms/algorithms.css?v=20260618algoTextP1">
     <link rel="stylesheet" href="pages/biology/biology.css?v=20260618neuralP1">
-    <link rel="stylesheet" href="pages/admin/admin.css?v=20260710v6653PermissionMatrixP1">
+    <link rel="stylesheet" href="pages/admin/admin.css?v=20260711v740RoleShellP0">
     <link rel="stylesheet" href="pages/teacher/teacher.css?v=20260710v6653PermissionMatrixP1">
     <link rel="stylesheet" href="pages/student/student.css?v=20260710v6653PermissionMatrixP1">
-    <link rel="stylesheet" href="shared/css/auth-ui.css?v=20260711v730AuthUiP0">
+    <link rel="stylesheet" href="shared/css/auth-ui.css?v=20260711v740RoleShellP0">
+    <link rel="stylesheet" href="shared/css/app-session.css?v=20260711v740RoleShellP0">
     <!-- v4.5-α1 全局搜索 -->
     <link rel="stylesheet" href="shared/css/global-search.css?v=20260606v62e">
     <!-- v4.5-α3 相关实验推荐 -->
@@ -238,17 +239,17 @@
                     <i data-lucide="leaf"></i>
                     <span>生物</span>
                 </a>
-                <a href="#student" class="nav-item nav-item--student" data-page="student" aria-label="学习">
+                <a href="#student" class="nav-item nav-item--student" data-page="student" data-app-roles="student" aria-label="我的学习">
                     <i data-lucide="graduation-cap"></i>
-                    <span>学习</span>
+                    <span>我的学习</span>
                 </a>
-                <a href="#teacher" class="nav-item nav-item--teacher" data-page="teacher" aria-label="教师">
+                <a href="#teacher" class="nav-item nav-item--teacher" data-page="teacher" data-app-roles="teacher,admin" aria-label="教学管理">
                     <i data-lucide="presentation"></i>
-                    <span>教师</span>
+                    <span>教学管理</span>
                 </a>
-                <a href="#admin" class="nav-item nav-item--admin" data-page="admin" aria-label="管理">
+                <a href="#admin" class="nav-item nav-item--admin" data-page="admin" data-app-roles="admin" aria-label="全局治理">
                     <i data-lucide="shield-check"></i>
-                    <span>管理</span>
+                    <span>全局治理</span>
                 </a>
                 <button type="button" id="nav-search-trigger" aria-label="全局搜索实验" title="搜索实验 (Ctrl+K 或 /)">
                     <i data-lucide="search"></i>
@@ -5148,10 +5149,11 @@
     <!-- Application Scripts: minimal boot path -->
     <script src="shared/js/config.js?v=20260710v6653PermissionMatrixP1"></script>
     <script src="shared/js/api-client.js?v=20260710v6653PermissionMatrixP1"></script>
-    <script src="shared/js/auth-ui.js?v=20260711v730AuthUiP0"></script>
+    <script src="shared/js/auth-ui.js?v=20260711v740RoleShellP0"></script>
+    <script src="shared/js/app-session.js?v=20260711v740RoleShellP0"></script>
     <script src="shared/js/backend-content.js?v=20260710v6653PermissionMatrixP1"></script>
-    <script src="shared/js/router.js?v=20260710v6653PermissionMatrixP1"></script>
-    <script src="shared/js/main.js?v=20260710v6653PermissionMatrixP1"></script>
+    <script src="shared/js/router.js?v=20260711v740RoleShellP0"></script>
+    <script src="shared/js/main.js?v=20260711v740RoleShellP0"></script>
     <script>
         (function () {
             try {

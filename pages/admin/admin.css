@@ -598,6 +598,150 @@
     animation: admin-spin 1s linear infinite;
 }
 
+.admin-database-map {
+    padding: 18px;
+    border: 1px solid rgba(102, 215, 180, 0.22);
+    border-radius: var(--radius-lg);
+    background:
+        linear-gradient(145deg, rgba(25, 50, 57, 0.34), rgba(14, 16, 25, 0.82) 44%),
+        rgba(14, 16, 25, 0.82);
+    box-shadow: var(--shadow-sm);
+}
+
+.admin-database-map:empty {
+    display: none;
+}
+
+.admin-database-map__header,
+.admin-database-map__actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.admin-database-map__header h2 {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.admin-database-map__header h2 svg,
+.admin-database-map__header h2 i {
+    width: 18px;
+    height: 18px;
+    color: var(--accent-green);
+}
+
+.admin-database-map__header p {
+    max-width: 760px;
+    margin-top: 6px;
+    color: var(--text-tertiary);
+    font-size: 0.78rem;
+    line-height: 1.6;
+}
+
+.admin-database-map__entities {
+    display: grid;
+    grid-template-columns: repeat(8, minmax(100px, 1fr));
+    gap: 8px;
+    margin-top: 18px;
+}
+
+.admin-database-map__entities article {
+    position: relative;
+    min-width: 0;
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: rgba(8, 9, 14, 0.48);
+}
+
+.admin-database-map__entities article > span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-tertiary);
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.admin-database-map__entities article > span svg,
+.admin-database-map__entities article > span i {
+    width: 14px;
+    height: 14px;
+    color: var(--accent-cyan);
+}
+
+.admin-database-map__entities strong {
+    color: var(--text-primary);
+    font-size: 1.24rem;
+}
+
+.admin-database-map__arrow {
+    position: absolute;
+    z-index: 1;
+    right: -13px;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    padding: 2px;
+    border-radius: 999px;
+    background: #151b26;
+    color: var(--accent-green);
+}
+
+.admin-database-map__roles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px 20px;
+    margin-top: 16px;
+}
+
+.admin-database-map__roles > div {
+    display: grid;
+    grid-template-columns: 58px minmax(40px, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    color: var(--text-secondary);
+    font-size: 0.73rem;
+}
+
+.admin-database-map__roles b {
+    height: 6px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.admin-database-map__roles b i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
+}
+
+.admin-user-governance {
+    display: grid;
+    grid-template-columns: minmax(82px, 1fr) minmax(82px, 1fr) auto;
+    gap: 6px;
+    margin-bottom: 9px;
+}
+
+.admin-user-governance select {
+    min-width: 0;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-default);
+    padding: 6px;
+    background: rgba(8, 9, 14, 0.82);
+    color: var(--text-primary);
+    font-size: 0.72rem;
+}
+
 @keyframes admin-spin {
     to {
         transform: rotate(360deg);
@@ -611,6 +755,14 @@
 
     .admin-summary-grid {
         grid-template-columns: repeat(3, minmax(180px, 1fr));
+    }
+
+    .admin-database-map__entities {
+        grid-template-columns: repeat(4, minmax(110px, 1fr));
+    }
+
+    .admin-database-map__arrow {
+        display: none;
     }
 }
 
@@ -641,6 +793,11 @@
     .admin-panel__filters {
         grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
     }
+
+    .admin-database-map__header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
 }
 
 @media (max-width: 680px) {
@@ -668,6 +825,24 @@
     .admin-panel__filters .admin-icon-button {
         width: 100%;
         grid-column: span 2;
+    }
+
+    .admin-database-map {
+        padding: 14px;
+    }
+
+    .admin-database-map__entities {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .admin-database-map__roles {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-database-map__actions {
+        width: 100%;
+        align-items: flex-start;
+        flex-direction: column;
     }
 
     .admin-table {

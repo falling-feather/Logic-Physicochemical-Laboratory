@@ -313,6 +313,9 @@
         if (target.closest('[data-auth-action="logout"]')) {
             await runMutation(state, async () => {
                 await request('/api/auth/logout', state, { method: 'POST' });
+                try {
+                    global.dispatchEvent(new global.CustomEvent('astra:session-signed-out'));
+                } catch (error) {}
                 if (typeof state.config.onSignedOut === 'function') state.config.onSignedOut();
             });
             return;

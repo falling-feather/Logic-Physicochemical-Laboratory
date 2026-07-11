@@ -82,9 +82,9 @@ const Router = {
         engineering: 'pages/engineering/bridge-truss.js?v=20260630mainV64',
         license: 'pages/about/about.js?v=20260630mainV64',
         changelog: 'pages/about/about.js?v=20260630mainV64',
-        student: 'pages/student/student.js?v=20260710v6653PermissionMatrixP1',
-        teacher: 'pages/teacher/teacher.js?v=20260710v6653PermissionMatrixP1',
-        admin: 'pages/admin/admin.js?v=20260710v6653PermissionMatrixP1'
+        student: 'pages/student/student.js?v=20260711v740RoleShellP0',
+        teacher: 'pages/teacher/teacher.js?v=20260711v740RoleShellP0',
+        admin: 'pages/admin/admin.js?v=20260711v740RoleShellP0'
     },
     pageReadyChecks: {
         home: () => typeof window.initHome === 'function',
@@ -145,7 +145,7 @@ const Router = {
         });
 
         // Initial state 鈥?determine page from hash
-        const parsedInit = this._parseHash();
+        const parsedInit = this._guardParsedRoute(this._parseHash());
         const initialPage = parsedInit.page;
         this.currentPage = initialPage;
         this._pendingModule = parsedInit.moduleId;
@@ -200,6 +200,19 @@ const Router = {
         const idx = raw.indexOf('/');
         if (idx === -1) return { page: raw, moduleId: null, anchorId: null };
         return { page: raw.slice(0, idx), moduleId: raw.slice(idx + 1) || null, anchorId: null };
+    },
+
+    _guardParsedRoute(parsed) {
+        const route = parsed || { page: 'planets', moduleId: null, anchorId: null };
+        const session = window.AstraApplicationSession;
+        if (!session || typeof session.guardPage !== 'function') return route;
+        const allowedPage = session.guardPage(route.page);
+        if (allowedPage === route.page) return route;
+        const guarded = { page: allowedPage, moduleId: null, anchorId: null };
+        if (window.location.hash.slice(1) !== allowedPage) {
+            history.replaceState(null, '', `#${allowedPage}`);
+        }
+        return guarded;
     },
 
     _pageForFrontierAnchor(anchorId) {
@@ -354,7 +367,7 @@ const Router = {
     },
 
     _reapplyFrontierAnchorAfterRuntime(page) {
-        const parsed = this._parseHash();
+        const parsed = this._guardParsedRoute(this._parseHash());
         if (parsed.page !== page || !parsed.anchorId) return;
         this._pendingAnchor = parsed.anchorId;
         this._scheduleAnchorScroll(() => {
@@ -446,7 +459,7 @@ const Router = {
     },
 
     handleHash() {
-        const parsed = this._parseHash();
+        const parsed = this._guardParsedRoute(this._parseHash());
         const page = parsed.page;
         this._pendingModule = parsed.moduleId;
         this._pendingAnchor = parsed.anchorId || null;
@@ -467,6 +480,12 @@ const Router = {
     },
 
     navigateTo(page, animate = true) {
+        const guarded = this._guardParsedRoute({ page, moduleId: this._pendingModule, anchorId: this._pendingAnchor });
+        if (guarded.page !== page) {
+            page = guarded.page;
+            this._pendingModule = null;
+            this._pendingAnchor = null;
+        }
         if (this.isTransitioning) {
             this._queueNavigation(page, animate);
             return;
@@ -667,7 +686,7 @@ const Router = {
         if (this._hashReconcileId) return;
         this._hashReconcileId = setInterval(() => {
             if (this.isTransitioning) return;
-            const parsed = this._parseHash();
+            const parsed = this._guardParsedRoute(this._parseHash());
             const page = parsed.page;
             if (!document.getElementById(`page-${page}`)) return;
             if (page === this.currentPage && this._isActivePage(page)) {
@@ -793,6 +812,9 @@ const Router = {
     },
 
     _loadPageScript(page) {
+        if (window.AstraApplicationSession && !window.AstraApplicationSession.canAccessPage(page)) {
+            return Promise.resolve();
+        }
         const src = this.pageScripts[page];
         if (!src || this._isPageScriptReady(page)) return Promise.resolve();
         if (this._pageScriptPromises[src]) return this._pageScriptPromises[src];
@@ -874,6 +896,10 @@ const Router = {
     },
 
     onPageEnter(page) {
+        if (window.AstraApplicationSession && !window.AstraApplicationSession.canAccessPage(page)) {
+            this.navigateTo(window.AstraApplicationSession.guardPage(page), false);
+            return;
+        }
         if (!this._ensurePageScript(page)) {
             this._pageEnterComplete = true;
             this._flushQueuedNavigation();

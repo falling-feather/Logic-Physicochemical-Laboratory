@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    const ADMIN_ASSET_VERSION = '20260710v6653PermissionMatrixP1';
+    const ADMIN_ASSET_VERSION = '20260711v740RoleShellP0';
     const API_BASE_STORAGE_KEY = 'astra-admin-api-base';
 
     const state = {
@@ -18,6 +18,7 @@
         panelGenerations: Object.create(null),
         writeLock: null,
         pendingJoinReview: null,
+        pendingUserUpdate: null,
         onOnline: null,
         onOffline: null,
         onAuthRequired: null,
@@ -90,6 +91,50 @@
     ];
 
     const PANEL_CONFIGS = [
+        {
+            id: 'users',
+            title: '用户与权限',
+            icon: 'users-round',
+            path: '/api/admin/users',
+            filters: [
+                selectFilter('role', '角色', [
+                    ['', '全部'], ['student', '学生'], ['teacher', '教师'], ['admin', '管理员']
+                ]),
+                selectFilter('status', '状态', [
+                    ['', '全部'], ['active', '启用'], ['disabled', '停用']
+                ]),
+                textFilter('q', '账号或名称')
+            ],
+            columns: [
+                col('id', 'ID'), col('username', '账号'), col('display_name', '显示名称'),
+                badgeCol('role', '角色'), badgeCol('status', '状态'), dateCol('updated_at', '更新')
+            ],
+            details: ['created_at', 'updated_at'],
+            actions: 'user-governance'
+        },
+        {
+            id: 'schools',
+            title: '学校与组织',
+            icon: 'landmark',
+            path: '/api/admin/schools',
+            filters: [textFilter('q', '学校或区域')],
+            columns: [
+                col('id', 'ID'), col('name', '学校'), col('region', '区域'), badgeCol('status', '状态')
+            ],
+            details: ['id', 'name', 'region', 'status']
+        },
+        {
+            id: 'classes',
+            title: '全局班级',
+            icon: 'school',
+            path: '/api/admin/classes',
+            filters: [textFilter('q', '班级、年级或学期'), textFilter('school_id', '学校 ID')],
+            columns: [
+                col('id', 'ID'), col('school_id', '学校 ID'), col('name', '班级'),
+                col('grade', '年级'), col('term', '学期'), badgeCol('status', '状态')
+            ],
+            details: ['id', 'school_id', 'name', 'grade', 'term', 'status']
+        },
         {
             id: 'join-requests',
             title: '班级加入请求',
@@ -478,6 +523,7 @@
             <div class="admin-notice" data-admin-notice hidden role="status" aria-live="polite"></div>
             <div class="admin-dashboard" data-admin-dashboard hidden>
                 <section class="admin-kpi-grid" data-admin-stats></section>
+                <section class="admin-database-map" data-admin-database-map></section>
                 <section class="admin-summary-grid" data-admin-summary></section>
                 <section class="admin-panel-grid" data-admin-panels>
                     ${PANEL_CONFIGS.map(renderPanelShell).join('')}
@@ -544,6 +590,7 @@
             if (refreshAllButton) {
                 state.writeLock = null;
                 state.pendingJoinReview = null;
+                state.pendingUserUpdate = null;
                 setNotice('', '');
                 refreshAll();
                 return;
@@ -654,6 +701,7 @@
             if (isCurrentRequest(generation)) {
                 setBusy(false);
                 rerenderJoinRequestsPanel();
+                rerenderPanel('users');
                 refreshIcons();
             }
         }
@@ -665,9 +713,14 @@
         if (!container) return;
         container.innerHTML = renderLoading('统计加载中');
         try {
-            const stats = await fetchJson('/api/admin/stats');
+            const [stats, health] = await Promise.all([
+                fetchJson('/api/admin/stats'),
+                fetchJson('/api/health')
+            ]);
             if (!isCurrentRequest(requestGeneration)) return;
             container.innerHTML = renderStats(stats);
+            const databaseMap = state.root.querySelector('[data-admin-database-map]');
+            if (databaseMap) databaseMap.innerHTML = renderDatabaseMap(stats, health);
             return true;
         } catch (error) {
             if (AstraApiClient.isCancelled(error) || !isCurrentRequest(requestGeneration)) return;
@@ -752,6 +805,18 @@
                 });
                 return;
             }
+
+            const userUpdateButton = event.target.closest('[data-admin-user-update]');
+            if (userUpdateButton) {
+                updateUserGovernance(userUpdateButton);
+                return;
+            }
+
+            const teachingButton = event.target.closest('[data-admin-open-teaching]');
+            if (teachingButton && window.Router) {
+                Router.navigateTo('teacher', true);
+                return;
+            }
             container.innerHTML = `
                 <div class="admin-auth-card admin-auth-card--blocked">
                     <i data-lucide="shield-x"></i>
@@ -829,6 +894,51 @@
                 ${key === 'total_users' && roleText ? `<em>${escapeHtml(roleText)}</em>` : ''}
             </article>
         `).join('');
+    }
+
+    function renderDatabaseMap(stats, health) {
+        const databaseOk = Boolean(health && health.database && health.database.ok);
+        const entities = [
+            ['users', '用户', stats.total_users, 'users'],
+            ['schools', '学校', stats.total_schools, 'landmark'],
+            ['classes', '班级', stats.total_classes, 'school'],
+            ['courses', '课程', stats.total_courses, 'book-open'],
+            ['assignments', '作业', stats.total_assignments, 'clipboard-list'],
+            ['submissions', '提交', stats.total_submissions, 'send'],
+            ['events', '学习事件', stats.total_learning_events, 'activity'],
+            ['audits', '审计记录', stats.total_audit_logs, 'scroll-text']
+        ];
+        const roleTotal = Math.max(1, Number(stats.total_users || 0));
+        return `
+            <header class="admin-database-map__header">
+                <div>
+                    <h2><i data-lucide="database-zap"></i>领域数据地图</h2>
+                    <p>展示业务实体与规模；写入只能通过带校验、审计和权限控制的领域操作完成，不开放任意 SQL。</p>
+                </div>
+                <div class="admin-database-map__actions">
+                    <span class="admin-status-pill admin-status-pill--${databaseOk ? 'good' : 'bad'}">数据库 ${databaseOk ? '已连接' : '异常'}</span>
+                    <button type="button" class="admin-icon-button" data-admin-open-teaching>
+                        <i data-lucide="workflow"></i><span>组织与班级编辑</span>
+                    </button>
+                </div>
+            </header>
+            <div class="admin-database-map__entities">
+                ${entities.map(([id, label, total, icon], index) => `
+                    <article data-entity="${id}">
+                        <span><i data-lucide="${icon}"></i>${escapeHtml(label)}</span>
+                        <strong>${formatNumber(total || 0)}</strong>
+                        ${index < entities.length - 1 ? '<i class="admin-database-map__arrow" data-lucide="arrow-right"></i>' : ''}
+                    </article>
+                `).join('')}
+            </div>
+            <div class="admin-database-map__roles" aria-label="用户角色分布">
+                ${['student', 'teacher', 'admin'].map((role) => {
+                    const total = Number((stats.users_by_role || {})[role] || 0);
+                    const width = Math.max(total ? 4 : 0, Math.round(total / roleTotal * 100));
+                    return `<div><span>${escapeHtml(role)}</span><b><i style="width:${width}%"></i></b><strong>${formatNumber(total)}</strong></div>`;
+                }).join('')}
+            </div>
+        `;
     }
 
     function renderSummaryCard(config, data, loading) {
@@ -915,6 +1025,7 @@
             details[key] = valueAt(item, key);
         });
         return `
+            ${config.actions === 'user-governance' ? renderUserGovernance(item) : ''}
             ${config.actions === 'join-request-review' && item.status === 'pending' ? `
                 <div class="admin-row-actions">
                     <button type="button" class="admin-icon-button admin-icon-button--compact${approvePending ? ' admin-icon-button--confirming' : ''}" data-admin-join-review="approved" data-join-request-id="${item.id}" ${state.busy || state.writeLock || !state.online ? 'disabled' : ''} aria-label="${approvePending ? '再次点击确认批准加入请求' : '批准加入请求'}">
@@ -930,6 +1041,27 @@
                 <pre>${escapeHtml(JSON.stringify(details, null, 2))}</pre>
             </details>
         `;
+    }
+
+    function renderUserGovernance(item) {
+        const pending = state.pendingUserUpdate && state.pendingUserUpdate.userId === Number(item.id)
+            ? state.pendingUserUpdate
+            : null;
+        const confirming = Boolean(pending);
+        const selectedRole = pending ? pending.role : item.role;
+        const selectedStatus = pending ? pending.status : item.status;
+        return `
+            <div class="admin-user-governance" data-admin-user-governance="${item.id}">
+                <select data-admin-user-role aria-label="用户角色">
+                    ${['student', 'teacher', 'admin'].map((role) => `<option value="${role}"${selectedRole === role ? ' selected' : ''}>${role}</option>`).join('')}
+                </select>
+                <select data-admin-user-status aria-label="用户状态">
+                    ${['active', 'disabled'].map((status) => `<option value="${status}"${selectedStatus === status ? ' selected' : ''}>${status}</option>`).join('')}
+                </select>
+                <button type="button" class="admin-icon-button admin-icon-button--compact${confirming ? ' admin-icon-button--confirming' : ''}" data-admin-user-update data-user-id="${item.id}" ${state.busy || state.writeLock || !state.online ? 'disabled' : ''} aria-label="${confirming ? '再次点击确认用户权限变更' : '预览用户权限变更'}">
+                    <i data-lucide="${confirming ? 'shield-alert' : 'save'}"></i>
+                </button>
+            </div>`;
     }
 
     function renderPager(panelId, data) {
@@ -952,6 +1084,72 @@
                 </div>
             </div>
         `;
+    }
+
+    async function updateUserGovernance(button) {
+        if (state.busy || state.writeLock) return;
+        if (!state.online) {
+            setNotice('warning', '当前离线，用户治理写入已停用。');
+            return;
+        }
+        const userId = Number(button.dataset.userId);
+        const controls = button.closest('[data-admin-user-governance]');
+        const role = controls && controls.querySelector('[data-admin-user-role]')?.value;
+        const status = controls && controls.querySelector('[data-admin-user-status]')?.value;
+        if (!userId || !['student', 'teacher', 'admin'].includes(role) || !['active', 'disabled'].includes(status)) return;
+
+        const currentUser = ((state.panelData.users && state.panelData.users.items) || [])
+            .find((item) => Number(item.id) === userId);
+        if (currentUser && currentUser.role === role && currentUser.status === status) {
+            state.pendingUserUpdate = null;
+            setNotice('warning', `用户 #${userId} 的角色和状态没有变化，未发送写入。`);
+            rerenderPanel('users');
+            refreshIcons();
+            return;
+        }
+
+        const confirmationKey = `${userId}:${role}:${status}`;
+        if (!state.pendingUserUpdate || state.pendingUserUpdate.key !== confirmationKey) {
+            state.pendingUserUpdate = { key: confirmationKey, userId, role, status };
+            setNotice('warning', `将用户 #${userId} 调整为 ${role} / ${status}。再次点击同一保存按钮才会写入；权限变化会撤销其活动会话。`);
+            rerenderPanel('users');
+            refreshIcons();
+            return;
+        }
+
+        state.pendingUserUpdate = null;
+        setBusy(true);
+        try {
+            await AstraApiClient.request(`/api/admin/users/${userId}`, {
+                baseUrl: state.apiBase,
+                method: 'PATCH',
+                body: { role, status },
+                signal: state.lifecycleController && state.lifecycleController.signal
+            });
+            const results = await Promise.all([
+                refreshPanel('users'), refreshPanel('audit-logs'), refreshStats()
+            ]);
+            if (results.some((result) => !result)) {
+                state.writeLock = { action: 'user-governance', resourceId: userId };
+                setNotice('warning', '用户变更已由服务端确认，但列表核对未完整完成；写入已锁定，请刷新后核对。');
+            } else {
+                setNotice('success', `用户 #${userId} 已更新为 ${role} / ${status}，审计日志和统计已同步。`);
+            }
+        } catch (error) {
+            if (error && (error.confirmed || AstraApiClient.isAmbiguousMutation(error))) {
+                state.writeLock = {
+                    action: 'user-governance', resourceId: userId, requestId: String(error.requestId || '')
+                };
+                await Promise.all([refreshPanel('users'), refreshPanel('audit-logs'), refreshStats()]);
+                setNotice('warning', '用户变更结果尚未确认，系统未自动重试；写入已锁定，请刷新并依据审计日志核对。');
+            } else {
+                setNotice('error', errorMessage(error));
+            }
+        } finally {
+            setBusy(false);
+            rerenderPanel('users');
+            refreshIcons();
+        }
     }
 
     async function reviewJoinRequest(button) {
@@ -1014,6 +1212,13 @@
         const data = state.panelData['join-requests'];
         const config = PANEL_CONFIGS.find((item) => item.id === 'join-requests');
         const body = state.root && state.root.querySelector('[data-admin-panel-body="join-requests"]');
+        if (data && config && body) body.innerHTML = renderPanelData(config, data);
+    }
+
+    function rerenderPanel(panelId) {
+        const data = state.panelData[panelId];
+        const config = PANEL_CONFIGS.find((item) => item.id === panelId);
+        const body = state.root && state.root.querySelector(`[data-admin-panel-body="${panelId}"]`);
         if (data && config && body) body.innerHTML = renderPanelData(config, data);
     }
 
@@ -1168,8 +1373,10 @@
     function clearDashboardDom() {
         if (!state.root) return;
         const stats = state.root.querySelector('[data-admin-stats]');
+        const databaseMap = state.root.querySelector('[data-admin-database-map]');
         const summary = state.root.querySelector('[data-admin-summary]');
         if (stats) stats.innerHTML = '';
+        if (databaseMap) databaseMap.innerHTML = '';
         if (summary) summary.innerHTML = '';
         state.root.querySelectorAll('[data-admin-panel-body]').forEach((body) => {
             body.innerHTML = renderLoading('等待权威刷新');

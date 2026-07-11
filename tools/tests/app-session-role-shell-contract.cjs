@@ -1,0 +1,58 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const root = path.resolve(__dirname, '../..');
+const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+
+const html = read('index.html');
+const session = read('shared/js/app-session.js');
+const sessionCss = read('shared/css/app-session.css');
+const main = read('shared/js/main.js');
+const router = read('shared/js/router.js');
+const admin = read('pages/admin/admin.js');
+
+assert.match(html, /shared\/css\/app-session\.css/);
+assert.match(html, /api-client\.js[\s\S]*auth-ui\.js[\s\S]*app-session\.js[\s\S]*router\.js[\s\S]*main\.js/);
+assert.match(html, /data-page="student" data-app-roles="student"/);
+assert.match(html, /data-page="teacher" data-app-roles="teacher,admin"/);
+assert.match(html, /data-page="admin" data-app-roles="admin"/);
+
+for (const endpoint of [
+    '/api/users/me', '/api/auth/login', '/api/auth/register',
+    '/api/auth/password-reset/request', '/api/auth/password-reset/confirm', '/api/auth/logout'
+]) {
+    assert.ok(session.includes(endpoint), `application session must cover ${endpoint}`);
+}
+
+assert.match(session, /student:\s*new Set\(\['student'\]\)/);
+assert.match(session, /teacher:\s*new Set\(\['teacher'\]\)/);
+assert.match(session, /admin:\s*new Set\(\['teacher', 'admin'\]\)/);
+assert.match(session, /PROTECTED_PAGES\.forEach/);
+assert.match(session, /section\.hidden = !allowed/);
+assert.match(session, /section\.inert = !allowed/);
+assert.match(session, /HttpOnly Cookie/);
+assert.doesNotMatch(session, /localStorage|sessionStorage|Authorization\s*:|\.access_token/);
+
+assert.match(main, /await window\.AstraApplicationSession\.bootstrap\(\);\s*initApp\(\)/);
+assert.doesNotMatch(main, /\ninitApp\(\);\s*$/);
+assert.match(router, /_guardParsedRoute\(this\._parseHash\(\)\)/);
+assert.match(router, /AstraApplicationSession\.canAccessPage\(page\)/);
+assert.match(router, /AstraApplicationSession\.guardPage\(page\)/);
+
+for (const endpoint of ['/api/admin/users', '/api/admin/schools', '/api/admin/classes', '/api/health']) {
+    assert.ok(admin.includes(endpoint), `admin governance must expose ${endpoint}`);
+}
+assert.match(admin, /data-admin-database-map/);
+assert.match(admin, /领域数据地图/);
+assert.match(admin, /不开放任意 SQL/);
+assert.match(admin, /\/api\/admin\/users\/\$\{userId\}/);
+assert.match(admin, /state\.pendingUserUpdate/);
+assert.match(admin, /再次点击同一保存按钮/);
+assert.doesNotMatch(admin, /textarea[^>]+sql|execute\s+sql/i);
+
+assert.match(sessionCss, /@media \(max-width: 860px\)/);
+assert.match(sessionCss, /prefers-reduced-motion/);
+assert.match(sessionCss, /app-auth-locked/);
+
+console.log('app-session-role-shell-contract: ok');
