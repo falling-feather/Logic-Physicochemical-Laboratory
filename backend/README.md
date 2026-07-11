@@ -1,27 +1,14 @@
-# 星序 Astra · Python 后端
+# 星序 Astra · Python 业务后端
 
-本文档记录 v6.5 后端化第一阶段的本地开发入口。当前 Python 后端与既有 `server/` C++ 静态服务并存，先承担业务 API、内容协议、内容 seed 初始化与读取无副作用边界、正式内容初始化入口、ContentDraft 草稿、脚本审核、脚本静态分析风险等级、脚本 sandbox 契约、脚本资产 allowlist/SRI 静态门禁、脚本资产下载校验证据、发布版本绑定的外部脚本资产镜像、管理端脚本资产供应链清单、内容脚本镜像一致性审计、内容脚本远端漂移扫描、内容脚本扫描 run 台账与远端漂移告警候选摘要、内容脚本远端漂移扫描调度/CLI observe-only 首轮、内容脚本扫描 run 健康/队列摘要、内容脚本远端漂移告警 outbox 人工复核入队与状态流转、内容脚本 CDN host 信任治理首轮、公开 render 脚本 manifest 脱敏、sandbox embed 描述符与沙箱执行契约头、浏览器自动化隔离证明、稳定 `sectionId/sourceId` 内容身份、草稿编辑、提交/退回/撤回工作流、active 草稿数据库唯一约束、内容发布/版本记录/回滚、发布/回滚冲突 409、脚本历史版本 rollback 重审门禁、内容页 current 指针、草稿 base version/hash、版本 previous 链、发布元数据回填、管理端版本 JSON path diff 敏感预览脱敏与带显式稳定 ID 字段的 semantic 富语义摘要、登录、密码策略、登录失败锁定、活动会话列表与单会话撤销、会话设备标识与 last_seen 追踪/节流、管理员密码重置、用户自助密码重置令牌、密码重置 token 留存清理脚本、禁用用户会话撤销、用户名大小写规范化与数据库级 normalized key 唯一约束、必填文本修剪后校验、学校、班级、班级加入申请审批、学校/班级/课程访问控制服务层、课程、作业、提交批改、跨班级提交唯一性、学生资源状态可见性、学生侧作业历史/复盘只读入口、积分流水、知识状态/班级规则统计、个人/班级知识快照、周期重算运行记录、进程内调度器、数据库租约防重入与自动心跳、管理端知识快照运行列表/健康摘要、协作式取消、手动 requeue、调度积压摘要、告警候选摘要与告警 outbox 人工复核台账、状态流转、队列摘要、批量复核、dispatch dry-run、执行计划台账与再校验、管理端基础 API、学校/班级深度统计、管理端加入申请队列、管理端列表分页搜索、管理端内容页数据库侧分页、中文路径/中文 slug 回归、待批改队列、缺陷记录外部 issue 链接、审计元数据、认证事件审计、审计日志链式哈希、审计链完整性校验、审计日志 JSON/CSV 明细导出、报表摘要导出、审计高频候选摘要、审计留存预检、本地审计归档包导出/Manifest 校验和导出/摘要行为审计留痕等能力。
+> **文档定位**：后端本地开发、API/服务边界、配置、迁移、运维脚本和验证入口。版本流水与实机证据见 [`../doc/03-发布历史.md`](../doc/03-发布历史.md)，未来任务见 [`../doc/02-更新规划.md`](../doc/02-更新规划.md)。
+>
+> **当前基线**：FastAPI + SQLAlchemy + Alembic 0046；SQLite 为安全本地默认，MySQL 为发布目标。V6.6.63 后端阶段、真实 MySQL、四服务拓扑、Release 构建/回滚和 15/15 stage gate 已完成。
+>
+> **最后更新**：2026-07-11
 
-V6.6.54 已在本地 outbox/dispatch plan 基座上增加默认关闭的 Webhook 外部告警适配器。只有 admin 显式确认、计划再校验通过且 `ASTRA_ALERT_DELIVERY_ENABLED=true`、HTTPS URL 和 SecretStr token 均已通过环境/安全配置注入时才会外发；条目按 `queued -> dispatching -> delivered/failed` 流转，失败可人工重新排队，重试沿用稳定幂等键。外发信封、响应和审计不包含原始 `payload_json`、source key、Webhook URL、token 或异常正文。
+后端当前承担认证与会话、学校/班级/课程、作业/提交/批改、积分与知识状态、内容草稿/审核/发布/回滚、脚本隔离、管理治理、DB-backed 任务和审计链。`server/` 中的 Node/C++ 进程只承担显式白名单静态资源，不是业务 API。
 
-V6.6.55 已增加 `background_tasks/background_task_attempts` DB-backed 控制面和统一 worker。告警 plan、知识快照、内容脚本扫描共享幂等入队、优先级、租约、attempt、指数退避、dead-letter 与人工 retry/cancel；知识快照和脚本扫描继续以领域 run 为权威记录，避免控制面完成写入中断后重复副作用。worker 与内容脚本外网执行分别默认关闭，管理 API 只返回脱敏摘要，不返回任务 payload 或 lease token。
-
-V6.6.56 选择默认关闭的 HTTPS hash 回执作为审计外部锚定方案。`audit_chain_heads` 在 MySQL 通过 `SELECT ... FOR UPDATE` 串行化链尾，SQLite 本地回归使用事务级进程锁；归档 Manifest v2 记录范围、archive hash、导出人、导出时间和删除/脱敏/恢复审批策略。`audit_archive_anchors` 保存回执状态，锚定任务复用统一 worker 的 attempt/退避/dead-letter；外发信封只包含 manifest/archive hash、链边界和范围摘要，不包含审计正文、快照、文件路径、URL 或 token。
-
-V6.6.57 已新增外部 issue provider 协议与首个 GitHub REST 适配器。管理员可沿用 `BugRecord.external_issue_provider/id/url` 手工绑定，也可显式确认创建 issue、同步本地状态和发送单条安全评论；`bug_external_sync_operations` 以稳定操作键记录 create/status/comment 的 attempt、成功、失败或 ambiguous 状态，成功操作可恢复读取，创建和评论的未知结果禁止盲重试。系统不自动接收外部状态，不让外部 issue 覆盖本地字段；自动创建只发送本地编号、分类、严重度、状态和本地权威声明，不发送 evidence、notes、source、URL 或凭据。当前只有 GitHub 可执行，Gitee/Jira 仅保留 provider 扩展位；功能默认关闭，只有被选入 RC 时才在 V6.6.63 补真实 staging 和凭据/限流证据。
-
-V6.6.58 已新增 `app.services.backend_performance`、`scripts.backend_performance_drill` 与管理端性能报告。11 个 query profile 覆盖审计、知识快照 run、脚本扫描 run、待批改、任务 claim、Bug 和外部同步账本；Alembic 0043 新增 10 个复合索引，并复用 0040 既有任务 claim 索引。报告可执行 EXPLAIN 和 3 轮最多 50 行的有界基准，只返回索引/访问方式/耗时/行数摘要，不返回 SQL、参数、结果值或数据库 URL。API 返回 `Server-Timing`，慢 API 只记录 request id/方法/路由模板/状态/耗时，慢 SQL 只记录语句 hash/操作/方言/耗时。MySQL 配置显式定义 pool size、overflow、等待/回收和 connect/read/write timeout；`pool_pre_ping` 与 LIFO 保留，事务写入不自动重试，worker 推荐独立服务。
-
-V6.6.59 已完成安全、隐私和发布冻结：非本地环境 bootstrap/cookie fail closed，CORS 只接受精确 origin；全局角色与 scoped authority 联动，角色变化撤销会话并清理不兼容权限，admin 控制面使用数据库锁串行化。内容审核绑定最后编辑者和精确 schema hash，schema 有界；外部脚本统一走公网 HTTPS pinned fetch，sandbox 资产按 hash CSP/SRI 执行且导航 fail closed。后台外部副作用要求活动 admin actor/有效租约，浏览器敏感学习状态不落普通 storage，静态服务只公开显式前端资源。Alembic head 为 0045。
-
-V6.6.60 已完成本地发布候选总验收并判定延期：opaque sandbox 的 SRI 资产端点增加仅资源级、无凭据的匿名 CORS，外部 Edge 桌面/390×844 proof 27/27；SQLite 空库迁移、preflight/smoke 和 MySQL-required fail-closed 通过。真实 MySQL、反向代理/服务注册和合格 C++17 构建仍为 P1，分别进入 V6.6.61-V6.6.62；默认关闭的外部 provider 只有被选入 RC 时才在 V6.6.63 补 staging。
-
-V6.6.61 已在隔离、仅回环监听的 MySQL 8.0.46 上关闭 `RC-MYSQL`。空库 0001→0046、真实 preflight/smoke、内容 publish/rollback、知识快照/脚本扫描/统一任务 lease/cancel/retry、6 writer 审计链与安全控制锁均通过；代表性数据覆盖 11 个 EXPLAIN ANALYZE profile、0043 索引建撤、连接池耗尽恢复、100 API + 100 worker 并发和独立备份恢复。Alembic 0046 将知识快照窗口字段统一为 DATETIME(6)，并修复真实 MySQL 暴露的标识符长度、保留字、DATETIME(0) hash/窗口精度、0044 downgrade 外键顺序和 health 探针重复释放全局连接池问题。该版本结束时 stage gate 仅缺 V6.6.62 真实 topology。
-
-V6.6.62 已关闭 `RC-TOPOLOGY` 与 `RC-CPP-BUILD`。新增 `scripts.windows_service_drill_bundle` 生成 Caddy + WinSW 四服务可逆包，`EngLab/AstraApi/AstraWorker/AstraProxy` 均以 `LocalService`、Automatic delayed start、滚动日志和失败重启运行；代理与上游不设 SCM 硬依赖，因此 API 停止时静态首页仍保持 200。`deploy_topology_drill --verify-windows-services` 会从 SCM 回读状态、启动类型、最小权限账号和 PID。MSVC 19.43 Release 构建、配置/服务定义/二进制回滚、直连端口隔离和最终 stage gate 14/14 均已实证。真实演练还发现并修复公开 health 返回数据库地址，以及代理依赖 API 导致静态回退同时停止的问题。
-
-V6.6.63 已冻结首个 RC 不选入任何外部通道。新增 `app.services.rc_external_scope` 与 `scripts.rc_external_scope_gate`，只读检查 Webhook/GitHub/audit anchor 的 selected/enabled/configured/readback，阻断未选能力启用或伪造读回确认；默认报告网络请求 0、无副作用且不返回 URL、owner/repo 或 token。`backend_stage_gate --run-rc-external-scope` 将其作为第 15 道门禁，最终 15/15 通过；V6.6.37-V6.6.63 后端阶段收束完成。
-
+Webhook、GitHub issue sync、audit anchor、远端脚本扫描等外部副作用继续默认关闭；只有显式配置、管理员确认、计划再校验和真实 staging 证据齐全后才可启用。
 ## 本地启动
 
 ```bash

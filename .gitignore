@@ -21,6 +21,12 @@ Thumbs.db
 *.tmp
 *~
 .codex-public-preview-*.log
+.codex/worktrees/
+.openai/
+.tmp-*/
+_codex_tmp_*/
+backend/.tmp-*.db
+
 # Test screenshots
 test-screenshots/
 .commit-msg-*.txt
