@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException
@@ -44,3 +45,9 @@ def next_offset(total: int, offset: int, item_count: int) -> int | None:
 def contains_pattern(value: str) -> str:
     escaped = value.replace("~", "~~").replace("%", "~%").replace("_", "~_")
     return f"%{escaped}%"
+
+
+def naive_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(UTC).replace(tzinfo=None)
