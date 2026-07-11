@@ -39,3 +39,8 @@ def change_snapshot(before: dict[str, Any], after: dict[str, Any]) -> dict[str, 
 def next_offset(total: int, offset: int, item_count: int) -> int | None:
     candidate = offset + item_count
     return candidate if candidate < total else None
+
+
+def contains_pattern(value: str) -> str:
+    escaped = value.replace("~", "~~").replace("%", "~%").replace("_", "~_")
+    return f"%{escaped}%"
