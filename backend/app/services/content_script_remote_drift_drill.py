@@ -11,7 +11,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import Session
 
-from app.models import AdminAlertOutboxEntry, ContentScriptAsset, ContentScriptAssetScanRun
+from app.models import AdminAlertOutboxEntry, ContentScriptAssetScanRun
 from app.services.admin_alert_outbox import (
     ALERT_OUTBOX_DELIVERY_TARGET_ADMIN_OUTBOX,
     ALERT_OUTBOX_DISPATCH_MODE_MANUAL_REVIEW,
@@ -20,7 +20,6 @@ from app.services.admin_alert_outbox import (
 from app.services.content_script_asset_scan_runs import (
     CONTENT_SCRIPT_ASSET_SCAN_TYPE_REMOTE_DRIFT,
     build_content_script_asset_scan_alert_report,
-    build_content_script_asset_scan_health_report,
     build_content_script_asset_scan_queue_report,
 )
 from app.services.content_script_assets import audit_current_content_script_asset_mirrors

@@ -1,0 +1,87 @@
+name: Quality gates
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-sqlite:
+    name: Backend · SQLite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -r backend/requirements.txt
+      - run: python -m pytest backend
+
+  backend-mysql:
+    name: Backend · MySQL release evidence
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: astra_ci_drill
+          MYSQL_ROOT_PASSWORD: astra-ci-root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pastra-ci-root"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      ASTRA_DATABASE_URL: mysql+pymysql://root:astra-ci-root@127.0.0.1:3306/astra_ci_drill
+      ASTRA_TEST_MYSQL_URL: mysql+pymysql://root:astra-ci-root@127.0.0.1:3306/astra_ci_drill
+      ASTRA_TEST_MYSQL_DATABASE: astra_ci_drill
+      ASTRA_TEST_ADMIN_BOOTSTRAP_TOKEN: ci-bootstrap-token
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -r requirements.txt
+        working-directory: backend
+      - run: python -m alembic upgrade head
+        working-directory: backend
+      - run: python -m pytest tests/test_mysql_release_evidence.py
+        working-directory: backend
+
+  frontend-contracts:
+    name: Frontend · syntax and contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check JavaScript syntax
+        shell: bash
+        run: git ls-files -z '*.js' '*.mjs' '*.cjs' | xargs -0 -n1 node --check
+      - name: Run frontend contracts
+        run: node tools/tests/run-contracts.cjs
+
+  cpp-static-server:
+    name: C++ · release build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S server -B server/build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build server/build --config Release --parallel 2

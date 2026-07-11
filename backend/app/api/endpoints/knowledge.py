@@ -38,7 +38,6 @@ from app.services.assignment_policies import (
 )
 from app.services.access_control import (
     active_class_student_ids,
-    course_attached_to_class,
     get_class,
     require_class_member,
     require_class_teacher_or_admin,
