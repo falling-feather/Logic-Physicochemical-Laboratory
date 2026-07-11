@@ -32,6 +32,7 @@ const ParticleNetwork = {
     // ── OffscreenCanvas Worker ──
     _worker: null,
     _useWorker: false,
+    _canvasTransferred: false,
     _dpr: 1,
     _initing: false,
     _mouseBound: false,
@@ -80,7 +81,12 @@ const ParticleNetwork = {
                 return;
             } catch (e) {
                 console.warn('[ParticleNetwork] OffscreenCanvas 回退:', e);
-                this.canvas.dataset.workerFailed = '1';
+                if (this._worker) {
+                    this._worker.terminate();
+                    this._worker = null;
+                }
+                this._useWorker = false;
+                this._replaceTransferredCanvas(true);
             }
         }
 
@@ -93,6 +99,7 @@ const ParticleNetwork = {
         const lowEnd = typeof _isLowEnd !== 'undefined' && _isLowEnd;
         this._dpr = lowEnd ? Math.min(window.devicePixelRatio || 1, 1.25) : Math.min(window.devicePixelRatio || 1, 1.5);
         const offscreen = this.canvas.transferControlToOffscreen();
+        this._canvasTransferred = true;
         this._worker = new Worker('shared/workers/particle-worker.js');
         this._useWorker = true;
 
@@ -108,7 +115,9 @@ const ParticleNetwork = {
                 this._worker = null;
             }
             this._useWorker = false;
-            this.canvas.dataset.workerFailed = '1';
+            this._replaceTransferredCanvas(true);
+            const homePage = document.getElementById('page-home');
+            if (!homePage || homePage.classList.contains('active')) this._initDirect();
         };
 
         this._worker.postMessage({
@@ -176,6 +185,25 @@ const ParticleNetwork = {
         this.loop();
     },
 
+    /**
+     * transferControlToOffscreen() is irreversible for a canvas element. Replace
+     * the transferred node before falling back or re-entering the home page so a
+     * fresh rendering context can be created without InvalidStateError.
+     */
+    _replaceTransferredCanvas(markWorkerFailed = false) {
+        if (!this.canvas || !this._canvasTransferred) {
+            if (markWorkerFailed && this.canvas) this.canvas.dataset.workerFailed = '1';
+            return;
+        }
+        const replacement = this.canvas.cloneNode(false);
+        if (markWorkerFailed) replacement.dataset.workerFailed = '1';
+        else delete replacement.dataset.workerFailed;
+        this.canvas.replaceWith(replacement);
+        this.canvas = replacement;
+        this.ctx = null;
+        this._canvasTransferred = false;
+    },
+
     destroy() {
         this.running = false;
         this._initing = false;
@@ -186,6 +214,7 @@ const ParticleNetwork = {
         }
         this._useWorker = false;
         if (this._resizeObs) { this._resizeObs.disconnect(); this._resizeObs = null; }
+        this._replaceTransferredCanvas(false);
     },
 
     resize() {
