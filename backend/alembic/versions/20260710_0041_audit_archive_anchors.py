@@ -18,7 +18,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
+    audit_chain_heads = op.create_table(
         "audit_chain_heads",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("current_audit_log_id", sa.Integer(), nullable=True),
@@ -36,18 +36,15 @@ def upgrade() -> None:
     ).mappings().first()
     now = datetime.now(UTC)
     connection.execute(
-        sa.text(
-            "INSERT INTO audit_chain_heads "
-            "(id, current_audit_log_id, current_hash, created_at, updated_at) "
-            "VALUES (:id, :current_audit_log_id, :current_hash, :created_at, :updated_at)"
-        ),
-        {
-            "id": 1,
-            "current_audit_log_id": latest["id"] if latest is not None else None,
-            "current_hash": latest["current_hash"] if latest is not None else None,
-            "created_at": now,
-            "updated_at": now,
-        },
+        audit_chain_heads.insert().values(
+            {
+                "id": 1,
+                "current_audit_log_id": latest["id"] if latest is not None else None,
+                "current_hash": latest["current_hash"] if latest is not None else None,
+                "created_at": now,
+                "updated_at": now,
+            }
+        )
     )
 
     op.create_table(

@@ -503,6 +503,11 @@ class _FakeMysqlResult:
         return self._variables
 
 
+def _sqlite_datetime(value: datetime) -> str:
+    """Mirror SQLite's legacy adapter explicitly for raw migration fixtures."""
+    return value.isoformat(" ")
+
+
 def _insert_user(database_url: str, username: str) -> None:
     now = datetime.now(UTC)
     engine = make_engine(database_url)
@@ -524,8 +529,8 @@ def _insert_user(database_url: str, username: str) -> None:
                 "password_hash": "not-used-in-test",
                 "role": "teacher",
                 "status": "active",
-                "created_at": now,
-                "updated_at": now,
+                "created_at": _sqlite_datetime(now),
+                "updated_at": _sqlite_datetime(now),
             },
         )
 
@@ -548,9 +553,9 @@ def _insert_login_attempt(database_url: str, username: str) -> None:
             {
                 "username": username,
                 "failure_count": 1,
-                "last_failed_at": now,
-                "created_at": now,
-                "updated_at": now,
+                "last_failed_at": _sqlite_datetime(now),
+                "created_at": _sqlite_datetime(now),
+                "updated_at": _sqlite_datetime(now),
             },
         )
 
@@ -578,8 +583,8 @@ def _insert_normalized_user(database_url: str, username: str) -> int:
                 "password_hash": "not-used-in-test",
                 "role": "teacher",
                 "status": "active",
-                "created_at": now,
-                "updated_at": now,
+                "created_at": _sqlite_datetime(now),
+                "updated_at": _sqlite_datetime(now),
             },
         )
         return int(result.lastrowid)
@@ -603,9 +608,9 @@ def _insert_auth_session(database_url: str, user_id: int) -> int:
             {
                 "user_id": user_id,
                 "token_hash": f"legacy-token-{user_id}",
-                "expires_at": now + timedelta(days=7),
-                "created_at": now,
-                "updated_at": now,
+                "expires_at": _sqlite_datetime(now + timedelta(days=7)),
+                "created_at": _sqlite_datetime(now),
+                "updated_at": _sqlite_datetime(now),
             },
         )
         return int(result.lastrowid)
@@ -630,7 +635,7 @@ def _insert_audit_log(database_url: str) -> int:
                 )
                 """
             ),
-            {"created_at": now, "updated_at": now},
+            {"created_at": _sqlite_datetime(now), "updated_at": _sqlite_datetime(now)},
         )
         return int(result.lastrowid)
 
@@ -654,12 +659,12 @@ def _insert_knowledge_snapshot_run(database_url: str) -> int:
                 """
             ),
             {
-                "period_start": now,
-                "period_end": now,
-                "started_at": now,
-                "finished_at": now,
-                "created_at": now,
-                "updated_at": now,
+                "period_start": _sqlite_datetime(now),
+                "period_end": _sqlite_datetime(now),
+                "started_at": _sqlite_datetime(now),
+                "finished_at": _sqlite_datetime(now),
+                "created_at": _sqlite_datetime(now),
+                "updated_at": _sqlite_datetime(now),
             },
         )
         return int(result.lastrowid)
@@ -751,7 +756,7 @@ def test_bug_external_sync_migration_round_trip_preserves_local_bug(monkeypatch)
                     )
                     """
                 ),
-                {"created_at": now, "updated_at": now},
+                {"created_at": _sqlite_datetime(now), "updated_at": _sqlite_datetime(now)},
             )
             bug_id = int(result.lastrowid)
 
