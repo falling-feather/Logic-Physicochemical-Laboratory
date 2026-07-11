@@ -11,7 +11,7 @@
 ## 当前状态
 
 - 前端主线已进入 V7.3.1：三角色工作台已接入第一方账号入口，隔离端到端门禁覆盖建课、入班、提交、批改、管理审批、审计对账、越权拒绝和三端 390×844。
-- 后端 V6.6.37–V6.6.63 阶段已完成，真实 MySQL、反向代理/四服务、Release 构建、回滚与 15/15 stage gate 已留证。
+- 后端 V6.6.37–V6.6.63 阶段已完成，真实 MySQL、反向代理/四服务、Release 构建、回滚与 15/15 stage gate 已留证；V7.4.9 已建立 Python 3.12 通用哈希锁和 CI 漂移门禁。
 - V7.3.2 已增加目标环境发布证据闸；没有真实域名、owner、TLS、secret、备份恢复、日志监控和七份哈希报告时默认延期，不能用本地基线冒充正式上线。
 - 2026-07-11 全局 review 已修复首页 OffscreenCanvas 重入、协议页 404、全局控件重复初始化和 SQLite 时间适配告警，并补齐持续集成质量门禁。
 - Webhook、GitHub issue sync、audit anchor 等外部通道未进入首个 RC，继续默认关闭；启用前必须单独审批并完成真实 staging 验证。
@@ -36,12 +36,14 @@ node server/dev-static-server.mjs --port 8766
 
 ```bash
 cd backend
-python -m pip install -r requirements.txt
+python -m pip install --require-hashes -r requirements.lock
 python -m alembic upgrade head
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
 默认数据库是本地 SQLite。生产或发布证据环境必须显式配置 MySQL、关闭自动建表，并按 [`doc/04-部署指南.md`](doc/04-部署指南.md) 执行预检、迁移、烟测和回滚检查。
+
+`backend/requirements.txt` 是直接依赖约束输入，不能用于发布安装。依赖升级必须在独立变更中同时更新哈希锁：先安装 `uv==0.10.6`，再从仓库根目录执行 `python backend/scripts/compile_requirements_lock.py --exclude-newer YYYY-MM-DD`；CI 会重新解析并拒绝漂移。
 
 联调入口：
 

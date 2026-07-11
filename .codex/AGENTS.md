@@ -10,7 +10,7 @@
 - Python/FastAPI 业务后端：认证、学校/班级/课程、作业、内容、学习分析、任务与审计。
 - Node/C++ 静态服务：只承担审核后的浏览器资源托管。
 
-V6.6.63 后端阶段已经完成，V7.4.8 已完成登录前置、角色应用外壳、管理领域数据地图及管理 API 全部分域拆分，`admin.py` 只保留路由聚合；当前后续工作以目标环境上线和其余结构性维护为主，详见 `doc/02-更新规划.md`。
+V6.6.63 后端阶段已经完成，V7.4.8 已完成登录前置、角色应用外壳、管理领域数据地图及管理 API 全部分域拆分，`admin.py` 只保留路由聚合；V7.4.9 已建立 Python 3.12 通用哈希锁、固定解析器和 CI 漂移门禁。当前后续工作以目标环境上线和其余结构性维护为主，详见 `doc/02-更新规划.md`。
 
 ## 文档职责
 
@@ -38,6 +38,7 @@ V6.6.63 后端阶段已经完成，V7.4.8 已完成登录前置、角色应用�
 ## 验证要求
 
 - 后端：`python -m pytest backend`。
+- Python 依赖：新环境/CI 使用 `backend/requirements.lock` 和 `--require-hashes`；直接约束变化后以固定 uv 版本重生成，并执行 `python backend/scripts/compile_requirements_lock.py --check`。
 - 前端契约：`node tools/tests/run-contracts.cjs`。
 - JavaScript 修改：相关文件 `node --check`。
 - 用户界面：桌面与 390×844 浏览器验收，检查页面身份、交互、console、重复 ID、遮罩和溢出。

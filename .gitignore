@@ -26,6 +26,7 @@ Thumbs.db
 .tmp-*/
 _codex_tmp_*/
 backend/.tmp-*.db
+backend/.requirements.lock.check-*
 
 # Test screenshots
 test-screenshots/

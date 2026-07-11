@@ -2,13 +2,33 @@
 
 > **文档定位**：后端本地开发、API/服务边界、配置、迁移、运维脚本和验证入口。版本流水与实机证据见 [`../doc/03-发布历史.md`](../doc/03-发布历史.md)，未来任务见 [`../doc/02-更新规划.md`](../doc/02-更新规划.md)。
 >
-> **当前基线**：FastAPI + SQLAlchemy + Alembic 0046；SQLite 为安全本地默认，MySQL 为发布目标。V7.4.8 已完成管理 API 全部分域拆分，`admin.py` 为纯路由聚合器；V6.6.63 后端阶段、真实 MySQL、四服务拓扑、Release 构建/回滚和 15/15 stage gate 已完成。
+> **当前基线**：FastAPI + SQLAlchemy + Alembic 0046；SQLite 为安全本地默认，MySQL 为发布目标。V7.4.9 已建立 Python 3.12 通用哈希锁和 CI 漂移门禁；V7.4.8 已完成管理 API 全部分域拆分，`admin.py` 为纯路由聚合器；V6.6.63 后端阶段、真实 MySQL、四服务拓扑、Release 构建/回滚和 15/15 stage gate 已完成。
 >
 > **最后更新**：2026-07-11
 
 后端当前承担认证与会话、学校/班级/课程、作业/提交/批改、积分与知识状态、内容草稿/审核/发布/回滚、脚本隔离、管理治理、DB-backed 任务和审计链。`server/` 中的 Node/C++ 进程只承担显式白名单静态资源，不是业务 API。
 
 Webhook、GitHub issue sync、audit anchor、远端脚本扫描等外部副作用继续默认关闭；只有显式配置、管理员确认、计划再校验和真实 staging 证据齐全后才可启用。
+
+## Python 依赖锁
+
+`requirements.txt` 只维护人工审查的直接依赖兼容范围；新环境、CI 和发布安装一律消费 `requirements.lock`。锁文件由 uv 0.10.6 面向 Python 3.12 通用解析生成，包含传递依赖、平台条件和发行包 SHA-256，不接受手工编辑。
+
+```bash
+cd backend
+python -m pip install --require-hashes -r requirements.lock
+```
+
+依赖升级必须是独立提交或独立 PR，并同时审查直接约束与完整锁差异。更新时从仓库根目录运行：
+
+```bash
+python -m pip install uv==0.10.6
+python backend/scripts/compile_requirements_lock.py --exclude-newer YYYY-MM-DD
+python backend/scripts/compile_requirements_lock.py --check
+```
+
+`--exclude-newer` 固定本次解析可见的软件发布日期；`--check` 会从已提交锁的生成命令读取该日期，重新解析并在内容漂移时失败。升级 uv 本身也必须在同一独立依赖变更中同步修改脚本、CI、文档与锁文件。
+
 ## 本地启动
 
 ```bash
