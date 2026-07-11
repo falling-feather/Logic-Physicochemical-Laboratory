@@ -373,6 +373,9 @@ const ModuleSelector = {
         // Deactivate previous module
         const prevModule = this.activeModule[page];
         if (prevModule) {
+            if (window.BackendContent && typeof BackendContent.destroyExperimentSchema === 'function') {
+                BackendContent.destroyExperimentSchema(page, prevModule);
+            }
             pageEl.querySelectorAll(`[data-module="${prevModule}"].module-active`).forEach(s => {
                 s.classList.remove('module-active');
             });
@@ -449,6 +452,10 @@ const ModuleSelector = {
     closeModule(page) {
         const pageEl = document.getElementById(`page-${page}`);
         if (!pageEl) return;
+        const activeModule = this.activeModule[page];
+        if (activeModule && window.BackendContent && typeof BackendContent.destroyExperimentSchema === 'function') {
+            BackendContent.destroyExperimentSchema(page, activeModule);
+        }
 
         // Hide experiment guide help button
         const guide = this._getExperimentGuide();
@@ -795,6 +802,9 @@ const ModuleSelector = {
     resetPage(page) {
         const experiments = CONFIG.experiments[page];
         if (!experiments) return;
+        if (window.BackendContent && typeof BackendContent.destroyPage === 'function') {
+            BackendContent.destroyPage(page);
+        }
         experiments.forEach(exp => {
             delete this._initialized[`${page}:${exp.id}`];
         });

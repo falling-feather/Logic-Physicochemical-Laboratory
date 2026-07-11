@@ -1,15 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
 from app.db.session import get_db
 from app.models import (
     Assignment,
+    AssignmentClassPolicy,
     ClassGroup,
-    ClassMembership,
     Course,
     CourseClass,
+    CourseCollaborator,
     CourseUnit,
     SchoolMembership,
     User,
@@ -19,12 +20,35 @@ from app.schemas.course import (
     AssignmentRead,
     CourseClassAttach,
     CourseClassRead,
+    CourseCollaboratorBatchRead,
+    CourseCollaboratorBatchResult,
+    CourseCollaboratorBatchUpdate,
+    CourseCollaboratorCreate,
+    CourseCollaboratorRead,
+    CourseCollaboratorUpdate,
     CourseCreate,
+    CourseOwnerTransfer,
     CourseRead,
     CourseUnitCreate,
     CourseUnitRead,
 )
 from app.services.audit import record_audit_log
+from app.services.assignment_policies import build_effective_assignment_policy, effective_assignment_payload
+from app.services.access_control import (
+    course_attached_to_class,
+    get_course,
+    lock_scope_eligible_user,
+    require_class_member,
+    require_class_teacher_or_admin,
+    require_course_author_or_admin,
+    require_course_collaborator_or_admin,
+    require_course_visible,
+    require_school_member,
+    require_school_role,
+    teacher_school_ids,
+    visible_class_ids,
+)
+from app.services.text import require_trimmed_text
 
 
 router = APIRouter()
@@ -39,7 +63,7 @@ def list_courses(
 ) -> list[Course]:
     statement = select(Course).order_by(Course.id)
     if class_id is not None:
-        class_group = _require_class_member(db, current_user, class_id)
+        class_group = require_class_member(db, current_user, class_id)
         if school_id is not None and class_group.school_id != school_id:
             raise HTTPException(status_code=422, detail="Class does not belong to requested school")
         statement = statement.join(CourseClass, CourseClass.course_id == Course.id).where(
@@ -47,20 +71,30 @@ def list_courses(
             CourseClass.status == "active",
         )
     elif school_id is not None:
-        _require_school_member(db, current_user, school_id)
+        require_school_member(db, current_user, school_id)
         statement = statement.where(Course.school_id == school_id)
+        if current_user.role == "student":
+            class_ids = visible_class_ids(db, current_user.id)
+            if not class_ids:
+                return []
+            statement = statement.join(CourseClass, CourseClass.course_id == Course.id).where(
+                CourseClass.class_id.in_(class_ids),
+                CourseClass.status == "active",
+            )
     elif current_user.role != "admin":
-        teacher_school_ids = _teacher_school_ids(db, current_user.id)
-        if teacher_school_ids:
-            statement = statement.where(Course.school_id.in_(teacher_school_ids))
+        school_ids = teacher_school_ids(db, current_user.id)
+        if school_ids:
+            statement = statement.where(Course.school_id.in_(school_ids))
             return list(db.scalars(statement).all())
-        class_ids = _visible_class_ids(db, current_user.id)
+        class_ids = visible_class_ids(db, current_user.id)
         if not class_ids:
             return []
         statement = statement.join(CourseClass, CourseClass.course_id == Course.id).where(
             CourseClass.class_id.in_(class_ids),
             CourseClass.status == "active",
         )
+    if current_user.role == "student":
+        statement = statement.where(Course.status == "published").distinct()
     return list(db.scalars(statement).all())
 
 
@@ -71,8 +105,15 @@ def create_course(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Course:
-    _require_school_role(db, current_user, payload.school_id, {"admin", "teacher"})
-    title = payload.title.strip()
+    current_user = lock_scope_eligible_user(
+        db,
+        current_user.id,
+        "teacher",
+        detail="Course creation requires an active teacher/admin role",
+        status_code=403,
+    )
+    require_school_role(db, current_user, payload.school_id, {"admin", "teacher"})
+    title = require_trimmed_text(payload.title, "Course title is required")
     existing = db.scalar(select(Course).where(Course.school_id == payload.school_id, Course.title == title))
     if existing is not None:
         raise HTTPException(status_code=409, detail="Course already exists in this school")
@@ -118,13 +159,19 @@ def attach_course_class(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CourseClass:
-    course = _get_course(db, course_id)
-    _require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    course = get_course(db, course_id)
+    require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
     class_group = db.get(ClassGroup, payload.class_id)
     if class_group is None:
         raise HTTPException(status_code=404, detail="Class not found")
     if class_group.school_id != course.school_id:
         raise HTTPException(status_code=422, detail="Class must belong to course school")
+    require_class_teacher_or_admin(
+        db,
+        current_user,
+        class_group,
+        detail="Course class attachment requires class teacher role",
+    )
 
     existing = db.scalar(
         select(CourseClass).where(CourseClass.course_id == course.id, CourseClass.class_id == class_group.id)
@@ -158,16 +205,395 @@ def attach_course_class(
     return course_class
 
 
+@router.patch("/{course_id}/owner", response_model=CourseRead)
+def transfer_course_owner(
+    course_id: int,
+    payload: CourseOwnerTransfer,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Course:
+    course = get_course(db, course_id)
+    require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    require_course_author_or_admin(
+        current_user,
+        course,
+        detail="Course owner transfer requires course owner role",
+    )
+    _require_active_school_teacher(
+        db,
+        course.school_id,
+        payload.target_user_id,
+        target_not_found_detail="Course owner transfer target not found",
+        membership_detail="Course owner transfer target must be active school teacher/admin",
+    )
+    if payload.target_user_id == course.creator_user_id:
+        raise HTTPException(status_code=409, detail="Course owner is already target user")
+
+    before = _course_snapshot(course)
+    previous_owner_id = course.creator_user_id
+    target_collaborator = db.scalar(
+        select(CourseCollaborator).where(
+            CourseCollaborator.course_id == course.id,
+            CourseCollaborator.user_id == payload.target_user_id,
+        )
+    )
+    owner_update = db.execute(
+        update(Course)
+        .where(Course.id == course.id, Course.creator_user_id == previous_owner_id)
+        .values(creator_user_id=payload.target_user_id)
+    )
+    if owner_update.rowcount != 1:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Course owner changed; retry transfer")
+
+    course.creator_user_id = payload.target_user_id
+    collaborator_before = _course_collaborator_snapshot(target_collaborator) if target_collaborator is not None else None
+    if target_collaborator is not None and target_collaborator.status != "inactive":
+        target_collaborator.status = "inactive"
+    collaborator_after = _course_collaborator_snapshot(target_collaborator) if target_collaborator is not None else None
+
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="course.owner.transfer",
+        resource_type="course",
+        resource_id=course.id,
+        school_id=course.school_id,
+        event_result="success",
+        request=request,
+        snapshot={
+            "before": before,
+            "after": _course_snapshot(course),
+            "target_collaborator_before": collaborator_before,
+            "target_collaborator_after": collaborator_after,
+        },
+    )
+    db.commit()
+    db.refresh(course)
+    return course
+
+
+@router.get("/{course_id}/collaborators", response_model=list[CourseCollaboratorRead])
+def list_course_collaborators(
+    course_id: int,
+    status_filter: str = Query(default="active", alias="status"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[CourseCollaborator]:
+    if status_filter not in {"active", "inactive", "all"}:
+        raise HTTPException(status_code=400, detail="Invalid collaborator status")
+    course = get_course(db, course_id)
+    require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    require_course_collaborator_or_admin(
+        db,
+        current_user,
+        course,
+        {"editor", "content_editor", "assessment_editor", "viewer"},
+        detail="Course collaborators require active collaborator role",
+    )
+    statement = select(CourseCollaborator).where(CourseCollaborator.course_id == course.id).order_by(
+        CourseCollaborator.id
+    )
+    if status_filter != "all":
+        statement = statement.where(CourseCollaborator.status == status_filter)
+    return list(db.scalars(statement).all())
+
+
+@router.post(
+    "/{course_id}/collaborators",
+    response_model=CourseCollaboratorRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_course_collaborator(
+    course_id: int,
+    payload: CourseCollaboratorCreate,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CourseCollaborator:
+    course = get_course(db, course_id)
+    require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    require_course_author_or_admin(
+        current_user,
+        course,
+        detail="Course collaborator management requires course owner role",
+    )
+    _require_active_school_teacher(db, course.school_id, payload.user_id)
+    if payload.user_id == course.creator_user_id:
+        raise HTTPException(status_code=409, detail="Course creator is already an owner")
+    existing = db.scalar(
+        select(CourseCollaborator).where(
+            CourseCollaborator.course_id == course.id,
+            CourseCollaborator.user_id == payload.user_id,
+        )
+    )
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="Course collaborator already exists")
+
+    collaborator = CourseCollaborator(
+        course_id=course.id,
+        user_id=payload.user_id,
+        role=payload.role,
+        status="active",
+    )
+    db.add(collaborator)
+    db.flush()
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="course.collaborator.create",
+        resource_type="course_collaborator",
+        resource_id=collaborator.id,
+        school_id=course.school_id,
+        event_result="success",
+        request=request,
+        snapshot={"after": _course_collaborator_snapshot(collaborator)},
+    )
+    db.commit()
+    db.refresh(collaborator)
+    return collaborator
+
+
+@router.post(
+    "/{course_id}/collaborators/batch",
+    response_model=CourseCollaboratorBatchRead,
+)
+def batch_update_course_collaborators(
+    course_id: int,
+    payload: CourseCollaboratorBatchUpdate,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CourseCollaboratorBatchRead:
+    course = get_course(db, course_id)
+    require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    require_course_author_or_admin(
+        current_user,
+        course,
+        detail="Course collaborator management requires course owner role",
+    )
+
+    user_ids = {item.user_id for item in payload.items}
+    users = list(
+        db.scalars(
+            select(User)
+            .where(User.id.in_(user_ids))
+            .order_by(User.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).all()
+    )
+    active_user_ids = {user.id for user in users if user.status == "active"}
+    eligible_user_ids = set(
+        db.scalars(
+            select(SchoolMembership.user_id)
+            .join(User, User.id == SchoolMembership.user_id)
+            .where(
+                SchoolMembership.school_id == course.school_id,
+                SchoolMembership.user_id.in_(active_user_ids),
+                SchoolMembership.role.in_(["admin", "teacher"]),
+                SchoolMembership.status == "active",
+                User.status == "active",
+                User.role.in_(["admin", "teacher"]),
+            )
+        ).all()
+    ) if active_user_ids else set()
+    existing = list(
+        db.scalars(
+            select(CourseCollaborator).where(
+                CourseCollaborator.course_id == course.id,
+                CourseCollaborator.user_id.in_(user_ids),
+            )
+        ).all()
+    )
+    collaborator_by_user_id = {collaborator.user_id: collaborator for collaborator in existing}
+
+    seen_user_ids: set[int] = set()
+    prepared_results: list[dict] = []
+    audit_items: list[dict] = []
+    counts = {"created": 0, "updated": 0, "unchanged": 0, "failed": 0}
+    for index, item in enumerate(payload.items):
+        client_ref = (item.client_ref or "").strip() or None
+        collaborator = collaborator_by_user_id.get(item.user_id)
+        error_code = None
+        if item.user_id in seen_user_ids:
+            error_code = "duplicate_item"
+        elif item.user_id == course.creator_user_id:
+            error_code = "course_owner_conflict"
+        elif item.status == "active" and item.user_id not in eligible_user_ids:
+            error_code = "collaborator_not_eligible"
+        elif item.status == "inactive" and collaborator is None:
+            error_code = "collaborator_not_found"
+        seen_user_ids.add(item.user_id)
+
+        if error_code is not None:
+            counts["failed"] += 1
+            prepared_results.append(
+                {
+                    "user_id": item.user_id,
+                    "client_ref": client_ref,
+                    "outcome": "failed",
+                    "collaborator": None,
+                    "error_code": error_code,
+                }
+            )
+            audit_items.append(
+                {
+                    "index": index,
+                    "client_ref": client_ref,
+                    "user_id": item.user_id,
+                    "outcome": "failed",
+                    "error_code": error_code,
+                }
+            )
+            continue
+
+        before = _course_collaborator_snapshot(collaborator) if collaborator is not None else None
+        if collaborator is None:
+            collaborator = CourseCollaborator(
+                course_id=course.id,
+                user_id=item.user_id,
+                role=item.role,
+                status=item.status,
+            )
+            db.add(collaborator)
+            collaborator_by_user_id[item.user_id] = collaborator
+            outcome = "created"
+        elif collaborator.role != item.role or collaborator.status != item.status:
+            collaborator.role = item.role
+            collaborator.status = item.status
+            outcome = "updated"
+        else:
+            outcome = "unchanged"
+        counts[outcome] += 1
+        prepared_results.append(
+            {
+                "user_id": item.user_id,
+                "client_ref": client_ref,
+                "outcome": outcome,
+                "collaborator": collaborator,
+                "error_code": None,
+            }
+        )
+        audit_items.append(
+            {
+                "index": index,
+                "client_ref": client_ref,
+                "user_id": item.user_id,
+                "outcome": outcome,
+                "before": before,
+            }
+        )
+
+    db.flush()
+    for audit_item, prepared in zip(audit_items, prepared_results, strict=True):
+        collaborator = prepared.get("collaborator")
+        if collaborator is not None:
+            audit_item["after"] = _course_collaborator_snapshot(collaborator)
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="course.collaborator.batch_update",
+        resource_type="course_collaborator_batch",
+        resource_id=course.id,
+        school_id=course.school_id,
+        event_result="success",
+        request=request,
+        snapshot={
+            "items": audit_items,
+            "item_count": len(payload.items),
+            "created_count": counts["created"],
+            "updated_count": counts["updated"],
+            "unchanged_count": counts["unchanged"],
+            "failed_count": counts["failed"],
+            "partial_failure": 0 < counts["failed"] < len(payload.items),
+        },
+    )
+    db.commit()
+
+    results: list[CourseCollaboratorBatchResult] = []
+    for prepared in prepared_results:
+        collaborator = prepared["collaborator"]
+        if collaborator is not None:
+            db.refresh(collaborator)
+        results.append(
+            CourseCollaboratorBatchResult(
+                user_id=prepared["user_id"],
+                client_ref=prepared["client_ref"],
+                outcome=prepared["outcome"],
+                collaborator=collaborator,
+                error_code=prepared["error_code"],
+            )
+        )
+    return CourseCollaboratorBatchRead(
+        items=results,
+        created_count=counts["created"],
+        updated_count=counts["updated"],
+        unchanged_count=counts["unchanged"],
+        failed_count=counts["failed"],
+    )
+
+
+@router.patch("/{course_id}/collaborators/{collaborator_id}", response_model=CourseCollaboratorRead)
+def update_course_collaborator(
+    course_id: int,
+    collaborator_id: int,
+    payload: CourseCollaboratorUpdate,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CourseCollaborator:
+    course = get_course(db, course_id)
+    require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    require_course_author_or_admin(
+        current_user,
+        course,
+        detail="Course collaborator management requires course owner role",
+    )
+    collaborator = db.get(CourseCollaborator, collaborator_id)
+    if collaborator is None or collaborator.course_id != course.id:
+        raise HTTPException(status_code=404, detail="Course collaborator not found")
+    if payload.role is None and payload.status is None:
+        raise HTTPException(status_code=422, detail="Collaborator update requires role or status")
+    next_role = payload.role or collaborator.role
+    next_status = payload.status or collaborator.status
+    if next_status == "active":
+        _require_active_school_teacher(db, course.school_id, collaborator.user_id)
+    before = _course_collaborator_snapshot(collaborator)
+    if collaborator.status == next_status and collaborator.role == next_role:
+        return collaborator
+
+    collaborator.role = next_role
+    collaborator.status = next_status
+    after = _course_collaborator_snapshot(collaborator)
+    record_audit_log(
+        db,
+        actor=current_user,
+        action="course.collaborator.update",
+        resource_type="course_collaborator",
+        resource_id=collaborator.id,
+        school_id=course.school_id,
+        event_result="success",
+        request=request,
+        snapshot={"before": before, "after": after},
+    )
+    db.commit()
+    db.refresh(collaborator)
+    return collaborator
+
+
 @router.get("/{course_id}/units", response_model=list[CourseUnitRead])
 def list_course_units(
     course_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[CourseUnit]:
-    _require_course_visible(db, current_user, course_id)
-    return list(
-        db.scalars(select(CourseUnit).where(CourseUnit.course_id == course_id).order_by(CourseUnit.position)).all()
-    )
+    require_course_visible(db, current_user, course_id)
+    statement = select(CourseUnit).where(CourseUnit.course_id == course_id).order_by(CourseUnit.position)
+    if current_user.role == "student":
+        statement = statement.where(CourseUnit.status == "published")
+    return list(db.scalars(statement).all())
 
 
 @router.post("/{course_id}/units", response_model=CourseUnitRead, status_code=status.HTTP_201_CREATED)
@@ -178,9 +604,17 @@ def create_course_unit(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CourseUnit:
-    course = _get_course(db, course_id)
-    _require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    course = get_course(db, course_id)
+    require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    require_course_collaborator_or_admin(
+        db,
+        current_user,
+        course,
+        {"editor", "content_editor"},
+        detail="Course unit creation requires editor or content_editor role",
+    )
     content_slug = (payload.content_slug or "").strip() or None
+    title = require_trimmed_text(payload.title, "Course unit title is required")
     existing_position = db.scalar(
         select(CourseUnit).where(CourseUnit.course_id == course_id, CourseUnit.position == payload.position)
     )
@@ -195,7 +629,7 @@ def create_course_unit(
 
     unit = CourseUnit(
         course_id=course_id,
-        title=payload.title.strip(),
+        title=title,
         position=payload.position,
         content_slug=content_slug,
         status=payload.status,
@@ -229,18 +663,94 @@ def create_course_unit(
 @router.get("/{course_id}/assignments", response_model=list[AssignmentRead])
 def list_course_assignments(
     course_id: int,
+    class_id: int | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> list[Assignment]:
-    _require_course_visible(db, current_user, course_id)
-    return list(
-        db.scalars(
-            select(Assignment)
-            .join(CourseUnit, CourseUnit.id == Assignment.unit_id)
-            .where(CourseUnit.course_id == course_id)
-            .order_by(Assignment.id)
-        ).all()
+) -> list[AssignmentRead]:
+    course = require_course_visible(db, current_user, course_id)
+    if current_user.role == "student" and class_id is None:
+        eligible_class_ids = list(
+            db.scalars(
+                select(CourseClass.class_id)
+                .where(
+                    CourseClass.course_id == course.id,
+                    CourseClass.class_id.in_(visible_class_ids(db, current_user.id)),
+                    CourseClass.status == "active",
+                )
+                .order_by(CourseClass.class_id)
+            ).all()
+        )
+        if len(eligible_class_ids) != 1:
+            raise HTTPException(status_code=422, detail="class_id is required for student assignment scope")
+        class_id = eligible_class_ids[0]
+
+    class_group = None
+    if class_id is not None:
+        class_group = db.get(ClassGroup, class_id)
+        if class_group is None:
+            raise HTTPException(status_code=404, detail="Class not found")
+        if class_group.school_id != course.school_id:
+            raise HTTPException(status_code=422, detail="Class does not belong to course school")
+        if not course_attached_to_class(db, course.id, class_group.id):
+            raise HTTPException(status_code=403, detail="Course is not attached to this class")
+        if current_user.role == "student":
+            require_class_member(db, current_user, class_group.id)
+        else:
+            require_class_teacher_or_admin(
+                db,
+                current_user,
+                class_group,
+                detail="Class assignment scope requires class teacher role",
+            )
+
+    statement = (
+        select(Assignment, AssignmentClassPolicy)
+        .join(CourseUnit, CourseUnit.id == Assignment.unit_id)
+        .where(CourseUnit.course_id == course_id)
+        .order_by(Assignment.id)
     )
+    if class_group is not None:
+        statement = statement.outerjoin(
+            AssignmentClassPolicy,
+            and_(
+                AssignmentClassPolicy.assignment_id == Assignment.id,
+                AssignmentClassPolicy.class_id == class_group.id,
+            ),
+        ).where(
+            or_(
+                and_(
+                    Assignment.audience_mode == "selected_classes",
+                    AssignmentClassPolicy.id.is_not(None),
+                    AssignmentClassPolicy.assigned.is_(True),
+                ),
+                and_(
+                    Assignment.audience_mode == "all_attached_classes",
+                    or_(AssignmentClassPolicy.id.is_(None), AssignmentClassPolicy.assigned.is_(True)),
+                ),
+            )
+        )
+        if current_user.role == "student":
+            statement = statement.where(
+                CourseUnit.status == "published",
+                func.coalesce(AssignmentClassPolicy.status_override, Assignment.status) == "active",
+            )
+    else:
+        statement = statement.outerjoin(
+            AssignmentClassPolicy,
+            and_(AssignmentClassPolicy.assignment_id == Assignment.id, AssignmentClassPolicy.id.is_(None)),
+        )
+    rows = db.execute(statement).all()
+    return [
+        AssignmentRead.model_validate(
+            effective_assignment_payload(
+                assignment,
+                build_effective_assignment_policy(assignment, class_group.id, policy)
+                if class_group is not None
+                else None,
+            )
+        )
+        for assignment, policy in rows
+    ]
 
 
 @router.post(
@@ -256,12 +766,19 @@ def create_assignment(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Assignment:
-    course = _get_course(db, course_id)
-    _require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    course = get_course(db, course_id)
+    require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
+    require_course_collaborator_or_admin(
+        db,
+        current_user,
+        course,
+        {"editor", "content_editor", "assessment_editor"},
+        detail="Assignment creation requires active editing collaborator role",
+    )
     unit = db.get(CourseUnit, unit_id)
     if unit is None or unit.course_id != course_id:
         raise HTTPException(status_code=404, detail="Course unit not found")
-    title = payload.title.strip()
+    title = require_trimmed_text(payload.title, "Assignment title is required")
     existing = db.scalar(select(Assignment).where(Assignment.unit_id == unit_id, Assignment.title == title))
     if existing is not None:
         raise HTTPException(status_code=409, detail="Assignment already exists in this unit")
@@ -273,6 +790,7 @@ def create_assignment(
         due_at=payload.due_at,
         max_score=payload.max_score,
         status=payload.status,
+        audience_mode=payload.audience_mode,
     )
     db.add(assignment)
     db.flush()
@@ -293,6 +811,7 @@ def create_assignment(
                 "due_at": assignment.due_at.isoformat() if assignment.due_at is not None else None,
                 "max_score": assignment.max_score,
                 "status": assignment.status,
+                "audience_mode": assignment.audience_mode,
             }
         },
     )
@@ -301,106 +820,52 @@ def create_assignment(
     return assignment
 
 
-def _get_course(db: Session, course_id: int) -> Course:
-    course = db.get(Course, course_id)
-    if course is None:
-        raise HTTPException(status_code=404, detail="Course not found")
-    return course
-
-
-def _visible_class_ids(db: Session, user_id: int) -> list[int]:
-    return list(
-        db.scalars(
-            select(ClassMembership.class_id).where(
-                ClassMembership.user_id == user_id,
-                ClassMembership.status == "active",
-            )
-        ).all()
+def _require_active_school_teacher(
+    db: Session,
+    school_id: int,
+    user_id: int,
+    *,
+    target_not_found_detail: str = "Course collaborator user not found",
+    membership_detail: str = "Course collaborator must be active school teacher/admin",
+) -> None:
+    target = db.scalar(
+        select(User)
+        .where(User.id == user_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
-
-
-def _teacher_school_ids(db: Session, user_id: int) -> list[int]:
-    return list(
-        db.scalars(
-            select(SchoolMembership.school_id).where(
-                SchoolMembership.user_id == user_id,
-                SchoolMembership.role.in_(["admin", "teacher"]),
-                SchoolMembership.status == "active",
-            )
-        ).all()
-    )
-
-
-def _require_course_visible(db: Session, user: User, course_id: int) -> Course:
-    course = _get_course(db, course_id)
-    if user.role == "admin":
-        return course
-    school_membership = db.scalar(
+    if target is None:
+        raise HTTPException(status_code=404, detail=target_not_found_detail)
+    if target.status != "active" or target.role not in {"admin", "teacher"}:
+        raise HTTPException(status_code=422, detail=membership_detail)
+    membership = db.scalar(
         select(SchoolMembership).where(
-            SchoolMembership.school_id == course.school_id,
-            SchoolMembership.user_id == user.id,
+            SchoolMembership.school_id == school_id,
+            SchoolMembership.user_id == user_id,
             SchoolMembership.role.in_(["admin", "teacher"]),
             SchoolMembership.status == "active",
         )
     )
-    if school_membership is not None:
-        return course
-    class_ids = _visible_class_ids(db, user.id)
-    if class_ids:
-        course_class = db.scalar(
-            select(CourseClass).where(
-                CourseClass.course_id == course.id,
-                CourseClass.class_id.in_(class_ids),
-                CourseClass.status == "active",
-            )
-        )
-        if course_class is not None:
-            return course
-    raise HTTPException(status_code=403, detail="Course is outside current user scope")
-
-
-def _require_class_member(db: Session, user: User, class_id: int) -> ClassGroup:
-    class_group = db.get(ClassGroup, class_id)
-    if class_group is None:
-        raise HTTPException(status_code=404, detail="Class not found")
-    if user.role == "admin":
-        return class_group
-    membership = db.scalar(
-        select(ClassMembership).where(
-            ClassMembership.class_id == class_id,
-            ClassMembership.user_id == user.id,
-            ClassMembership.status == "active",
-        )
-    )
     if membership is None:
-        raise HTTPException(status_code=403, detail="Class is outside current user scope")
-    return class_group
+        raise HTTPException(status_code=422, detail=membership_detail)
 
 
-def _require_school_member(db: Session, user: User, school_id: int) -> None:
-    if user.role == "admin":
-        return
-    membership = db.scalar(
-        select(SchoolMembership).where(
-            SchoolMembership.school_id == school_id,
-            SchoolMembership.user_id == user.id,
-            SchoolMembership.status == "active",
-        )
-    )
-    if membership is None:
-        raise HTTPException(status_code=403, detail="School is outside current user scope")
+def _course_snapshot(course: Course) -> dict:
+    return {
+        "id": course.id,
+        "school_id": course.school_id,
+        "creator_user_id": course.creator_user_id,
+        "title": course.title,
+        "summary": course.summary,
+        "status": course.status,
+    }
 
 
-def _require_school_role(db: Session, user: User, school_id: int, roles: set[str]) -> None:
-    if user.role == "admin":
-        return
-    membership = db.scalar(
-        select(SchoolMembership).where(
-            SchoolMembership.school_id == school_id,
-            SchoolMembership.user_id == user.id,
-            SchoolMembership.role.in_(roles),
-            SchoolMembership.status == "active",
-        )
-    )
-    if membership is None:
-        raise HTTPException(status_code=403, detail="School role is outside current user scope")
+def _course_collaborator_snapshot(collaborator: CourseCollaborator) -> dict:
+    return {
+        "id": collaborator.id,
+        "course_id": collaborator.course_id,
+        "user_id": collaborator.user_id,
+        "role": collaborator.role,
+        "status": collaborator.status,
+    }

@@ -1,19 +1,26 @@
-const CACHE_NAME = 'astra-static-v20260704qianduanV72';
+const CACHE_NAME = 'astra-static-v20260710v6659SecurityFreeze';
 const APP_SHELL = [
   './',
   './index.html',
   './shared/js/lucide.min.js?v=20260417d',
-  './shared/js/config.js?v=20260703v65BackendSchemaP4',
-  './shared/js/router.js?v=20260704qianduanV70',
-  './shared/js/main.js?v=20260704qianduanV70',
-  './shared/js/backend-content.js?v=20260703v65BackendSchemaP4',
+  './shared/js/config.js?v=20260710v6653PermissionMatrixP1',
+  './shared/js/api-client.js?v=20260710v6653PermissionMatrixP1',
+  './shared/js/router.js?v=20260710v6653PermissionMatrixP1',
+  './shared/js/main.js?v=20260710v6653PermissionMatrixP1',
+  './shared/js/backend-content.js?v=20260710v6653PermissionMatrixP1',
   './shared/css/tokens.css?v=20260424ss',
   './shared/css/base.css?v=20260630mainV64',
   './shared/css/typography.css?v=20260526v61c',
-  './shared/css/navbar.css?v=20260630mainV64',
+  './shared/css/navbar.css?v=20260710v6653PermissionMatrixP1',
   './shared/css/page-layout.css?v=20260606v62e',
-  './shared/css/backend-content.css?v=20260703v65BackendSchemaP4',
-  './shared/css/responsive.css?v=20260704qianduanV70',
+  './shared/css/backend-content.css?v=20260710v6653PermissionMatrixP1',
+  './shared/css/responsive.css?v=20260710v6653PermissionMatrixP1',
+  './pages/admin/admin.css?v=20260710v6653PermissionMatrixP1',
+  './pages/admin/admin.js?v=20260710v6653PermissionMatrixP1',
+  './pages/teacher/teacher.css?v=20260710v6653PermissionMatrixP1',
+  './pages/teacher/teacher.js?v=20260710v6653PermissionMatrixP1',
+  './pages/student/student.css?v=20260710v6653PermissionMatrixP1',
+  './pages/student/student.js?v=20260710v6653PermissionMatrixP1',
   './pages/planets/planets.css?v=20260704qianduanV72',
   './pages/planets/planets.js?v=20260704qianduanV72',
   './UI/future-galaxy/future-galaxy-hero-sky.png',
@@ -25,14 +32,17 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(APP_SHELL.map((url) => new Request(url, { cache: 'reload' }))))
       .then(() => self.skipWaiting())
-      .catch(() => self.skipWaiting())
+      .catch(async (error) => {
+        await caches.delete(CACHE_NAME);
+        throw error;
+      })
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => Promise.all(
-      keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      keys.filter((key) => key.startsWith('astra-static-') && key !== CACHE_NAME).map((key) => caches.delete(key))
     )).then(() => self.clients.claim())
   );
 });
@@ -44,7 +54,15 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (/^\/(?:(?:doc|muban|server|tools)(?:\/|$)|(?:.*\/)?README\.md$|\.(?:git|github|vscode|agents|codex)(?:\/|$))/i.test(url.pathname)) {
+  // API responses, sandbox documents and API-shaped assets are always network-only.
+  // Let the browser honor backend no-store headers; never provide CacheStorage fallback.
+  if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return;
+
+  const publicPath = url.pathname === '/'
+    || url.pathname === '/index.html'
+    || url.pathname === '/sw.js'
+    || /^\/(?:pages|shared|UI|codevis)(?:\/|$)/.test(url.pathname);
+  if (!publicPath) {
     event.respondWith(new Response('Not Found', {
       status: 404,
       headers: { 'Content-Type': 'text/plain; charset=utf-8' }
@@ -56,10 +74,11 @@ self.addEventListener('fetch', (event) => {
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
-        .then((response) => {
+        .then(async (response) => {
           if (response && response.status === 200) {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(request, clone);
           }
           return response;
         })
@@ -94,10 +113,11 @@ self.addEventListener('fetch', (event) => {
   if (isLocalhost || isVersionedAsset) {
     event.respondWith(
       fetch(request, { cache: 'reload' })
-        .then((response) => {
+        .then(async (response) => {
           if (response && response.status === 200) {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(request, clone);
           }
           return response;
         })
@@ -110,10 +130,11 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(request).then((cached) => {
       const fetchPromise = fetch(request)
-        .then((response) => {
+        .then(async (response) => {
           if (response && response.status === 200) {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(request, clone);
           }
           return response;
         })

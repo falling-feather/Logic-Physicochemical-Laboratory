@@ -1,8 +1,9 @@
-from datetime import datetime
-from typing import Literal
+from datetime import date, datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.content import ScriptAnalysisRead
 from app.schemas.school import ClassRead, SchoolRead
 
 
@@ -45,6 +46,17 @@ class AdminUserUpdate(BaseModel):
     status: AdminUserStatus | None = None
 
 
+class AdminUserPasswordReset(BaseModel):
+    password: str = Field(min_length=8, max_length=128)
+
+
+class AdminUserPasswordResetResponse(BaseModel):
+    status: str = "ok"
+    user_id: int
+    revoked_sessions: int
+    cleared_login_attempt: bool
+
+
 class AdminContentPageRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -56,6 +68,10 @@ class AdminContentPageRead(BaseModel):
     layout: str
     status: str
     version: str
+    schema_hash: str | None = None
+    current_version_id: int | None = None
+    published_by_user_id: int | None = None
+    published_at: datetime | None = None
     updated_at: datetime
 
 
@@ -65,6 +81,462 @@ class AdminContentPagePage(BaseModel):
     limit: int
     offset: int
     next_offset: int | None = None
+
+
+class AdminContentDraftRead(BaseModel):
+    id: int
+    author_user_id: int
+    author_username: str
+    author_display_name: str
+    target_slug: str
+    title: str
+    status: str
+    allow_script: bool
+    schema_hash: str | None = None
+    base_version_id: int | None = None
+    base_schema_hash: str | None = None
+    script_risk_level: str | None = None
+    script_analysis: ScriptAnalysisRead | None = None
+    script_review_status: str
+    script_reviewed_by_user_id: int | None = None
+    script_reviewed_at: datetime | None = None
+    script_review_note: str | None = None
+    submitted_at: datetime | None = None
+    withdrawn_at: datetime | None = None
+    change_requested_by_user_id: int | None = None
+    change_requested_at: datetime | None = None
+    change_request_note: str | None = None
+    published_page_id: int | None = None
+    published_version_id: int | None = None
+    published_by_user_id: int | None = None
+    published_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminContentDraftPage(BaseModel):
+    items: list[AdminContentDraftRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class AdminContentPageVersionRead(BaseModel):
+    id: int
+    page_id: int
+    slug: str
+    title: str
+    status: str
+    version: str
+    schema_hash: str
+    previous_version_id: int | None = None
+    source_draft_id: int | None = None
+    restored_from_version_id: int | None = None
+    published_by_user_id: int
+    published_at: datetime
+    note: str | None = None
+    created_at: datetime
+
+
+class AdminContentPageVersionPage(BaseModel):
+    items: list[AdminContentPageVersionRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class AdminContentScriptAssetRead(BaseModel):
+    id: int
+    page_id: int
+    page_version_id: int
+    slug: str
+    sandbox_id: str
+    reference_key: str
+    reference_value_sha256: str
+    source_host: str
+    source_url_sha256: str
+    matched_algorithm: str
+    asset_sha256: str
+    asset_size_bytes: int
+    policy_version: str
+    policy_context_hash: str
+    published_by_user_id: int
+    published_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminContentScriptAssetPage(BaseModel):
+    items: list[AdminContentScriptAssetRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+ContentScriptHostPolicyStatus = Literal["trusted", "watch", "blocked"]
+
+
+class AdminContentScriptHostPolicyRead(BaseModel):
+    id: int | None = None
+    source_host: str
+    status: str
+    reason: str | None = None
+    configured_allowed: bool
+    observed_asset_count: int
+    observed_page_count: int
+    last_observed_at: datetime | None = None
+    reviewed_by_user_id: int | None = None
+    reviewed_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class AdminContentScriptHostPolicyPage(BaseModel):
+    items: list[AdminContentScriptHostPolicyRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class AdminContentScriptHostPolicyUpdate(BaseModel):
+    status: ContentScriptHostPolicyStatus
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class AdminContentScriptAssetAuditIssueRead(BaseModel):
+    code: str
+    severity: str
+    message: str
+    page_id: int | None = None
+    page_version_id: int | None = None
+    slug: str
+    sandbox_id: str | None = None
+    reference_key: str | None = None
+    reference_value_sha256: str | None = None
+    source_host: str | None = None
+    source_url_sha256: str | None = None
+    asset_id: int | None = None
+    asset_sha256: str | None = None
+    published_at: datetime | None = None
+
+
+class AdminContentScriptAssetAuditReport(BaseModel):
+    generated_at: datetime
+    total_pages_scanned: int
+    total_external_references: int
+    total_issues: int
+    issue_counts_by_code: dict[str, int]
+    issue_counts_by_severity: dict[str, int]
+    items: list[AdminContentScriptAssetAuditIssueRead]
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class AdminContentScriptAssetRemoteDriftScanRequest(BaseModel):
+    slug: str | None = Field(default=None, max_length=180)
+    source_host: str | None = Field(default=None, max_length=255)
+    issue_code: str | None = Field(default=None, max_length=80)
+    severity: Literal["critical", "warning", "info"] | None = None
+    limit: int = Field(default=25, ge=1, le=50)
+    offset: int = Field(default=0, ge=0)
+    confirm_external_network: bool = False
+
+
+class AdminContentScriptAssetRemoteDriftIssueRead(BaseModel):
+    code: str
+    severity: str
+    message: str
+    page_id: int | None = None
+    page_version_id: int | None = None
+    slug: str
+    sandbox_id: str | None = None
+    reference_key: str | None = None
+    reference_value_sha256: str | None = None
+    source_host: str | None = None
+    source_url_sha256: str | None = None
+    asset_id: int | None = None
+    asset_sha256: str | None = None
+    remote_asset_sha256: str | None = None
+    remote_asset_size_bytes: int | None = None
+    published_at: datetime | None = None
+
+
+class AdminContentScriptAssetRemoteDriftReport(BaseModel):
+    scan_run_id: int | None = None
+    scan_run_key: str | None = None
+    generated_at: datetime
+    total_pages_scanned: int
+    total_external_references: int
+    total_scanned_references: int
+    total_remote_fetches: int
+    total_skipped_references: int
+    total_issues: int
+    issue_counts_by_code: dict[str, int]
+    issue_counts_by_severity: dict[str, int]
+    items: list[AdminContentScriptAssetRemoteDriftIssueRead]
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class AdminContentScriptAssetScanRunRead(BaseModel):
+    id: int
+    run_key: str
+    scan_type: str
+    trigger_source: str
+    status: str
+    started_at: datetime
+    finished_at: datetime | None = None
+    created_by_user_id: int | None = None
+    attempt_count: int
+    scheduler_lease_owner: str | None = None
+    scheduler_lease_expires_at: datetime | None = None
+    scheduler_heartbeat_at: datetime | None = None
+    filters_json: dict[str, Any]
+    totals_json: dict[str, Any]
+    issue_counts_json: dict[str, Any]
+    alert_status: str
+    error_message: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminContentScriptAssetScanRunPage(BaseModel):
+    items: list[AdminContentScriptAssetScanRunRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class AdminContentScriptAssetScanRunStatusBucket(BaseModel):
+    status: str | None = None
+    total: int
+
+
+class AdminContentScriptAssetScanHealthItem(BaseModel):
+    id: int
+    run_key: str
+    scan_type: str
+    trigger_source: str
+    status: str
+    alert_status: str
+    started_at: datetime
+    finished_at: datetime | None = None
+    scheduler_lease_owner: str | None = None
+    scheduler_lease_expires_at: datetime | None = None
+    scheduler_heartbeat_at: datetime | None = None
+    attempt_count: int
+    error_message: str | None = None
+    health_flags: list[str]
+    retryable: bool
+    claimable: bool
+    lease_seconds_remaining: int | None = None
+
+
+class AdminContentScriptAssetScanHealthReport(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    health_status: Literal["ok", "warning", "attention"]
+    total: int
+    by_status: list[AdminContentScriptAssetScanRunStatusBucket]
+    running_count: int
+    active_running_count: int
+    stale_running_count: int
+    lease_expiring_count: int
+    legacy_running_without_lease_count: int
+    claimable_count: int
+    success_count: int
+    failed_count: int
+    warning_run_count: int
+    critical_run_count: int
+    issue_run_count: int
+    needs_attention_count: int
+    problem_count: int
+    problem_runs: list[AdminContentScriptAssetScanHealthItem]
+    newest_finished_at: datetime | None = None
+    oldest_running_started_at: datetime | None = None
+    next_lease_expires_at: datetime | None = None
+
+
+class AdminContentScriptAssetScanQueueItem(BaseModel):
+    source: Literal["due", "stale_running", "failed", "active_running", "legacy_running", "current_window"]
+    reason: str
+    ready: bool
+    claimable: bool
+    run_key: str
+    scan_type: str
+    status: str
+    trigger_source: str | None = None
+    run_id: int | None = None
+    alert_status: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    scheduler_lease_owner: str | None = None
+    scheduler_lease_expires_at: datetime | None = None
+    scheduler_heartbeat_at: datetime | None = None
+    attempt_count: int | None = None
+
+
+class AdminContentScriptAssetScanQueueReport(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    queue_status: Literal["disabled", "empty", "ready", "backlog"]
+    backlog_count: int
+    ready_count: int
+    dispatchable_now_count: int
+    claimable_by_lease_rule_count: int
+    manual_review_count: int
+    blocked_count: int
+    failed_count: int
+    stale_running_count: int
+    active_running_count: int
+    legacy_running_without_lease_count: int
+    by_trigger_source: dict[str, int]
+    ready_jobs: list[AdminContentScriptAssetScanQueueItem]
+    manual_review_runs: list[AdminContentScriptAssetScanQueueItem]
+    blocked_runs: list[AdminContentScriptAssetScanQueueItem]
+    current_window: list[AdminContentScriptAssetScanQueueItem]
+    oldest_ready_at: datetime | None = None
+    oldest_manual_review_at: datetime | None = None
+    next_lease_expires_at: datetime | None = None
+
+
+class AdminContentScriptAssetScanAlertCandidate(BaseModel):
+    severity: str
+    code: str
+    source: str
+    action_hint: str
+    run_id: int
+    run_key: str
+    scan_type: str
+    trigger_source: str
+    status: str
+    alert_status: str
+    started_at: datetime
+    finished_at: datetime | None = None
+    slug: str | None = None
+    page_id: int | None = None
+    page_version_id: int | None = None
+    sandbox_id: str | None = None
+    reference_key: str | None = None
+    reference_value_sha256: str | None = None
+    source_host: str | None = None
+    source_url_sha256: str | None = None
+    asset_id: int | None = None
+    asset_sha256: str | None = None
+    remote_asset_sha256: str | None = None
+    remote_asset_size_bytes: int | None = None
+    published_at: datetime | None = None
+
+
+class AdminContentScriptAssetScanAlertReport(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    alert_status: str
+    candidate_count: int
+    critical_count: int
+    warning_count: int
+    info_count: int
+    recent_run_count: int
+    issue_run_count: int
+    candidates: list[AdminContentScriptAssetScanAlertCandidate]
+
+
+AdminAlertOutboxReviewStatus = Literal["pending_review", "planned", "queued", "suppressed", "cancelled"]
+AdminAlertOutboxStatus = Literal[
+    "pending_review",
+    "planned",
+    "queued",
+    "dispatching",
+    "delivered",
+    "failed",
+    "suppressed",
+    "cancelled",
+]
+AdminAlertOutboxDispatchPlanStatus = Literal["created", "dispatching", "delivered", "partial_failed", "failed"]
+
+
+class AdminContentScriptAssetScanAlertOutboxRequest(BaseModel):
+    trigger_source: str | None = Field(default=None, max_length=32)
+    alert_status: Literal["ok", "warning", "critical"] | None = None
+    recent_run_limit: int = Field(default=20, ge=1, le=100)
+    candidate_limit: int = Field(default=20, ge=0, le=100)
+    now_at: datetime | None = None
+    status: AdminAlertOutboxReviewStatus = "pending_review"
+    confirm_observe_only: bool = False
+
+
+class AdminContentPageVersionDiffItem(BaseModel):
+    path: str
+    before: Any = None
+    after: Any = None
+
+
+class AdminContentPageVersionSemanticFieldChange(BaseModel):
+    field: str
+    before: Any = None
+    after: Any = None
+
+
+class AdminContentPageVersionSemanticSectionChange(BaseModel):
+    action: Literal["added", "removed", "modified", "moved"]
+    key: str
+    index_before: int | None = None
+    index_after: int | None = None
+    section_id_before: str | None = None
+    section_id_after: str | None = None
+    type_before: str | None = None
+    type_after: str | None = None
+    title_before: str | None = None
+    title_after: str | None = None
+    moved: bool = False
+    field_changes: list[AdminContentPageVersionSemanticFieldChange] = Field(default_factory=list)
+    prop_changes: list[AdminContentPageVersionSemanticFieldChange] = Field(default_factory=list)
+
+
+class AdminContentPageVersionSemanticSourceChange(BaseModel):
+    action: Literal["added", "removed", "modified", "moved"]
+    key: str
+    index_before: int | None = None
+    index_after: int | None = None
+    source_id_before: str | None = None
+    source_id_after: str | None = None
+    label_before: str | None = None
+    label_after: str | None = None
+    url_before: str | None = None
+    url_after: str | None = None
+    moved: bool = False
+    field_changes: list[AdminContentPageVersionSemanticFieldChange] = Field(default_factory=list)
+
+
+class AdminContentPageVersionSemanticDiff(BaseModel):
+    metadata_changes: list[AdminContentPageVersionSemanticFieldChange] = Field(default_factory=list)
+    course_unit_changes: list[AdminContentPageVersionSemanticFieldChange] = Field(default_factory=list)
+    section_changes: list[AdminContentPageVersionSemanticSectionChange] = Field(default_factory=list)
+    source_changes: list[AdminContentPageVersionSemanticSourceChange] = Field(default_factory=list)
+    summary: dict[str, int]
+
+
+class AdminContentPageVersionDiff(BaseModel):
+    slug: str
+    base_version_id: int
+    base_version: str
+    base_schema_hash: str
+    target_version_id: int
+    target_version: str
+    target_schema_hash: str
+    change_count: int
+    changes: list[AdminContentPageVersionDiffItem]
+    semantic: AdminContentPageVersionSemanticDiff
 
 
 class AdminSchoolPage(BaseModel):
@@ -124,6 +596,9 @@ class AdminStats(BaseModel):
     total_classes: int
     pending_class_join_requests: int
     total_content_pages: int
+    total_content_drafts: int
+    total_content_page_versions: int
+    pending_script_reviews: int
     total_courses: int
     total_assignments: int
     total_learning_events: int
@@ -207,6 +682,602 @@ class AdminPendingSubmissionQueue(BaseModel):
     next_offset: int | None = None
 
 
+class AdminKnowledgeSnapshotRunRead(BaseModel):
+    id: int
+    run_key: str
+    granularity: str
+    period_start: datetime
+    period_end: datetime
+    trigger_source: str
+    status: str
+    started_at: datetime
+    finished_at: datetime | None = None
+    scheduler_lease_owner: str | None = None
+    scheduler_lease_expires_at: datetime | None = None
+    scheduler_heartbeat_at: datetime | None = None
+    attempt_count: int
+    user_snapshot_count: int
+    class_snapshot_count: int
+    error_message: str | None = None
+    metadata_summary: dict[str, Any]
+    metadata_redacted: bool = True
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminKnowledgeSnapshotRunPage(BaseModel):
+    items: list[AdminKnowledgeSnapshotRunRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class AdminKnowledgeSnapshotRunRequeueRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class AdminKnowledgeSnapshotRunStatusBucket(BaseModel):
+    status: str | None = None
+    total: int
+
+
+class AdminKnowledgeSnapshotRunHealthItem(BaseModel):
+    id: int
+    run_key: str
+    granularity: str
+    period_start: datetime
+    period_end: datetime
+    trigger_source: str
+    status: str
+    started_at: datetime
+    finished_at: datetime | None = None
+    scheduler_lease_owner: str | None = None
+    scheduler_lease_expires_at: datetime | None = None
+    scheduler_heartbeat_at: datetime | None = None
+    attempt_count: int
+    user_snapshot_count: int
+    class_snapshot_count: int
+    error_message: str | None = None
+    health_flags: list[str]
+    retryable: bool
+    claimable: bool
+    cancellable: bool
+    lease_seconds_remaining: int | None = None
+
+
+class AdminKnowledgeSnapshotRunHealthReport(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    health_status: Literal["ok", "warning", "attention"]
+    total: int
+    by_status: list[AdminKnowledgeSnapshotRunStatusBucket]
+    running_count: int
+    active_running_count: int
+    stale_running_count: int
+    lease_expiring_count: int
+    legacy_running_without_lease_count: int
+    partial_running_lease_count: int
+    claimable_count: int
+    pending_count: int
+    success_count: int
+    failed_count: int
+    retryable_failed_count: int
+    exhausted_failed_count: int
+    cancelled_count: int
+    needs_attention_count: int
+    problem_count: int
+    problem_runs: list[AdminKnowledgeSnapshotRunHealthItem]
+    latest_success_by_granularity: dict[str, datetime | None]
+    oldest_running_started_at: datetime | None = None
+    next_lease_expires_at: datetime | None = None
+    newest_finished_at: datetime | None = None
+
+
+class AdminKnowledgeSnapshotRunQueueItem(BaseModel):
+    source: Literal[
+        "due",
+        "pending",
+        "retryable_failed",
+        "exhausted_failed",
+        "cancelled",
+        "stale_running",
+        "active_running",
+        "legacy_running",
+    ]
+    reason: str
+    ready: bool
+    claimable: bool
+    run_id: int | None = None
+    run_key: str
+    granularity: str
+    reference_date: date
+    period_start: datetime
+    period_end: datetime
+    status: str
+    trigger_source: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    scheduler_lease_owner: str | None = None
+    scheduler_lease_expires_at: datetime | None = None
+    scheduler_heartbeat_at: datetime | None = None
+    attempt_count: int | None = None
+
+
+class AdminKnowledgeSnapshotRunQueueReport(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    queue_status: Literal["empty", "ready", "backlog"]
+    backlog_count: int
+    ready_count: int
+    dispatchable_now_count: int
+    claimable_by_lease_rule_count: int
+    due_count: int
+    pending_count: int
+    manual_requeue_count: int
+    blocked_count: int
+    retryable_failed_count: int
+    exhausted_failed_count: int
+    cancelled_count: int
+    stale_running_count: int
+    active_running_count: int
+    legacy_running_without_lease_count: int
+    by_granularity: dict[str, int]
+    ready_jobs: list[AdminKnowledgeSnapshotRunQueueItem]
+    manual_requeue_runs: list[AdminKnowledgeSnapshotRunQueueItem]
+    blocked_runs: list[AdminKnowledgeSnapshotRunQueueItem]
+    next_due_jobs: list[AdminKnowledgeSnapshotRunQueueItem]
+    oldest_ready_at: datetime | None = None
+    oldest_manual_requeue_at: datetime | None = None
+    next_lease_expires_at: datetime | None = None
+
+
+class AdminKnowledgeSnapshotRunAlertCandidate(BaseModel):
+    severity: Literal["critical", "warning", "info"]
+    code: str
+    source: Literal["health", "queue"]
+    action_hint: Literal["requeue", "dispatch", "investigate", "monitor"]
+    run_id: int | None = None
+    run_key: str
+    granularity: str
+    status: str
+    trigger_source: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    scheduler_lease_owner: str | None = None
+    scheduler_lease_expires_at: datetime | None = None
+    scheduler_heartbeat_at: datetime | None = None
+    attempt_count: int | None = None
+    health_flags: list[str] = Field(default_factory=list)
+    queue_reason: str | None = None
+    retryable: bool = False
+    claimable: bool = False
+    cancellable: bool = False
+    ready: bool = False
+
+
+class AdminKnowledgeSnapshotRunAlertReport(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    alert_status: Literal["ok", "warning", "critical"]
+    health_status: Literal["ok", "warning", "attention"]
+    queue_status: Literal["empty", "ready", "backlog"]
+    candidate_count: int
+    critical_count: int
+    warning_count: int
+    info_count: int
+    needs_attention_count: int
+    lease_expiring_count: int
+    dispatchable_now_count: int
+    manual_requeue_count: int
+    blocked_count: int
+    candidates: list[AdminKnowledgeSnapshotRunAlertCandidate]
+
+
+class AdminKnowledgeSnapshotRunAlertOutboxRequest(BaseModel):
+    granularity: str | None = Field(default=None, max_length=16)
+    trigger_source: str | None = Field(default=None, max_length=32)
+    from_at: datetime | None = None
+    to_at: datetime | None = None
+    now_at: datetime | None = None
+    lease_expiring_seconds: int = Field(default=900, ge=0, le=24 * 60 * 60)
+    candidate_limit: int = Field(default=20, ge=0, le=100)
+    status: AdminAlertOutboxReviewStatus = "pending_review"
+    confirm_observe_only: bool = False
+
+
+class AdminAlertOutboxReviewRequest(BaseModel):
+    status: AdminAlertOutboxReviewStatus
+    note: str | None = Field(default=None, max_length=500)
+    confirm_manual_review: bool = False
+
+
+class AdminAlertOutboxBulkReviewRequest(BaseModel):
+    entry_ids: list[int] = Field(min_length=1, max_length=100)
+    status: AdminAlertOutboxReviewStatus
+    note: str | None = Field(default=None, max_length=500)
+    confirm_manual_review: bool = False
+
+
+class AdminAlertOutboxStatusBucket(BaseModel):
+    status: AdminAlertOutboxStatus
+    total: int
+    critical_count: int
+    warning_count: int
+    info_count: int
+    oldest_last_seen_at: datetime | None = None
+    latest_last_seen_at: datetime | None = None
+    oldest_available_at: datetime | None = None
+    latest_reviewed_at: datetime | None = None
+
+
+class AdminAlertOutboxQueueItem(BaseModel):
+    id: int
+    source_type: str
+    source_id: int | None = None
+    source_key: str
+    event_code: str
+    severity: str
+    action_hint: str
+    status: AdminAlertOutboxStatus
+    external_delivery: bool
+    last_seen_at: datetime
+    available_at: datetime | None = None
+    reviewed_at: datetime | None = None
+    seen_count: int
+
+
+class AdminAlertOutboxQueueReport(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    queue_status: Literal["empty", "review_required", "ready", "cleared"]
+    total_count: int
+    active_count: int
+    pending_review_count: int
+    planned_count: int
+    queued_count: int
+    dispatching_count: int
+    delivered_count: int
+    failed_count: int
+    suppressed_count: int
+    cancelled_count: int
+    terminal_count: int
+    stale_pending_review_count: int
+    due_planned_count: int
+    due_queued_count: int
+    external_delivery_count: int
+    oldest_pending_review_at: datetime | None = None
+    oldest_due_at: datetime | None = None
+    status_buckets: list[AdminAlertOutboxStatusBucket]
+    pending_review_items: list[AdminAlertOutboxQueueItem]
+    ready_items: list[AdminAlertOutboxQueueItem]
+    terminal_items: list[AdminAlertOutboxQueueItem]
+
+
+class AdminAlertOutboxBulkReviewResponse(BaseModel):
+    generated_at: datetime
+    status: AdminAlertOutboxReviewStatus
+    updated_count: int
+    requested_count: int
+    previous_status_counts: dict[str, int]
+    policy: dict[str, Any]
+    items: list[AdminAlertOutboxQueueItem]
+
+
+class AdminAlertOutboxDispatchDryRunRequest(BaseModel):
+    entry_ids: list[int] | None = Field(default=None, min_length=1, max_length=100)
+    source_type: str | None = Field(default=None, max_length=80)
+    from_at: datetime | None = None
+    to_at: datetime | None = None
+    now_at: datetime | None = None
+    item_limit: int = Field(default=20, ge=0, le=100)
+    confirm_dry_run: bool = False
+
+
+class AdminAlertOutboxDispatchDryRunItem(BaseModel):
+    id: int
+    source_type: str
+    source_id: int | None = None
+    source_key: str
+    event_code: str
+    severity: str
+    action_hint: str
+    status: AdminAlertOutboxStatus
+    reason: str
+    dispatch_mode: str
+    delivery_target: str
+    external_delivery: bool
+    payload_hash_prefix: str
+    delivery_key: str
+    last_seen_at: datetime
+    available_at: datetime | None = None
+    expires_at: datetime | None = None
+    reviewed_at: datetime | None = None
+    attempt_count: int
+
+
+class AdminAlertOutboxDispatchDryRunReport(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    dry_run_status: Literal["empty", "blocked", "expired", "ready", "cleared"]
+    total_count: int
+    active_count: int
+    pending_review_count: int
+    planned_count: int
+    queued_count: int
+    ready_count: int
+    blocked_count: int
+    expired_count: int
+    not_due_count: int
+    terminal_count: int
+    external_delivery_count: int
+    blocked_reason_counts: dict[str, int]
+    ready_items: list[AdminAlertOutboxDispatchDryRunItem]
+    blocked_items: list[AdminAlertOutboxDispatchDryRunItem]
+    expired_items: list[AdminAlertOutboxDispatchDryRunItem]
+    not_due_items: list[AdminAlertOutboxDispatchDryRunItem]
+
+
+class AdminAlertOutboxDispatchPlanCreateRequest(BaseModel):
+    entry_ids: list[int] = Field(min_length=1, max_length=100)
+    source_type: str | None = Field(default=None, max_length=80)
+    from_at: datetime | None = None
+    to_at: datetime | None = None
+    now_at: datetime | None = None
+    entry_limit: int = Field(default=100, ge=1, le=100)
+    allow_empty_plan: bool = False
+    confirm_create_plan: bool = False
+
+
+class AdminAlertOutboxDispatchPlanRead(BaseModel):
+    id: int
+    plan_key: str
+    plan_status: AdminAlertOutboxDispatchPlanStatus
+    generated_at: datetime
+    created_at: datetime
+    updated_at: datetime
+    created_by_user_id: int | None = None
+    source_type: str | None = None
+    filters: dict[str, Any]
+    policy: dict[str, Any]
+    dry_run_status: Literal["empty", "blocked", "expired", "ready", "cleared"]
+    total_count: int
+    active_count: int
+    ready_count: int
+    blocked_count: int
+    expired_count: int
+    not_due_count: int
+    terminal_count: int
+    external_delivery_count: int
+    ready_entry_ids: list[int]
+    ready_entry_count: int
+    truncated_ready_entry_ids: bool
+    blocked_reason_counts: dict[str, int]
+
+
+class AdminAlertOutboxDispatchPlanPage(BaseModel):
+    items: list[AdminAlertOutboxDispatchPlanRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class AdminAlertOutboxDispatchPlanValidateRequest(BaseModel):
+    now_at: datetime | None = None
+    confirm_validate_plan: bool = False
+
+
+class AdminAlertOutboxDispatchPlanValidationReport(BaseModel):
+    generated_at: datetime
+    plan_id: int
+    plan_key: str
+    plan_status: AdminAlertOutboxDispatchPlanStatus
+    validation_status: Literal["valid", "changed", "empty"]
+    policy: dict[str, Any]
+    planned_ready_count: int
+    current_ready_count: int
+    missing_count: int
+    payload_hash_mismatch_count: int
+    payload_hash_snapshot_missing_count: int
+    blocked_count: int
+    expired_count: int
+    not_due_count: int
+    payload_hash_snapshot_available: bool
+    ready_entry_ids: list[int]
+    missing_entry_ids: list[int]
+    payload_hash_mismatch_entry_ids: list[int]
+    payload_hash_snapshot_missing_entry_ids: list[int]
+    blocked_entry_ids: list[int]
+    expired_entry_ids: list[int]
+    not_due_entry_ids: list[int]
+    blocked_reason_counts: dict[str, int]
+
+
+class AdminAlertOutboxExternalDispatchRequest(BaseModel):
+    confirm_external_dispatch: bool = False
+
+
+class AdminAlertOutboxExternalDispatchItem(BaseModel):
+    entry_id: int
+    status: Literal["delivered", "failed"]
+    attempt_count: int
+    provider: str
+    retryable: bool
+    last_error_code: str | None = None
+    receipt_hash_prefix: str | None = None
+
+
+class AdminAlertOutboxExternalDispatchReport(BaseModel):
+    generated_at: datetime
+    plan_id: int
+    plan_key: str
+    plan_status: Literal["delivered", "partial_failed", "failed"]
+    provider: str
+    delivery_target: str
+    attempted_count: int
+    delivered_count: int
+    failed_count: int
+    policy: dict[str, Any]
+    items: list[AdminAlertOutboxExternalDispatchItem]
+
+
+class AdminAlertOutboxEntryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    source_type: str
+    source_id: int | None = None
+    source_key: str
+    event_code: str
+    severity: str
+    action_hint: str
+    status: str
+    dispatch_mode: str
+    delivery_target: str
+    external_delivery: bool
+    payload_hash_prefix: str
+    payload_redacted: bool = True
+    first_seen_at: datetime
+    last_seen_at: datetime
+    available_at: datetime | None = None
+    expires_at: datetime | None = None
+    seen_count: int
+    attempt_count: int
+    last_error_code: str | None = None
+    created_by_user_id: int | None = None
+    reviewed_by_user_id: int | None = None
+    reviewed_at: datetime | None = None
+    review_note_present: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminAlertOutboxPage(BaseModel):
+    items: list[AdminAlertOutboxEntryRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class AdminAlertOutboxWriteResponse(BaseModel):
+    generated_at: datetime
+    source_type: str
+    status: str
+    dispatch_mode: str
+    delivery_target: str
+    external_delivery: bool
+    candidate_count: int
+    created_count: int
+    refreshed_count: int
+    skipped_count: int
+    items: list[AdminAlertOutboxEntryRead]
+
+
+BackgroundTaskStatus = Literal[
+    "pending",
+    "leased",
+    "retry_wait",
+    "succeeded",
+    "dead_letter",
+    "cancelled",
+]
+
+
+class AdminBackgroundTaskRead(BaseModel):
+    id: int
+    task_type: str
+    source_type: str
+    source_id: int | None = None
+    status: BackgroundTaskStatus
+    priority: int
+    idempotency_key_prefix: str
+    payload_redacted: bool = True
+    result_summary: dict[str, Any]
+    available_at: datetime
+    attempt_count: int
+    max_attempts: int
+    last_error_code: str | None = None
+    lease_owner: str | None = None
+    lease_active: bool
+    lease_expires_at: datetime | None = None
+    heartbeat_at: datetime | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    created_by_user_id: int | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminBackgroundTaskPage(BaseModel):
+    items: list[AdminBackgroundTaskRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class AdminBackgroundTaskAttemptRead(BaseModel):
+    id: int
+    task_id: int
+    attempt_number: int
+    worker_id: str
+    status: str
+    started_at: datetime
+    finished_at: datetime | None = None
+    error_code: str | None = None
+    retryable: bool | None = None
+    result_summary: dict[str, Any]
+
+
+class AdminBackgroundTaskQueueReport(BaseModel):
+    generated_at: datetime
+    total_count: int
+    ready_count: int
+    leased_count: int
+    retry_wait_count: int
+    succeeded_count: int
+    dead_letter_count: int
+    cancelled_count: int
+    stale_lease_count: int
+    by_task_type: dict[str, int]
+    by_status: dict[str, int]
+    oldest_ready_at: datetime | None = None
+    next_available_at: datetime | None = None
+    next_lease_expires_at: datetime | None = None
+    policy: dict[str, Any]
+
+
+class AdminBackgroundTaskActionRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)
+    confirm_action: bool = False
+
+
+class AdminBackgroundTaskEnqueueRequest(BaseModel):
+    priority: int = Field(default=0, ge=-100, le=100)
+    max_attempts: int = Field(default=3, ge=1, le=20)
+    confirm_enqueue: bool = False
+
+
+class AdminKnowledgeSnapshotTaskEnqueueRequest(AdminBackgroundTaskEnqueueRequest):
+    granularity: Literal["day", "week"]
+    reference_date: date
+
+
+class AdminContentScriptScanTaskEnqueueRequest(AdminBackgroundTaskEnqueueRequest):
+    request_key: str = Field(min_length=1, max_length=64)
+    slug: str | None = Field(default=None, max_length=240)
+    source_host: str | None = Field(default=None, max_length=240)
+    scan_limit: int = Field(default=25, ge=1, le=200)
+    scan_offset: int = Field(default=0, ge=0, le=100000)
+
+
 class AuditLogRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -226,6 +1297,8 @@ class AuditLogRead(BaseModel):
     user_agent: str | None = None
     request_method: str | None = None
     request_path: str | None = None
+    prev_hash: str | None = None
+    current_hash: str | None = None
     snapshot_json: dict
     created_at: datetime
 
@@ -238,12 +1311,174 @@ class AuditLogPage(BaseModel):
     next_offset: int | None = None
 
 
+class AuditLogExportItem(BaseModel):
+    id: int
+    actor_user_id: int | None = None
+    actor_role: str | None = None
+    action: str
+    resource: str
+    resource_type: str
+    resource_id: str | None = None
+    school_id: int | None = None
+    class_id: int | None = None
+    event_result: str | None = None
+    failure_reason: str | None = None
+    request_id: str | None = None
+    client_ip_hash: str | None = None
+    user_agent: str | None = None
+    request_method: str | None = None
+    request_path: str | None = None
+    prev_hash: str | None = None
+    current_hash: str | None = None
+    snapshot_json: dict | None = None
+    created_at: datetime
+
+
+class AuditLogExport(BaseModel):
+    items: list[AuditLogExportItem]
+    total: int
+    limit: int
+    truncated: bool
+    include_snapshot: bool
+    exported_at: datetime
+
+
+class AuditLogReportBucket(BaseModel):
+    key: str | None = None
+    total: int
+
+
+class AuditLogActionReport(BaseModel):
+    action: str
+    total: int
+    success: int
+    failure: int
+    other: int
+    latest_at: datetime | None = None
+
+
+class AuditLogReport(BaseModel):
+    total: int
+    bucket_limit: int
+    generated_at: datetime
+    filters: dict[str, Any]
+    by_action: list[AuditLogActionReport]
+    by_resource_type: list[AuditLogReportBucket]
+    by_actor_role: list[AuditLogReportBucket]
+    by_event_result: list[AuditLogReportBucket]
+    by_failure_reason: list[AuditLogReportBucket]
+
+
+class AuditLogFrequencyCandidate(BaseModel):
+    dimension: str
+    key: str | None = None
+    action: str | None = None
+    actor_user_id: int | None = None
+    actor_role: str | None = None
+    resource_type: str | None = None
+    resource_id: str | None = None
+    school_id: int | None = None
+    class_id: int | None = None
+    failure_reason: str | None = None
+    total: int
+    success: int
+    failure: int
+    other: int
+    failure_ratio: float
+    distinct_actors: int
+    distinct_ip_hashes: int
+    distinct_request_ids: int
+    first_at: datetime | None = None
+    latest_at: datetime | None = None
+    reasons: list[str]
+
+
+class AuditLogFrequencyReport(BaseModel):
+    total: int
+    generated_at: datetime
+    filters: dict[str, Any]
+    window: dict[str, Any]
+    thresholds: dict[str, Any]
+    candidates: list[AuditLogFrequencyCandidate]
+
+
+class AuditLogRetentionPolicy(BaseModel):
+    retention_days: int | None = None
+    warning_days: int
+    cutoff_at: datetime
+    expiring_soon_cutoff_at: datetime
+    source: Literal["config", "query", "before"]
+
+
+class AuditLogRetentionSummary(BaseModel):
+    total: int
+    retained: int
+    archive_candidates: int
+    expiring_soon: int
+    oldest_at: datetime | None = None
+    newest_at: datetime | None = None
+    first_candidate_id: int | None = None
+    last_candidate_id: int | None = None
+    chain_start_prev_hash: str | None = None
+    chain_start_current_hash: str | None = None
+    chain_end_current_hash: str | None = None
+
+
+class AuditLogRetentionPlan(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    capabilities: dict[str, bool]
+    policy: AuditLogRetentionPolicy
+    summary: AuditLogRetentionSummary
+    bucket_limit: int
+    by_action: list[AuditLogReportBucket]
+    by_resource_type: list[AuditLogReportBucket]
+    by_event_result: list[AuditLogReportBucket]
+
+
+class AuditLogChainIssue(BaseModel):
+    type: Literal["null_current_hash", "current_hash_mismatch", "prev_hash_mismatch"]
+    log_id: int
+    previous_log_id: int | None = None
+    expected_hash: str | None = None
+    actual_hash: str | None = None
+
+
+class AuditLogChainVerification(BaseModel):
+    generated_at: datetime
+    filters: dict[str, Any]
+    capabilities: dict[str, bool]
+    algorithm: str
+    chain_version: int
+    status: Literal["valid", "partial", "invalid"]
+    valid: bool
+    total: int
+    scanned_count: int
+    limit: int
+    truncated: bool
+    issue_limit: int
+    issue_count: int
+    issues_truncated: bool
+    null_current_hash_count: int
+    current_hash_mismatch_count: int
+    prev_hash_mismatch_count: int
+    first_id: int | None = None
+    last_id: int | None = None
+    chain_start_prev_hash: str | None = None
+    chain_start_current_hash: str | None = None
+    chain_end_current_hash: str | None = None
+    issues: list[AuditLogChainIssue]
+
+
 class BugRecordCreate(BaseModel):
     title: str = Field(min_length=1, max_length=240)
     category: str = Field(default="general", min_length=1, max_length=80)
     severity: BugSeverity = "P2"
     status: BugStatus = "open"
     source: str | None = Field(default=None, max_length=240)
+    external_issue_provider: str | None = Field(default=None, max_length=80)
+    external_issue_id: str | None = Field(default=None, max_length=120)
+    external_issue_url: str | None = Field(default=None, max_length=500)
     evidence: str | None = Field(default=None, max_length=4000)
     notes: str | None = Field(default=None, max_length=4000)
 
@@ -254,6 +1489,9 @@ class BugRecordUpdate(BaseModel):
     severity: BugSeverity | None = None
     status: BugStatus | None = None
     source: str | None = Field(default=None, max_length=240)
+    external_issue_provider: str | None = Field(default=None, max_length=80)
+    external_issue_id: str | None = Field(default=None, max_length=120)
+    external_issue_url: str | None = Field(default=None, max_length=500)
     evidence: str | None = Field(default=None, max_length=4000)
     notes: str | None = Field(default=None, max_length=4000)
 
@@ -267,6 +1505,12 @@ class BugRecordRead(BaseModel):
     severity: str
     status: str
     source: str | None = None
+    external_issue_provider: str | None = None
+    external_issue_id: str | None = None
+    external_issue_url: str | None = None
+    external_issue_state: str | None = None
+    external_issue_synced_at: datetime | None = None
+    external_sync_revision: int
     evidence: str | None = None
     notes: str | None = None
     created_at: datetime
@@ -279,3 +1523,52 @@ class BugRecordPage(BaseModel):
     limit: int
     offset: int
     next_offset: int | None = None
+
+
+class BugExternalSyncRequest(BaseModel):
+    confirm_external_sync: bool = False
+
+
+class BugExternalCommentSyncRequest(BugExternalSyncRequest):
+    comment: str = Field(min_length=1, max_length=2000)
+
+
+class BugExternalSyncOperationRead(BaseModel):
+    id: int
+    bug_record_id: int
+    provider: str
+    operation: Literal["create", "status", "comment"]
+    operation_key_prefix: str
+    status: Literal["pending", "dispatching", "succeeded", "failed", "ambiguous"]
+    desired_state: str | None = None
+    comment_sha256: str | None = None
+    comment_length: int | None = None
+    external_issue_id: str | None = None
+    external_issue_url: str | None = None
+    external_state: str | None = None
+    external_comment_id: str | None = None
+    attempt_count: int
+    last_error_code: str | None = None
+    last_attempt_at: datetime | None = None
+    finished_at: datetime | None = None
+    response_hash: str | None = None
+    created_by_user_id: int | None = None
+    created_at: datetime
+    updated_at: datetime
+    comment_body_returned: bool
+    operation_key_redacted: bool
+
+
+class BugExternalSyncOperationPage(BaseModel):
+    items: list[BugExternalSyncOperationRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
+class BugExternalSyncResponse(BaseModel):
+    bug: BugRecordRead
+    operation: BugExternalSyncOperationRead
+    recovered: bool
+    posture: dict[str, Any]

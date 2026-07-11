@@ -93,6 +93,31 @@
     }
 }
 
+@media (min-width: 769px) and (max-width: 1180px) {
+    .navbar:not(.navbar--frontier) .nav-container {
+        padding-right: 0;
+        gap: var(--space-2);
+    }
+
+    .navbar:not(.navbar--frontier) .nav-logo--englab {
+        flex: 0 0 auto;
+    }
+
+    .navbar:not(.navbar--frontier) .nav-menu--englab {
+        max-width: calc(100vw - 148px);
+        overflow-x: auto;
+        overflow-y: hidden;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+        padding-right: var(--space-4);
+    }
+
+    .navbar:not(.navbar--frontier) .nav-menu--englab::-webkit-scrollbar {
+        display: none;
+    }
+}
+
 /* ── Mobile ── */
 @media (max-width: 768px) {
     /* Nav – icon-only, 44px touch targets */
@@ -132,6 +157,28 @@
         display: none;
     }
     .navbar--frontier .nav-menu--frontier .nav-item {
+        flex: 0 0 44px;
+    }
+    .navbar:not(.navbar--frontier) .nav-container {
+        padding-right: 0;
+        gap: var(--space-2);
+    }
+    .navbar:not(.navbar--frontier) .nav-logo--englab {
+        flex: 0 0 auto;
+    }
+    .navbar:not(.navbar--frontier) .nav-menu--englab {
+        max-width: calc(100vw - 76px);
+        overflow-x: auto;
+        overflow-y: hidden;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+        padding-right: var(--space-4);
+    }
+    .navbar:not(.navbar--frontier) .nav-menu--englab::-webkit-scrollbar {
+        display: none;
+    }
+    .navbar:not(.navbar--frontier) .nav-menu--englab .nav-item {
         flex: 0 0 44px;
     }
 

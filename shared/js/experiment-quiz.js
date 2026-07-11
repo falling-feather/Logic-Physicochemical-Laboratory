@@ -7,6 +7,7 @@ const ExperimentQuiz = {
     _btn: null,
     _currentModule: null,
     _scoreKey: 'englab-quiz-scores',
+    _scores: {},
     _moduleAliases: {
         complex: 'complex-numbers',
     },
@@ -183,15 +184,11 @@ const ExperimentQuiz = {
     },
 
     _saveScore(moduleId, correct, total) {
-        try {
-            const scores = JSON.parse(localStorage.getItem(this._scoreKey) || '{}');
-            const prev = scores[moduleId];
-            const pct = Math.round((correct / total) * 100);
-            if (!prev || pct > prev.pct) {
-                scores[moduleId] = { correct, total, pct, ts: Date.now() };
-                localStorage.setItem(this._scoreKey, JSON.stringify(scores));
-            }
-        } catch (_) { /* localStorage quota or disabled */ }
+        const prev = this._scores[moduleId];
+        const pct = Math.round((correct / total) * 100);
+        if (!prev || pct > prev.pct) {
+            this._scores[moduleId] = { correct, total, pct, ts: Date.now() };
+        }
     },
 
     _closeOverlay() {

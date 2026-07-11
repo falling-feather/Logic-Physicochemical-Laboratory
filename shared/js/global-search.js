@@ -11,8 +11,10 @@ const GlobalSearch = {
     activeIndex: 0,
     isOpen: false,
     _trigger: null,
+    _initialized: false,
 
     init() {
+        if (this._initialized) return;
         // v5.0：HTML 中的 #global-search-overlay 位于 main.js 之后才被解析，
         // 因此这里只挂全局事件 & 触发按钮；overlay/input/list 的查找延迟到 _ensureDom()。
         this._trigger = document.getElementById('nav-search-trigger');
@@ -34,6 +36,7 @@ const GlobalSearch = {
                 else this._activate();
             }
         });
+        this._initialized = true;
     },
 
     _ensureDom() {

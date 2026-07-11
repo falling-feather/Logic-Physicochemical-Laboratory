@@ -1,11 +1,31 @@
 from app.models.base import Base
-from app.models.admin import AuditLog, BugRecord
-from app.models.content import ContentPageRecord
+from app.models.admin import (
+    AdminAlertOutboxDispatchPlan,
+    AdminAlertOutboxEntry,
+    AuditArchiveAnchor,
+    AuditChainHead,
+    AuditLog,
+    BackgroundTask,
+    BackgroundTaskAttempt,
+    BugExternalSyncOperation,
+    BugRecord,
+    SecurityControlLock,
+)
+from app.models.content import (
+    ContentDraft,
+    ContentPageRecord,
+    ContentPageVersion,
+    ContentScriptAsset,
+    ContentScriptAssetScanRun,
+    ContentScriptHostPolicy,
+)
 from app.models.course import (
     Assignment,
+    AssignmentClassPolicy,
     ClassKnowledgeSnapshot,
     Course,
     CourseClass,
+    CourseCollaborator,
     CourseUnit,
     KnowledgeSnapshotRun,
     LearningEvent,
@@ -14,25 +34,41 @@ from app.models.course import (
     UserKnowledgeSnapshot,
 )
 from app.models.school import ClassGroup, ClassJoinRequest, ClassMembership, School, SchoolMembership
-from app.models.user import AuthSession, LoginAttempt, User
+from app.models.user import AuthSession, LoginAttempt, PasswordResetToken, User
 
 __all__ = [
     "Assignment",
+    "AssignmentClassPolicy",
+    "AdminAlertOutboxDispatchPlan",
+    "AdminAlertOutboxEntry",
+    "AuditArchiveAnchor",
+    "AuditChainHead",
     "AuditLog",
+    "BackgroundTask",
+    "BackgroundTaskAttempt",
+    "BugExternalSyncOperation",
     "AuthSession",
     "Base",
     "BugRecord",
+    "SecurityControlLock",
     "ClassGroup",
     "ClassJoinRequest",
     "ClassKnowledgeSnapshot",
     "ClassMembership",
+    "ContentDraft",
     "ContentPageRecord",
+    "ContentPageVersion",
+    "ContentScriptAsset",
+    "ContentScriptAssetScanRun",
+    "ContentScriptHostPolicy",
     "Course",
     "CourseClass",
+    "CourseCollaborator",
     "CourseUnit",
     "KnowledgeSnapshotRun",
     "LearningEvent",
     "LoginAttempt",
+    "PasswordResetToken",
     "PointLedger",
     "School",
     "SchoolMembership",

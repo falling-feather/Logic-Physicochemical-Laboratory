@@ -3,8 +3,10 @@
 
 const EnergyConservation = {
     canvas: null, ctx: null, W: 0, H: 0,
+    root: null,
     _listeners: [],
     _resizeObs: null,
+    _resizeRaf: null,
     _raf: null,
 
     running: true,
@@ -38,10 +40,50 @@ const EnergyConservation = {
         this._listeners.push({ el, evt, fn, opts });
     },
 
-    init() {
-        this.canvas = document.getElementById('energy-canvas');
-        if (!this.canvas) return;
+    _find(id) {
+        if (!this.root) return null;
+        if (typeof this.root.getElementById === 'function') return this.root.getElementById(id);
+        return this.root.querySelector(`#${id}`);
+    },
+
+    _font(kind) {
+        if (typeof CF !== 'undefined' && CF && CF[kind]) return CF[kind];
+        const cssName = kind === 'mono' ? '--font-mono' : '--font-sans';
+        const fallback = kind === 'mono' ? 'monospace' : 'sans-serif';
+        try {
+            return getComputedStyle(document.documentElement).getPropertyValue(cssName).trim() || fallback;
+        } catch (_) {
+            return fallback;
+        }
+    },
+
+    init(options = {}) {
+        this.destroy();
+        this.root = options && options.root ? options.root : document;
+        const requiredIds = [
+            'energy-canvas',
+            'energy-friction',
+            'energy-play',
+            'energy-reset',
+            'energy-info'
+        ];
+        const missingIds = requiredIds.filter((id) => !this._find(id));
+        if (missingIds.length) {
+            throw new Error(`Energy conservation template is missing required nodes: ${missingIds.join(', ')}`);
+        }
+
+        this.canvas = this._find('energy-canvas');
         this.ctx = this.canvas.getContext('2d');
+        if (!this.ctx) throw new Error('Energy conservation canvas context is unavailable.');
+        const configuredFriction = options && options.config
+            ? Number(options.config.defaultFriction)
+            : Number(this._find('energy-friction').value);
+        if (!Number.isFinite(configuredFriction) || configuredFriction < 0 || configuredFriction > 0.3) {
+            throw new Error('Energy conservation default friction is invalid.');
+        }
+        this.friction = configuredFriction;
+        this._find('energy-friction').value = String(configuredFriction);
+        this._updateFrictionValue();
         this.running = true;
         this.lastTime = performance.now();
         this.buildTrack();
@@ -54,15 +96,22 @@ const EnergyConservation = {
         this.resize();
         this.bindEvents();
         this.updateInfo();
-        this.loop();
+        this._startLoop();
+        return { ready: true };
     },
 
     destroy() {
         this.running = false;
         if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
+        if (this._resizeRaf) { cancelAnimationFrame(this._resizeRaf); this._resizeRaf = null; }
         for (const l of this._listeners) l.el.removeEventListener(l.evt, l.fn, l.opts);
         this._listeners = [];
         if (this._resizeObs) { this._resizeObs.disconnect(); this._resizeObs = null; }
+        this.canvas = null;
+        this.ctx = null;
+        this.root = null;
+        this.W = 0;
+        this.H = 0;
     },
 
     resize() {
@@ -71,12 +120,16 @@ const EnergyConservation = {
         if (!wrap) return;
         const dpr = window.devicePixelRatio || 1;
         const rect = wrap.getBoundingClientRect();
-        const w = rect.width;
-        const h = Math.min(w * 0.55, 380);
-        this.canvas.width = w * dpr;
-        this.canvas.height = h * dpr;
-        this.canvas.style.width = w + 'px';
-        this.canvas.style.height = h + 'px';
+        const w = Math.max(1, rect.width);
+        const h = Math.max(1, Math.min(w * 0.55, 380));
+        const bitmapWidth = Math.max(1, Math.round(w * dpr));
+        const bitmapHeight = Math.max(1, Math.round(h * dpr));
+        if (this.canvas.width !== bitmapWidth) this.canvas.width = bitmapWidth;
+        if (this.canvas.height !== bitmapHeight) this.canvas.height = bitmapHeight;
+        const cssWidth = `${w}px`;
+        const cssHeight = `${h}px`;
+        if (this.canvas.style.width !== cssWidth) this.canvas.style.width = cssWidth;
+        if (this.canvas.style.height !== cssHeight) this.canvas.style.height = cssHeight;
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.W = w;
         this.H = h;
@@ -99,23 +152,36 @@ const EnergyConservation = {
 
     bindEvents() {
         if (typeof ResizeObserver !== 'undefined') {
-            this._resizeObs = new ResizeObserver(() => { this.resize(); });
+            this._resizeObs = new ResizeObserver(() => {
+                if (this._resizeRaf) return;
+                this._resizeRaf = requestAnimationFrame(() => {
+                    this._resizeRaf = null;
+                    this.resize();
+                });
+            });
             this._resizeObs.observe(this.canvas.parentElement);
         }
 
-        const fricSlider = document.getElementById('energy-friction');
+        const fricSlider = this._find('energy-friction');
         if (fricSlider) this._on(fricSlider, 'input', () => {
             this.friction = parseFloat(fricSlider.value);
+            this._updateFrictionValue();
+            this.updateInfo();
         });
 
-        const playBtn = document.getElementById('energy-play');
+        const playBtn = this._find('energy-play');
         if (playBtn) this._on(playBtn, 'click', () => {
-            this.running = !this.running;
-            playBtn.textContent = this.running ? '\u23f8 \u6682\u505c' : '\u25b6 \u64ad\u653e';
-            if (this.running) { this.lastTime = performance.now(); this.loop(); }
+            if (this.running) {
+                this.running = false;
+                if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
+                playBtn.textContent = '\u25b6 \u64ad\u653e';
+            } else {
+                playBtn.textContent = '\u23f8 \u6682\u505c';
+                this._startLoop();
+            }
         });
 
-        const resetBtn = document.getElementById('energy-reset');
+        const resetBtn = this._find('energy-reset');
         if (resetBtn) this._on(resetBtn, 'click', () => {
             this.ballPos = 0;
             this.ballSpeed = 0;
@@ -123,16 +189,26 @@ const EnergyConservation = {
             this.initialE = null;
             this._peakKE = 0;
             this._peakPE = 0;
-            this.running = true;
-            this.lastTime = performance.now();
-            const pb = document.getElementById('energy-play');
+            const pb = this._find('energy-play');
             if (pb) pb.textContent = '\u23f8 \u6682\u505c';
-            this.loop();
+            this._startLoop();
             this.updateInfo();
         });
 
         // v4.6.0-α2：摩擦改变即时刷新教学面板（说明文案随 μ 变化）
         if (fricSlider) this._on(fricSlider, 'change', () => this.updateInfo());
+    },
+
+    _updateFrictionValue() {
+        const output = this._find('energy-friction-value');
+        if (output) output.textContent = Number(this.friction).toFixed(2);
+    },
+
+    _startLoop() {
+        if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
+        this.running = true;
+        this.lastTime = performance.now();
+        this.loop();
     },
 
     getHeight(pos) {
@@ -153,6 +229,7 @@ const EnergyConservation = {
 
     loop() {
         if (!this.running) return;
+        this._raf = null;
         const now = performance.now();
         const dt = Math.min((now - this.lastTime) / 1000, 0.03);
         this.lastTime = now;
@@ -194,7 +271,7 @@ const EnergyConservation = {
         if (PE > this._peakPE) this._peakPE = PE;
 
         this.draw();
-        this._raf = requestAnimationFrame(() => this.loop());
+        if (this.running) this._raf = requestAnimationFrame(() => this.loop());
     },
 
     draw() {
@@ -260,7 +337,7 @@ const EnergyConservation = {
 
         // h label
         ctx.fillStyle = 'rgba(91,141,206,0.5)';
-        ctx.font = '15px ' + CF.mono;
+        ctx.font = '15px ' + this._font('mono');
         ctx.textAlign = 'left';
         ctx.fillText('h=' + (h * 5).toFixed(1) + 'm', x + 8, (y + area.y + area.h) / 2);
     },
@@ -300,7 +377,7 @@ const EnergyConservation = {
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.fillStyle = 'rgba(229,192,123,0.85)';
-        ctx.font = '10px ' + CF.mono;
+        ctx.font = '10px ' + this._font('mono');
         ctx.textAlign = 'left';
         ctx.fillText('E\u2080=' + E0.toFixed(1) + 'J', area.x - 2, e0Y - 4);
         ctx.restore();
@@ -331,12 +408,12 @@ const EnergyConservation = {
 
             // Label（柱底）
             ctx.fillStyle = colors[i];
-            ctx.font = 'bold 13px ' + CF.sans;
+            ctx.font = 'bold 13px ' + this._font('sans');
             ctx.textAlign = 'center';
             ctx.fillText(label, x + barW / 2, area.y + area.h + 14);
 
             // Value（柱顶）
-            ctx.font = '11px ' + CF.mono;
+            ctx.font = '11px ' + this._font('mono');
             ctx.fillText(values[i].toFixed(1), x + barW / 2, y - 4);
         });
 
@@ -344,7 +421,7 @@ const EnergyConservation = {
         const deviation = Math.abs(total - E0) / Math.max(E0, 0.01) * 100;
         ctx.save();
         ctx.fillStyle = deviation < 3 ? 'rgba(46,204,113,0.85)' : 'rgba(231,76,60,0.75)';
-        ctx.font = '10px ' + CF.mono;
+        ctx.font = '10px ' + this._font('mono');
         ctx.textAlign = 'left';
         ctx.fillText('|\u0394E/E\u2080|=' + deviation.toFixed(1) + '%', area.x, area.y + area.h + 30);
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
@@ -356,7 +433,7 @@ const EnergyConservation = {
         const { ctx } = this;
         const v = Math.abs(this.ballSpeed) * 0.75;
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '15px ' + CF.mono;
+        ctx.font = '15px ' + this._font('mono');
         ctx.textAlign = 'left';
         ctx.fillText('v = ' + v.toFixed(2) + ' m/s', area.x, area.y + area.h + 16);
         // v4.6.0-α2：摩擦工况下显示已耗散的热量
@@ -368,7 +445,7 @@ const EnergyConservation = {
 
     /* ── education panel ── */
     updateInfo() {
-        const el = document.getElementById('energy-info');
+        const el = this._find('energy-info');
         if (!el) return;
         const fricDesc = this.friction > 0
             ? `摩擦系数 μ = ${this.friction.toFixed(2)}（<span style="color:#f39c12">非守恒系统</span>）：机械能 E<sub>k</sub>+E<sub>p</sub> 持续减少，转化为内能 Q（轨道生热）。但<b>能量总量 Σ = E<sub>k</sub>+E<sub>p</sub>+Q 仍守恒</b>（黄色虚线）`
@@ -383,8 +460,8 @@ const EnergyConservation = {
     }
 };
 
-function initEnergyConservation() {
-    EnergyConservation.init();
+function initEnergyConservation(options) {
+    return EnergyConservation.init(options);
 }
 
 window.EnergyConservation = EnergyConservation;

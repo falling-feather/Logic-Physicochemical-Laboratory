@@ -14,11 +14,14 @@ const KeyboardShortcuts = {
     ],
     _toastEl: null,
     _toastTimer: null,
+    _initialized: false,
 
     init() {
+        if (this._initialized) return;
         // 创建一次性 toast 元素
         this._ensureToast();
         window.addEventListener('keydown', (e) => this._onKey(e));
+        this._initialized = true;
     },
 
     _onKey(e) {

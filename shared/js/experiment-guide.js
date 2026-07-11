@@ -1,12 +1,13 @@
 // ===== Experiment Guide System =====
 // Shows first-time operation hints when user opens an experiment.
-// Tracks seen status in localStorage. Provides a "?" re-open button.
+// Tracks seen status in memory. Provides a "?" re-open button.
 
 var ExperimentGuide = {
     _storageKey: 'englab-guide-seen',
     _overlay: null,
     _helpBtn: null,
     _currentModule: null,
+    _seen: new Set(),
     _moduleAliases: {
         complex: 'complex-numbers',
     },
@@ -978,18 +979,11 @@ var ExperimentGuide = {
     },
 
     _getSeenSet() {
-        try {
-            const raw = localStorage.getItem(this._storageKey);
-            return raw ? new Set(JSON.parse(raw)) : new Set();
-        } catch {
-            return new Set();
-        }
+        return new Set(this._seen);
     },
 
     _saveSeenSet(set) {
-        try {
-            localStorage.setItem(this._storageKey, JSON.stringify([...set]));
-        } catch { /* quota exceeded — degrade gracefully */ }
+        this._seen = new Set(set);
     },
 
     _resolveModuleId(moduleId) {

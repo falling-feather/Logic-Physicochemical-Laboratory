@@ -1,9 +1,14 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, utc_now
+
+
+def _knowledge_window_datetime_type():
+    return DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql")
 
 
 class Course(TimestampMixin, Base):
@@ -25,6 +30,17 @@ class CourseClass(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), index=True, nullable=False)
     class_id: Mapped[int] = mapped_column(ForeignKey("class_groups.id"), index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
+
+
+class CourseCollaborator(TimestampMixin, Base):
+    __tablename__ = "course_collaborators"
+    __table_args__ = (UniqueConstraint("course_id", "user_id", name="uq_course_collaborators_course_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), index=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    role: Mapped[str] = mapped_column(String(32), default="editor", nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
 
 
@@ -54,11 +70,38 @@ class Assignment(TimestampMixin, Base):
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     max_score: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
+    audience_mode: Mapped[str] = mapped_column(String(32), default="all_attached_classes", nullable=False)
+    point_rule_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
+class AssignmentClassPolicy(TimestampMixin, Base):
+    __tablename__ = "assignment_class_policies"
+    __table_args__ = (
+        UniqueConstraint("assignment_id", "class_id", name="uq_assignment_class_policies_assignment_class"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    assignment_id: Mapped[int] = mapped_column(ForeignKey("assignments.id"), index=True, nullable=False)
+    class_id: Mapped[int] = mapped_column(ForeignKey("class_groups.id"), index=True, nullable=False)
+    assigned: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    status_override: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    due_at_overridden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    due_at_override: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    point_rule_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class Submission(TimestampMixin, Base):
     __tablename__ = "submissions"
-    __table_args__ = (UniqueConstraint("assignment_id", "student_id", name="uq_submissions_assignment_student"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "assignment_id",
+            "student_id",
+            "class_id",
+            name="uq_submissions_assignment_student_class",
+        ),
+        Index("ix_submissions_status_submitted_id", "status", "submitted_at", "id"),
+        Index("ix_submissions_class_status_submitted", "class_id", "status", "submitted_at", "id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     assignment_id: Mapped[int] = mapped_column(ForeignKey("assignments.id"), index=True, nullable=False)
@@ -98,6 +141,7 @@ class LearningEvent(TimestampMixin, Base):
     course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True, nullable=True)
     unit_id: Mapped[int | None] = mapped_column(ForeignKey("course_units.id"), index=True, nullable=True)
     assignment_id: Mapped[int | None] = mapped_column(ForeignKey("assignments.id"), index=True, nullable=True)
+    knowledge_code: Mapped[str | None] = mapped_column(String(120), index=True, nullable=True)
     event_type: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
     payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
@@ -123,8 +167,8 @@ class ClassKnowledgeSnapshot(TimestampMixin, Base):
     course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True, nullable=True)
     course_scope_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     granularity: Mapped[str] = mapped_column(String(16), default="custom", index=True, nullable=False)
-    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
-    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    period_start: Mapped[datetime] = mapped_column(_knowledge_window_datetime_type(), index=True, nullable=False)
+    period_end: Mapped[datetime] = mapped_column(_knowledge_window_datetime_type(), index=True, nullable=False)
     rule_version: Mapped[str] = mapped_column(String(32), default="v1", nullable=False)
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
     students_total: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -168,8 +212,8 @@ class UserKnowledgeSnapshot(TimestampMixin, Base):
     course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True, nullable=True)
     course_scope_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     granularity: Mapped[str] = mapped_column(String(16), default="custom", index=True, nullable=False)
-    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
-    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    period_start: Mapped[datetime] = mapped_column(_knowledge_window_datetime_type(), index=True, nullable=False)
+    period_end: Mapped[datetime] = mapped_column(_knowledge_window_datetime_type(), index=True, nullable=False)
     rule_version: Mapped[str] = mapped_column(String(32), default="v1", nullable=False)
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
     assignment_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -191,17 +235,25 @@ class UserKnowledgeSnapshot(TimestampMixin, Base):
 
 class KnowledgeSnapshotRun(TimestampMixin, Base):
     __tablename__ = "knowledge_snapshot_runs"
-    __table_args__ = (UniqueConstraint("run_key", name="uq_knowledge_snapshot_runs_run_key"),)
+    __table_args__ = (
+        UniqueConstraint("run_key", name="uq_knowledge_snapshot_runs_run_key"),
+        Index("ix_knowledge_runs_started_id", "started_at", "id"),
+        Index("ix_knowledge_runs_status_started", "status", "started_at", "id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     run_key: Mapped[str] = mapped_column(String(160), nullable=False)
     granularity: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
-    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
-    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    period_start: Mapped[datetime] = mapped_column(_knowledge_window_datetime_type(), index=True, nullable=False)
+    period_end: Mapped[datetime] = mapped_column(_knowledge_window_datetime_type(), index=True, nullable=False)
     trigger_source: Mapped[str] = mapped_column(String(32), default="script", nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="running", index=True, nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    scheduler_lease_owner: Mapped[str | None] = mapped_column(String(96), nullable=True)
+    scheduler_lease_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    scheduler_lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
+    scheduler_heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     user_snapshot_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     class_snapshot_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

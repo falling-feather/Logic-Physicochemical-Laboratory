@@ -1,3 +1,35 @@
+import base64
+import csv
+import hashlib
+import io
+import json
+from datetime import UTC, datetime, timedelta
+
+from sqlalchemy import func, select
+
+from app.core.config import get_settings
+from app.db.session import get_session_factory
+from app.models import (
+    AdminAlertOutboxDispatchPlan,
+    AdminAlertOutboxEntry,
+    AuditChainHead,
+    AuditLog,
+    AuthSession,
+    ContentPageRecord,
+    ContentPageVersion,
+    ContentScriptAsset,
+    ContentScriptAssetScanRun,
+    KnowledgeSnapshotRun,
+    LoginAttempt,
+    SchoolMembership,
+    SecurityControlLock,
+    User,
+)
+from app.services import content_script_assets
+from app.services.content_script_assets import external_script_references
+from app.services.audit import audit_log_chain_hash, record_audit_log
+
+
 def _auth_header(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
@@ -38,6 +70,12 @@ def _register_and_login(client, username: str, role: str) -> str:
     return login.json()["access_token"]
 
 
+def _current_user_id(client, token: str) -> int:
+    response = client.get("/api/users/me", headers=_auth_header(token))
+    assert response.status_code == 200
+    return response.json()["id"]
+
+
 def test_admin_bootstrap_rejects_weak_password(client):
     response = client.post(
         "/api/admin/bootstrap",
@@ -50,6 +88,45 @@ def test_admin_bootstrap_rejects_weak_password(client):
 
     assert response.status_code == 422
     assert "Password must include at least one letter" in response.json()["detail"]["password"]
+
+
+def test_admin_bootstrap_rejects_blank_display_name_after_trimming(client):
+    response = client.post(
+        "/api/admin/bootstrap",
+        json={
+            "username": "admin_blank_display",
+            "password": "secret123",
+            "display_name": "   ",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Display name is required"
+
+
+def test_admin_bootstrap_normalizes_username(client):
+    response = client.post(
+        "/api/admin/bootstrap",
+        json={
+            "username": "AdminRootCase",
+            "password": "secret123",
+            "display_name": "Root Admin",
+        },
+    )
+    assert response.status_code == 201
+    assert response.json()["username"] == "adminrootcase"
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        stored = db.scalar(select(User).where(User.username == "adminrootcase"))
+        assert stored is not None
+        assert stored.normalized_username == "adminrootcase"
+
+    login = client.post(
+        "/api/auth/login",
+        json={"username": "ADMINROOTCASE", "password": "secret123"},
+    )
+    assert login.status_code == 200
+    assert login.json()["user"]["username"] == "adminrootcase"
 
 
 def test_admin_bootstrap_is_single_use(client):
@@ -68,6 +145,79 @@ def test_admin_bootstrap_is_single_use(client):
     me = client.get("/api/users/me", headers=_auth_header(admin_token))
     assert me.status_code == 200
     assert me.json()["role"] == "admin"
+    with get_session_factory(get_settings().database_url)() as db:
+        assert db.get(SecurityControlLock, "admin-authority") is not None
+
+
+def test_admin_bootstrap_requires_token_in_production_without_leaking_token(client, monkeypatch):
+    monkeypatch.setenv("ASTRA_ENVIRONMENT", "production")
+    monkeypatch.delenv("ASTRA_ADMIN_BOOTSTRAP_TOKEN", raising=False)
+    get_settings.cache_clear()
+
+    missing_token = client.post(
+        "/api/admin/bootstrap",
+        json={
+            "username": "prod_admin_missing_token",
+            "password": "secret123",
+            "display_name": "Production Admin",
+        },
+    )
+    assert missing_token.status_code == 403
+
+    bootstrap_token = "prod-bootstrap-token-123456789012345678901234567890"
+    monkeypatch.setenv("ASTRA_ADMIN_BOOTSTRAP_TOKEN", bootstrap_token)
+    get_settings.cache_clear()
+    wrong_token = client.post(
+        "/api/admin/bootstrap",
+        json={
+            "username": "prod_admin_wrong_token",
+            "password": "secret123",
+            "display_name": "Production Admin",
+            "bootstrap_token": "wrong-token",
+        },
+    )
+    assert wrong_token.status_code == 403
+    assert bootstrap_token not in wrong_token.text
+
+    created = client.post(
+        "/api/admin/bootstrap",
+        headers={"X-Request-ID": "prod-bootstrap-token-check"},
+        json={
+            "username": "prod_admin_root",
+            "password": "secret123",
+            "display_name": "Production Admin",
+            "bootstrap_token": bootstrap_token,
+        },
+    )
+    assert created.status_code == 201
+    assert created.json()["role"] == "admin"
+    assert bootstrap_token not in created.text
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        audit = db.scalar(select(AuditLog).where(AuditLog.action == "admin.bootstrap"))
+        assert audit is not None
+        assert audit.request_id == "prod-bootstrap-token-check"
+        assert bootstrap_token not in json.dumps(audit.snapshot_json, ensure_ascii=False)
+        assert "password" not in json.dumps(audit.snapshot_json, ensure_ascii=False).lower()
+
+
+def test_admin_bootstrap_fails_closed_for_noncanonical_environment(client, monkeypatch):
+    monkeypatch.setenv("ASTRA_ENVIRONMENT", "staging-blue")
+    monkeypatch.delenv("ASTRA_ADMIN_BOOTSTRAP_TOKEN", raising=False)
+    get_settings.cache_clear()
+
+    response = client.post(
+        "/api/admin/bootstrap",
+        json={
+            "username": "staging_admin",
+            "password": "secret123",
+            "display_name": "Staging Admin",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Admin bootstrap token is required outside local development"
 
 
 def test_admin_views_user_management_stats_and_bug_records(client):
@@ -102,6 +252,21 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     )
     assert disable_teacher.status_code == 200
     assert disable_teacher.json()["status"] == "disabled"
+    disabled_teacher_me = client.get("/api/users/me", headers=_auth_header(teacher_token))
+    assert disabled_teacher_me.status_code == 401
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        teacher_session = db.scalar(select(AuthSession).where(AuthSession.user_id == teacher["id"]))
+        assert teacher_session is not None
+        assert teacher_session.revoked_at is not None
+
+    blank_display = client.patch(
+        f"/api/admin/users/{teacher['id']}",
+        headers=_auth_header(admin_token),
+        json={"display_name": "   "},
+    )
+    assert blank_display.status_code == 422
+    assert blank_display.json()["detail"] == "Display name is required"
 
     disabled_login = client.post(
         "/api/auth/login",
@@ -119,7 +284,7 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     school_request_id = "school-create-request"
     school = client.post(
         "/api/schools",
-        headers={**_auth_header(admin_token), "X-Request-ID": school_request_id},
+        headers={**_auth_header(admin_token), "X-Request-ID": school_request_id, "User-Agent": "=audit-csv-risk"},
         json={"name": "Admin Visible School", "region": "Shanghai"},
     )
     assert school.status_code == 201
@@ -166,18 +331,65 @@ def test_admin_views_user_management_stats_and_bug_records(client):
             "category": "BE",
             "severity": "P1",
             "source": "test_admin.py",
+            "external_issue_provider": " Manual ",
+            "external_issue_id": " DOC-001 ",
+            "external_issue_url": " https://tracker.local/issues/DOC-001 ",
         },
     )
     assert bug.status_code == 201
     bug_id = bug.json()["id"]
+    assert bug.json()["external_issue_provider"] == "manual"
+    assert bug.json()["external_issue_id"] == "DOC-001"
+    assert bug.json()["external_issue_url"] == "https://tracker.local/issues/DOC-001"
+
+    blank_bug_title = client.post(
+        "/api/admin/bugs",
+        headers=_auth_header(admin_token),
+        json={"title": "   ", "category": "BE"},
+    )
+    assert blank_bug_title.status_code == 422
+    assert blank_bug_title.json()["detail"] == "Bug title is required"
+
+    blank_bug_category = client.post(
+        "/api/admin/bugs",
+        headers=_auth_header(admin_token),
+        json={"title": "Category blank risk", "category": "   "},
+    )
+    assert blank_bug_category.status_code == 422
+    assert blank_bug_category.json()["detail"] == "Bug category is required"
+
+    blank_bug_title_update = client.patch(
+        f"/api/admin/bugs/{bug_id}",
+        headers=_auth_header(admin_token),
+        json={"title": "   "},
+    )
+    assert blank_bug_title_update.status_code == 422
+    assert blank_bug_title_update.json()["detail"] == "Bug title is required"
+
+    blank_bug_category_update = client.patch(
+        f"/api/admin/bugs/{bug_id}",
+        headers=_auth_header(admin_token),
+        json={"category": "   "},
+    )
+    assert blank_bug_category_update.status_code == 422
+    assert blank_bug_category_update.json()["detail"] == "Bug category is required"
 
     close_bug = client.patch(
         f"/api/admin/bugs/{bug_id}",
         headers=_auth_header(admin_token),
-        json={"status": "closed", "notes": "covered by regression"},
+        json={
+            "status": "closed",
+            "notes": "covered by regression",
+            "external_issue_provider": " GitHub ",
+            "external_issue_id": " ASTRA-42 ",
+            "external_issue_url": " https://github.com/example/astra/issues/42 ",
+        },
     )
     assert close_bug.status_code == 200
     assert close_bug.json()["status"] == "closed"
+    assert close_bug.json()["external_issue_provider"] == "github"
+    assert close_bug.json()["external_issue_id"] == "ASTRA-42"
+    assert close_bug.json()["external_issue_url"] == "https://github.com/example/astra/issues/42"
 
     stats = client.get("/api/admin/stats", headers=_auth_header(admin_token))
     assert stats.status_code == 200
@@ -194,10 +406,38 @@ def test_admin_views_user_management_stats_and_bug_records(client):
 
     audit_forbidden = client.get("/api/admin/audit-logs", headers=_auth_header(student_token))
     assert audit_forbidden.status_code == 403
+    audit_export_forbidden = client.get("/api/admin/audit-logs/export", headers=_auth_header(student_token))
+    assert audit_export_forbidden.status_code == 403
+    audit_csv_export_forbidden = client.get("/api/admin/audit-logs/export.csv", headers=_auth_header(student_token))
+    assert audit_csv_export_forbidden.status_code == 403
+    audit_report_forbidden = client.get("/api/admin/audit-logs/report", headers=_auth_header(student_token))
+    assert audit_report_forbidden.status_code == 403
+    audit_report_csv_forbidden = client.get("/api/admin/audit-logs/report.csv", headers=_auth_header(student_token))
+    assert audit_report_csv_forbidden.status_code == 403
+    audit_retention_forbidden = client.get(
+        "/api/admin/audit-logs/retention-plan",
+        headers=_auth_header(student_token),
+    )
+    assert audit_retention_forbidden.status_code == 403
+    audit_chain_forbidden = client.get(
+        "/api/admin/audit-logs/chain-integrity",
+        headers=_auth_header(student_token),
+    )
+    assert audit_chain_forbidden.status_code == 403
+    audit_frequency_forbidden = client.get("/api/admin/audit-logs/high-frequency", headers=_auth_header(student_token))
+    assert audit_frequency_forbidden.status_code == 403
 
     audit_logs = client.get("/api/admin/audit-logs?limit=10", headers=_auth_header(admin_token))
     assert audit_logs.status_code == 200
     assert audit_logs.json()["total"] == 10
+    ordered_chain_items = sorted(audit_logs.json()["items"], key=lambda item: item["id"])
+    assert ordered_chain_items[0]["prev_hash"] is None
+    for previous, current in zip(ordered_chain_items, ordered_chain_items[1:], strict=False):
+        assert previous["current_hash"]
+        assert len(previous["current_hash"]) == 64
+        assert current["prev_hash"] == previous["current_hash"]
+        assert current["current_hash"]
+        assert len(current["current_hash"]) == 64
     actions = {item["action"] for item in audit_logs.json()["items"]}
     assert actions == {
         "admin.bootstrap",
@@ -209,6 +449,46 @@ def test_admin_views_user_management_stats_and_bug_records(client):
         "admin.bug.create",
         "admin.bug.update",
     }
+    export_request_headers = {**_auth_header(admin_token), "X-Request-ID": "audit-export-request"}
+    limited_export = client.get("/api/admin/audit-logs/export?limit=2", headers=export_request_headers)
+    assert limited_export.status_code == 200
+    assert limited_export.json()["total"] == 10
+    assert limited_export.json()["limit"] == 2
+    assert limited_export.json()["truncated"] is True
+    assert len(limited_export.json()["items"]) == 2
+    assert limited_export.json()["include_snapshot"] is False
+    assert all(item["snapshot_json"] is None for item in limited_export.json()["items"])
+    assert [item["id"] for item in limited_export.json()["items"]] == [
+        item["id"] for item in audit_logs.json()["items"][:2]
+    ]
+    first_export_audit = client.get(
+        "/api/admin/audit-logs?action=admin.audit.export&resource_type=audit_log&request_id=audit-export-request",
+        headers=_auth_header(admin_token),
+    )
+    assert first_export_audit.status_code == 200
+    assert first_export_audit.json()["total"] == 1
+    first_export_item = first_export_audit.json()["items"][0]
+    assert first_export_item["actor_role"] == "admin"
+    assert first_export_item["resource_type"] == "audit_log"
+    assert first_export_item["resource_id"] is None
+    assert first_export_item["request_id"] == "audit-export-request"
+    first_export_snapshot = first_export_item["snapshot_json"]
+    assert first_export_snapshot["filters"] == {}
+    assert first_export_snapshot["include_snapshot"] is False
+    assert first_export_snapshot["limit"] == limited_export.json()["limit"]
+    assert first_export_snapshot["total"] == limited_export.json()["total"]
+    assert first_export_snapshot["exported_count"] == len(limited_export.json()["items"])
+    assert first_export_snapshot["truncated"] == limited_export.json()["truncated"]
+    assert "items" not in first_export_snapshot
+
+    export_limit_too_large = client.get("/api/admin/audit-logs/export?limit=5001", headers=_auth_header(admin_token))
+    assert export_limit_too_large.status_code == 422
+
+    export_invalid_window = client.get(
+        "/api/admin/audit-logs/export?from=2026-07-06T10:00:00Z&to=2026-07-05T10:00:00Z",
+        headers=_auth_header(admin_token),
+    )
+    assert export_invalid_window.status_code == 422
 
     school_audit = client.get(
         f"/api/admin/audit-logs?action=school.create&resource_id={school_id}",
@@ -223,6 +503,72 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert school_audit_item["request_method"] == "POST"
     assert school_audit_item["request_path"] == "/api/schools"
     assert school_audit_item["client_ip_hash"]
+    assert school_audit_item["current_hash"]
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        stored_school_audit = db.get(AuditLog, school_audit_item["id"])
+        assert stored_school_audit is not None
+        assert stored_school_audit.current_hash == audit_log_chain_hash(stored_school_audit)
+
+    school_export = client.get(
+        f"/api/admin/audit-logs/export?action=school.create&resource_id={school_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert school_export.status_code == 200
+    assert school_export.json()["total"] == 1
+    assert school_export.json()["truncated"] is False
+    assert school_export.json()["items"][0]["action"] == "school.create"
+    assert school_export.json()["items"][0]["snapshot_json"] is None
+
+    school_export_with_snapshot = client.get(
+        f"/api/admin/audit-logs/export?action=school.create&resource_id={school_id}&include_snapshot=true",
+        headers=_auth_header(admin_token),
+    )
+    assert school_export_with_snapshot.status_code == 200
+    assert school_export_with_snapshot.json()["include_snapshot"] is True
+    assert school_export_with_snapshot.json()["items"][0]["snapshot_json"]["after"]["name"] == "Admin Visible School"
+
+    school_csv_export = client.get(
+        f"/api/admin/audit-logs/export.csv?action=school.create&resource_id={school_id}",
+        headers={**_auth_header(admin_token), "X-Request-ID": "audit-export-csv-request"},
+    )
+    assert school_csv_export.status_code == 200
+    assert school_csv_export.headers["content-type"].startswith("text/csv")
+    assert school_csv_export.headers["content-disposition"].startswith('attachment; filename="audit-logs-')
+    assert school_csv_export.headers["x-audit-export-total"] == "1"
+    assert school_csv_export.headers["x-audit-export-limit"] == "1000"
+    assert school_csv_export.headers["x-audit-export-truncated"] == "false"
+    assert school_csv_export.headers["x-audit-export-include-snapshot"] == "false"
+    assert school_csv_export.headers["x-audit-exported-at"]
+    school_csv_rows = list(csv.DictReader(io.StringIO(school_csv_export.text)))
+    assert len(school_csv_rows) == 1
+    assert school_csv_rows[0]["action"] == "school.create"
+    assert school_csv_rows[0]["resource_id"] == str(school_id)
+    assert school_csv_rows[0]["user_agent"] == "'=audit-csv-risk"
+    assert school_csv_rows[0]["current_hash"] == school_audit_item["current_hash"]
+    assert school_csv_rows[0]["prev_hash"] == school_audit_item["prev_hash"]
+    assert school_csv_rows[0]["snapshot_json"] == ""
+
+    school_csv_export_with_snapshot = client.get(
+        f"/api/admin/audit-logs/export.csv?action=school.create&resource_id={school_id}&include_snapshot=true",
+        headers=_auth_header(admin_token),
+    )
+    assert school_csv_export_with_snapshot.status_code == 200
+    school_csv_snapshot_rows = list(csv.DictReader(io.StringIO(school_csv_export_with_snapshot.text)))
+    assert json.loads(school_csv_snapshot_rows[0]["snapshot_json"])["after"]["name"] == "Admin Visible School"
+
+    csv_export_audit = client.get(
+        "/api/admin/audit-logs?action=admin.audit.export&resource_type=audit_log&request_id=audit-export-csv-request",
+        headers=_auth_header(admin_token),
+    )
+    assert csv_export_audit.status_code == 200
+    assert csv_export_audit.json()["total"] == 1
+    csv_export_snapshot = csv_export_audit.json()["items"][0]["snapshot_json"]
+    assert csv_export_snapshot["format"] == "csv"
+    assert csv_export_snapshot["filters"] == {"action": "school.create", "resource_id": str(school_id)}
+    assert csv_export_snapshot["include_snapshot"] is False
+    assert csv_export_snapshot["exported_count"] == 1
+    assert "items" not in csv_export_snapshot
 
     request_filtered_audit = client.get(
         f"/api/admin/audit-logs?request_id={school_request_id}",
@@ -231,6 +577,13 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert request_filtered_audit.status_code == 200
     assert request_filtered_audit.json()["total"] == 1
     assert request_filtered_audit.json()["items"][0]["action"] == "school.create"
+    request_filtered_export = client.get(
+        f"/api/admin/audit-logs/export?request_id={school_request_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert request_filtered_export.status_code == 200
+    assert request_filtered_export.json()["total"] == 1
+    assert request_filtered_export.json()["items"][0]["request_id"] == school_request_id
 
     disabled_login_audit = client.get(
         "/api/admin/audit-logs?action=auth.login.failed&failure_reason=user_disabled&event_result=failure",
@@ -238,6 +591,199 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     )
     assert disabled_login_audit.status_code == 200
     assert disabled_login_audit.json()["total"] == 1
+    disabled_login_export = client.get(
+        "/api/admin/audit-logs/export?action=auth.login.failed&failure_reason=user_disabled&event_result=failure",
+        headers=_auth_header(admin_token),
+    )
+    assert disabled_login_export.status_code == 200
+    assert disabled_login_export.json()["total"] == 1
+    assert disabled_login_export.json()["items"][0]["event_result"] == "failure"
+
+    report_base_total = client.get("/api/admin/audit-logs?limit=1", headers=_auth_header(admin_token)).json()["total"]
+    audit_report = client.get(
+        "/api/admin/audit-logs/report?bucket_limit=20",
+        headers={**_auth_header(admin_token), "X-Request-ID": "audit-report-request"},
+    )
+    assert audit_report.status_code == 200
+    audit_report_body = audit_report.json()
+    assert audit_report_body["total"] == report_base_total
+    assert audit_report_body["bucket_limit"] == 20
+    assert audit_report_body["filters"] == {}
+    actions_report = {item["action"]: item for item in audit_report_body["by_action"]}
+    assert actions_report["school.create"]["total"] == 1
+    assert actions_report["school.create"]["success"] == 1
+    assert actions_report["auth.login.failed"]["failure"] == 1
+    assert actions_report["admin.audit.export"]["success"] == 7
+    event_results_report = {item["key"]: item["total"] for item in audit_report_body["by_event_result"]}
+    assert event_results_report["success"] >= 1
+    assert event_results_report["failure"] >= 1
+    failure_reasons_report = {item["key"]: item["total"] for item in audit_report_body["by_failure_reason"]}
+    assert failure_reasons_report["user_disabled"] == 1
+
+    report_audit = client.get(
+        "/api/admin/audit-logs?action=admin.audit.report&resource_type=audit_log&request_id=audit-report-request",
+        headers=_auth_header(admin_token),
+    )
+    assert report_audit.status_code == 200
+    assert report_audit.json()["total"] == 1
+    report_snapshot = report_audit.json()["items"][0]["snapshot_json"]
+    assert report_snapshot["format"] == "json"
+    assert report_snapshot["filters"] == {}
+    assert report_snapshot["total"] == report_base_total
+    assert report_snapshot["bucket_limit"] == 20
+    assert "by_action" not in report_snapshot
+
+    school_report_csv = client.get(
+        f"/api/admin/audit-logs/report.csv?action=school.create&resource_id={school_id}&bucket_limit=5",
+        headers={**_auth_header(admin_token), "X-Request-ID": "audit-report-csv-request"},
+    )
+    assert school_report_csv.status_code == 200
+    assert school_report_csv.headers["content-type"].startswith("text/csv")
+    assert school_report_csv.headers["content-disposition"].startswith('attachment; filename="audit-log-report-')
+    assert school_report_csv.headers["x-audit-report-total"] == "1"
+    assert school_report_csv.headers["x-audit-report-bucket-limit"] == "5"
+    school_report_rows = list(csv.DictReader(io.StringIO(school_report_csv.text)))
+    school_action_row = next(row for row in school_report_rows if row["section"] == "action")
+    assert school_action_row["key"] == "school.create"
+    assert school_action_row["total"] == "1"
+    assert school_action_row["success"] == "1"
+    assert school_action_row["failure"] == "0"
+    assert any(row["section"] == "resource_type" and row["key"] == "school" for row in school_report_rows)
+
+    csv_report_audit = client.get(
+        "/api/admin/audit-logs?action=admin.audit.report&resource_type=audit_log&request_id=audit-report-csv-request",
+        headers=_auth_header(admin_token),
+    )
+    assert csv_report_audit.status_code == 200
+    assert csv_report_audit.json()["total"] == 1
+    csv_report_snapshot = csv_report_audit.json()["items"][0]["snapshot_json"]
+    assert csv_report_snapshot["format"] == "csv"
+    assert csv_report_snapshot["filters"] == {"action": "school.create", "resource_id": str(school_id)}
+    assert csv_report_snapshot["total"] == 1
+    assert csv_report_snapshot["bucket_limit"] == 5
+    assert "items" not in csv_report_snapshot
+
+    report_bucket_limit_too_large = client.get(
+        "/api/admin/audit-logs/report?bucket_limit=101",
+        headers=_auth_header(admin_token),
+    )
+    assert report_bucket_limit_too_large.status_code == 422
+
+    report_invalid_window = client.get(
+        "/api/admin/audit-logs/report.csv?from=2026-07-06T10:00:00Z&to=2026-07-05T10:00:00Z",
+        headers=_auth_header(admin_token),
+    )
+    assert report_invalid_window.status_code == 422
+
+    audit_high_frequency = client.get(
+        "/api/admin/audit-logs/high-frequency?min_count=2&bucket_limit=10&window_hours=24",
+        headers={**_auth_header(admin_token), "X-Request-ID": "audit-high-frequency-request"},
+    )
+    assert audit_high_frequency.status_code == 200
+    audit_high_frequency_body = audit_high_frequency.json()
+    assert audit_high_frequency_body["thresholds"] == {
+        "min_count": 2,
+        "min_failure_count": 3,
+        "min_failure_ratio": 0.5,
+        "bucket_limit": 10,
+    }
+    assert audit_high_frequency_body["window"]["window_hours"] == 24
+    assert audit_high_frequency_body["filters"] == {}
+    frequency_actions = {
+        item["action"]: item for item in audit_high_frequency_body["candidates"] if item["dimension"] == "action"
+    }
+    assert frequency_actions["admin.audit.export"]["total"] == 7
+    assert frequency_actions["admin.audit.export"]["success"] == 7
+    assert "count_threshold" in frequency_actions["admin.audit.export"]["reasons"]
+
+    failure_frequency = client.get(
+        "/api/admin/audit-logs/high-frequency?action=auth.login.failed"
+        "&failure_reason=user_disabled&min_failure_count=1&min_failure_ratio=1&bucket_limit=10",
+        headers=_auth_header(admin_token),
+    )
+    assert failure_frequency.status_code == 200
+    failure_candidate = next(
+        item for item in failure_frequency.json()["candidates"] if item["dimension"] == "failure_reason"
+    )
+    assert failure_candidate["failure_reason"] == "user_disabled"
+    assert failure_candidate["failure"] == 1
+    assert failure_candidate["failure_ratio"] == 1
+    assert "failure_count_threshold" in failure_candidate["reasons"]
+    assert "failure_ratio_threshold" in failure_candidate["reasons"]
+
+    path_frequency = client.get(
+        f"/api/admin/audit-logs/high-frequency?action=school.create&resource_id={school_id}&min_count=1",
+        headers=_auth_header(admin_token),
+    )
+    assert path_frequency.status_code == 200
+    path_frequency_body = path_frequency.json()
+    assert path_frequency_body["filters"] == {"action": "school.create", "resource_id": str(school_id)}
+    resource_candidate = next(
+        item for item in path_frequency_body["candidates"] if item["dimension"] == "resource_action"
+    )
+    assert resource_candidate["key"] == f"school:{school_id}"
+    assert resource_candidate["action"] == "school.create"
+    assert resource_candidate["resource_type"] == "school"
+    assert resource_candidate["resource_id"] == str(school_id)
+    assert resource_candidate["total"] == 1
+    assert resource_candidate["success"] == 1
+
+    frequency_audit = client.get(
+        "/api/admin/audit-logs?action=admin.audit.high_frequency&resource_type=audit_log&request_id=audit-high-frequency-request",
+        headers=_auth_header(admin_token),
+    )
+    assert frequency_audit.status_code == 200
+    assert frequency_audit.json()["total"] == 1
+    frequency_snapshot = frequency_audit.json()["items"][0]["snapshot_json"]
+    assert frequency_snapshot["format"] == "high_frequency"
+    assert frequency_snapshot["filters"] == {}
+    assert frequency_snapshot["thresholds"]["min_count"] == 2
+    assert frequency_snapshot["thresholds"]["bucket_limit"] == 10
+    assert frequency_snapshot["candidate_count"] == len(audit_high_frequency_body["candidates"])
+    assert frequency_snapshot["dimension_counts"]["action"] >= 1
+    assert "candidates" not in frequency_snapshot
+
+    frequency_threshold_too_large = client.get(
+        "/api/admin/audit-logs/high-frequency?min_count=10001",
+        headers=_auth_header(admin_token),
+    )
+    assert frequency_threshold_too_large.status_code == 422
+
+    frequency_ratio_invalid = client.get(
+        "/api/admin/audit-logs/high-frequency?min_failure_ratio=1.1",
+        headers=_auth_header(admin_token),
+    )
+    assert frequency_ratio_invalid.status_code == 422
+
+    frequency_invalid_window = client.get(
+        "/api/admin/audit-logs/high-frequency?from=2026-07-06T10:00:00Z&to=2026-07-05T10:00:00Z",
+        headers=_auth_header(admin_token),
+    )
+    assert frequency_invalid_window.status_code == 422
+
+    export_audit = client.get(
+        "/api/admin/audit-logs?action=admin.audit.export&limit=10",
+        headers=_auth_header(admin_token),
+    )
+    assert export_audit.status_code == 200
+    assert export_audit.json()["total"] == 7
+    latest_export = export_audit.json()["items"][0]
+    assert latest_export["resource_type"] == "audit_log"
+    assert latest_export["event_result"] == "success"
+    assert latest_export["request_method"] == "GET"
+    assert latest_export["request_path"] == "/api/admin/audit-logs/export"
+    export_snapshot = latest_export["snapshot_json"]
+    assert export_snapshot["filters"] == {
+        "action": "auth.login.failed",
+        "event_result": "failure",
+        "failure_reason": "user_disabled",
+    }
+    assert export_snapshot["include_snapshot"] is False
+    assert export_snapshot["limit"] == 1000
+    assert export_snapshot["total"] == 1
+    assert export_snapshot["exported_count"] == 1
+    assert export_snapshot["truncated"] is False
+    assert "items" not in export_snapshot
 
     class_audit = client.get(
         f"/api/admin/audit-logs?action=class.create&resource_id={class_group.json()['id']}",
@@ -255,6 +801,7 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert update_audit.json()["total"] == 1
     update_snapshot = update_audit.json()["items"][0]["snapshot_json"]
     assert update_snapshot["changes"]["status"] == {"from": "active", "to": "disabled"}
+    assert update_snapshot["revoked_sessions"] == 1
 
     bug_page = client.get("/api/admin/bugs?q=smoke&limit=1", headers=_auth_header(admin_token))
     assert bug_page.status_code == 200
@@ -262,8 +809,2996 @@ def test_admin_views_user_management_stats_and_bug_records(client):
     assert bug_page.json()["items"][0]["id"] == bug_id
     assert bug_page.json()["next_offset"] is None
 
+    bug_issue_page = client.get("/api/admin/bugs?q=ASTRA-42&limit=1", headers=_auth_header(admin_token))
+    assert bug_issue_page.status_code == 200
+    assert bug_issue_page.json()["total"] == 1
+    assert bug_issue_page.json()["items"][0]["external_issue_provider"] == "github"
+
+    bug_update_audit = client.get(
+        f"/api/admin/audit-logs?action=admin.bug.update&resource_id={bug_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert bug_update_audit.status_code == 200
+    assert bug_update_audit.json()["total"] == 1
+    bug_update_snapshot = bug_update_audit.json()["items"][0]["snapshot_json"]
+    assert bug_update_snapshot["changes"]["external_issue_provider"] == {"from": "manual", "to": "github"}
+    assert bug_update_snapshot["changes"]["external_issue_id"] == {"from": "DOC-001", "to": "ASTRA-42"}
+
     student_forbidden = client.get("/api/admin/stats", headers=_auth_header(student_token))
     assert student_forbidden.status_code == 403
+
+
+def test_school_and_class_stats_are_available_to_scoped_teachers(client):
+    admin_token = _bootstrap_admin(client)
+    owner_teacher_token = _register_and_login(client, "stats_owner_teacher", "teacher")
+    school_peer_token = _register_and_login(client, "stats_school_peer", "teacher")
+    outside_teacher_token = _register_and_login(client, "stats_outside_teacher", "teacher")
+    student_token = _register_and_login(client, "stats_scoped_student", "student")
+
+    school = client.post(
+        "/api/schools",
+        headers=_auth_header(owner_teacher_token),
+        json={"name": "Scoped Stats School", "region": "Hangzhou"},
+    )
+    assert school.status_code == 201
+    school_id = school.json()["id"]
+
+    class_group = client.post(
+        "/api/classes",
+        headers=_auth_header(owner_teacher_token),
+        json={"school_id": school_id, "name": "Scoped Stats Class", "grade": "11"},
+    )
+    assert class_group.status_code == 201
+    class_id = class_group.json()["id"]
+
+    student_join = client.post(
+        f"/api/classes/{class_id}/join",
+        headers=_auth_header(student_token),
+        json={"role": "student"},
+    )
+    assert student_join.status_code == 201
+
+    peer_user_id = _current_user_id(client, school_peer_token)
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        db.add(SchoolMembership(school_id=school_id, user_id=peer_user_id, role="teacher", status="active"))
+        db.commit()
+
+    owner_school_stats = client.get(f"/api/admin/schools/{school_id}/stats", headers=_auth_header(owner_teacher_token))
+    assert owner_school_stats.status_code == 200
+    assert owner_school_stats.json()["school_id"] == school_id
+    assert owner_school_stats.json()["active_students"] == 1
+
+    peer_school_stats = client.get(f"/api/admin/schools/{school_id}/stats", headers=_auth_header(school_peer_token))
+    assert peer_school_stats.status_code == 200
+    assert peer_school_stats.json()["school_id"] == school_id
+
+    admin_school_stats = client.get(f"/api/admin/schools/{school_id}/stats", headers=_auth_header(admin_token))
+    assert admin_school_stats.status_code == 200
+    admin_missing_school = client.get("/api/admin/schools/999999/stats", headers=_auth_header(admin_token))
+    assert admin_missing_school.status_code == 404
+
+    owner_class_stats = client.get(f"/api/admin/classes/{class_id}/stats", headers=_auth_header(owner_teacher_token))
+    assert owner_class_stats.status_code == 200
+    assert owner_class_stats.json()["class_id"] == class_id
+    assert owner_class_stats.json()["active_students"] == 1
+
+    admin_class_stats = client.get(f"/api/admin/classes/{class_id}/stats", headers=_auth_header(admin_token))
+    assert admin_class_stats.status_code == 200
+
+    peer_class_stats = client.get(f"/api/admin/classes/{class_id}/stats", headers=_auth_header(school_peer_token))
+    assert peer_class_stats.status_code == 403
+    assert peer_class_stats.json()["detail"] == "Class statistics require class teacher scope"
+
+    outside_school_stats = client.get(
+        f"/api/admin/schools/{school_id}/stats",
+        headers=_auth_header(outside_teacher_token),
+    )
+    assert outside_school_stats.status_code == 403
+    assert outside_school_stats.json()["detail"] == "School statistics require school teacher scope"
+    outside_missing_school = client.get("/api/admin/schools/999999/stats", headers=_auth_header(outside_teacher_token))
+    assert outside_missing_school.status_code == 403
+
+    outside_class_stats = client.get(
+        f"/api/admin/classes/{class_id}/stats",
+        headers=_auth_header(outside_teacher_token),
+    )
+    assert outside_class_stats.status_code == 403
+    outside_missing_class = client.get("/api/admin/classes/999999/stats", headers=_auth_header(outside_teacher_token))
+    assert outside_missing_class.status_code == 403
+
+    student_school_stats = client.get(f"/api/admin/schools/{school_id}/stats", headers=_auth_header(student_token))
+    assert student_school_stats.status_code == 403
+
+    student_class_stats = client.get(f"/api/admin/classes/{class_id}/stats", headers=_auth_header(student_token))
+    assert student_class_stats.status_code == 403
+
+    global_stats_forbidden = client.get("/api/admin/stats", headers=_auth_header(owner_teacher_token))
+    assert global_stats_forbidden.status_code == 403
+
+
+def test_admin_audit_retention_plan_summarizes_candidates_without_deleting(client):
+    admin_token = _bootstrap_admin(client)
+    now = datetime.now(UTC)
+    old_created_at = now - timedelta(days=45)
+    expiring_created_at = now - timedelta(days=20)
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        old_log = AuditLog(
+            action="legacy.audit",
+            resource="legacy:old",
+            resource_type="legacy",
+            resource_id="old",
+            event_result="success",
+            prev_hash="a" * 64,
+            current_hash="b" * 64,
+            snapshot_json={"sensitive": "kept-out-of-plan"},
+            created_at=old_created_at,
+            updated_at=old_created_at,
+        )
+        expiring_log = AuditLog(
+            action="legacy.audit",
+            resource="legacy:expiring",
+            resource_type="legacy",
+            resource_id="expiring",
+            event_result="failure",
+            failure_reason="legacy_check",
+            prev_hash="b" * 64,
+            current_hash="c" * 64,
+            snapshot_json={"sensitive": "also-kept-out-of-plan"},
+            created_at=expiring_created_at,
+            updated_at=expiring_created_at,
+        )
+        db.add_all([old_log, expiring_log])
+        db.commit()
+        old_log_id = old_log.id
+        expiring_log_id = expiring_log.id
+
+    plan_response = client.get(
+        "/api/admin/audit-logs/retention-plan?action=legacy.audit&retention_days=30&warning_days=15&bucket_limit=5",
+        headers={**_auth_header(admin_token), "X-Request-ID": "audit-retention-plan-request"},
+    )
+    assert plan_response.status_code == 200
+    plan = plan_response.json()
+    assert plan["filters"] == {"action": "legacy.audit"}
+    assert plan["capabilities"] == {
+        "archive_export": False,
+        "delete": False,
+        "worm": False,
+        "external_anchor": False,
+    }
+    assert plan["policy"]["source"] == "query"
+    assert plan["policy"]["retention_days"] == 30
+    assert plan["policy"]["warning_days"] == 15
+    assert plan["summary"]["total"] == 2
+    assert plan["summary"]["archive_candidates"] == 1
+    assert plan["summary"]["expiring_soon"] == 1
+    assert plan["summary"]["retained"] == 1
+    assert plan["summary"]["first_candidate_id"] == old_log_id
+    assert plan["summary"]["last_candidate_id"] == old_log_id
+    assert plan["summary"]["chain_start_prev_hash"] == "a" * 64
+    assert plan["summary"]["chain_start_current_hash"] == "b" * 64
+    assert plan["summary"]["chain_end_current_hash"] == "b" * 64
+    assert plan["by_action"] == [{"key": "legacy.audit", "total": 1}]
+    assert plan["by_resource_type"] == [{"key": "legacy", "total": 1}]
+    assert plan["by_event_result"] == [{"key": "success", "total": 1}]
+    assert "items" not in plan
+    assert "snapshot_json" not in json.dumps(plan)
+
+    retention_audit = client.get(
+        "/api/admin/audit-logs?action=admin.audit.retention_plan"
+        "&resource_type=audit_log&request_id=audit-retention-plan-request",
+        headers=_auth_header(admin_token),
+    )
+    assert retention_audit.status_code == 200
+    assert retention_audit.json()["total"] == 1
+    retention_snapshot = retention_audit.json()["items"][0]["snapshot_json"]
+    assert retention_snapshot["format"] == "retention_plan"
+    assert retention_snapshot["filters"] == {"action": "legacy.audit"}
+    assert retention_snapshot["capabilities"]["delete"] is False
+    assert retention_snapshot["policy"]["retention_days"] == 30
+    assert retention_snapshot["archive_candidates"] == 1
+    assert retention_snapshot["expiring_soon"] == 1
+    assert retention_snapshot["first_candidate_id"] == old_log_id
+    assert retention_snapshot["last_candidate_id"] == old_log_id
+    assert "by_action" not in retention_snapshot
+    assert "items" not in retention_snapshot
+
+    with session_factory() as db:
+        assert db.get(AuditLog, old_log_id) is not None
+        assert db.get(AuditLog, expiring_log_id) is not None
+        assert (
+            db.scalar(select(func.count()).select_from(AuditLog).where(AuditLog.action == "legacy.audit"))
+            == 2
+        )
+
+    default_plan = client.get(
+        "/api/admin/audit-logs/retention-plan?action=legacy.audit",
+        headers=_auth_header(admin_token),
+    )
+    assert default_plan.status_code == 200
+    assert default_plan.json()["policy"]["source"] == "config"
+    assert default_plan.json()["policy"]["retention_days"] == 365
+
+    before_plan = client.get(
+        "/api/admin/audit-logs/retention-plan",
+        params={"action": "legacy.audit", "before": expiring_created_at.isoformat()},
+        headers=_auth_header(admin_token),
+    )
+    assert before_plan.status_code == 200
+    assert before_plan.json()["policy"]["source"] == "before"
+    assert before_plan.json()["policy"]["retention_days"] is None
+    assert before_plan.json()["summary"]["archive_candidates"] == 2
+
+    invalid_policy = client.get(
+        "/api/admin/audit-logs/retention-plan?before=2026-07-01T00:00:00Z&retention_days=30",
+        headers=_auth_header(admin_token),
+    )
+    assert invalid_policy.status_code == 422
+
+    invalid_window = client.get(
+        "/api/admin/audit-logs/retention-plan?from=2026-07-06T10:00:00Z&to=2026-07-05T10:00:00Z",
+        headers=_auth_header(admin_token),
+    )
+    assert invalid_window.status_code == 422
+
+
+def test_admin_audit_chain_integrity_reports_hash_and_link_issues(client):
+    admin_token = _bootstrap_admin(client)
+    session_factory = get_session_factory(get_settings().database_url)
+
+    def audit_log(
+        *,
+        action: str,
+        resource: str,
+        created_at: datetime,
+        prev_hash: str | None = None,
+        current_hash: str | None = "computed",
+    ) -> AuditLog:
+        log = AuditLog(
+            action=action,
+            resource=resource,
+            resource_type="chain_test",
+            resource_id=resource.rsplit(":", 1)[-1],
+            event_result="success",
+            request_id=f"{resource}-request",
+            prev_hash=prev_hash,
+            snapshot_json={"resource": resource},
+            created_at=created_at,
+            updated_at=created_at,
+        )
+        if current_hash == "computed":
+            log.current_hash = audit_log_chain_hash(log)
+        else:
+            log.current_hash = current_hash
+        return log
+
+    valid_base = datetime.now(UTC) + timedelta(minutes=1)
+    with session_factory() as db:
+        first = audit_log(action="chain.valid", resource="chain:valid:first", created_at=valid_base)
+        second = audit_log(
+            action="chain.valid",
+            resource="chain:valid:second",
+            created_at=valid_base + timedelta(seconds=1),
+            prev_hash=first.current_hash,
+        )
+        db.add_all([first, second])
+        db.commit()
+        first_id = first.id
+        second_id = second.id
+
+    valid_report = client.get(
+        "/api/admin/audit-logs/chain-integrity",
+        params={
+            "from": (valid_base - timedelta(seconds=1)).isoformat(),
+            "to": (valid_base + timedelta(seconds=5)).isoformat(),
+        },
+        headers={**_auth_header(admin_token), "X-Request-ID": "audit-chain-valid-request"},
+    )
+    assert valid_report.status_code == 200
+    valid_body = valid_report.json()
+    assert valid_body["status"] == "valid"
+    assert valid_body["valid"] is True
+    assert valid_body["total"] == 2
+    assert valid_body["scanned_count"] == 2
+    assert valid_body["truncated"] is False
+    assert valid_body["issue_count"] == 0
+    assert valid_body["first_id"] == first_id
+    assert valid_body["last_id"] == second_id
+
+    invalid_base = datetime.now(UTC) + timedelta(minutes=2)
+    with session_factory() as db:
+        intact_first = audit_log(action="chain.invalid", resource="chain:invalid:first", created_at=invalid_base)
+        intact_second = audit_log(
+            action="chain.invalid",
+            resource="chain:invalid:second",
+            created_at=invalid_base + timedelta(seconds=1),
+            prev_hash=intact_first.current_hash,
+        )
+        broken_prev = audit_log(
+            action="chain.invalid",
+            resource="chain:invalid:broken-prev",
+            created_at=invalid_base + timedelta(seconds=2),
+            prev_hash="9" * 64,
+        )
+        broken_current = audit_log(
+            action="chain.invalid",
+            resource="chain:invalid:broken-current",
+            created_at=invalid_base + timedelta(seconds=3),
+            prev_hash=broken_prev.current_hash,
+            current_hash="f" * 64,
+        )
+        legacy = audit_log(
+            action="chain.invalid",
+            resource="chain:invalid:legacy",
+            created_at=invalid_base + timedelta(seconds=4),
+            current_hash=None,
+        )
+        db.add_all([intact_first, intact_second, broken_prev, broken_current, legacy])
+        db.commit()
+
+    truncated_report = client.get(
+        "/api/admin/audit-logs/chain-integrity",
+        params={
+            "from": (invalid_base - timedelta(seconds=1)).isoformat(),
+            "to": (invalid_base + timedelta(seconds=10)).isoformat(),
+            "limit": 2,
+        },
+        headers=_auth_header(admin_token),
+    )
+    assert truncated_report.status_code == 200
+    assert truncated_report.json()["total"] == 5
+    assert truncated_report.json()["scanned_count"] == 2
+    assert truncated_report.json()["truncated"] is True
+    assert truncated_report.json()["status"] == "partial"
+    assert truncated_report.json()["valid"] is False
+
+    invalid_report = client.get(
+        "/api/admin/audit-logs/chain-integrity",
+        params={
+            "from": (invalid_base - timedelta(seconds=1)).isoformat(),
+            "to": (invalid_base + timedelta(seconds=10)).isoformat(),
+            "issue_limit": 2,
+        },
+        headers={**_auth_header(admin_token), "X-Request-ID": "audit-chain-invalid-request"},
+    )
+    assert invalid_report.status_code == 200
+    invalid_body = invalid_report.json()
+    assert invalid_body["status"] == "invalid"
+    assert invalid_body["valid"] is False
+    assert invalid_body["total"] == 5
+    assert invalid_body["scanned_count"] == 5
+    assert invalid_body["truncated"] is False
+    assert invalid_body["issue_count"] == 3
+    assert invalid_body["issues_truncated"] is True
+    assert invalid_body["current_hash_mismatch_count"] == 1
+    assert invalid_body["prev_hash_mismatch_count"] == 1
+    assert invalid_body["null_current_hash_count"] == 1
+    assert {issue["type"] for issue in invalid_body["issues"]} == {
+        "prev_hash_mismatch",
+        "current_hash_mismatch",
+    }
+    assert "snapshot_json" not in json.dumps(invalid_body)
+
+    chain_audit = client.get(
+        "/api/admin/audit-logs?action=admin.audit.chain_integrity&resource_type=audit_log&request_id=audit-chain-invalid-request",
+        headers=_auth_header(admin_token),
+    )
+    assert chain_audit.status_code == 200
+    assert chain_audit.json()["total"] == 1
+    chain_snapshot = chain_audit.json()["items"][0]["snapshot_json"]
+    assert chain_snapshot["format"] == "chain_integrity"
+    assert chain_snapshot["status"] == "invalid"
+    assert chain_snapshot["issue_count"] == 3
+    assert chain_snapshot["current_hash_mismatch_count"] == 1
+    assert chain_snapshot["prev_hash_mismatch_count"] == 1
+    assert chain_snapshot["null_current_hash_count"] == 1
+    assert "issues" not in chain_snapshot
+    assert "snapshot_json" not in json.dumps(chain_snapshot)
+
+    invalid_window = client.get(
+        "/api/admin/audit-logs/chain-integrity?from=2026-07-06T10:00:00Z&to=2026-07-05T10:00:00Z",
+        headers=_auth_header(admin_token),
+    )
+    assert invalid_window.status_code == 422
+
+
+def test_audit_hash_chain_links_multiple_logs_in_one_transaction(client):
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        first = record_audit_log(
+            db,
+            action="test.audit.first",
+            resource_type="test_resource",
+            event_result="success",
+            snapshot={"value": 1},
+        )
+        second = record_audit_log(
+            db,
+            action="test.audit.second",
+            resource_type="test_resource",
+            event_result="success",
+            snapshot={"value": 2},
+        )
+
+        assert first.prev_hash is None
+        assert first.current_hash
+        assert len(first.current_hash) == 64
+        assert second.prev_hash == first.current_hash
+        assert second.current_hash
+        assert second.current_hash != first.current_hash
+        assert first.current_hash == audit_log_chain_hash(first)
+        assert second.current_hash == audit_log_chain_hash(second)
+
+        original_second_hash = second.current_hash
+        second.snapshot_json = {"value": "tampered"}
+        assert audit_log_chain_hash(second) != original_second_hash
+
+
+def test_audit_hash_chain_head_tracks_commits_and_repairs_a_stale_tail(client):
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        first = record_audit_log(
+            db,
+            action="test.audit.chain_head.first",
+            resource_type="test_resource",
+            event_result="success",
+        )
+        db.commit()
+        first_id = first.id
+        first_hash = first.current_hash
+
+    with session_factory() as db:
+        head = db.get(AuditChainHead, 1)
+        assert head.current_audit_log_id == first_id
+        assert head.current_hash == first_hash
+        head.current_audit_log_id = 999999
+        head.current_hash = "f" * 64
+        db.commit()
+
+    with session_factory() as db:
+        second = record_audit_log(
+            db,
+            action="test.audit.chain_head.second",
+            resource_type="test_resource",
+            event_result="success",
+        )
+        assert second.prev_hash == first_hash
+        db.commit()
+        second_id = second.id
+        second_hash = second.current_hash
+
+    with session_factory() as db:
+        head = db.get(AuditChainHead, 1)
+        assert head.current_audit_log_id == second_id
+        assert head.current_hash == second_hash
+
+
+def test_admin_can_reset_user_password_and_revoke_sessions(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "teacher_password_reset", "teacher")
+
+    users = client.get("/api/admin/users?q=teacher_password_reset", headers=_auth_header(admin_token))
+    assert users.status_code == 200
+    teacher = users.json()["items"][0]
+
+    weak_reset = client.post(
+        f"/api/admin/users/{teacher['id']}/password-reset",
+        headers=_auth_header(admin_token),
+        json={"password": "12345678"},
+    )
+    assert weak_reset.status_code == 422
+    assert "Password must include at least one letter" in weak_reset.json()["detail"]["password"]
+
+    forbidden_reset = client.post(
+        f"/api/admin/users/{teacher['id']}/password-reset",
+        headers=_auth_header(teacher_token),
+        json={"password": "ResetPass123"},
+    )
+    assert forbidden_reset.status_code == 403
+
+    missing_user_reset = client.post(
+        "/api/admin/users/9999/password-reset",
+        headers=_auth_header(admin_token),
+        json={"password": "ResetPass123"},
+    )
+    assert missing_user_reset.status_code == 404
+
+    failed_login = client.post(
+        "/api/auth/login",
+        json={"username": "teacher_password_reset", "password": "wrong-secret"},
+    )
+    assert failed_login.status_code == 401
+
+    reset = client.post(
+        f"/api/admin/users/{teacher['id']}/password-reset",
+        headers={**_auth_header(admin_token), "X-Request-ID": "admin-password-reset-request"},
+        json={"password": "ResetPass123"},
+    )
+    assert reset.status_code == 200
+    assert reset.json() == {
+        "status": "ok",
+        "user_id": teacher["id"],
+        "revoked_sessions": 1,
+        "cleared_login_attempt": True,
+    }
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        cleared_attempt = db.scalar(
+            select(LoginAttempt).where(LoginAttempt.normalized_username == "teacher_password_reset")
+        )
+        assert cleared_attempt is None
+
+    old_token_me = client.get("/api/users/me", headers=_auth_header(teacher_token))
+    assert old_token_me.status_code == 401
+    old_password_login = client.post(
+        "/api/auth/login",
+        json={"username": "teacher_password_reset", "password": "secret123"},
+    )
+    assert old_password_login.status_code == 401
+    new_password_login = client.post(
+        "/api/auth/login",
+        json={"username": "teacher_password_reset", "password": "ResetPass123"},
+    )
+    assert new_password_login.status_code == 200
+
+    with session_factory() as db:
+        revoked_session = db.scalar(
+            select(AuthSession).where(AuthSession.user_id == teacher["id"], AuthSession.revoked_at.is_not(None))
+        )
+        assert revoked_session is not None
+        audit = db.scalar(select(AuditLog).where(AuditLog.action == "admin.user.password_reset"))
+        assert audit is not None
+        assert audit.resource_type == "user"
+        assert audit.resource_id == str(teacher["id"])
+        assert audit.request_id == "admin-password-reset-request"
+        assert audit.snapshot_json["revoked_sessions"] == 1
+        assert audit.snapshot_json["cleared_login_attempt"] is True
+        assert audit.snapshot_json["user"]["username"] == "teacher_password_reset"
+        assert "password" not in audit.snapshot_json
+        assert "ResetPass123" not in str(audit.snapshot_json)
+        assert "secret123" not in str(audit.snapshot_json)
+
+
+def test_admin_can_list_and_cancel_knowledge_snapshot_runs(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "snapshot_run_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        run = KnowledgeSnapshotRun(
+            run_key="knowledge:day:2026-07-01",
+            granularity="day",
+            period_start=datetime(2026, 7, 1, tzinfo=UTC),
+            period_end=datetime(2026, 7, 1, 23, 59, 59, tzinfo=UTC),
+            trigger_source="scheduler",
+            status="running",
+            started_at=datetime(2026, 7, 2, 3, 0, tzinfo=UTC),
+            scheduler_lease_owner="worker-admin-cancel",
+            scheduler_lease_token="secret-lease-token",
+            scheduler_lease_expires_at=datetime(2026, 7, 2, 4, 0, tzinfo=UTC),
+            scheduler_heartbeat_at=datetime(2026, 7, 2, 3, 30, tzinfo=UTC),
+            attempt_count=1,
+            user_snapshot_count=0,
+            class_snapshot_count=0,
+            metadata_json={"trigger_source": "scheduler", "token": "secret-run-metadata-token"},
+        )
+        success_run = KnowledgeSnapshotRun(
+            run_key="knowledge:day:2026-07-02",
+            granularity="day",
+            period_start=datetime(2026, 7, 2, tzinfo=UTC),
+            period_end=datetime(2026, 7, 2, 23, 59, 59, tzinfo=UTC),
+            trigger_source="script",
+            status="success",
+            started_at=datetime(2026, 7, 3, 3, 0, tzinfo=UTC),
+            finished_at=datetime(2026, 7, 3, 3, 1, tzinfo=UTC),
+            attempt_count=1,
+            user_snapshot_count=0,
+            class_snapshot_count=0,
+            metadata_json={"trigger_source": "script"},
+        )
+        failed_run = KnowledgeSnapshotRun(
+            run_key="knowledge:day:2026-07-03",
+            granularity="day",
+            period_start=datetime(2026, 7, 3, tzinfo=UTC),
+            period_end=datetime(2026, 7, 3, 23, 59, 59, tzinfo=UTC),
+            trigger_source="scheduler",
+            status="failed",
+            started_at=datetime(2026, 7, 4, 3, 0, tzinfo=UTC),
+            finished_at=datetime(2026, 7, 4, 3, 1, tzinfo=UTC),
+            attempt_count=1,
+            user_snapshot_count=0,
+            class_snapshot_count=0,
+            error_message="RuntimeError",
+            metadata_json={"trigger_source": "scheduler"},
+        )
+        legacy_running_run = KnowledgeSnapshotRun(
+            run_key="knowledge:day:2026-07-04",
+            granularity="day",
+            period_start=datetime(2026, 7, 4, tzinfo=UTC),
+            period_end=datetime(2026, 7, 4, 23, 59, 59, tzinfo=UTC),
+            trigger_source="script",
+            status="running",
+            started_at=datetime(2026, 7, 5, 3, 0, tzinfo=UTC),
+            attempt_count=1,
+            user_snapshot_count=0,
+            class_snapshot_count=0,
+            metadata_json={"trigger_source": "script"},
+        )
+        db.add_all([run, success_run, failed_run, legacy_running_run])
+        db.commit()
+        run_id = run.id
+        success_run_id = success_run.id
+        failed_run_id = failed_run.id
+        legacy_running_run_id = legacy_running_run.id
+
+    forbidden = client.get("/api/admin/knowledge-snapshot-runs", headers=_auth_header(teacher_token))
+    assert forbidden.status_code == 403
+
+    page = client.get(
+        "/api/admin/knowledge-snapshot-runs?status=running&trigger_source=scheduler",
+        headers=_auth_header(admin_token),
+    )
+    assert page.status_code == 200
+    body = page.json()
+    assert body["total"] == 1
+    assert body["items"][0]["id"] == run_id
+    assert body["items"][0]["scheduler_lease_owner"] == "worker-admin-cancel"
+    assert body["items"][0]["metadata_summary"]["trigger_source"] == "scheduler"
+    assert body["items"][0]["metadata_redacted"] is True
+    assert "scheduler_lease_token" not in body["items"][0]
+    page_text = json.dumps(body, ensure_ascii=False)
+    assert "metadata_json" not in page_text
+    assert "secret-lease-token" not in page_text
+    assert "secret-run-metadata-token" not in page_text
+
+    cancelled = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{run_id}/cancel",
+        headers=_auth_header(admin_token),
+    )
+    assert cancelled.status_code == 200
+    cancelled_body = cancelled.json()
+    assert cancelled_body["status"] == "cancelled"
+    assert cancelled_body["finished_at"] is not None
+    assert cancelled_body["error_message"] == "cancelled_by_admin"
+    assert cancelled_body["scheduler_lease_owner"] is None
+    assert cancelled_body["scheduler_lease_expires_at"] is None
+    assert cancelled_body["scheduler_heartbeat_at"] is None
+    assert cancelled_body["metadata_summary"]["previous_status"] == "running"
+    assert cancelled_body["metadata_summary"]["admin_actor_present"] is True
+    assert cancelled_body["metadata_redacted"] is True
+    assert "scheduler_lease_token" not in cancelled_body
+    cancelled_text = json.dumps(cancelled_body, ensure_ascii=False)
+    assert "metadata_json" not in cancelled_text
+    assert "secret-run-metadata-token" not in cancelled_text
+
+    second_cancel = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{run_id}/cancel",
+        headers=_auth_header(admin_token),
+    )
+    assert second_cancel.status_code == 409
+
+    success_cancel = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{success_run_id}/cancel",
+        headers=_auth_header(admin_token),
+    )
+    assert success_cancel.status_code == 409
+
+    failed_cancel = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{failed_run_id}/cancel",
+        headers=_auth_header(admin_token),
+    )
+    assert failed_cancel.status_code == 409
+
+    legacy_cancel = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{legacy_running_run_id}/cancel",
+        headers=_auth_header(admin_token),
+    )
+    assert legacy_cancel.status_code == 409
+
+    audit = client.get(
+        f"/api/admin/audit-logs?action=admin.knowledge_snapshot_run.cancel&resource_id={run_id}",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    audit_item = audit.json()["items"][0]
+    assert audit_item["snapshot_json"]["previous_status"] == "running"
+    assert audit_item["snapshot_json"]["status"] == "cancelled"
+    assert audit_item["snapshot_json"]["cleared_lease"] is True
+    assert "secret-lease-token" not in json.dumps(audit_item["snapshot_json"], ensure_ascii=False)
+
+    with session_factory() as db:
+        stored = db.get(KnowledgeSnapshotRun, run_id)
+        assert stored is not None
+        assert stored.status == "cancelled"
+        assert stored.scheduler_lease_token is None
+        assert stored.metadata_json["previous_status"] == "running"
+
+
+def test_admin_can_read_knowledge_snapshot_run_health(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "snapshot_health_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    settings = get_settings()
+    now = datetime.now(UTC).replace(microsecond=0)
+    retryable_attempts = max(settings.knowledge_snapshot_retry_attempts - 1, 0)
+    with session_factory() as db:
+        runs = [
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:active",
+                granularity="day",
+                period_start=now - timedelta(days=8),
+                period_end=now - timedelta(days=8) + timedelta(hours=23, minutes=59),
+                trigger_source="scheduler",
+                status="running",
+                started_at=now - timedelta(minutes=10),
+                scheduler_lease_owner="worker-active",
+                scheduler_lease_token="secret-active-token",
+                scheduler_lease_expires_at=now + timedelta(hours=1),
+                scheduler_heartbeat_at=now - timedelta(minutes=1),
+                attempt_count=1,
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:expiring",
+                granularity="day",
+                period_start=now - timedelta(days=7),
+                period_end=now - timedelta(days=7) + timedelta(hours=23, minutes=59),
+                trigger_source="scheduler",
+                status="running",
+                started_at=now - timedelta(minutes=20),
+                scheduler_lease_owner="worker-expiring",
+                scheduler_lease_token="secret-expiring-token",
+                scheduler_lease_expires_at=now + timedelta(minutes=5),
+                scheduler_heartbeat_at=now - timedelta(minutes=1),
+                attempt_count=1,
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:stale",
+                granularity="day",
+                period_start=now - timedelta(days=6),
+                period_end=now - timedelta(days=6) + timedelta(hours=23, minutes=59),
+                trigger_source="scheduler",
+                status="running",
+                started_at=now - timedelta(hours=2),
+                scheduler_lease_owner="worker-stale",
+                scheduler_lease_token="secret-stale-token",
+                scheduler_lease_expires_at=now - timedelta(minutes=1),
+                scheduler_heartbeat_at=now - timedelta(hours=1),
+                attempt_count=1,
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:partial",
+                granularity="day",
+                period_start=now - timedelta(days=9),
+                period_end=now - timedelta(days=9) + timedelta(hours=23, minutes=59),
+                trigger_source="scheduler",
+                status="running",
+                started_at=now - timedelta(minutes=30),
+                scheduler_lease_token="secret-partial-token",
+                scheduler_lease_expires_at=now + timedelta(minutes=30),
+                attempt_count=1,
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:legacy",
+                granularity="day",
+                period_start=now - timedelta(days=5),
+                period_end=now - timedelta(days=5) + timedelta(hours=23, minutes=59),
+                trigger_source="script",
+                status="running",
+                started_at=now - timedelta(seconds=settings.knowledge_snapshot_scheduler_lease_seconds + 60),
+                attempt_count=1,
+                metadata_json={"trigger_source": "script"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:retryable",
+                granularity="day",
+                period_start=now - timedelta(days=4),
+                period_end=now - timedelta(days=4) + timedelta(hours=23, minutes=59),
+                trigger_source="scheduler",
+                status="failed",
+                started_at=now - timedelta(hours=4),
+                finished_at=now - timedelta(hours=3, minutes=59),
+                attempt_count=retryable_attempts,
+                error_message="SnapshotRunLeaseLost",
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:exhausted",
+                granularity="day",
+                period_start=now - timedelta(days=3),
+                period_end=now - timedelta(days=3) + timedelta(hours=23, minutes=59),
+                trigger_source="scheduler",
+                status="failed",
+                started_at=now - timedelta(hours=3),
+                finished_at=now - timedelta(hours=2, minutes=59),
+                attempt_count=settings.knowledge_snapshot_retry_attempts,
+                error_message="RuntimeError",
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:pending",
+                granularity="week",
+                period_start=now - timedelta(days=14),
+                period_end=now - timedelta(days=8),
+                trigger_source="queue",
+                status="pending",
+                started_at=now - timedelta(hours=2),
+                attempt_count=0,
+                metadata_json={"trigger_source": "queue"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:success",
+                granularity="day",
+                period_start=now - timedelta(days=2),
+                period_end=now - timedelta(days=2) + timedelta(hours=23, minutes=59),
+                trigger_source="scheduler",
+                status="success",
+                started_at=now - timedelta(hours=2),
+                finished_at=now - timedelta(hours=1),
+                attempt_count=1,
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:health:cancelled",
+                granularity="day",
+                period_start=now - timedelta(days=1),
+                period_end=now - timedelta(days=1) + timedelta(hours=23, minutes=59),
+                trigger_source="scheduler",
+                status="cancelled",
+                started_at=now - timedelta(hours=1),
+                finished_at=now - timedelta(minutes=30),
+                attempt_count=1,
+                error_message="cancelled_by_admin",
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+        ]
+        db.add_all(runs)
+        db.commit()
+
+    forbidden = client.get("/api/admin/knowledge-snapshot-runs/health", headers=_auth_header(teacher_token))
+    assert forbidden.status_code == 403
+
+    response = client.get(
+        "/api/admin/knowledge-snapshot-runs/health?lease_expiring_seconds=600&problem_limit=3",
+        headers={**_auth_header(admin_token), "X-Request-ID": "snapshot-health-request"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["health_status"] == "attention"
+    assert body["total"] == 10
+    by_status = {item["status"]: item["total"] for item in body["by_status"]}
+    assert by_status == {
+        "cancelled": 1,
+        "failed": 2,
+        "pending": 1,
+        "running": 5,
+        "success": 1,
+    }
+    assert body["running_count"] == 5
+    assert body["active_running_count"] == 2
+    assert body["stale_running_count"] == 2
+    assert body["lease_expiring_count"] == 1
+    assert body["legacy_running_without_lease_count"] == 1
+    assert body["partial_running_lease_count"] == 1
+    assert body["failed_count"] == 2
+    assert body["retryable_failed_count"] == 1
+    assert body["exhausted_failed_count"] == 1
+    assert body["claimable_count"] == 4
+    assert body["pending_count"] == 1
+    assert body["cancelled_count"] == 1
+    assert body["needs_attention_count"] == 6
+    assert body["problem_count"] == 7
+    assert len(body["problem_runs"]) == 3
+    assert body["latest_success_by_granularity"]["day"] is not None
+    problem_flags = {flag for item in body["problem_runs"] for flag in item["health_flags"]}
+    assert "stale_running" in problem_flags
+    assert "partial_scheduler_lease" in problem_flags
+    assert "running_missing_lease_owner" in problem_flags
+    assert "running_missing_heartbeat" in problem_flags
+    serialized = json.dumps(body, ensure_ascii=False)
+    assert "scheduler_lease_token" not in serialized
+    assert "secret-active-token" not in serialized
+    assert "secret-expiring-token" not in serialized
+    assert "secret-stale-token" not in serialized
+    assert "secret-partial-token" not in serialized
+
+    invalid_window = client.get(
+        "/api/admin/knowledge-snapshot-runs/health?from=2026-07-06T10:00:00Z&to=2026-07-05T10:00:00Z",
+        headers=_auth_header(admin_token),
+    )
+    assert invalid_window.status_code == 422
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.knowledge_snapshot_run.health_report"
+        "&resource_type=knowledge_snapshot_run&request_id=snapshot-health-request",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    audit_item = audit.json()["items"][0]
+    assert audit_item["snapshot_json"]["health_status"] == "attention"
+    assert audit_item["snapshot_json"]["problem_count"] == 7
+    assert audit_item["snapshot_json"]["claimable_count"] == 4
+    assert "secret-" not in json.dumps(audit_item["snapshot_json"], ensure_ascii=False)
+    assert "problem_runs" not in audit_item["snapshot_json"]
+
+
+def test_admin_can_read_knowledge_snapshot_run_queue(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "snapshot_queue_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    settings = get_settings()
+    now = datetime(2026, 7, 20, 4, 30, tzinfo=UTC)
+    with session_factory() as db:
+        runs = [
+            KnowledgeSnapshotRun(
+                run_key="knowledge:queue:pending",
+                granularity="day",
+                period_start=datetime(2026, 7, 10),
+                period_end=datetime(2026, 7, 10, 23, 59),
+                trigger_source="admin_requeue",
+                status="pending",
+                started_at=datetime(2026, 7, 20, 1, 0),
+                attempt_count=0,
+                metadata_json={"trigger_source": "admin_requeue", "requeue_reason": "secret-reason"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:queue:retryable",
+                granularity="day",
+                period_start=datetime(2026, 7, 9),
+                period_end=datetime(2026, 7, 9, 23, 59),
+                trigger_source="scheduler",
+                status="failed",
+                started_at=datetime(2026, 7, 19, 1, 0),
+                finished_at=datetime(2026, 7, 19, 1, 1),
+                attempt_count=max(settings.knowledge_snapshot_retry_attempts - 1, 0),
+                error_message="SnapshotRunLeaseLost",
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:queue:exhausted",
+                granularity="day",
+                period_start=datetime(2026, 7, 8),
+                period_end=datetime(2026, 7, 8, 23, 59),
+                trigger_source="scheduler",
+                status="failed",
+                started_at=datetime(2026, 7, 18, 1, 0),
+                finished_at=datetime(2026, 7, 18, 1, 1),
+                attempt_count=settings.knowledge_snapshot_retry_attempts,
+                error_message="RuntimeError",
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:queue:cancelled",
+                granularity="week",
+                period_start=datetime(2026, 7, 7),
+                period_end=datetime(2026, 7, 13, 23, 59),
+                trigger_source="admin",
+                status="cancelled",
+                started_at=datetime(2026, 7, 19, 2, 0),
+                finished_at=datetime(2026, 7, 19, 2, 1),
+                attempt_count=1,
+                error_message="cancelled_by_admin",
+                metadata_json={"trigger_source": "admin", "cancelled_by_user_id": 1},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:queue:active",
+                granularity="day",
+                period_start=datetime(2026, 7, 6),
+                period_end=datetime(2026, 7, 6, 23, 59),
+                trigger_source="scheduler",
+                status="running",
+                started_at=datetime(2026, 7, 20, 3, 50),
+                scheduler_lease_owner="worker-active-queue",
+                scheduler_lease_token="secret-active-queue-token",
+                scheduler_lease_expires_at=datetime(2026, 7, 20, 5, 0),
+                scheduler_heartbeat_at=datetime(2026, 7, 20, 4, 20),
+                attempt_count=1,
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:queue:stale",
+                granularity="day",
+                period_start=datetime(2026, 7, 5),
+                period_end=datetime(2026, 7, 5, 23, 59),
+                trigger_source="scheduler",
+                status="running",
+                started_at=datetime(2026, 7, 20, 1, 30),
+                scheduler_lease_owner="worker-stale-queue",
+                scheduler_lease_token="secret-stale-queue-token",
+                scheduler_lease_expires_at=datetime(2026, 7, 20, 3, 0),
+                scheduler_heartbeat_at=datetime(2026, 7, 20, 2, 0),
+                attempt_count=1,
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:queue:legacy",
+                granularity="day",
+                period_start=datetime(2026, 7, 4),
+                period_end=datetime(2026, 7, 4, 23, 59),
+                trigger_source="script",
+                status="running",
+                started_at=datetime(2026, 7, 20, 1, 0),
+                attempt_count=1,
+                metadata_json={"trigger_source": "script"},
+            ),
+        ]
+        db.add_all(runs)
+        db.commit()
+
+    forbidden = client.get(
+        "/api/admin/knowledge-snapshot-runs/queue",
+        headers=_auth_header(teacher_token),
+        params={"now": now.isoformat()},
+    )
+    assert forbidden.status_code == 403
+
+    response = client.get(
+        "/api/admin/knowledge-snapshot-runs/queue",
+        headers={**_auth_header(admin_token), "X-Request-ID": "snapshot-queue-request"},
+        params={"now": now.isoformat(), "item_limit": "10"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["queue_status"] == "ready"
+    assert body["due_count"] == 2
+    assert body["pending_count"] == 1
+    assert body["ready_count"] == 3
+    assert body["dispatchable_now_count"] == 3
+    assert body["manual_requeue_count"] == 4
+    assert body["blocked_count"] == 2
+    assert body["retryable_failed_count"] == 1
+    assert body["exhausted_failed_count"] == 1
+    assert body["cancelled_count"] == 1
+    assert body["stale_running_count"] == 2
+    assert body["active_running_count"] == 1
+    assert body["legacy_running_without_lease_count"] == 1
+    assert body["claimable_by_lease_rule_count"] == 4
+    ready_sources = [item["source"] for item in body["ready_jobs"]]
+    assert ready_sources.count("due") == 2
+    assert "pending" in ready_sources
+    manual_sources = {item["source"] for item in body["manual_requeue_runs"]}
+    assert {"retryable_failed", "exhausted_failed", "cancelled", "stale_running"} <= manual_sources
+    blocked_sources = {item["source"] for item in body["blocked_runs"]}
+    assert {"active_running", "legacy_running"} <= blocked_sources
+    serialized = json.dumps(body, ensure_ascii=False)
+    assert "scheduler_lease_token" not in serialized
+    assert "secret-" not in serialized
+    assert "metadata_json" not in serialized
+    assert "secret-reason" not in serialized
+
+    invalid_window = client.get(
+        "/api/admin/knowledge-snapshot-runs/queue",
+        headers=_auth_header(admin_token),
+        params={"from": "2026-07-06T10:00:00Z", "to": "2026-07-05T10:00:00Z"},
+    )
+    assert invalid_window.status_code == 422
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.knowledge_snapshot_run.queue_report"
+        "&resource_type=knowledge_snapshot_run&request_id=snapshot-queue-request",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    audit_snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert audit_snapshot["queue_status"] == "ready"
+    assert audit_snapshot["ready_count"] == 3
+    assert audit_snapshot["manual_requeue_count"] == 4
+    assert audit_snapshot["blocked_count"] == 2
+    assert "ready_jobs" not in audit_snapshot
+    assert "manual_requeue_runs" not in audit_snapshot
+    assert "blocked_runs" not in audit_snapshot
+    assert "secret-" not in json.dumps(audit_snapshot, ensure_ascii=False)
+
+
+def test_admin_can_read_knowledge_snapshot_run_alert_candidates(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "snapshot_alert_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    settings = get_settings()
+    now = datetime(2026, 7, 21, 4, 30, tzinfo=UTC)
+    with session_factory() as db:
+        runs = [
+            KnowledgeSnapshotRun(
+                run_key="knowledge:alerts:pending",
+                granularity="day",
+                period_start=datetime(2026, 7, 10),
+                period_end=datetime(2026, 7, 10, 23, 59),
+                trigger_source="admin_requeue",
+                status="pending",
+                started_at=datetime(2026, 7, 21, 1, 0),
+                attempt_count=0,
+                metadata_json={"trigger_source": "admin_requeue", "requeue_reason": "secret-alert-reason"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:alerts:retryable",
+                granularity="day",
+                period_start=datetime(2026, 7, 9),
+                period_end=datetime(2026, 7, 9, 23, 59),
+                trigger_source="scheduler",
+                status="failed",
+                started_at=datetime(2026, 7, 20, 1, 0),
+                finished_at=datetime(2026, 7, 20, 1, 1),
+                attempt_count=max(settings.knowledge_snapshot_retry_attempts - 1, 0),
+                error_message="SnapshotRunLeaseLost",
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:alerts:exhausted",
+                granularity="day",
+                period_start=datetime(2026, 7, 8),
+                period_end=datetime(2026, 7, 8, 23, 59),
+                trigger_source="scheduler",
+                status="failed",
+                started_at=datetime(2026, 7, 20, 2, 0),
+                finished_at=datetime(2026, 7, 20, 2, 1),
+                attempt_count=settings.knowledge_snapshot_retry_attempts,
+                error_message="RuntimeError",
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:alerts:expiring",
+                granularity="day",
+                period_start=datetime(2026, 7, 7),
+                period_end=datetime(2026, 7, 7, 23, 59),
+                trigger_source="scheduler",
+                status="running",
+                started_at=datetime(2026, 7, 21, 3, 50),
+                scheduler_lease_owner="worker-alert-expiring",
+                scheduler_lease_token="secret-alert-expiring-token",
+                scheduler_lease_expires_at=datetime(2026, 7, 21, 4, 35),
+                scheduler_heartbeat_at=datetime(2026, 7, 21, 4, 25),
+                attempt_count=1,
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:alerts:stale",
+                granularity="day",
+                period_start=datetime(2026, 7, 6),
+                period_end=datetime(2026, 7, 6, 23, 59),
+                trigger_source="scheduler",
+                status="running",
+                started_at=datetime(2026, 7, 21, 1, 30),
+                scheduler_lease_owner="worker-alert-stale",
+                scheduler_lease_token="secret-alert-stale-token",
+                scheduler_lease_expires_at=datetime(2026, 7, 21, 3, 0),
+                scheduler_heartbeat_at=datetime(2026, 7, 21, 2, 0),
+                attempt_count=1,
+                metadata_json={"trigger_source": "scheduler"},
+            ),
+            KnowledgeSnapshotRun(
+                run_key="knowledge:alerts:cancelled",
+                granularity="week",
+                period_start=datetime(2026, 7, 7),
+                period_end=datetime(2026, 7, 13, 23, 59),
+                trigger_source="admin",
+                status="cancelled",
+                started_at=datetime(2026, 7, 20, 3, 0),
+                finished_at=datetime(2026, 7, 20, 3, 1),
+                attempt_count=1,
+                error_message="cancelled_by_admin",
+                metadata_json={"trigger_source": "admin", "cancelled_by_user_id": 1},
+            ),
+        ]
+        db.add_all(runs)
+        db.commit()
+
+    forbidden = client.get(
+        "/api/admin/knowledge-snapshot-runs/alerts",
+        headers=_auth_header(teacher_token),
+        params={"now": now.isoformat()},
+    )
+    assert forbidden.status_code == 403
+
+    response = client.get(
+        "/api/admin/knowledge-snapshot-runs/alerts",
+        headers={**_auth_header(admin_token), "X-Request-ID": "snapshot-alert-request"},
+        params={"now": now.isoformat(), "lease_expiring_seconds": "600", "candidate_limit": "100"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["alert_status"] == "critical"
+    assert body["health_status"] == "attention"
+    assert body["candidate_count"] >= 6
+    assert body["critical_count"] >= 2
+    assert body["warning_count"] >= 3
+    assert body["manual_requeue_count"] >= 3
+    assert body["dispatchable_now_count"] >= 1
+    codes = {item["code"] for item in body["candidates"]}
+    assert {"stale_running", "exhausted_failed", "retryable_failed", "pending", "lease_expiring"} <= codes
+    assert "manual_cancelled" in codes
+    severities = [item["severity"] for item in body["candidates"]]
+    assert severities[: body["critical_count"]] == ["critical"] * body["critical_count"]
+    serialized = json.dumps(body, ensure_ascii=False)
+    assert "scheduler_lease_token" not in serialized
+    assert "secret-" not in serialized
+    assert "metadata_json" not in serialized
+    assert "secret-alert-reason" not in serialized
+
+    limited = client.get(
+        "/api/admin/knowledge-snapshot-runs/alerts",
+        headers=_auth_header(admin_token),
+        params={"now": now.isoformat(), "candidate_limit": "2"},
+    )
+    assert limited.status_code == 200
+    assert len(limited.json()["candidates"]) == 2
+    assert limited.json()["candidate_count"] >= 6
+
+    invalid_window = client.get(
+        "/api/admin/knowledge-snapshot-runs/alerts",
+        headers=_auth_header(admin_token),
+        params={"from": "2026-07-06T10:00:00Z", "to": "2026-07-05T10:00:00Z"},
+    )
+    assert invalid_window.status_code == 422
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.knowledge_snapshot_run.alert_report"
+        "&resource_type=knowledge_snapshot_run&request_id=snapshot-alert-request",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    audit_snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert audit_snapshot["format"] == "alert_candidates"
+    assert audit_snapshot["alert_status"] == "critical"
+    assert audit_snapshot["candidate_count"] >= 6
+    assert audit_snapshot["candidate_codes"]["stale_running"] >= 1
+    assert "candidates" not in audit_snapshot
+    assert "secret-" not in json.dumps(audit_snapshot, ensure_ascii=False)
+
+
+def test_admin_enqueues_knowledge_snapshot_alert_outbox_with_idempotent_redacted_payload(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "snapshot_outbox_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    now = datetime(2026, 7, 22, 9, 0, tzinfo=UTC)
+    with session_factory() as db:
+        db.add_all(
+            [
+                KnowledgeSnapshotRun(
+                    run_key="knowledge:outbox:pending",
+                    granularity="day",
+                    period_start=datetime(2026, 7, 20, tzinfo=UTC),
+                    period_end=datetime(2026, 7, 20, 23, 59, tzinfo=UTC),
+                    trigger_source="scheduler",
+                    status="pending",
+                    started_at=now - timedelta(hours=3),
+                    attempt_count=0,
+                    metadata_json={"requeue_reason": "secret-outbox-reason"},
+                ),
+                KnowledgeSnapshotRun(
+                    run_key="knowledge:outbox:stale",
+                    granularity="day",
+                    period_start=datetime(2026, 7, 19, tzinfo=UTC),
+                    period_end=datetime(2026, 7, 19, 23, 59, tzinfo=UTC),
+                    trigger_source="scheduler",
+                    status="running",
+                    started_at=now - timedelta(hours=5),
+                    scheduler_lease_owner="worker-outbox-secret-owner",
+                    scheduler_lease_token="secret-outbox-token",
+                    scheduler_lease_expires_at=now - timedelta(hours=2),
+                    scheduler_heartbeat_at=now - timedelta(hours=4),
+                    attempt_count=1,
+                    error_message="secret-outbox-exception",
+                    metadata_json={"trigger_source": "scheduler", "token": "secret-outbox-metadata"},
+                ),
+            ]
+        )
+        db.commit()
+
+    forbidden = client.post(
+        "/api/admin/knowledge-snapshot-runs/alerts/outbox",
+        headers=_auth_header(teacher_token),
+        json={"confirm_observe_only": True, "now_at": now.isoformat()},
+    )
+    assert forbidden.status_code == 403
+
+    missing_confirmation = client.post(
+        "/api/admin/knowledge-snapshot-runs/alerts/outbox",
+        headers=_auth_header(admin_token),
+        json={"now_at": now.isoformat()},
+    )
+    assert missing_confirmation.status_code == 422
+
+    response = client.post(
+        "/api/admin/knowledge-snapshot-runs/alerts/outbox",
+        headers={**_auth_header(admin_token), "X-Request-ID": "snapshot-outbox-enqueue"},
+        json={"confirm_observe_only": True, "now_at": now.isoformat(), "candidate_limit": 100},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source_type"] == "knowledge_snapshot_run_alert"
+    assert body["external_delivery"] is False
+    assert body["dispatch_mode"] == "manual_review"
+    assert body["delivery_target"] == "admin_outbox"
+    assert body["created_count"] >= 2
+    assert body["refreshed_count"] == 0
+    assert len(body["items"]) == body["created_count"]
+    serialized = json.dumps(body, ensure_ascii=False)
+    assert "scheduler_lease_token" not in serialized
+    assert "scheduler_lease_owner" not in serialized
+    assert "metadata_json" not in serialized
+    assert "secret-outbox" not in serialized
+    assert '"sent"' not in serialized
+
+    repeated = client.post(
+        "/api/admin/knowledge-snapshot-runs/alerts/outbox",
+        headers=_auth_header(admin_token),
+        json={"confirm_observe_only": True, "now_at": now.isoformat(), "candidate_limit": 100},
+    )
+    assert repeated.status_code == 200
+    repeated_body = repeated.json()
+    assert repeated_body["created_count"] == 0
+    assert repeated_body["refreshed_count"] == body["created_count"]
+    assert all(item["seen_count"] == 2 for item in repeated_body["items"])
+
+    outbox = client.get(
+        "/api/admin/alert-outbox?source_type=knowledge_snapshot_run_alert&status=pending_review",
+        headers=_auth_header(admin_token),
+    )
+    assert outbox.status_code == 200
+    outbox_body = outbox.json()
+    assert outbox_body["total"] == body["created_count"]
+    assert all(item["external_delivery"] is False for item in outbox_body["items"])
+    outbox_text = json.dumps(outbox_body, ensure_ascii=False)
+    assert "dedupe_key" not in outbox_text
+    assert "payload_hash\"" not in outbox_text
+    assert "payload_json" not in outbox_text
+    assert '"review_note":' not in outbox_text
+    assert "secret-outbox" not in outbox_text
+    assert all(item["payload_redacted"] is True for item in outbox_body["items"])
+    assert all(len(item["payload_hash_prefix"]) <= 12 for item in outbox_body["items"])
+    reviewed_entry_id = outbox_body["items"][0]["id"]
+
+    forbidden_review = client.patch(
+        f"/api/admin/alert-outbox/{reviewed_entry_id}",
+        headers=_auth_header(teacher_token),
+        json={"status": "suppressed", "confirm_manual_review": True},
+    )
+    assert forbidden_review.status_code == 403
+
+    missing_review_confirmation = client.patch(
+        f"/api/admin/alert-outbox/{reviewed_entry_id}",
+        headers=_auth_header(admin_token),
+        json={"status": "suppressed"},
+    )
+    assert missing_review_confirmation.status_code == 422
+
+    missing_review_entry = client.patch(
+        "/api/admin/alert-outbox/999999",
+        headers=_auth_header(admin_token),
+        json={"status": "suppressed", "confirm_manual_review": True},
+    )
+    assert missing_review_entry.status_code == 404
+
+    invalid_review_status = client.patch(
+        f"/api/admin/alert-outbox/{reviewed_entry_id}",
+        headers=_auth_header(admin_token),
+        json={"status": "sent", "confirm_manual_review": True},
+    )
+    assert invalid_review_status.status_code == 422
+
+    reviewed = client.patch(
+        f"/api/admin/alert-outbox/{reviewed_entry_id}",
+        headers={**_auth_header(admin_token), "X-Request-ID": "snapshot-outbox-review"},
+        json={
+            "status": "suppressed",
+            "note": "manual review secret-review-note",
+            "confirm_manual_review": True,
+        },
+    )
+    assert reviewed.status_code == 200
+    reviewed_body = reviewed.json()
+    assert reviewed_body["status"] == "suppressed"
+    assert reviewed_body["reviewed_by_user_id"] is not None
+    assert reviewed_body["reviewed_at"] is not None
+    assert reviewed_body["review_note_present"] is True
+    assert '"review_note":' not in json.dumps(reviewed_body, ensure_ascii=False)
+    assert "secret-review-note" not in json.dumps(reviewed_body, ensure_ascii=False)
+    assert reviewed_body["external_delivery"] is False
+
+    suppressed_outbox = client.get(
+        "/api/admin/alert-outbox?source_type=knowledge_snapshot_run_alert&status=suppressed",
+        headers=_auth_header(admin_token),
+    )
+    assert suppressed_outbox.status_code == 200
+    suppressed_body = suppressed_outbox.json()
+    assert suppressed_body["total"] == 1
+    assert suppressed_body["items"][0]["id"] == reviewed_entry_id
+
+    repeated_after_review = client.post(
+        "/api/admin/knowledge-snapshot-runs/alerts/outbox",
+        headers=_auth_header(admin_token),
+        json={"confirm_observe_only": True, "now_at": now.isoformat(), "candidate_limit": 100},
+    )
+    assert repeated_after_review.status_code == 200
+    reviewed_after_reenqueue = next(
+        item for item in repeated_after_review.json()["items"] if item["id"] == reviewed_entry_id
+    )
+    assert reviewed_after_reenqueue["status"] == "suppressed"
+    assert reviewed_after_reenqueue["seen_count"] == 3
+
+    with session_factory() as db:
+        assert db.scalar(select(func.count()).select_from(AdminAlertOutboxEntry)) == body["created_count"]
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.knowledge_snapshot_run.enqueue"
+        "&resource_type=admin_alert_outbox&request_id=snapshot-outbox-enqueue",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    audit_snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert audit_snapshot["format"] == "admin_alert_outbox_write"
+    assert audit_snapshot["source_type"] == "knowledge_snapshot_run_alert"
+    assert audit_snapshot["external_delivery"] is False
+    assert audit_snapshot["created_count"] == body["created_count"]
+    assert "entries" not in audit_snapshot
+    assert "payload_json" not in audit_snapshot
+    assert "secret-outbox" not in json.dumps(audit_snapshot, ensure_ascii=False)
+
+    review_audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.review"
+        "&resource_type=admin_alert_outbox&request_id=snapshot-outbox-review",
+        headers=_auth_header(admin_token),
+    )
+    assert review_audit.status_code == 200
+    assert review_audit.json()["total"] == 1
+    review_snapshot = review_audit.json()["items"][0]["snapshot_json"]
+    assert review_snapshot["format"] == "admin_alert_outbox_review"
+    assert review_snapshot["entry_id"] == reviewed_entry_id
+    assert review_snapshot["source_type"] == "knowledge_snapshot_run_alert"
+    assert review_snapshot["previous_status"] == "pending_review"
+    assert review_snapshot["status"] == "suppressed"
+    assert review_snapshot["external_delivery"] is False
+    assert review_snapshot["automatic_actions"] is False
+    assert review_snapshot["note_provided"] is True
+    review_snapshot_text = json.dumps(review_snapshot, ensure_ascii=False)
+    assert "payload_json" not in review_snapshot
+    assert "secret-review-note" not in review_snapshot_text
+    assert "secret-outbox" not in review_snapshot_text
+    assert "scheduler_lease_token" not in review_snapshot_text
+
+
+def test_admin_reads_alert_outbox_queue_report_without_leaking_payload_or_mutating(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "alert_outbox_queue_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    now = datetime(2026, 7, 23, 9, 0, tzinfo=UTC)
+    entries = [
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=101,
+            source_key="knowledge:queue-report:pending-old",
+            event_code="stale_running",
+            severity="critical",
+            action_hint="investigate",
+            status="pending_review",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="queue-report-pending-old",
+            payload_hash="hash-pending-old",
+            payload_json={"secret": "secret-queue-payload", "scheduler_lease_token": "secret-queue-token"},
+            first_seen_at=now - timedelta(hours=30),
+            last_seen_at=now - timedelta(hours=30),
+            available_at=now - timedelta(hours=30),
+            seen_count=2,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="content_script_asset_scan_run_alert",
+            source_id=102,
+            source_key="content:queue-report:pending-recent",
+            event_code="remote_drift_detected",
+            severity="warning",
+            action_hint="monitor",
+            status="pending_review",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="queue-report-pending-recent",
+            payload_hash="hash-pending-recent",
+            payload_json={"source_url": "https://cdn.example.test/secret-queue.js"},
+            first_seen_at=now - timedelta(hours=1),
+            last_seen_at=now - timedelta(hours=1),
+            available_at=now - timedelta(hours=1),
+            seen_count=1,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=103,
+            source_key="knowledge:queue-report:planned-due",
+            event_code="retryable_failed",
+            severity="warning",
+            action_hint="requeue",
+            status="planned",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="queue-report-planned-due",
+            payload_hash="hash-planned-due",
+            payload_json={"secret": "secret-planned-payload"},
+            first_seen_at=now - timedelta(hours=5),
+            last_seen_at=now - timedelta(hours=4),
+            available_at=now - timedelta(hours=2),
+            reviewed_at=now - timedelta(hours=3),
+            review_note="secret-planned-review-note",
+            seen_count=3,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=104,
+            source_key="knowledge:queue-report:planned-future",
+            event_code="pending_backlog",
+            severity="info",
+            action_hint="dispatch",
+            status="planned",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="queue-report-planned-future",
+            payload_hash="hash-planned-future",
+            payload_json={"secret": "secret-future-payload"},
+            first_seen_at=now - timedelta(hours=2),
+            last_seen_at=now - timedelta(hours=2),
+            available_at=now + timedelta(hours=2),
+            reviewed_at=now - timedelta(hours=1),
+            review_note="future plan secret note",
+            seen_count=1,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="content_script_asset_scan_run_alert",
+            source_id=105,
+            source_key="content:queue-report:queued",
+            event_code="scan_failed",
+            severity="critical",
+            action_hint="investigate",
+            status="queued",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="queue-report-queued",
+            payload_hash="hash-queued",
+            payload_json={"content_bytes": "secret-bytes"},
+            first_seen_at=now - timedelta(hours=4),
+            last_seen_at=now - timedelta(hours=3),
+            available_at=now - timedelta(minutes=10),
+            reviewed_at=now - timedelta(hours=2),
+            review_note="queued secret note",
+            seen_count=4,
+            attempt_count=7,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=106,
+            source_key="knowledge:queue-report:suppressed",
+            event_code="manual_cancelled",
+            severity="info",
+            action_hint="monitor",
+            status="suppressed",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="queue-report-suppressed",
+            payload_hash="hash-suppressed",
+            payload_json={"secret": "secret-suppressed-payload"},
+            first_seen_at=now - timedelta(days=2),
+            last_seen_at=now - timedelta(days=2),
+            reviewed_at=now - timedelta(days=1),
+            review_note="suppressed secret note",
+            seen_count=1,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="content_script_asset_scan_run_alert",
+            source_id=107,
+            source_key="content:queue-report:cancelled",
+            event_code="blocked_run",
+            severity="warning",
+            action_hint="monitor",
+            status="cancelled",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="queue-report-cancelled",
+            payload_hash="hash-cancelled",
+            payload_json={"exception": "secret-cancelled-exception"},
+            first_seen_at=now - timedelta(days=1, hours=3),
+            last_seen_at=now - timedelta(days=1, hours=3),
+            reviewed_at=now - timedelta(days=1),
+            review_note="cancelled secret note",
+            seen_count=1,
+        ),
+    ]
+    with session_factory() as db:
+        db.add_all(entries)
+        db.commit()
+        queued_entry_id = entries[4].id
+
+    forbidden = client.get(
+        "/api/admin/alert-outbox/queue",
+        params={"now_at": now.isoformat()},
+        headers=_auth_header(teacher_token),
+    )
+    assert forbidden.status_code == 403
+
+    invalid_window = client.get(
+        "/api/admin/alert-outbox/queue",
+        params={"from": (now + timedelta(hours=1)).isoformat(), "to": now.isoformat()},
+        headers=_auth_header(admin_token),
+    )
+    assert invalid_window.status_code == 422
+
+    response = client.get(
+        "/api/admin/alert-outbox/queue",
+        params={"now_at": now.isoformat(), "stale_after_hours": 24, "item_limit": 1},
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-queue-report"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["queue_status"] == "ready"
+    assert body["policy"]["external_delivery"] is False
+    assert body["policy"]["automatic_actions"] is False
+    assert body["policy"]["dispatch_mode"] == "manual_review"
+    assert body["total_count"] == 7
+    assert body["active_count"] == 5
+    assert body["pending_review_count"] == 2
+    assert body["planned_count"] == 2
+    assert body["queued_count"] == 1
+    assert body["suppressed_count"] == 1
+    assert body["cancelled_count"] == 1
+    assert body["terminal_count"] == 2
+    assert body["stale_pending_review_count"] == 1
+    assert body["due_planned_count"] == 1
+    assert body["due_queued_count"] == 1
+    assert body["external_delivery_count"] == 0
+    assert len(body["pending_review_items"]) == 1
+    assert len(body["ready_items"]) == 1
+    assert len(body["terminal_items"]) == 1
+    buckets = {item["status"]: item for item in body["status_buckets"]}
+    assert buckets["pending_review"]["total"] == 2
+    assert buckets["planned"]["total"] == 2
+    assert buckets["queued"]["critical_count"] == 1
+    response_text = json.dumps(body, ensure_ascii=False)
+    assert "payload_json" not in response_text
+    assert "review_note" not in response_text
+    assert "secret-queue" not in response_text
+    assert "secret-planned" not in response_text
+    assert "content_bytes" not in response_text
+    assert "scheduler_lease_token" not in response_text
+
+    with session_factory() as db:
+        queued_entry = db.get(AdminAlertOutboxEntry, queued_entry_id)
+        assert queued_entry is not None
+        assert queued_entry.status == "queued"
+        assert queued_entry.attempt_count == 7
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.queue_report"
+        "&resource_type=admin_alert_outbox&request_id=alert-outbox-queue-report",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert snapshot["format"] == "admin_alert_outbox_queue"
+    assert snapshot["queue_status"] == "ready"
+    assert snapshot["total_count"] == 7
+    assert snapshot["status_buckets"]["queued"] == 1
+    assert snapshot["automatic_actions"] is False
+    assert snapshot["external_delivery"] is False
+    audit_text = json.dumps(snapshot, ensure_ascii=False)
+    assert "payload_json" not in audit_text
+    assert "review_note" not in audit_text
+    assert "secret-queue" not in audit_text
+    assert "content_bytes" not in audit_text
+    assert "scheduler_lease_token" not in audit_text
+
+
+def test_admin_dry_runs_alert_outbox_dispatch_without_delivery_or_mutation(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "alert_outbox_dispatch_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    now = datetime(2026, 7, 25, 9, 0, tzinfo=UTC)
+    entries = [
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=301,
+            source_key="knowledge:dispatch:ready",
+            event_code="stale_running",
+            severity="critical",
+            action_hint="investigate",
+            status="queued",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-ready",
+            payload_hash="dispatch-ready-payload-hash",
+            payload_json={"secret": "secret-dispatch-ready", "scheduler_lease_token": "secret-dispatch-token"},
+            first_seen_at=now - timedelta(hours=6),
+            last_seen_at=now - timedelta(hours=6),
+            available_at=now - timedelta(hours=2),
+            reviewed_at=now - timedelta(hours=3),
+            review_note="secret dispatch review note",
+            seen_count=2,
+            attempt_count=7,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=302,
+            source_key="knowledge:dispatch:not-due",
+            event_code="pending_backlog",
+            severity="warning",
+            action_hint="monitor",
+            status="queued",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-not-due",
+            payload_hash="dispatch-not-due-payload-hash",
+            payload_json={"secret": "secret-dispatch-not-due"},
+            first_seen_at=now - timedelta(hours=1),
+            last_seen_at=now - timedelta(hours=1),
+            available_at=now + timedelta(hours=2),
+            seen_count=1,
+            attempt_count=3,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="content_script_asset_scan_run_alert",
+            source_id=303,
+            source_key="content:dispatch:planned",
+            event_code="remote_drift_detected",
+            severity="warning",
+            action_hint="monitor",
+            status="planned",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-planned",
+            payload_hash="dispatch-planned-payload-hash",
+            payload_json={"source_url": "https://cdn.example.test/secret-dispatch.js", "content_bytes": "secret-bytes"},
+            first_seen_at=now - timedelta(hours=5),
+            last_seen_at=now - timedelta(hours=5),
+            available_at=now - timedelta(hours=1),
+            seen_count=1,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=304,
+            source_key="knowledge:dispatch:pending",
+            event_code="lease_expiring",
+            severity="info",
+            action_hint="review",
+            status="pending_review",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-pending",
+            payload_hash="dispatch-pending-payload-hash",
+            payload_json={"metadata_json": {"secret": "secret-dispatch-metadata"}},
+            first_seen_at=now - timedelta(hours=4),
+            last_seen_at=now - timedelta(hours=4),
+            available_at=now - timedelta(hours=4),
+            seen_count=1,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=305,
+            source_key="knowledge:dispatch:expired",
+            event_code="retry_exhausted",
+            severity="critical",
+            action_hint="investigate",
+            status="queued",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-expired",
+            payload_hash="dispatch-expired-payload-hash",
+            payload_json={"exception": "secret-dispatch-exception"},
+            first_seen_at=now - timedelta(days=2),
+            last_seen_at=now - timedelta(days=2),
+            available_at=now - timedelta(days=1),
+            expires_at=now - timedelta(minutes=1),
+            seen_count=1,
+            attempt_count=1,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=306,
+            source_key="knowledge:dispatch:external",
+            event_code="manual_requeue",
+            severity="warning",
+            action_hint="monitor",
+            status="queued",
+            dispatch_mode="webhook",
+            delivery_target="external_webhook",
+            external_delivery=True,
+            dedupe_key="dispatch-external",
+            payload_hash="dispatch-external-payload-hash",
+            payload_json={"secret": "secret-dispatch-external"},
+            first_seen_at=now - timedelta(hours=3),
+            last_seen_at=now - timedelta(hours=3),
+            available_at=now - timedelta(hours=3),
+            seen_count=1,
+            attempt_count=5,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=307,
+            source_key="knowledge:dispatch:suppressed",
+            event_code="manual_cancelled",
+            severity="info",
+            action_hint="monitor",
+            status="suppressed",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-suppressed",
+            payload_hash="dispatch-suppressed-payload-hash",
+            payload_json={"secret": "secret-dispatch-suppressed"},
+            first_seen_at=now - timedelta(hours=7),
+            last_seen_at=now - timedelta(hours=7),
+            reviewed_at=now - timedelta(hours=6),
+            review_note="secret suppressed note",
+            seen_count=1,
+        ),
+    ]
+    with session_factory() as db:
+        db.add_all(entries)
+        db.commit()
+        ids = [entry.id for entry in entries]
+        before = {
+            entry.id: {
+                "status": entry.status,
+                "attempt_count": entry.attempt_count,
+                "last_error_code": entry.last_error_code,
+                "available_at": entry.available_at,
+                "review_note": entry.review_note,
+            }
+            for entry in entries
+        }
+    ready_id, not_due_id, planned_id, pending_id, expired_id, external_id, suppressed_id = ids
+
+    forbidden = client.post(
+        "/api/admin/alert-outbox/dispatch-dry-run",
+        headers=_auth_header(teacher_token),
+        json={"confirm_dry_run": True},
+    )
+    assert forbidden.status_code == 403
+
+    missing_confirmation = client.post(
+        "/api/admin/alert-outbox/dispatch-dry-run",
+        headers=_auth_header(admin_token),
+        json={},
+    )
+    assert missing_confirmation.status_code == 422
+
+    invalid_window = client.post(
+        "/api/admin/alert-outbox/dispatch-dry-run",
+        headers=_auth_header(admin_token),
+        json={
+            "from_at": (now + timedelta(hours=1)).isoformat(),
+            "to_at": now.isoformat(),
+            "confirm_dry_run": True,
+        },
+    )
+    assert invalid_window.status_code == 422
+
+    duplicate_ids = client.post(
+        "/api/admin/alert-outbox/dispatch-dry-run",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [ready_id, ready_id], "now_at": now.isoformat(), "confirm_dry_run": True},
+    )
+    assert duplicate_ids.status_code == 422
+
+    missing_id = client.post(
+        "/api/admin/alert-outbox/dispatch-dry-run",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [ready_id, 999999], "now_at": now.isoformat(), "confirm_dry_run": True},
+    )
+    assert missing_id.status_code == 404
+    assert missing_id.json()["detail"]["missing_ids"] == [999999]
+
+    selected = client.post(
+        "/api/admin/alert-outbox/dispatch-dry-run",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [ready_id, not_due_id], "now_at": now.isoformat(), "confirm_dry_run": True},
+    )
+    assert selected.status_code == 200
+    selected_body = selected.json()
+    assert selected_body["total_count"] == 2
+    assert selected_body["ready_count"] == 1
+    assert selected_body["not_due_count"] == 1
+    assert selected_body["blocked_count"] == 0
+
+    response = client.post(
+        "/api/admin/alert-outbox/dispatch-dry-run",
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-dispatch-dry-run"},
+        json={"now_at": now.isoformat(), "item_limit": 10, "confirm_dry_run": True},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["dry_run_status"] == "ready"
+    assert body["policy"]["dry_run"] is True
+    assert body["policy"]["writes_outbox_state"] is False
+    assert body["policy"]["increments_attempts"] is False
+    assert body["policy"]["external_delivery"] is False
+    assert body["policy"]["broker_delivery"] is False
+    assert body["policy"]["automatic_actions"] is False
+    assert body["ready_count"] == 1
+    assert body["blocked_count"] == 3
+    assert body["expired_count"] == 1
+    assert body["not_due_count"] == 1
+    assert body["terminal_count"] == 1
+    assert body["external_delivery_count"] == 1
+    assert [item["id"] for item in body["ready_items"]] == [ready_id]
+    assert body["ready_items"][0]["reason"] == "queued_due"
+    assert body["ready_items"][0]["payload_hash_prefix"] == "dispatch-rea"
+    assert {item["id"] for item in body["blocked_items"]} == {planned_id, pending_id, external_id}
+    assert body["blocked_reason_counts"] == {
+        "external_delivery_disabled": 1,
+        "pending_review": 1,
+        "planned_not_queued": 1,
+    }
+    assert [item["id"] for item in body["expired_items"]] == [expired_id]
+    assert [item["id"] for item in body["not_due_items"]] == [not_due_id]
+    assert suppressed_id not in {item["id"] for item in body["ready_items"]}
+    response_text = json.dumps(body, ensure_ascii=False)
+    assert "payload_json" not in response_text
+    assert "review_note" not in response_text
+    assert "secret-dispatch" not in response_text
+    assert "scheduler_lease_token" not in response_text
+    assert "metadata_json" not in response_text
+    assert "content_bytes" not in response_text
+    assert "source_url" not in response_text
+
+    count_only = client.post(
+        "/api/admin/alert-outbox/dispatch-dry-run",
+        headers=_auth_header(admin_token),
+        json={"now_at": now.isoformat(), "item_limit": 0, "confirm_dry_run": True},
+    )
+    assert count_only.status_code == 200
+    count_only_body = count_only.json()
+    assert count_only_body["ready_count"] == 1
+    assert count_only_body["blocked_count"] == 3
+    assert count_only_body["ready_items"] == []
+    assert count_only_body["blocked_items"] == []
+    assert count_only_body["blocked_reason_counts"] == {
+        "external_delivery_disabled": 1,
+        "pending_review": 1,
+        "planned_not_queued": 1,
+    }
+
+    with session_factory() as db:
+        for entry_id, expected in before.items():
+            stored = db.get(AdminAlertOutboxEntry, entry_id)
+            assert stored is not None
+            assert stored.status == expected["status"]
+            assert stored.attempt_count == expected["attempt_count"]
+            assert stored.last_error_code == expected["last_error_code"]
+            assert stored.available_at == expected["available_at"]
+            assert stored.review_note == expected["review_note"]
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.dispatch_dry_run"
+        "&resource_type=admin_alert_outbox&request_id=alert-outbox-dispatch-dry-run",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert snapshot["format"] == "admin_alert_outbox_dispatch_dry_run"
+    assert snapshot["dry_run_status"] == "ready"
+    assert snapshot["ready_count"] == 1
+    assert snapshot["blocked_count"] == 3
+    assert snapshot["expired_count"] == 1
+    assert snapshot["not_due_count"] == 1
+    assert snapshot["external_delivery_count"] == 1
+    assert snapshot["ready_entry_ids"] == [ready_id]
+    assert snapshot["blocked_reason_counts"] == {
+        "external_delivery_disabled": 1,
+        "pending_review": 1,
+        "planned_not_queued": 1,
+    }
+    assert snapshot["policy"]["dry_run"] is True
+    assert snapshot["policy"]["external_delivery"] is False
+    assert snapshot["policy"]["automatic_actions"] is False
+    audit_text = json.dumps(snapshot, ensure_ascii=False)
+    assert "payload_json" not in audit_text
+    assert "review_note" not in audit_text
+    assert "secret-dispatch" not in audit_text
+    assert "scheduler_lease_token" not in audit_text
+    assert "metadata_json" not in audit_text
+    assert "content_bytes" not in audit_text
+    assert "source_url" not in audit_text
+
+
+def test_admin_creates_alert_outbox_dispatch_plan_ledger_without_mutating_entries_or_leaking_payload(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "alert_outbox_plan_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    now = datetime(2026, 7, 24, 12, 0, tzinfo=UTC)
+    entries = [
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=501,
+            source_key="plan-ready",
+            event_code="lease_expiring",
+            severity="critical",
+            action_hint="inspect",
+            status="queued",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-plan-ready",
+            payload_hash="plan-ready-payload-hash",
+            payload_json={"secret": "secret-plan-ready", "scheduler_lease_token": "secret-plan-token"},
+            first_seen_at=now - timedelta(hours=3),
+            last_seen_at=now - timedelta(hours=3),
+            available_at=now - timedelta(minutes=5),
+            seen_count=2,
+            attempt_count=4,
+            last_error_code="previous-error",
+            review_note="secret-plan-review-note",
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=502,
+            source_key="plan-not-due",
+            event_code="pending_backlog",
+            severity="warning",
+            action_hint="monitor",
+            status="queued",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-plan-not-due",
+            payload_hash="plan-not-due-payload-hash",
+            payload_json={"secret": "secret-plan-not-due"},
+            first_seen_at=now - timedelta(hours=2),
+            last_seen_at=now - timedelta(hours=2),
+            available_at=now + timedelta(hours=1),
+            seen_count=1,
+            review_note="secret-plan-not-due-note",
+        ),
+        AdminAlertOutboxEntry(
+            source_type="content_script_asset_scan_run_alert",
+            source_id=503,
+            source_key="plan-planned",
+            event_code="remote_drift",
+            severity="critical",
+            action_hint="review",
+            status="planned",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-plan-planned",
+            payload_hash="plan-planned-payload-hash",
+            payload_json={"source_url": "https://cdn.example.test/secret-plan.js", "content_bytes": "secret-bytes"},
+            first_seen_at=now - timedelta(hours=4),
+            last_seen_at=now - timedelta(hours=4),
+            available_at=now - timedelta(minutes=10),
+            seen_count=1,
+            review_note="secret-plan-planned-note",
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=504,
+            source_key="plan-expired",
+            event_code="stale_running",
+            severity="warning",
+            action_hint="inspect",
+            status="queued",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-plan-expired",
+            payload_hash="plan-expired-payload-hash",
+            payload_json={"secret": "secret-plan-expired"},
+            first_seen_at=now - timedelta(days=2),
+            last_seen_at=now - timedelta(days=2),
+            available_at=now - timedelta(days=1),
+            expires_at=now - timedelta(minutes=1),
+            seen_count=1,
+            review_note="secret-plan-expired-note",
+        ),
+        AdminAlertOutboxEntry(
+            source_type="content_script_asset_scan_run_alert",
+            source_id=505,
+            source_key="plan-external",
+            event_code="webhook_ready",
+            severity="info",
+            action_hint="notify",
+            status="queued",
+            dispatch_mode="webhook",
+            delivery_target="external_webhook",
+            external_delivery=True,
+            dedupe_key="dispatch-plan-external",
+            payload_hash="plan-external-payload-hash",
+            payload_json={"secret": "secret-plan-external"},
+            first_seen_at=now - timedelta(hours=5),
+            last_seen_at=now - timedelta(hours=5),
+            available_at=now - timedelta(minutes=20),
+            seen_count=1,
+            review_note="secret-plan-external-note",
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=506,
+            source_key="plan-suppressed",
+            event_code="manual_close",
+            severity="info",
+            action_hint="ignore",
+            status="suppressed",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="dispatch-plan-suppressed",
+            payload_hash="plan-suppressed-payload-hash",
+            payload_json={"secret": "secret-plan-suppressed"},
+            first_seen_at=now - timedelta(days=1),
+            last_seen_at=now - timedelta(days=1),
+            available_at=now - timedelta(days=1),
+            seen_count=1,
+            review_note="secret-plan-suppressed-note",
+        ),
+    ]
+    with session_factory() as db:
+        db.add_all(entries)
+        db.commit()
+        ids = [entry.id for entry in entries]
+        ready_id, not_due_id = ids[0], ids[1]
+        before = {
+            entry.id: {
+                "status": entry.status,
+                "attempt_count": entry.attempt_count,
+                "last_error_code": entry.last_error_code,
+                "available_at": entry.available_at,
+                "review_note": entry.review_note,
+                "reviewed_at": entry.reviewed_at,
+                "reviewed_by_user_id": entry.reviewed_by_user_id,
+            }
+            for entry in entries
+        }
+
+    forbidden = client.post(
+        "/api/admin/alert-outbox/dispatch-plans",
+        headers=_auth_header(teacher_token),
+        json={"entry_ids": ids, "confirm_create_plan": True},
+    )
+    assert forbidden.status_code == 403
+
+    missing_confirmation = client.post(
+        "/api/admin/alert-outbox/dispatch-plans",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": ids},
+    )
+    assert missing_confirmation.status_code == 422
+
+    duplicate_ids = client.post(
+        "/api/admin/alert-outbox/dispatch-plans",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [ready_id, ready_id], "confirm_create_plan": True},
+    )
+    assert duplicate_ids.status_code == 422
+
+    missing_id = client.post(
+        "/api/admin/alert-outbox/dispatch-plans",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [ready_id, 999999], "confirm_create_plan": True},
+    )
+    assert missing_id.status_code == 404
+
+    empty_plan = client.post(
+        "/api/admin/alert-outbox/dispatch-plans",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [not_due_id], "now_at": now.isoformat(), "confirm_create_plan": True},
+    )
+    assert empty_plan.status_code == 409
+    with session_factory() as db:
+        assert db.scalar(select(func.count()).select_from(AdminAlertOutboxDispatchPlan)) == 0
+
+    created = client.post(
+        "/api/admin/alert-outbox/dispatch-plans",
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-dispatch-plan-create"},
+        json={"entry_ids": ids, "now_at": now.isoformat(), "entry_limit": 100, "confirm_create_plan": True},
+    )
+    assert created.status_code == 200
+    body = created.json()
+    assert body["plan_status"] == "created"
+    assert body["dry_run_status"] == "ready"
+    assert body["ready_entry_ids"] == [ready_id]
+    assert body["ready_entry_count"] == 1
+    assert body["truncated_ready_entry_ids"] is False
+    assert body["ready_count"] == 1
+    assert body["blocked_count"] == 2
+    assert body["expired_count"] == 1
+    assert body["not_due_count"] == 1
+    assert body["terminal_count"] == 1
+    assert body["external_delivery_count"] == 1
+    assert body["blocked_reason_counts"] == {
+        "external_delivery_disabled": 1,
+        "planned_not_queued": 1,
+    }
+    assert body["policy"]["writes_dispatch_plan"] is True
+    assert body["policy"]["writes_outbox_state"] is False
+    assert body["policy"]["external_delivery"] is False
+    assert body["policy"]["broker_delivery"] is False
+    assert body["policy"]["automatic_actions"] is False
+    assert body["filters"]["entry_ids"] == ids
+    created_text = json.dumps(body, ensure_ascii=False)
+    assert "payload_json" not in created_text
+    assert "review_note" not in created_text
+    assert "secret-plan" not in created_text
+    assert "scheduler_lease_token" not in created_text
+    assert "content_bytes" not in created_text
+    assert "source_url" not in created_text
+
+    listed = client.get(
+        "/api/admin/alert-outbox/dispatch-plans?dry_run_status=ready",
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-dispatch-plan-list"},
+    )
+    assert listed.status_code == 200
+    listed_body = listed.json()
+    assert listed_body["total"] == 1
+    assert listed_body["items"][0]["id"] == body["id"]
+    listed_text = json.dumps(listed_body, ensure_ascii=False)
+    assert "payload_json" not in listed_text
+    assert "secret-plan" not in listed_text
+
+    read = client.get(
+        f"/api/admin/alert-outbox/dispatch-plans/{body['id']}",
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-dispatch-plan-read"},
+    )
+    assert read.status_code == 200
+    assert read.json()["ready_entry_ids"] == [ready_id]
+    read_text = json.dumps(read.json(), ensure_ascii=False)
+    assert "payload_json" not in read_text
+    assert "review_note" not in read_text
+    assert "secret-plan" not in read_text
+
+    with session_factory() as db:
+        plan = db.get(AdminAlertOutboxDispatchPlan, body["id"])
+        assert plan is not None
+        assert plan.ready_entry_ids_json == [ready_id]
+        assert plan.ready_entry_payload_hashes_json == {str(ready_id): "plan-ready-payload-hash"}
+        assert plan.blocked_reason_counts_json == {
+            "external_delivery_disabled": 1,
+            "planned_not_queued": 1,
+        }
+        assert "payload_json" not in json.dumps(plan.filters_json, ensure_ascii=False)
+        for entry_id, snapshot in before.items():
+            stored = db.get(AdminAlertOutboxEntry, entry_id)
+            assert stored.status == snapshot["status"]
+            assert stored.attempt_count == snapshot["attempt_count"]
+            assert stored.last_error_code == snapshot["last_error_code"]
+            assert stored.available_at == snapshot["available_at"]
+            assert stored.review_note == snapshot["review_note"]
+            assert stored.reviewed_at == snapshot["reviewed_at"]
+            assert stored.reviewed_by_user_id == snapshot["reviewed_by_user_id"]
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.dispatch_plan.create"
+        "&resource_type=admin_alert_outbox_dispatch_plan&request_id=alert-outbox-dispatch-plan-create",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert snapshot["format"] == "admin_alert_outbox_dispatch_plan"
+    assert snapshot["plan_id"] == body["id"]
+    assert snapshot["ready_entry_ids"] == [ready_id]
+    assert snapshot["ready_count"] == 1
+    assert snapshot["blocked_count"] == 2
+    assert snapshot["policy"]["writes_dispatch_plan"] is True
+    assert snapshot["policy"]["writes_outbox_state"] is False
+    audit_text = json.dumps(snapshot, ensure_ascii=False)
+    assert "payload_json" not in audit_text
+    assert "review_note" not in audit_text
+    assert "secret-plan" not in audit_text
+    assert "scheduler_lease_token" not in audit_text
+    assert "metadata_json" not in audit_text
+    assert "content_bytes" not in audit_text
+    assert "source_url" not in audit_text
+
+
+def test_admin_validates_alert_outbox_dispatch_plan_against_current_entries_without_mutation(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "alert_outbox_plan_validate_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    now = datetime(2026, 7, 24, 14, 0, tzinfo=UTC)
+    entries = [
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=601 + index,
+            source_key=f"validate-ready-{index}",
+            event_code="lease_expiring",
+            severity="critical",
+            action_hint="inspect",
+            status="queued",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key=f"dispatch-plan-validate-ready-{index}",
+            payload_hash=f"validate-ready-payload-hash-{index}",
+            payload_json={"secret": f"secret-validate-{index}", "metadata_json": {"token": "secret-token"}},
+            first_seen_at=now - timedelta(hours=index + 1),
+            last_seen_at=now - timedelta(hours=index + 1),
+            available_at=now - timedelta(minutes=index + 1),
+            seen_count=1,
+            attempt_count=index,
+            review_note=f"secret-validate-note-{index}",
+        )
+        for index in range(5)
+    ]
+    with session_factory() as db:
+        db.add_all(entries)
+        db.commit()
+        ids = [entry.id for entry in entries]
+
+    created = client.post(
+        "/api/admin/alert-outbox/dispatch-plans",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": ids, "now_at": now.isoformat(), "confirm_create_plan": True},
+    )
+    assert created.status_code == 200
+    plan_id = created.json()["id"]
+    planned_ids = created.json()["ready_entry_ids"]
+
+    forbidden = client.post(
+        f"/api/admin/alert-outbox/dispatch-plans/{plan_id}/validate",
+        headers=_auth_header(teacher_token),
+        json={"confirm_validate_plan": True},
+    )
+    assert forbidden.status_code == 403
+
+    missing_confirmation = client.post(
+        f"/api/admin/alert-outbox/dispatch-plans/{plan_id}/validate",
+        headers=_auth_header(admin_token),
+        json={},
+    )
+    assert missing_confirmation.status_code == 422
+
+    missing_plan = client.post(
+        "/api/admin/alert-outbox/dispatch-plans/999999/validate",
+        headers=_auth_header(admin_token),
+        json={"confirm_validate_plan": True},
+    )
+    assert missing_plan.status_code == 404
+
+    valid = client.post(
+        f"/api/admin/alert-outbox/dispatch-plans/{plan_id}/validate",
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-dispatch-plan-validate-valid"},
+        json={"now_at": now.isoformat(), "confirm_validate_plan": True},
+    )
+    assert valid.status_code == 200
+    valid_body = valid.json()
+    assert valid_body["validation_status"] == "valid"
+    assert valid_body["planned_ready_count"] == 5
+    assert valid_body["current_ready_count"] == 5
+    assert valid_body["missing_count"] == 0
+    assert valid_body["payload_hash_mismatch_count"] == 0
+    assert valid_body["payload_hash_snapshot_missing_count"] == 0
+    assert valid_body["blocked_count"] == 0
+    assert valid_body["expired_count"] == 0
+    assert valid_body["not_due_count"] == 0
+    assert valid_body["payload_hash_snapshot_available"] is True
+    assert valid_body["ready_entry_ids"] == planned_ids
+    assert valid_body["policy"]["validates_payload_hashes"] is True
+    assert valid_body["policy"]["writes_outbox_state"] is False
+    assert valid_body["policy"]["external_delivery"] is False
+    assert valid_body["policy"]["broker_delivery"] is False
+
+    original_hashes = {str(entry_id): f"validate-ready-payload-hash-{index}" for index, entry_id in enumerate(ids)}
+    with session_factory() as db:
+        plan = db.get(AdminAlertOutboxDispatchPlan, plan_id)
+        plan.ready_entry_payload_hashes_json = {}
+        db.commit()
+
+    legacy = client.post(
+        f"/api/admin/alert-outbox/dispatch-plans/{plan_id}/validate",
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-dispatch-plan-validate-legacy"},
+        json={"now_at": now.isoformat(), "confirm_validate_plan": True},
+    )
+    assert legacy.status_code == 200
+    legacy_body = legacy.json()
+    assert legacy_body["validation_status"] == "changed"
+    assert legacy_body["payload_hash_snapshot_available"] is False
+    assert legacy_body["payload_hash_snapshot_missing_count"] == 5
+    assert legacy_body["payload_hash_snapshot_missing_entry_ids"] == planned_ids
+    assert legacy_body["blocked_entry_ids"] == planned_ids
+    assert legacy_body["blocked_reason_counts"] == {"payload_hash_snapshot_missing": 5}
+
+    with session_factory() as db:
+        plan = db.get(AdminAlertOutboxDispatchPlan, plan_id)
+        plan.ready_entry_payload_hashes_json = original_hashes
+        db.commit()
+
+    with session_factory() as db:
+        changed_hash = db.get(AdminAlertOutboxEntry, ids[0])
+        changed_status = db.get(AdminAlertOutboxEntry, ids[1])
+        expired = db.get(AdminAlertOutboxEntry, ids[2])
+        not_due = db.get(AdminAlertOutboxEntry, ids[3])
+        missing = db.get(AdminAlertOutboxEntry, ids[4])
+        changed_hash.payload_hash = "validate-ready-payload-hash-changed"
+        changed_status.status = "planned"
+        expired.expires_at = now - timedelta(minutes=1)
+        not_due.available_at = now + timedelta(hours=1)
+        db.delete(missing)
+        db.commit()
+
+    changed = client.post(
+        f"/api/admin/alert-outbox/dispatch-plans/{plan_id}/validate",
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-dispatch-plan-validate-changed"},
+        json={"now_at": now.isoformat(), "confirm_validate_plan": True},
+    )
+    assert changed.status_code == 200
+    changed_body = changed.json()
+    assert changed_body["validation_status"] == "changed"
+    assert changed_body["planned_ready_count"] == 5
+    assert changed_body["current_ready_count"] == 0
+    assert changed_body["missing_count"] == 1
+    assert changed_body["payload_hash_mismatch_count"] == 1
+    assert changed_body["blocked_count"] == 2
+    assert changed_body["expired_count"] == 1
+    assert changed_body["not_due_count"] == 1
+    assert changed_body["missing_entry_ids"] == [ids[4]]
+    assert changed_body["payload_hash_mismatch_entry_ids"] == [ids[0]]
+    assert changed_body["blocked_entry_ids"] == [ids[1], ids[0]]
+    assert changed_body["expired_entry_ids"] == [ids[2]]
+    assert changed_body["not_due_entry_ids"] == [ids[3]]
+    assert changed_body["blocked_reason_counts"] == {
+        "payload_hash_mismatch": 1,
+        "planned_not_queued": 1,
+        "expired": 1,
+        "queued_not_due": 1,
+        "missing_entry": 1,
+    }
+    changed_text = json.dumps(changed_body, ensure_ascii=False)
+    assert "payload_json" not in changed_text
+    assert "review_note" not in changed_text
+    assert "secret-validate" not in changed_text
+    assert "metadata_json" not in changed_text
+    assert "validate-ready-payload-hash" not in changed_text
+
+    with session_factory() as db:
+        plan = db.get(AdminAlertOutboxDispatchPlan, plan_id)
+        assert plan.plan_status == "created"
+        assert plan.ready_entry_payload_hashes_json == original_hashes
+        stored_changed_hash = db.get(AdminAlertOutboxEntry, ids[0])
+        assert stored_changed_hash.status == "queued"
+        assert stored_changed_hash.attempt_count == 0
+        assert stored_changed_hash.review_note == "secret-validate-note-0"
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.dispatch_plan.validate"
+        "&resource_type=admin_alert_outbox_dispatch_plan&request_id=alert-outbox-dispatch-plan-validate-changed",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert snapshot["format"] == "admin_alert_outbox_dispatch_plan_validation"
+    assert snapshot["validation_status"] == "changed"
+    assert snapshot["payload_hash_mismatch_entry_ids"] == [ids[0]]
+    assert snapshot["missing_entry_ids"] == [ids[4]]
+    assert snapshot["policy"]["validates_payload_hashes"] is True
+    assert snapshot["policy"]["writes_outbox_state"] is False
+    audit_text = json.dumps(snapshot, ensure_ascii=False)
+    assert "payload_json" not in audit_text
+    assert "review_note" not in audit_text
+    assert "secret-validate" not in audit_text
+    assert "metadata_json" not in audit_text
+    assert "validate-ready-payload-hash" not in audit_text
+
+
+def test_admin_bulk_reviews_alert_outbox_entries_without_leaking_payload_or_partial_updates(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "alert_outbox_bulk_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    now = datetime(2026, 7, 24, 10, 0, tzinfo=UTC)
+    entries = [
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=201,
+            source_key="knowledge:bulk-review:pending",
+            event_code="stale_running",
+            severity="critical",
+            action_hint="investigate",
+            status="pending_review",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="bulk-review-pending",
+            payload_hash="bulk-hash-pending",
+            payload_json={"secret": "secret-bulk-payload", "scheduler_lease_token": "secret-bulk-token"},
+            first_seen_at=now - timedelta(hours=8),
+            last_seen_at=now - timedelta(hours=8),
+            available_at=now - timedelta(hours=8),
+            seen_count=1,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="content_script_asset_scan_run_alert",
+            source_id=202,
+            source_key="content:bulk-review:planned",
+            event_code="remote_drift_detected",
+            severity="warning",
+            action_hint="monitor",
+            status="planned",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="bulk-review-planned",
+            payload_hash="bulk-hash-planned",
+            payload_json={"source_url": "https://cdn.example.test/secret-bulk.js", "content_bytes": "secret-bytes"},
+            first_seen_at=now - timedelta(hours=6),
+            last_seen_at=now - timedelta(hours=6),
+            available_at=now - timedelta(hours=2),
+            reviewed_at=now - timedelta(hours=5),
+            review_note="old secret bulk note",
+            seen_count=2,
+        ),
+        AdminAlertOutboxEntry(
+            source_type="knowledge_snapshot_run_alert",
+            source_id=203,
+            source_key="knowledge:bulk-review:suppressed",
+            event_code="manual_cancelled",
+            severity="info",
+            action_hint="monitor",
+            status="suppressed",
+            dispatch_mode="manual_review",
+            delivery_target="admin_outbox",
+            external_delivery=False,
+            dedupe_key="bulk-review-suppressed",
+            payload_hash="bulk-hash-suppressed",
+            payload_json={"exception": "secret-bulk-exception"},
+            first_seen_at=now - timedelta(days=1),
+            last_seen_at=now - timedelta(days=1),
+            reviewed_at=now - timedelta(hours=12),
+            review_note="keep suppressed secret note",
+            seen_count=1,
+        ),
+    ]
+    with session_factory() as db:
+        db.add_all(entries)
+        db.commit()
+        first_id, second_id, third_id = [entry.id for entry in entries]
+
+    forbidden = client.patch(
+        "/api/admin/alert-outbox/reviews",
+        headers=_auth_header(teacher_token),
+        json={"entry_ids": [first_id, second_id], "status": "queued", "confirm_manual_review": True},
+    )
+    assert forbidden.status_code == 403
+
+    missing_confirmation = client.patch(
+        "/api/admin/alert-outbox/reviews",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [first_id, second_id], "status": "queued"},
+    )
+    assert missing_confirmation.status_code == 422
+
+    duplicate_ids = client.patch(
+        "/api/admin/alert-outbox/reviews",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [first_id, first_id], "status": "queued", "confirm_manual_review": True},
+    )
+    assert duplicate_ids.status_code == 422
+
+    invalid_status = client.patch(
+        "/api/admin/alert-outbox/reviews",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [first_id, second_id], "status": "sent", "confirm_manual_review": True},
+    )
+    assert invalid_status.status_code == 422
+
+    missing_entry = client.patch(
+        "/api/admin/alert-outbox/reviews",
+        headers=_auth_header(admin_token),
+        json={"entry_ids": [first_id, 999999], "status": "suppressed", "confirm_manual_review": True},
+    )
+    assert missing_entry.status_code == 404
+    assert missing_entry.json()["detail"]["missing_ids"] == [999999]
+    with session_factory() as db:
+        unchanged = db.get(AdminAlertOutboxEntry, first_id)
+        assert unchanged is not None
+        assert unchanged.status == "pending_review"
+        assert unchanged.reviewed_by_user_id is None
+
+    response = client.patch(
+        "/api/admin/alert-outbox/reviews",
+        headers={**_auth_header(admin_token), "X-Request-ID": "alert-outbox-bulk-review"},
+        json={
+            "entry_ids": [first_id, second_id],
+            "status": "queued",
+            "note": "bulk manual secret-review-note",
+            "confirm_manual_review": True,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "queued"
+    assert body["updated_count"] == 2
+    assert body["requested_count"] == 2
+    assert body["previous_status_counts"] == {"pending_review": 1, "planned": 1}
+    assert body["policy"]["external_delivery"] is False
+    assert body["policy"]["automatic_actions"] is False
+    assert {item["id"] for item in body["items"]} == {first_id, second_id}
+    assert all(item["status"] == "queued" for item in body["items"])
+    response_text = json.dumps(body, ensure_ascii=False)
+    assert "payload_json" not in response_text
+    assert "review_note" not in response_text
+    assert "secret-bulk" not in response_text
+    assert "secret-review-note" not in response_text
+    assert "content_bytes" not in response_text
+    assert "scheduler_lease_token" not in response_text
+
+    with session_factory() as db:
+        first = db.get(AdminAlertOutboxEntry, first_id)
+        second = db.get(AdminAlertOutboxEntry, second_id)
+        third = db.get(AdminAlertOutboxEntry, third_id)
+        assert first is not None and first.status == "queued"
+        assert first.reviewed_by_user_id is not None
+        assert first.reviewed_at is not None
+        assert first.review_note == "bulk manual secret-review-note"
+        assert second is not None and second.status == "queued"
+        assert second.review_note == "bulk manual secret-review-note"
+        assert third is not None and third.status == "suppressed"
+        assert third.review_note == "keep suppressed secret note"
+
+    queue = client.get(
+        "/api/admin/alert-outbox/queue",
+        params={"now_at": now.isoformat(), "item_limit": 10},
+        headers=_auth_header(admin_token),
+    )
+    assert queue.status_code == 200
+    queue_body = queue.json()
+    assert queue_body["queued_count"] == 2
+    assert queue_body["pending_review_count"] == 0
+    assert queue_body["planned_count"] == 0
+    assert queue_body["suppressed_count"] == 1
+    assert queue_body["due_queued_count"] == 2
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.bulk_review"
+        "&resource_type=admin_alert_outbox&request_id=alert-outbox-bulk-review",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert snapshot["format"] == "admin_alert_outbox_bulk_review"
+    assert snapshot["entry_count"] == 2
+    assert snapshot["entry_ids"] == [first_id, second_id]
+    assert snapshot["previous_status_counts"] == {"pending_review": 1, "planned": 1}
+    assert snapshot["status"] == "queued"
+    assert snapshot["note_provided"] is True
+    assert snapshot["external_delivery"] is False
+    assert snapshot["automatic_actions"] is False
+    audit_text = json.dumps(snapshot, ensure_ascii=False)
+    assert "payload_json" not in audit_text
+    assert "review_note" not in audit_text
+    assert "secret-bulk" not in audit_text
+    assert "secret-review-note" not in audit_text
+    assert "content_bytes" not in audit_text
+    assert "scheduler_lease_token" not in audit_text
+
+
+def test_admin_can_requeue_knowledge_snapshot_runs(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "snapshot_requeue_teacher", "teacher")
+    session_factory = get_session_factory(get_settings().database_url)
+    settings = get_settings()
+    now = datetime.now(UTC).replace(microsecond=0)
+    with session_factory() as db:
+        failed_run = KnowledgeSnapshotRun(
+            run_key="knowledge:requeue:failed",
+            granularity="day",
+            period_start=now - timedelta(days=5),
+            period_end=now - timedelta(days=5) + timedelta(hours=23, minutes=59),
+            trigger_source="scheduler",
+            status="failed",
+            started_at=now - timedelta(hours=5),
+            finished_at=now - timedelta(hours=4, minutes=59),
+            scheduler_lease_owner="old-worker",
+            scheduler_lease_token="secret-requeue-token",
+            scheduler_lease_expires_at=now - timedelta(hours=4),
+            scheduler_heartbeat_at=now - timedelta(hours=5),
+            attempt_count=settings.knowledge_snapshot_retry_attempts,
+            error_message="RuntimeError",
+            metadata_json={"trigger_source": "scheduler"},
+        )
+        pending_run = KnowledgeSnapshotRun(
+            run_key="knowledge:requeue:pending",
+            granularity="day",
+            period_start=now - timedelta(days=4),
+            period_end=now - timedelta(days=4) + timedelta(hours=23, minutes=59),
+            trigger_source="admin",
+            status="pending",
+            started_at=now - timedelta(hours=4),
+            attempt_count=0,
+            metadata_json={"trigger_source": "admin"},
+        )
+        cancelled_run = KnowledgeSnapshotRun(
+            run_key="knowledge:requeue:cancelled",
+            granularity="day",
+            period_start=now - timedelta(days=7),
+            period_end=now - timedelta(days=7) + timedelta(hours=23, minutes=59),
+            trigger_source="admin",
+            status="cancelled",
+            started_at=now - timedelta(days=7, hours=1),
+            finished_at=now - timedelta(days=7),
+            attempt_count=1,
+            error_message="cancelled_by_admin",
+            metadata_json={"trigger_source": "admin", "cancelled_by_user_id": 1},
+        )
+        active_running_run = KnowledgeSnapshotRun(
+            run_key="knowledge:requeue:active",
+            granularity="day",
+            period_start=now - timedelta(days=3),
+            period_end=now - timedelta(days=3) + timedelta(hours=23, minutes=59),
+            trigger_source="scheduler",
+            status="running",
+            started_at=now - timedelta(minutes=10),
+            scheduler_lease_owner="worker-active-requeue",
+            scheduler_lease_token="secret-active-requeue-token",
+            scheduler_lease_expires_at=now + timedelta(hours=1),
+            scheduler_heartbeat_at=now - timedelta(minutes=1),
+            attempt_count=1,
+            metadata_json={"trigger_source": "scheduler"},
+        )
+        stale_running_run = KnowledgeSnapshotRun(
+            run_key="knowledge:requeue:stale",
+            granularity="day",
+            period_start=now - timedelta(days=2),
+            period_end=now - timedelta(days=2) + timedelta(hours=23, minutes=59),
+            trigger_source="scheduler",
+            status="running",
+            started_at=now - timedelta(hours=3),
+            scheduler_lease_owner="worker-stale-requeue",
+            scheduler_lease_token="secret-stale-requeue-token",
+            scheduler_lease_expires_at=now - timedelta(minutes=1),
+            scheduler_heartbeat_at=now - timedelta(hours=2),
+            attempt_count=1,
+            metadata_json={"trigger_source": "scheduler"},
+        )
+        legacy_running_run = KnowledgeSnapshotRun(
+            run_key="knowledge:requeue:legacy-running",
+            granularity="day",
+            period_start=now - timedelta(days=1),
+            period_end=now - timedelta(days=1) + timedelta(hours=23, minutes=59),
+            trigger_source="scheduler",
+            status="running",
+            started_at=now - timedelta(hours=3),
+            attempt_count=1,
+            metadata_json={"trigger_source": "scheduler"},
+        )
+        success_run = KnowledgeSnapshotRun(
+            run_key="knowledge:requeue:success",
+            granularity="day",
+            period_start=now - timedelta(days=6),
+            period_end=now - timedelta(days=6) + timedelta(hours=23, minutes=59),
+            trigger_source="scheduler",
+            status="success",
+            started_at=now - timedelta(days=6, hours=1),
+            finished_at=now - timedelta(days=6),
+            attempt_count=1,
+            user_snapshot_count=2,
+            class_snapshot_count=1,
+            metadata_json={"trigger_source": "scheduler"},
+        )
+        db.add_all(
+            [
+                failed_run,
+                pending_run,
+                cancelled_run,
+                active_running_run,
+                stale_running_run,
+                legacy_running_run,
+                success_run,
+            ]
+        )
+        db.commit()
+        failed_run_id = failed_run.id
+        pending_run_id = pending_run.id
+        cancelled_run_id = cancelled_run.id
+        active_running_run_id = active_running_run.id
+        stale_running_run_id = stale_running_run.id
+        legacy_running_run_id = legacy_running_run.id
+        success_run_id = success_run.id
+
+    forbidden = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{failed_run_id}/requeue",
+        headers=_auth_header(teacher_token),
+        json={"reason": "retry after data fix"},
+    )
+    assert forbidden.status_code == 403
+
+    requeued = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{failed_run_id}/requeue",
+        headers={**_auth_header(admin_token), "X-Request-ID": "snapshot-requeue-request"},
+        json={"reason": " retry after data fix "},
+    )
+    assert requeued.status_code == 200
+    requeued_body = requeued.json()
+    assert requeued_body["status"] == "pending"
+    assert requeued_body["trigger_source"] == "admin_requeue"
+    assert requeued_body["attempt_count"] == 0
+    assert requeued_body["finished_at"] is None
+    assert requeued_body["error_message"] is None
+    assert requeued_body["scheduler_lease_owner"] is None
+    assert requeued_body["scheduler_lease_expires_at"] is None
+    assert requeued_body["scheduler_heartbeat_at"] is None
+    assert requeued_body["metadata_summary"]["trigger_source"] == "admin_requeue"
+    assert requeued_body["metadata_summary"]["previous_status"] == "failed"
+    assert requeued_body["metadata_summary"]["previous_attempt_count"] == settings.knowledge_snapshot_retry_attempts
+    assert requeued_body["metadata_summary"]["cleared_lease"] is True
+    assert requeued_body["metadata_summary"]["requeue_reason_present"] is True
+    assert requeued_body["metadata_summary"]["admin_actor_present"] is True
+    assert requeued_body["metadata_redacted"] is True
+    assert "scheduler_lease_token" not in requeued_body
+    requeued_text = json.dumps(requeued_body, ensure_ascii=False)
+    assert "metadata_json" not in requeued_text
+    assert "retry after data fix" not in requeued_text
+    assert "secret-requeue-token" not in requeued_text
+
+    pending_requeue = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{pending_run_id}/requeue",
+        headers=_auth_header(admin_token),
+        json={},
+    )
+    assert pending_requeue.status_code == 200
+    pending_body = pending_requeue.json()
+    assert pending_body["status"] == "pending"
+    assert pending_body["trigger_source"] == "admin"
+    assert pending_body["metadata_summary"]["trigger_source"] == "admin"
+    assert pending_body["metadata_redacted"] is False
+
+    cancelled_requeue = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{cancelled_run_id}/requeue",
+        headers=_auth_header(admin_token),
+        json={},
+    )
+    assert cancelled_requeue.status_code == 200
+    cancelled_body = cancelled_requeue.json()
+    assert cancelled_body["status"] == "pending"
+    assert cancelled_body["trigger_source"] == "admin_requeue"
+    assert cancelled_body["metadata_summary"]["previous_status"] == "cancelled"
+    assert cancelled_body["metadata_summary"]["cleared_lease"] is False
+    assert cancelled_body["metadata_redacted"] is True
+
+    active_requeue = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{active_running_run_id}/requeue",
+        headers=_auth_header(admin_token),
+        json={},
+    )
+    assert active_requeue.status_code == 409
+
+    legacy_running_requeue = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{legacy_running_run_id}/requeue",
+        headers=_auth_header(admin_token),
+        json={},
+    )
+    assert legacy_running_requeue.status_code == 409
+
+    success_requeue = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{success_run_id}/requeue",
+        headers=_auth_header(admin_token),
+        json={},
+    )
+    assert success_requeue.status_code == 409
+
+    stale_requeue = client.post(
+        f"/api/admin/knowledge-snapshot-runs/{stale_running_run_id}/requeue",
+        headers=_auth_header(admin_token),
+        json={},
+    )
+    assert stale_requeue.status_code == 200
+    stale_body = stale_requeue.json()
+    assert stale_body["status"] == "pending"
+    assert stale_body["metadata_summary"]["previous_status"] == "running"
+    stale_text = json.dumps(stale_body, ensure_ascii=False)
+    assert "metadata_json" not in stale_text
+    assert "secret-stale-requeue-token" not in stale_text
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.knowledge_snapshot_run.requeue"
+        "&resource_type=knowledge_snapshot_run&request_id=snapshot-requeue-request",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    audit_item = audit.json()["items"][0]
+    assert audit_item["snapshot_json"]["previous_status"] == "failed"
+    assert audit_item["snapshot_json"]["status"] == "pending"
+    assert audit_item["snapshot_json"]["attempt_count"] == 0
+    assert audit_item["snapshot_json"]["cleared_lease"] is True
+    assert audit_item["snapshot_json"]["reason_provided"] is True
+    assert "secret-" not in json.dumps(audit_item["snapshot_json"], ensure_ascii=False)
+
+    with session_factory() as db:
+        stored = db.get(KnowledgeSnapshotRun, failed_run_id)
+        assert stored is not None
+        assert stored.status == "pending"
+        assert stored.scheduler_lease_token is None
+        assert stored.error_message is None
+        assert stored.trigger_source == "admin_requeue"
+        assert stored.metadata_json["requeue_reason"] == "retry after data fix"
+
+
+def test_admin_content_pages_filter_count_and_paginate_in_database(client):
+    admin_token = _bootstrap_admin(client)
+    _insert_content_page("physics/db-page-alpha", "DBPage Alpha", status="published")
+    _insert_content_page("physics/db-page-beta", "DBPage Beta", status="published")
+    _insert_content_page("physics/db-page-draft", "DBPage Draft", status="draft")
+    _insert_content_page("physics/db-page-percent", "100% Energy", status="published")
+    _insert_content_page("physics/db-page-percent-decoy", "100X Energy", status="published")
+    _insert_content_page("physics/db-page_under", "Underscore Search", status="published")
+    _insert_content_page("physics/db-page-galaxy", "Galaxy Field", status="published", galaxy="db-galaxy-token")
+    _insert_content_page("physics/db-page-subject", "Subject Field", status="published", subject="db-subject-token")
+    _insert_content_page("physics/db-page-layout", "Layout Field", status="published", layout="db-layout-token")
+
+    first_page = client.get(
+        "/api/admin/content/pages?q=DBPage&limit=2",
+        headers=_auth_header(admin_token),
+    )
+    assert first_page.status_code == 200
+    first_body = first_page.json()
+    assert first_body["total"] == 3
+    assert first_body["next_offset"] == 2
+    assert [item["slug"] for item in first_body["items"]] == [
+        "physics/db-page-alpha",
+        "physics/db-page-beta",
+    ]
+
+    second_page = client.get(
+        "/api/admin/content/pages?q=DBPage&limit=2&offset=2",
+        headers=_auth_header(admin_token),
+    )
+    assert second_page.status_code == 200
+    second_body = second_page.json()
+    assert second_body["total"] == 3
+    assert second_body["next_offset"] is None
+    assert [item["slug"] for item in second_body["items"]] == ["physics/db-page-draft"]
+
+    draft_only = client.get(
+        "/api/admin/content/pages?q=DBPage&status=draft",
+        headers=_auth_header(admin_token),
+    )
+    assert draft_only.status_code == 200
+    assert draft_only.json()["total"] == 1
+    assert draft_only.json()["items"][0]["slug"] == "physics/db-page-draft"
+
+    literal_percent = client.get(
+        "/api/admin/content/pages",
+        params={"q": "100%"},
+        headers=_auth_header(admin_token),
+    )
+    assert literal_percent.status_code == 200
+    assert literal_percent.json()["total"] == 1
+    assert literal_percent.json()["items"][0]["slug"] == "physics/db-page-percent"
+
+    literal_underscore = client.get(
+        "/api/admin/content/pages",
+        params={"q": "_"},
+        headers=_auth_header(admin_token),
+    )
+    assert literal_underscore.status_code == 200
+    assert literal_underscore.json()["total"] == 1
+    assert literal_underscore.json()["items"][0]["slug"] == "physics/db-page_under"
+
+    for query, slug in [
+        ("db-galaxy-token", "physics/db-page-galaxy"),
+        ("db-subject-token", "physics/db-page-subject"),
+        ("db-layout-token", "physics/db-page-layout"),
+    ]:
+        field_search = client.get(
+            "/api/admin/content/pages",
+            params={"q": query},
+            headers=_auth_header(admin_token),
+        )
+        assert field_search.status_code == 200
+        assert field_search.json()["total"] == 1
+        assert field_search.json()["items"][0]["slug"] == slug
 
 
 def test_admin_class_join_request_queue_and_review(client):
@@ -388,3 +3923,1093 @@ def test_admin_class_join_request_queue_and_review(client):
     assert join_audit.status_code == 200
     assert join_audit.json()["total"] == 1
     assert join_audit.json()["items"][0]["snapshot_json"]["after"]["source_join_request_id"] == first_request_id
+
+
+def _insert_content_page(
+    slug: str,
+    title: str,
+    *,
+    status: str,
+    galaxy: str = "englab",
+    subject: str = "physics",
+    layout: str = "experiment-page",
+) -> None:
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        db.add(
+            ContentPageRecord(
+                slug=slug,
+                status=status,
+                version="test",
+                schema_json={
+                    "slug": slug,
+                    "galaxy": galaxy,
+                    "subject": subject,
+                    "title": title,
+                    "layout": layout,
+                    "status": status,
+                    "version": "test",
+                    "sections": [],
+                    "sources": [],
+                },
+                schema_hash=None,
+            )
+        )
+        db.commit()
+
+
+def test_admin_lists_content_script_asset_inventory_with_redaction_and_audit(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "teacher_script_assets", "teacher")
+    admin_user_id = _current_user_id(client, admin_token)
+    published_at = datetime(2026, 7, 8, 9, 30, tzinfo=UTC)
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        schema = {
+            "slug": "physics/script-asset-inventory",
+            "galaxy": "englab",
+            "subject": "physics",
+            "title": "Energy Conservation",
+            "layout": "experiment-page",
+            "status": "published",
+            "version": "v-test",
+            "sections": [],
+            "sources": [],
+        }
+        page = ContentPageRecord(
+            slug="physics/script-asset-inventory",
+            status="published",
+            version="v-test",
+            schema_json=schema,
+            schema_hash="d" * 64,
+            published_by_user_id=admin_user_id,
+            published_at=published_at,
+        )
+        db.add(page)
+        db.flush()
+        version = ContentPageVersion(
+            page_id=page.id,
+            slug=page.slug,
+            status="published",
+            version="v-test",
+            schema_hash="d" * 64,
+            schema_json=schema,
+            published_by_user_id=admin_user_id,
+            published_at=published_at,
+            note="content script asset inventory fixture",
+        )
+        db.add(version)
+        db.flush()
+        page.current_version_id = version.id
+        db.add_all(
+            [
+                ContentScriptAsset(
+                    page_id=page.id,
+                    page_version_id=version.id,
+                    slug=page.slug,
+                    sandbox_id="sb_energy",
+                    reference_key="scriptUrl",
+                    reference_value_sha256="a" * 64,
+                    source_url="https://cdn.example.test/assets/secret-token-tool.js",
+                    source_host="cdn.example.test",
+                    integrity="sha384-secret-integrity-token",
+                    matched_algorithm="sha384",
+                    asset_sha256="b" * 64,
+                    asset_size_bytes=18,
+                    content_bytes=b"secret-asset-bytes",
+                    policy_version="v6.6.20",
+                    policy_context_hash="c" * 64,
+                    published_by_user_id=admin_user_id,
+                    published_at=published_at + timedelta(minutes=1),
+                ),
+                ContentScriptAsset(
+                    page_id=page.id,
+                    page_version_id=version.id,
+                    slug=page.slug,
+                    sandbox_id="sb_energy",
+                    reference_key="workerUrl",
+                    reference_value_sha256="e" * 64,
+                    source_url="https://static.other.test/assets/worker.js",
+                    source_host="static.other.test",
+                    integrity="sha384-other-integrity-token",
+                    matched_algorithm="sha384",
+                    asset_sha256="f" * 64,
+                    asset_size_bytes=12,
+                    content_bytes=b"other-asset-bytes",
+                    policy_version="v6.6.20",
+                    policy_context_hash="c" * 64,
+                    published_by_user_id=admin_user_id,
+                    published_at=published_at,
+                ),
+            ]
+        )
+        db.commit()
+        page_id = page.id
+        version_id = version.id
+
+    forbidden = client.get("/api/admin/content/script-assets", headers=_auth_header(teacher_token))
+    assert forbidden.status_code == 403
+
+    first_page = client.get("/api/admin/content/script-assets?limit=1", headers=_auth_header(admin_token))
+    assert first_page.status_code == 200
+    first_page_body = first_page.json()
+    assert first_page_body["total"] == 2
+    assert first_page_body["next_offset"] == 1
+    assert first_page_body["items"][0]["source_host"] == "cdn.example.test"
+
+    response = client.get(
+        "/api/admin/content/script-assets"
+        "?source_host=cdn.example.test"
+        "&q=energy"
+        "&limit=50",
+        headers={**_auth_header(admin_token), "X-Request-ID": "script-asset-inventory"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert body["next_offset"] is None
+    item = body["items"][0]
+    assert item["page_id"] == page_id
+    assert item["page_version_id"] == version_id
+    assert item["slug"] == "physics/script-asset-inventory"
+    assert item["sandbox_id"] == "sb_energy"
+    assert item["reference_key"] == "scriptUrl"
+    assert item["reference_value_sha256"] == "a" * 64
+    assert item["asset_sha256"] == "b" * 64
+    assert item["asset_size_bytes"] == 18
+    assert item["policy_context_hash"] == "c" * 64
+    assert item["source_url_sha256"]
+    response_text = json.dumps(body, ensure_ascii=False)
+    assert "source_url" not in item
+    assert "integrity" not in item
+    assert "content_bytes" not in item
+    assert "secret-token" not in response_text
+    assert "secret-integrity-token" not in response_text
+    assert "secret-asset-bytes" not in response_text
+
+    invalid_window = client.get(
+        "/api/admin/content/script-assets?from=2026-07-09T00:00:00Z&to=2026-07-08T00:00:00Z",
+        headers=_auth_header(admin_token),
+    )
+    assert invalid_window.status_code == 422
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.content_script_asset.inventory"
+        "&resource_type=content_script_asset&request_id=script-asset-inventory",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert snapshot["filters"]["source_host"] == "cdn.example.test"
+    assert snapshot["filters"]["has_q"] is True
+    assert snapshot["total"] == 1
+    assert snapshot["item_count"] == 1
+    assert snapshot["host_counts"] == {"cdn.example.test": 1}
+    audit_text = json.dumps(snapshot, ensure_ascii=False)
+    assert "source_url" not in audit_text
+    assert "integrity" not in audit_text
+    assert "content_bytes" not in audit_text
+    assert "secret-token" not in audit_text
+    assert "secret-integrity-token" not in audit_text
+    assert "secret-asset-bytes" not in audit_text
+
+
+def test_admin_manages_content_script_host_policies_with_audit(client, monkeypatch):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "teacher_script_host_policy", "teacher")
+    admin_user_id = _current_user_id(client, admin_token)
+    published_at = datetime(2026, 7, 8, 13, 30, tzinfo=UTC)
+    monkeypatch.setenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", "cdn-policy.example.test,allowed-only.example.test")
+    get_settings.cache_clear()
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        schema = {
+            "slug": "physics/script-host-policy",
+            "galaxy": "englab",
+            "subject": "physics",
+            "title": "Script Host Policy",
+            "layout": "experiment-page",
+            "status": "published",
+            "version": "v-test",
+            "sections": [],
+            "sources": [],
+        }
+        page = ContentPageRecord(
+            slug="physics/script-host-policy",
+            status="published",
+            version="v-test",
+            schema_json=schema,
+            schema_hash="a" * 64,
+            published_by_user_id=admin_user_id,
+            published_at=published_at,
+        )
+        db.add(page)
+        db.flush()
+        version = ContentPageVersion(
+            page_id=page.id,
+            slug=page.slug,
+            status="published",
+            version="v-test",
+            schema_hash="a" * 64,
+            schema_json=schema,
+            published_by_user_id=admin_user_id,
+            published_at=published_at,
+            note="content script host policy fixture",
+        )
+        db.add(version)
+        db.flush()
+        page.current_version_id = version.id
+        db.add(
+            ContentScriptAsset(
+                page_id=page.id,
+                page_version_id=version.id,
+                slug=page.slug,
+                sandbox_id="sb_policy",
+                reference_key="scriptUrl",
+                reference_value_sha256="a" * 64,
+                source_url="https://cdn-policy.example.test/assets/policy-secret-token.js",
+                source_host="cdn-policy.example.test",
+                integrity="sha384-policy-secret-integrity",
+                matched_algorithm="sha384",
+                asset_sha256="b" * 64,
+                asset_size_bytes=24,
+                content_bytes=b"policy-secret-asset-bytes",
+                policy_version="v6.6.25",
+                policy_context_hash="c" * 64,
+                published_by_user_id=admin_user_id,
+                published_at=published_at,
+            )
+        )
+        db.commit()
+
+    try:
+        forbidden = client.get("/api/admin/content/script-host-policies", headers=_auth_header(teacher_token))
+        assert forbidden.status_code == 403
+
+        unreviewed = client.get(
+            "/api/admin/content/script-host-policies?source_host=cdn-policy.example.test",
+            headers=_auth_header(admin_token),
+        )
+        assert unreviewed.status_code == 200
+        unreviewed_body = unreviewed.json()
+        assert unreviewed_body["total"] == 1
+        item = unreviewed_body["items"][0]
+        assert item["source_host"] == "cdn-policy.example.test"
+        assert item["status"] == "unreviewed"
+        assert item["configured_allowed"] is True
+        assert item["observed_asset_count"] == 1
+        assert item["observed_page_count"] == 1
+        assert item["id"] is None
+
+        allowed_only = client.get(
+            "/api/admin/content/script-host-policies?source_host=allowed-only.example.test",
+            headers=_auth_header(admin_token),
+        )
+        assert allowed_only.status_code == 200
+        allowed_only_item = allowed_only.json()["items"][0]
+        assert allowed_only_item["status"] == "unreviewed"
+        assert allowed_only_item["configured_allowed"] is True
+        assert allowed_only_item["observed_asset_count"] == 0
+
+        blocked = client.patch(
+            "/api/admin/content/script-host-policies/cdn-policy.example.test",
+            headers={**_auth_header(admin_token), "X-Request-ID": "script-host-policy-update"},
+            json={"status": "blocked", "reason": "Drift found during manual review"},
+        )
+        assert blocked.status_code == 200
+        blocked_body = blocked.json()
+        assert blocked_body["id"] is not None
+        assert blocked_body["source_host"] == "cdn-policy.example.test"
+        assert blocked_body["status"] == "blocked"
+        assert blocked_body["reason"] == "Drift found during manual review"
+        assert blocked_body["configured_allowed"] is True
+        assert blocked_body["observed_asset_count"] == 1
+
+        blocked_page = client.get(
+            "/api/admin/content/script-host-policies?status=blocked",
+            headers=_auth_header(admin_token),
+        )
+        assert blocked_page.status_code == 200
+        assert blocked_page.json()["total"] == 1
+        assert blocked_page.json()["items"][0]["source_host"] == "cdn-policy.example.test"
+
+        invalid_host = client.patch(
+            "/api/admin/content/script-host-policies/cdn-policy.example.test:443",
+            headers=_auth_header(admin_token),
+            json={"status": "watch"},
+        )
+        assert invalid_host.status_code == 422
+
+        audit = client.get(
+            "/api/admin/audit-logs?action=admin.content_script_host_policy.update"
+            "&resource_type=content_script_host_policy&request_id=script-host-policy-update",
+            headers=_auth_header(admin_token),
+        )
+        assert audit.status_code == 200
+        assert audit.json()["total"] == 1
+        snapshot = audit.json()["items"][0]["snapshot_json"]
+        assert snapshot["before"]["status"] == "unreviewed"
+        assert snapshot["after"]["status"] == "blocked"
+        assert snapshot["capabilities"] == {
+            "allows_host": False,
+            "blocks_publish_when_status_blocked": True,
+            "external_network": False,
+            "mutation": True,
+        }
+        audit_text = json.dumps(snapshot, ensure_ascii=False)
+        assert "source_url" not in audit_text
+        assert "integrity" not in audit_text
+        assert "content_bytes" not in audit_text
+        assert "policy-secret-token" not in audit_text
+        assert "policy-secret-integrity" not in audit_text
+        assert "policy-secret-asset-bytes" not in audit_text
+    finally:
+        monkeypatch.delenv("ASTRA_CONTENT_SCRIPT_ALLOWED_HOSTS", raising=False)
+        get_settings.cache_clear()
+
+
+def test_admin_reads_content_script_asset_mirror_audit_with_redaction(client):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "teacher_script_asset_audit", "teacher")
+    admin_user_id = _current_user_id(client, admin_token)
+    published_at = datetime(2026, 7, 8, 10, 45, tzinfo=UTC)
+    ok_bytes = b"console.log('mirror audit ok');\n"
+    stale_bytes = b"console.log('mirror audit stale actual');\n"
+    expected_stale_bytes = b"console.log('mirror audit stale expected');\n"
+
+    ok_schema = _script_asset_schema(
+        "physics/script-asset-audit-ok",
+        "https://cdn-audit.example.test/ok.js",
+        _sri_sha384(ok_bytes),
+    )
+    missing_schema = _script_asset_schema(
+        "physics/script-asset-audit-missing",
+        "https://cdn-audit.example.test/missing.js",
+        _sri_sha384(b"console.log('missing mirror');\n"),
+    )
+    stale_schema = _script_asset_schema(
+        "physics/script-asset-audit-stale",
+        "https://cdn-audit.example.test/stale.js",
+        _sri_sha384(expected_stale_bytes),
+    )
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        ok_page, ok_version = _insert_published_script_page(
+            db,
+            schema=ok_schema,
+            publisher_user_id=admin_user_id,
+            published_at=published_at,
+        )
+        missing_page, missing_version = _insert_published_script_page(
+            db,
+            schema=missing_schema,
+            publisher_user_id=admin_user_id,
+            published_at=published_at + timedelta(minutes=1),
+        )
+        stale_page, stale_version = _insert_published_script_page(
+            db,
+            schema=stale_schema,
+            publisher_user_id=admin_user_id,
+            published_at=published_at + timedelta(minutes=2),
+        )
+
+        ok_ref = external_script_references(ok_schema)[0]
+        stale_ref = external_script_references(stale_schema)[0]
+        db.add(
+            ContentScriptAsset(
+                page_id=ok_page.id,
+                page_version_id=ok_version.id,
+                slug=ok_page.slug,
+                sandbox_id=ok_ref.sandbox_id,
+                reference_key=ok_ref.reference_key,
+                reference_value_sha256=ok_ref.reference_value_sha256,
+                source_url=ok_ref.source_url,
+                source_host=ok_ref.source_host,
+                integrity=ok_ref.integrity,
+                matched_algorithm="sha384",
+                asset_sha256=hashlib.sha256(ok_bytes).hexdigest(),
+                asset_size_bytes=len(ok_bytes),
+                content_bytes=ok_bytes,
+                policy_version="v6.6.23",
+                policy_context_hash="a" * 64,
+                published_by_user_id=admin_user_id,
+                published_at=ok_version.published_at,
+            )
+        )
+        db.add(
+            ContentScriptAsset(
+                page_id=stale_page.id,
+                page_version_id=stale_version.id,
+                slug=stale_page.slug,
+                sandbox_id=stale_ref.sandbox_id,
+                reference_key=stale_ref.reference_key,
+                reference_value_sha256=stale_ref.reference_value_sha256,
+                source_url="https://cdn-audit.example.test/secret-stale-token.js",
+                source_host=stale_ref.source_host,
+                integrity=stale_ref.integrity,
+                matched_algorithm="sha384",
+                asset_sha256="b" * 64,
+                asset_size_bytes=1,
+                content_bytes=stale_bytes,
+                policy_version="v6.6.23",
+                policy_context_hash="a" * 64,
+                published_by_user_id=admin_user_id,
+                published_at=stale_version.published_at,
+            )
+        )
+        db.commit()
+        missing_version_id = missing_version.id
+
+    forbidden = client.get("/api/admin/content/script-assets/mirror-audit", headers=_auth_header(teacher_token))
+    assert forbidden.status_code == 403
+
+    first_page = client.get(
+        "/api/admin/content/script-assets/mirror-audit?source_host=cdn-audit.example.test&limit=2",
+        headers=_auth_header(admin_token),
+    )
+    assert first_page.status_code == 200
+    first_page_body = first_page.json()
+    assert first_page_body["total_pages_scanned"] >= 3
+    assert first_page_body["total_external_references"] == 3
+    assert first_page_body["total_issues"] == 5
+    assert first_page_body["next_offset"] == 2
+    assert first_page_body["issue_counts_by_code"]["missing_mirror"] == 1
+    assert first_page_body["issue_counts_by_code"]["source_mismatch"] == 1
+    assert first_page_body["issue_counts_by_code"]["asset_hash_mismatch"] == 1
+    assert first_page_body["issue_counts_by_code"]["asset_size_mismatch"] == 1
+    assert first_page_body["issue_counts_by_code"]["sri_mismatch"] == 1
+    assert first_page_body["issue_counts_by_severity"] == {"critical": 5}
+
+    filtered = client.get(
+        "/api/admin/content/script-assets/mirror-audit"
+        "?source_host=cdn-audit.example.test"
+        "&issue_code=missing_mirror",
+        headers={**_auth_header(admin_token), "X-Request-ID": "script-mirror-audit"},
+    )
+    assert filtered.status_code == 200
+    body = filtered.json()
+    assert body["total_issues"] == 1
+    assert body["items"][0]["code"] == "missing_mirror"
+    assert body["items"][0]["page_version_id"] == missing_version_id
+    assert body["items"][0]["source_host"] == "cdn-audit.example.test"
+    response_text = json.dumps(body, ensure_ascii=False)
+    assert "source_url" not in body["items"][0]
+    assert "integrity" not in body["items"][0]
+    assert "content_bytes" not in body["items"][0]
+    assert "secret-stale-token" not in response_text
+    assert "mirror audit stale actual" not in response_text
+    assert "mirror audit stale expected" not in response_text
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.content_script_asset.mirror_audit"
+        "&resource_type=content_script_asset&request_id=script-mirror-audit",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert snapshot["filters"]["issue_code"] == "missing_mirror"
+    assert snapshot["total_issues"] == 1
+    assert snapshot["item_count"] == 1
+    assert snapshot["capabilities"] == {
+        "external_network": False,
+        "cdn_scan": False,
+        "external_alerts": False,
+        "repair": False,
+    }
+    audit_text = json.dumps(snapshot, ensure_ascii=False)
+    assert "source_url" not in audit_text
+    assert "integrity" not in audit_text
+    assert "content_bytes" not in audit_text
+    assert "secret-stale-token" not in audit_text
+
+
+def test_admin_scans_content_script_asset_remote_drift_with_redaction(client, monkeypatch):
+    admin_token = _bootstrap_admin(client)
+    teacher_token = _register_and_login(client, "teacher_remote_drift", "teacher")
+    admin_user_id = _current_user_id(client, admin_token)
+    published_at = datetime(2026, 7, 8, 12, 15, tzinfo=UTC)
+    ok_bytes = b"console.log('remote drift ok');\n"
+    mirrored_bytes = b"console.log('remote drift mirrored');\n"
+    drifted_bytes = b"console.log('remote drift now changed and longer');\n"
+    unavailable_bytes = b"console.log('remote drift unavailable');\n"
+
+    ok_schema = _script_asset_schema(
+        "physics/remote-drift-ok",
+        "https://cdn-remote.example.test/ok.js",
+        _sri_sha384(ok_bytes),
+    )
+    drift_schema = _script_asset_schema(
+        "physics/remote-drift-changed",
+        "https://cdn-remote.example.test/secret-drift-token.js",
+        _sri_sha384(mirrored_bytes),
+    )
+    unavailable_schema = _script_asset_schema(
+        "physics/remote-drift-unavailable",
+        "https://cdn-remote.example.test/unavailable.js",
+        _sri_sha384(unavailable_bytes),
+    )
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        ok_page, ok_version = _insert_published_script_page(
+            db,
+            schema=ok_schema,
+            publisher_user_id=admin_user_id,
+            published_at=published_at,
+        )
+        drift_page, drift_version = _insert_published_script_page(
+            db,
+            schema=drift_schema,
+            publisher_user_id=admin_user_id,
+            published_at=published_at + timedelta(minutes=1),
+        )
+        unavailable_page, unavailable_version = _insert_published_script_page(
+            db,
+            schema=unavailable_schema,
+            publisher_user_id=admin_user_id,
+            published_at=published_at + timedelta(minutes=2),
+        )
+        for page, version, schema, payload in (
+            (ok_page, ok_version, ok_schema, ok_bytes),
+            (drift_page, drift_version, drift_schema, mirrored_bytes),
+            (unavailable_page, unavailable_version, unavailable_schema, unavailable_bytes),
+        ):
+            reference = external_script_references(schema)[0]
+            db.add(
+                ContentScriptAsset(
+                    page_id=page.id,
+                    page_version_id=version.id,
+                    slug=page.slug,
+                    sandbox_id=reference.sandbox_id,
+                    reference_key=reference.reference_key,
+                    reference_value_sha256=reference.reference_value_sha256,
+                    source_url=reference.source_url,
+                    source_host=reference.source_host,
+                    integrity=reference.integrity,
+                    matched_algorithm="sha384",
+                    asset_sha256=hashlib.sha256(payload).hexdigest(),
+                    asset_size_bytes=len(payload),
+                    content_bytes=payload,
+                    policy_version="v6.6.24",
+                    policy_context_hash="c" * 64,
+                    published_by_user_id=admin_user_id,
+                    published_at=version.published_at,
+                )
+            )
+        db.commit()
+
+    def fake_fetch(url: str) -> bytes:
+        if url == "https://cdn-remote.example.test/ok.js":
+            return ok_bytes
+        if url == "https://cdn-remote.example.test/secret-drift-token.js":
+            return drifted_bytes
+        if url == "https://cdn-remote.example.test/unavailable.js":
+            raise RuntimeError("remote secret unavailable")
+        raise AssertionError(f"unexpected URL: {url}")
+
+    monkeypatch.setattr(content_script_assets, "_fetch_external_script_asset", fake_fetch)
+
+    forbidden = client.post(
+        "/api/admin/content/script-assets/remote-drift-scan",
+        headers=_auth_header(teacher_token),
+        json={"source_host": "cdn-remote.example.test"},
+    )
+    assert forbidden.status_code == 403
+
+    rejected = client.post(
+        "/api/admin/content/script-assets/remote-drift-scan",
+        headers=_auth_header(admin_token),
+        json={"source_host": "cdn-remote.example.test", "confirm_external_network": False},
+    )
+    assert rejected.status_code == 422
+
+    omitted_confirmation = client.post(
+        "/api/admin/content/script-assets/remote-drift-scan",
+        headers=_auth_header(admin_token),
+        json={"source_host": "cdn-remote.example.test"},
+    )
+    assert omitted_confirmation.status_code == 422
+
+    first_page = client.post(
+        "/api/admin/content/script-assets/remote-drift-scan",
+        headers=_auth_header(admin_token),
+        json={"source_host": "cdn-remote.example.test", "limit": 2, "confirm_external_network": True},
+    )
+    assert first_page.status_code == 200
+    first_page_body = first_page.json()
+    assert first_page_body["total_pages_scanned"] >= 3
+    assert first_page_body["total_external_references"] == 3
+    assert first_page_body["total_scanned_references"] == 2
+    assert first_page_body["total_remote_fetches"] == 2
+    assert first_page_body["total_issues"] == 3
+    assert first_page_body["next_offset"] == 2
+    assert first_page_body["issue_counts_by_code"] == {
+        "remote_hash_mismatch": 1,
+        "remote_size_mismatch": 1,
+        "remote_sri_mismatch": 1,
+    }
+    assert first_page_body["issue_counts_by_severity"] == {"critical": 3}
+
+    second_page = client.post(
+        "/api/admin/content/script-assets/remote-drift-scan",
+        headers=_auth_header(admin_token),
+        json={
+            "source_host": "cdn-remote.example.test",
+            "limit": 2,
+            "offset": 2,
+            "confirm_external_network": True,
+        },
+    )
+    assert second_page.status_code == 200
+    second_page_body = second_page.json()
+    assert second_page_body["scan_run_id"] is not None
+    assert second_page_body["total_scanned_references"] == 1
+    assert second_page_body["total_remote_fetches"] == 1
+    assert second_page_body["total_issues"] == 1
+    assert second_page_body["issue_counts_by_code"] == {"remote_asset_unavailable": 1}
+    assert second_page_body["next_offset"] is None
+
+    filtered = client.post(
+        "/api/admin/content/script-assets/remote-drift-scan",
+        headers={**_auth_header(admin_token), "X-Request-ID": "remote-drift-scan"},
+        json={
+            "source_host": "cdn-remote.example.test",
+            "issue_code": "remote_sri_mismatch",
+            "limit": 2,
+            "confirm_external_network": True,
+        },
+    )
+    assert filtered.status_code == 200
+    body = filtered.json()
+    assert body["scan_run_id"] is not None
+    assert body["scan_run_key"].startswith("content-script-remote-drift:")
+    assert body["total_issues"] == 1
+    assert body["items"][0]["code"] == "remote_sri_mismatch"
+    assert body["items"][0]["source_host"] == "cdn-remote.example.test"
+    assert body["items"][0]["remote_asset_sha256"] == hashlib.sha256(drifted_bytes).hexdigest()
+    response_text = json.dumps(body, ensure_ascii=False)
+    assert "source_url" not in body["items"][0]
+    assert "integrity" not in body["items"][0]
+    assert "content_bytes" not in body["items"][0]
+    assert "secret-drift-token" not in response_text
+    assert "remote drift now changed" not in response_text
+    assert "remote drift mirrored" not in response_text
+    assert "remote secret unavailable" not in response_text
+
+    session_factory = get_session_factory(get_settings().database_url)
+    with session_factory() as db:
+        run = db.get(ContentScriptAssetScanRun, body["scan_run_id"])
+        assert run is not None
+        assert run.run_key == body["scan_run_key"]
+        assert run.scan_type == "remote_drift"
+        assert run.trigger_source == "manual"
+        assert run.status == "success"
+        assert run.created_by_user_id == admin_user_id
+        assert run.filters_json == {
+            "source_host": "cdn-remote.example.test",
+            "issue_code": "remote_sri_mismatch",
+            "limit": 2,
+            "offset": 0,
+            "confirm_external_network": True,
+        }
+        assert run.totals_json["total_issues"] == 1
+        assert run.totals_json["issue_summary_truncated"] is False
+        assert run.issue_counts_json == {
+            "by_code": {"remote_sri_mismatch": 1},
+            "by_severity": {"critical": 1},
+        }
+        assert run.alert_status == "critical"
+        assert run.issue_summary_json[0]["code"] == "remote_sri_mismatch"
+        stored_run_text = json.dumps(
+            {
+                "filters": run.filters_json,
+                "totals": run.totals_json,
+                "issue_counts": run.issue_counts_json,
+                "issue_summary": run.issue_summary_json,
+            },
+            ensure_ascii=False,
+        )
+        assert '"source_url"' not in stored_run_text
+        assert "integrity" not in stored_run_text
+        assert "content_bytes" not in stored_run_text
+        assert "secret-drift-token" not in stored_run_text
+        assert "remote drift now changed" not in stored_run_text
+        assert "remote secret unavailable" not in stored_run_text
+
+    forbidden_runs = client.get(
+        "/api/admin/content/script-assets/remote-drift-scan-runs",
+        headers=_auth_header(teacher_token),
+    )
+    assert forbidden_runs.status_code == 403
+
+    runs = client.get(
+        "/api/admin/content/script-assets/remote-drift-scan-runs?alert_status=critical&limit=2",
+        headers={**_auth_header(admin_token), "X-Request-ID": "remote-drift-runs"},
+    )
+    assert runs.status_code == 200
+    runs_body = runs.json()
+    assert runs_body["total"] == 3
+    assert runs_body["next_offset"] == 2
+    assert runs_body["items"][0]["scan_type"] == "remote_drift"
+    assert runs_body["items"][0]["trigger_source"] == "manual"
+    assert runs_body["items"][0]["alert_status"] == "critical"
+    runs_text = json.dumps(runs_body, ensure_ascii=False)
+    assert '"source_url"' not in runs_text
+    assert "integrity" not in runs_text
+    assert "content_bytes" not in runs_text
+    assert "secret-drift-token" not in runs_text
+
+    forbidden_alerts = client.get(
+        "/api/admin/content/script-assets/remote-drift-alerts",
+        headers=_auth_header(teacher_token),
+    )
+    assert forbidden_alerts.status_code == 403
+
+    alerts = client.get(
+        "/api/admin/content/script-assets/remote-drift-alerts?recent_run_limit=10&candidate_limit=10",
+        headers={**_auth_header(admin_token), "X-Request-ID": "remote-drift-alerts"},
+    )
+    assert alerts.status_code == 200
+    alerts_body = alerts.json()
+    assert alerts_body["alert_status"] == "critical"
+    assert alerts_body["recent_run_count"] == 3
+    assert alerts_body["issue_run_count"] == 3
+    assert alerts_body["candidate_count"] == 5
+    assert alerts_body["critical_count"] == 5
+    assert {item["code"] for item in alerts_body["candidates"]} >= {
+        "remote_sri_mismatch",
+        "remote_asset_unavailable",
+    }
+    assert {item["action_hint"] for item in alerts_body["candidates"]} >= {"review_host", "investigate"}
+    alerts_text = json.dumps(alerts_body, ensure_ascii=False)
+    assert '"source_url"' not in alerts_text
+    assert "integrity" not in alerts_text
+    assert "content_bytes" not in alerts_text
+    assert "secret-drift-token" not in alerts_text
+    assert "remote drift now changed" not in alerts_text
+
+    forbidden_outbox = client.post(
+        "/api/admin/content/script-assets/remote-drift-alerts/outbox",
+        headers=_auth_header(teacher_token),
+        json={"confirm_observe_only": True},
+    )
+    assert forbidden_outbox.status_code == 403
+
+    missing_outbox_confirmation = client.post(
+        "/api/admin/content/script-assets/remote-drift-alerts/outbox",
+        headers=_auth_header(admin_token),
+        json={"recent_run_limit": 10, "candidate_limit": 10},
+    )
+    assert missing_outbox_confirmation.status_code == 422
+
+    outbox = client.post(
+        "/api/admin/content/script-assets/remote-drift-alerts/outbox",
+        headers={**_auth_header(admin_token), "X-Request-ID": "remote-drift-outbox"},
+        json={
+            "confirm_observe_only": True,
+            "recent_run_limit": 10,
+            "candidate_limit": 10,
+            "now_at": "2026-07-08T15:00:00Z",
+        },
+    )
+    assert outbox.status_code == 200
+    outbox_body = outbox.json()
+    assert outbox_body["source_type"] == "content_script_asset_scan_run_alert"
+    assert outbox_body["external_delivery"] is False
+    assert outbox_body["dispatch_mode"] == "manual_review"
+    assert outbox_body["delivery_target"] == "admin_outbox"
+    assert outbox_body["created_count"] == alerts_body["candidate_count"]
+    assert outbox_body["refreshed_count"] == 0
+    assert len(outbox_body["items"]) == alerts_body["candidate_count"]
+    outbox_text = json.dumps(outbox_body, ensure_ascii=False)
+    assert '"source_url"' not in outbox_text
+    assert "source_url_sha256" not in outbox_text
+    assert "asset_sha256" not in outbox_text
+    assert "remote_asset_sha256" not in outbox_text
+    assert "remote_asset_size_bytes" not in outbox_text
+    assert "payload_json" not in outbox_text
+    assert "payload_hash\"" not in outbox_text
+    assert all(item["payload_redacted"] is True for item in outbox_body["items"])
+    assert "integrity" not in outbox_text
+    assert "content_bytes" not in outbox_text
+    assert "scheduler_lease_token" not in outbox_text
+    assert "secret-drift-token" not in outbox_text
+    assert "remote drift now changed" not in outbox_text
+    assert "remote secret unavailable" not in outbox_text
+    assert '"sent"' not in outbox_text
+    with session_factory() as db:
+        stored_outbox_entry = db.scalar(
+            select(AdminAlertOutboxEntry).where(
+                AdminAlertOutboxEntry.source_type == "content_script_asset_scan_run_alert"
+            )
+        )
+        assert stored_outbox_entry is not None
+        stored_payload_text = json.dumps(stored_outbox_entry.payload_json, ensure_ascii=False)
+        assert "source_url_sha256" in stored_payload_text
+        assert "asset_sha256" in stored_payload_text
+        assert "remote_asset_sha256" in stored_payload_text
+        assert '"source_url"' not in stored_payload_text
+        assert "secret-drift-token" not in stored_payload_text
+
+    repeated_outbox = client.post(
+        "/api/admin/content/script-assets/remote-drift-alerts/outbox",
+        headers=_auth_header(admin_token),
+        json={
+            "confirm_observe_only": True,
+            "recent_run_limit": 10,
+            "candidate_limit": 10,
+            "now_at": "2026-07-08T15:00:00Z",
+        },
+    )
+    assert repeated_outbox.status_code == 200
+    repeated_outbox_body = repeated_outbox.json()
+    assert repeated_outbox_body["created_count"] == 0
+    assert repeated_outbox_body["refreshed_count"] == alerts_body["candidate_count"]
+    assert all(item["seen_count"] == 2 for item in repeated_outbox_body["items"])
+
+    listed_outbox = client.get(
+        "/api/admin/alert-outbox?source_type=content_script_asset_scan_run_alert&status=pending_review",
+        headers=_auth_header(admin_token),
+    )
+    assert listed_outbox.status_code == 200
+    listed_outbox_body = listed_outbox.json()
+    assert listed_outbox_body["total"] == alerts_body["candidate_count"]
+    assert all(item["external_delivery"] is False for item in listed_outbox_body["items"])
+    listed_outbox_text = json.dumps(listed_outbox_body, ensure_ascii=False)
+    assert "dedupe_key" not in listed_outbox_text
+    assert "payload_hash\"" not in listed_outbox_text
+    assert "payload_json" not in listed_outbox_text
+    assert '"review_note":' not in listed_outbox_text
+    assert "secret-drift-token" not in listed_outbox_text
+    content_outbox_entry_id = listed_outbox_body["items"][0]["id"]
+
+    reviewed_content_outbox = client.patch(
+        f"/api/admin/alert-outbox/{content_outbox_entry_id}",
+        headers={**_auth_header(admin_token), "X-Request-ID": "remote-drift-outbox-review"},
+        json={
+            "status": "planned",
+            "note": "reviewed content script drift secret-drift-review",
+            "confirm_manual_review": True,
+        },
+    )
+    assert reviewed_content_outbox.status_code == 200
+    reviewed_content_body = reviewed_content_outbox.json()
+    assert reviewed_content_body["status"] == "planned"
+    assert reviewed_content_body["source_type"] == "content_script_asset_scan_run_alert"
+    assert reviewed_content_body["reviewed_at"] is not None
+    assert reviewed_content_body["review_note_present"] is True
+    assert '"review_note":' not in json.dumps(reviewed_content_body, ensure_ascii=False)
+    assert "secret-drift-review" not in json.dumps(reviewed_content_body, ensure_ascii=False)
+    assert reviewed_content_body["external_delivery"] is False
+
+    with session_factory() as db:
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(AdminAlertOutboxEntry)
+                .where(AdminAlertOutboxEntry.source_type == "content_script_asset_scan_run_alert")
+            )
+            == alerts_body["candidate_count"]
+        )
+
+    audit = client.get(
+        "/api/admin/audit-logs?action=admin.content_script_asset.remote_drift_scan"
+        "&resource_type=content_script_asset&request_id=remote-drift-scan",
+        headers=_auth_header(admin_token),
+    )
+    assert audit.status_code == 200
+    assert audit.json()["total"] == 1
+    snapshot = audit.json()["items"][0]["snapshot_json"]
+    assert snapshot["filters"] == {
+        "source_host": "cdn-remote.example.test",
+        "issue_code": "remote_sri_mismatch",
+    }
+    assert snapshot["total_external_references"] == 3
+    assert snapshot["total_scanned_references"] == 2
+    assert snapshot["total_remote_fetches"] == 2
+    assert snapshot["total_issues"] == 1
+    assert snapshot["capabilities"] == {
+        "external_network": True,
+        "cdn_scan": True,
+        "external_alerts": False,
+        "repair": False,
+        "mutation": False,
+    }
+    assert snapshot["scan_run"]["id"] == body["scan_run_id"]
+    assert snapshot["scan_run"]["run_key"] == body["scan_run_key"]
+    assert snapshot["scan_run"]["issue_summary_count"] == 1
+    audit_text = json.dumps(snapshot, ensure_ascii=False)
+    assert "source_url" not in audit_text
+    assert "integrity" not in audit_text
+    assert "content_bytes" not in audit_text
+    assert "secret-drift-token" not in audit_text
+    assert "remote drift now changed" not in audit_text
+
+    run_list_audit = client.get(
+        "/api/admin/audit-logs?action=admin.content_script_asset.remote_drift_scan_run.list"
+        "&resource_type=content_script_asset_scan_run&request_id=remote-drift-runs",
+        headers=_auth_header(admin_token),
+    )
+    assert run_list_audit.status_code == 200
+    assert run_list_audit.json()["total"] == 1
+    run_list_snapshot = run_list_audit.json()["items"][0]["snapshot_json"]
+    assert run_list_snapshot["filters"] == {"scan_type": "remote_drift", "alert_status": "critical"}
+    assert run_list_snapshot["capabilities"] == {
+        "mutation": False,
+        "external_network": False,
+        "external_alerts": False,
+        "automatic_actions": False,
+    }
+
+    alert_audit = client.get(
+        "/api/admin/audit-logs?action=admin.content_script_asset.remote_drift_alert_report"
+        "&resource_type=content_script_asset_scan_run&request_id=remote-drift-alerts",
+        headers=_auth_header(admin_token),
+    )
+    assert alert_audit.status_code == 200
+    assert alert_audit.json()["total"] == 1
+    alert_snapshot = alert_audit.json()["items"][0]["snapshot_json"]
+    assert alert_snapshot["alert_status"] == "critical"
+    assert alert_snapshot["candidate_count"] == 5
+    assert alert_snapshot["policy"]["external_alerts"] is False
+    assert alert_snapshot["policy"]["automatic_actions"] is False
+    alert_audit_text = json.dumps(alert_snapshot, ensure_ascii=False)
+    assert "source_url" not in alert_audit_text
+    assert "integrity" not in alert_audit_text
+    assert "content_bytes" not in alert_audit_text
+    assert "secret-drift-token" not in alert_audit_text
+
+    outbox_audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.content_script_asset_remote_drift.enqueue"
+        "&resource_type=admin_alert_outbox&request_id=remote-drift-outbox",
+        headers=_auth_header(admin_token),
+    )
+    assert outbox_audit.status_code == 200
+    assert outbox_audit.json()["total"] == 1
+    outbox_snapshot = outbox_audit.json()["items"][0]["snapshot_json"]
+    assert outbox_snapshot["format"] == "admin_alert_outbox_write"
+    assert outbox_snapshot["source_type"] == "content_script_asset_scan_run_alert"
+    assert outbox_snapshot["external_delivery"] is False
+    assert outbox_snapshot["created_count"] == alerts_body["candidate_count"]
+    assert "entries" not in outbox_snapshot
+    assert "payload_json" not in outbox_snapshot
+    outbox_audit_text = json.dumps(outbox_snapshot, ensure_ascii=False)
+    assert '"source_url"' not in outbox_audit_text
+    assert "integrity" not in outbox_audit_text
+    assert "content_bytes" not in outbox_audit_text
+    assert "secret-drift-token" not in outbox_audit_text
+
+    content_review_audit = client.get(
+        "/api/admin/audit-logs?action=admin.alert_outbox.review"
+        "&resource_type=admin_alert_outbox&request_id=remote-drift-outbox-review",
+        headers=_auth_header(admin_token),
+    )
+    assert content_review_audit.status_code == 200
+    assert content_review_audit.json()["total"] == 1
+    content_review_snapshot = content_review_audit.json()["items"][0]["snapshot_json"]
+    assert content_review_snapshot["format"] == "admin_alert_outbox_review"
+    assert content_review_snapshot["source_type"] == "content_script_asset_scan_run_alert"
+    assert content_review_snapshot["previous_status"] == "pending_review"
+    assert content_review_snapshot["status"] == "planned"
+    assert content_review_snapshot["external_delivery"] is False
+    assert content_review_snapshot["automatic_actions"] is False
+    content_review_text = json.dumps(content_review_snapshot, ensure_ascii=False)
+    assert "payload_json" not in content_review_snapshot
+    assert "secret-drift-review" not in content_review_text
+    assert "secret-drift-token" not in content_review_text
+    assert '"source_url"' not in content_review_text
+
+    def fake_large_fetch(url: str) -> bytes:
+        assert url == "https://cdn-remote.example.test/ok.js"
+        return b"x" * (content_script_assets.content_script_policy.MAX_EXTERNAL_SCRIPT_BYTES + 1)
+
+    monkeypatch.setattr(content_script_assets, "_fetch_external_script_asset", fake_large_fetch)
+    too_large = client.post(
+        "/api/admin/content/script-assets/remote-drift-scan",
+        headers=_auth_header(admin_token),
+        json={
+            "slug": "physics/remote-drift-ok",
+            "issue_code": "remote_asset_too_large",
+            "limit": 1,
+            "confirm_external_network": True,
+        },
+    )
+    assert too_large.status_code == 200
+    too_large_body = too_large.json()
+    assert too_large_body["total_issues"] == 1
+    assert too_large_body["items"][0]["code"] == "remote_asset_too_large"
+    assert "x" * 32 not in json.dumps(too_large_body, ensure_ascii=False)
+
+
+def _script_asset_schema(slug: str, source_url: str, integrity: str) -> dict:
+    return {
+        "slug": slug,
+        "galaxy": "englab",
+        "subject": "physics",
+        "title": "Script Asset Audit",
+        "layout": "experiment-page",
+        "status": "published",
+        "version": "v-test",
+        "sections": [
+            {
+                "sectionId": f"{slug.rsplit('/', 1)[-1]}-section",
+                "type": "experiment",
+                "title": "Script Asset Audit",
+                "props": {
+                    "scriptUrl": source_url,
+                    "scriptIntegrity": integrity,
+                    "scriptCrossorigin": "anonymous",
+                    "scriptSandbox": {
+                        "mode": "isolated-iframe",
+                        "network": "same-origin",
+                    },
+                },
+            }
+        ],
+        "sources": [],
+    }
+
+
+def _insert_published_script_page(
+    db,
+    *,
+    schema: dict,
+    publisher_user_id: int,
+    published_at: datetime,
+) -> tuple[ContentPageRecord, ContentPageVersion]:
+    page = ContentPageRecord(
+        slug=schema["slug"],
+        status="published",
+        version="v-test",
+        schema_json=schema,
+        schema_hash=hashlib.sha256(json.dumps(schema, sort_keys=True).encode("utf-8")).hexdigest(),
+        published_by_user_id=publisher_user_id,
+        published_at=published_at,
+    )
+    db.add(page)
+    db.flush()
+    version = ContentPageVersion(
+        page_id=page.id,
+        slug=page.slug,
+        status="published",
+        version="v-test",
+        schema_hash=page.schema_hash,
+        schema_json=schema,
+        published_by_user_id=publisher_user_id,
+        published_at=published_at,
+        note="content script asset mirror audit fixture",
+    )
+    db.add(version)
+    db.flush()
+    page.current_version_id = version.id
+    return page, version
+
+
+def _sri_sha384(payload: bytes) -> str:
+    digest = hashlib.sha384(payload).digest()
+    return "sha384-" + base64.b64encode(digest).decode("ascii").rstrip("=")

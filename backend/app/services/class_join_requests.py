@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.models import ClassGroup, ClassJoinRequest, ClassMembership, SchoolMembership, User
 from app.models.base import utc_now
 from app.services.audit import record_audit_log
+from app.services.access_control import lock_scope_eligible_user
 
 
 CLASS_ROLES = {"student", "teacher"}
@@ -26,6 +27,7 @@ def normalize_join_request_status(value: str) -> str:
 
 
 def ensure_school_membership(db: Session, school_id: int, user_id: int, role: str) -> SchoolMembership:
+    lock_scope_eligible_user(db, user_id, role)
     membership = db.scalar(
         select(SchoolMembership).where(
             SchoolMembership.school_id == school_id,
@@ -46,6 +48,7 @@ def ensure_class_membership(
     user_id: int,
     role: str,
 ) -> tuple[ClassMembership, bool]:
+    lock_scope_eligible_user(db, user_id, role)
     membership = db.scalar(
         select(ClassMembership).where(
             ClassMembership.class_id == class_id,
@@ -87,6 +90,13 @@ def apply_class_join_request_review(
     note: str | None,
     approval_source: str,
 ) -> ClassJoinRequest:
+    lock_scope_eligible_user(
+        db,
+        reviewer.id,
+        "teacher",
+        detail="Class join review requires an active teacher/admin",
+        status_code=403,
+    )
     next_status = normalize_join_request_status(next_status)
     if next_status == "pending":
         raise HTTPException(status_code=422, detail="Class join request review requires approved or rejected")
@@ -109,6 +119,12 @@ def apply_class_join_request_review(
     membership_created = False
     membership: ClassMembership | None = None
     if next_status == "approved":
+        lock_scope_eligible_user(
+            db,
+            join_request.user_id,
+            join_request.role,
+            detail="Class join applicant is no longer eligible",
+        )
         ensure_school_membership(db, join_request.school_id, join_request.user_id, join_request.role)
         membership, membership_created = ensure_class_membership(
             db,

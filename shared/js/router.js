@@ -28,6 +28,9 @@ const Router = {
         chemistry: 'englab',
         algorithms: 'englab',
         biology: 'englab',
+        student: 'englab',
+        teacher: 'englab',
+        admin: 'englab',
         frontier: 'frontier',
         cosmos: 'frontier',
         engineering: 'frontier',
@@ -47,6 +50,7 @@ const Router = {
             'shared/js/lucide.min.js?v=20260417d'
         ],
         englab: [
+            'shared/js/lucide.min.js?v=20260417d',
             'shared/js/learning-progress.js?v=20260422a',
             'shared/js/back-to-top.js?v=20260424rr',
             'shared/js/fab-trigger.js?v=20260528v61g',
@@ -77,7 +81,10 @@ const Router = {
         humanities: 'pages/humanities/text-lab.js?v=20260630mainV64',
         engineering: 'pages/engineering/bridge-truss.js?v=20260630mainV64',
         license: 'pages/about/about.js?v=20260630mainV64',
-        changelog: 'pages/about/about.js?v=20260630mainV64'
+        changelog: 'pages/about/about.js?v=20260630mainV64',
+        student: 'pages/student/student.js?v=20260710v6653PermissionMatrixP1',
+        teacher: 'pages/teacher/teacher.js?v=20260710v6653PermissionMatrixP1',
+        admin: 'pages/admin/admin.js?v=20260710v6653PermissionMatrixP1'
     },
     pageReadyChecks: {
         home: () => typeof window.initHome === 'function',
@@ -89,7 +96,10 @@ const Router = {
         humanities: () => typeof window.initHumanitiesLab === 'function',
         engineering: () => typeof window.initBridgeTruss === 'function',
         license: () => typeof window.initLicense === 'function',
-        changelog: () => typeof window.initChangelog === 'function'
+        changelog: () => typeof window.initChangelog === 'function',
+        student: () => typeof window.initStudent === 'function',
+        teacher: () => typeof window.initTeacher === 'function',
+        admin: () => typeof window.initAdmin === 'function'
     },
     // Store origin point for radial wipe (set by selectModule or default center)
     transitionOrigin: { x: 50, y: 50 },
@@ -532,6 +542,7 @@ const Router = {
             chemistry: 'rgba(77,158,126,0.12)',
             algorithms: 'rgba(196,121,58,0.12)',
             biology: 'rgba(58,158,143,0.12)',
+            student: 'rgba(67,201,141,0.12)',
             cosmos: 'rgba(116,185,255,0.12)',
             datascience: 'rgba(138,167,255,0.12)',
             infotech: 'rgba(94,224,216,0.12)',
@@ -914,6 +925,12 @@ const Router = {
             if (typeof initLicense === 'function') initLicense();
         } else if (page === 'changelog') {
             if (typeof initChangelog === 'function') initChangelog();
+        } else if (page === 'student') {
+            if (typeof initStudent === 'function') initStudent();
+        } else if (page === 'teacher') {
+            if (typeof initTeacher === 'function') initTeacher();
+        } else if (page === 'admin') {
+            if (typeof initAdmin === 'function') initAdmin();
         }
         // Subject pages: show sidebar toggle if an experiment was previously open,
         // but don't eagerly initialize any experiments (ModuleSelector handles it).
@@ -1053,6 +1070,12 @@ const Router = {
             if (typeof destroyHumanitiesLab === 'function') destroyHumanitiesLab();
         } else if (page === 'engineering') {
             if (typeof destroyBridgeTruss === 'function') destroyBridgeTruss();
+        } else if (page === 'student') {
+            if (typeof destroyStudent === 'function') destroyStudent();
+        } else if (page === 'teacher') {
+            if (typeof destroyTeacher === 'function') destroyTeacher();
+        } else if (page === 'admin') {
+            if (typeof destroyAdmin === 'function') destroyAdmin();
         } else {
             // v4.2.3 Bug3 淇锛氬厛璋冪敤 closeModule 闅愯棌鍏ㄩ儴娴姩鎺т欢
             // 锛圗xperimentExport / ExperimentQuiz / ExperimentFavorites / ExperimentRating /

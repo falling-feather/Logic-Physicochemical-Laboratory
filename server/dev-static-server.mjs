@@ -1,10 +1,13 @@
 import http from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PORT = Number(process.env.PORT || getArg('--port') || getArg('-p') || 8766);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT_REAL = await realpath(ROOT);
+const PUBLIC_DIRECTORIES = new Set(['pages', 'shared', 'UI', 'codevis']);
+const PUBLIC_ROOT_FILES = new Set(['index.html', 'sw.js', 'LICENSE.md']);
 
 const MIME = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -12,6 +15,7 @@ const MIME = new Map([
   ['.js', 'application/javascript; charset=utf-8'],
   ['.mjs', 'application/javascript; charset=utf-8'],
   ['.json', 'application/json; charset=utf-8'],
+  ['.md', 'text/markdown; charset=utf-8'],
   ['.png', 'image/png'],
   ['.jpg', 'image/jpeg'],
   ['.jpeg', 'image/jpeg'],
@@ -28,10 +32,26 @@ function getArg(name) {
   return index >= 0 ? process.argv[index + 1] : '';
 }
 
-function isBlockedPath(urlPath) {
-  const normalized = urlPath.replace(/\\/g, '/');
-  return /^\/(?:(?:doc|muban|server|tools)(?:\/|$)|(?:.*\/)?README\.md$|\.(?:git|github|vscode|agents|codex)(?:\/|$))/i
-    .test(normalized);
+function normalizedPublicPath(urlPath) {
+  let normalized;
+  try {
+    normalized = decodeURIComponent(urlPath).replace(/\\/g, '/');
+  } catch {
+    return '';
+  }
+  if (normalized.includes('\0')) return '';
+  if (normalized === '/') return '/index.html';
+  if (normalized === '/codevis/' || normalized === '/codevis') return '/codevis/index.html';
+  const segments = normalized.split('/').filter(Boolean);
+  if (segments.some((segment) => segment === '.' || segment === '..')) return '';
+  if (segments.length === 1 && PUBLIC_ROOT_FILES.has(segments[0])) return normalized;
+  if (segments.length > 1 && PUBLIC_DIRECTORIES.has(segments[0])) return normalized;
+  return '';
+}
+
+function isWithin(candidate, root) {
+  const relative = path.relative(root, candidate);
+  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
 }
 
 function send(res, status, body, type = 'text/plain; charset=utf-8') {
@@ -44,27 +64,27 @@ function send(res, status, body, type = 'text/plain; charset=utf-8') {
 }
 
 async function resolveFile(urlPath) {
-  let cleanPath;
-  try {
-    cleanPath = decodeURIComponent(urlPath);
-  } catch {
-    return null;
-  }
-
-  if (cleanPath === '/') cleanPath = '/index.html';
-  if (cleanPath === '/codevis/' || cleanPath === '/codevis') cleanPath = '/codevis/index.html';
+  const cleanPath = normalizedPublicPath(urlPath);
+  if (!cleanPath) return null;
 
   const target = path.resolve(ROOT, `.${cleanPath}`);
-  if (!target.startsWith(ROOT + path.sep) && target !== ROOT) return null;
+  const firstSegment = cleanPath.split('/').filter(Boolean)[0];
+  const publicRoot = PUBLIC_ROOT_FILES.has(firstSegment) ? ROOT : path.resolve(ROOT, firstSegment);
+  if (!isWithin(target, publicRoot)) return null;
 
   try {
+    const publicRootReal = await realpath(publicRoot);
     const info = await stat(target);
     if (info.isDirectory()) {
       const indexFile = path.join(target, 'index.html');
       const indexInfo = await stat(indexFile);
-      return indexInfo.isFile() ? indexFile : null;
+      if (!indexInfo.isFile()) return null;
+      const realIndex = await realpath(indexFile);
+      return isWithin(realIndex, publicRootReal) && isWithin(realIndex, ROOT_REAL) ? realIndex : null;
     }
-    return info.isFile() ? target : null;
+    if (!info.isFile()) return null;
+    const realTarget = await realpath(target);
+    return isWithin(realTarget, publicRootReal) && isWithin(realTarget, ROOT_REAL) ? realTarget : null;
   } catch {
     return null;
   }
@@ -77,11 +97,6 @@ const server = http.createServer(async (req, res) => {
   }
 
   const url = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
-  if (isBlockedPath(url.pathname)) {
-    send(res, 404, 'Not Found');
-    return;
-  }
-
   const file = await resolveFile(url.pathname);
   if (!file) {
     send(res, 404, 'Not Found');

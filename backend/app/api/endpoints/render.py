@@ -1,17 +1,813 @@
-from fastapi import APIRouter, Depends, HTTPException
+import json
+import secrets
+import base64
+import hashlib
+from html import escape
+from pathlib import Path
+from typing import Any
+from urllib.parse import quote, unquote, urlsplit
+
+from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi.responses import HTMLResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.db.session import get_db
+from app.models import ContentPageRecord, ContentScriptAsset, ContentScriptHostPolicy
 from app.schemas.content import ContentPage
-from app.services.content_catalog import get_page_schema
+from app.services.content_script_assets import get_bound_content_script_asset
+from app.services.content_script_policy import collect_content_script_manifests, public_content_page_schema
+from app.services.content_script_sandbox_templates import (
+    ResolvedScriptSandboxDocument,
+    ScriptSandboxDocumentError,
+    resolve_script_sandbox_document,
+)
 
 
 router = APIRouter()
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
+LOCAL_SCRIPT_ASSET_ROOTS = (
+    PROJECT_ROOT / "pages",
+    PROJECT_ROOT / "shared" / "js",
+    PROJECT_ROOT / "codevis" / "shared" / "js",
+    PROJECT_ROOT / "drafts",
+)
+
+
+@router.get("/script-sandboxes/{sandbox_id}/page/{slug:path}", response_class=HTMLResponse)
+def render_script_sandbox_document(sandbox_id: str, slug: str, response: Response, db: Session = Depends(get_db)) -> str:
+    page_record = _published_content_page_record(db, slug)
+    if page_record is None:
+        raise HTTPException(status_code=404, detail="Renderable page not found")
+    page = ContentPage.model_validate(page_record.schema_json)
+    manifest = _find_script_sandbox_manifest(page, sandbox_id)
+    sandbox = manifest["sandbox"]
+    references = _script_manifest_references(manifest)
+    asset_descriptors = _script_sandbox_asset_descriptors(db, page_record, sandbox_id, references)
+    document = _script_sandbox_document_contract(manifest)
+    nonce = _script_sandbox_nonce()
+    csp = _harden_sandbox_csp(
+        str(sandbox["csp"]),
+        nonce=nonce,
+        script_hashes=[str(asset["integrity"]) for asset in asset_descriptors],
+        frame_ancestors=_sandbox_frame_ancestors(),
+    )
+    response.headers["Content-Security-Policy"] = csp
+    response.headers["X-Astra-Content-Script-Sandbox-Id"] = sandbox_id
+    response.headers["X-Astra-Content-Script-Iframe-Sandbox"] = str(sandbox["iframeSandbox"])
+    response.headers["X-Astra-Content-Script-Reference-Count"] = str(len(references))
+    response.headers["X-Astra-Content-Script-Template-Id"] = document.template_id
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Cache-Control"] = "no-store"
+    return _script_sandbox_html(slug=page.slug, sandbox_id=sandbox_id, nonce=nonce, document=document)
+
+
+@router.get("/script-sandboxes/{sandbox_id}/bootstrap/page/{slug:path}")
+def render_script_sandbox_bootstrap(
+    sandbox_id: str,
+    slug: str,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> Response:
+    page_record = _published_content_page_record(db, slug)
+    if page_record is None:
+        raise HTTPException(status_code=404, detail="Renderable page not found")
+    page = ContentPage.model_validate(page_record.schema_json)
+    manifest = _find_script_sandbox_manifest(page, sandbox_id)
+    references = _script_manifest_references(manifest)
+    for reference in references:
+        _script_asset_binding(db, page_record, sandbox_id, reference)
+    document = _script_sandbox_document_contract(manifest)
+    asset_descriptors = _script_sandbox_asset_descriptors(db, page_record, sandbox_id, references)
+    payload = _script_sandbox_bootstrap_js(
+        slug=page.slug,
+        sandbox_id=sandbox_id,
+        asset_descriptors=asset_descriptors,
+        document=document,
+    )
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Astra-Content-Script-Sandbox-Id"] = sandbox_id
+    response.headers["X-Astra-Content-Script-Bootstrap-Version"] = "bootstrap-v1"
+    response.headers["X-Astra-Content-Script-Asset-Count"] = str(len(asset_descriptors))
+    response.headers["X-Astra-Content-Script-Template-Id"] = document.template_id
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return Response(
+        content=payload,
+        media_type="application/javascript; charset=utf-8",
+        headers=dict(response.headers),
+    )
+
+
+@router.get("/script-sandboxes/{sandbox_id}/assets/{asset_sha256}/page/{slug:path}")
+def render_script_sandbox_asset(
+    sandbox_id: str,
+    asset_sha256: str,
+    slug: str,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> Response:
+    page_record = _published_content_page_record(db, slug)
+    if page_record is None:
+        raise HTTPException(status_code=404, detail="Renderable page not found")
+    page = ContentPage.model_validate(page_record.schema_json)
+    manifest = _find_script_sandbox_manifest(page, sandbox_id)
+    references = _script_manifest_references(manifest)
+    reference = _script_reference_by_sha256(references, asset_sha256)
+    if reference is None:
+        raise HTTPException(status_code=404, detail="Script sandbox asset not found")
+    binding = _script_asset_binding(db, page_record, sandbox_id, reference)
+    if isinstance(binding, ContentScriptAsset):
+        payload = binding.content_bytes
+        response.headers["X-Astra-Content-Script-Asset-Bytes-Sha256"] = binding.asset_sha256
+    else:
+        payload = binding.read_bytes()
+    response.headers["X-Astra-Content-Script-Sandbox-Id"] = sandbox_id
+    response.headers["X-Astra-Content-Script-Asset-Sha256"] = asset_sha256
+    response.headers["X-Astra-Content-Script-Reference-Sha256"] = asset_sha256
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Cache-Control"] = "no-store"
+    # A sandboxed iframe without allow-same-origin has an opaque origin. SRI
+    # therefore requires an anonymous CORS response even when the asset URL is
+    # hosted by the same API that served the iframe document. This endpoint is
+    # a public, hash-bound executable asset and never accepts credentials, so a
+    # resource-local wildcard is safe without relaxing credentialed API CORS.
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return Response(
+        content=payload,
+        media_type="application/javascript; charset=utf-8",
+        headers=dict(response.headers),
+    )
 
 
 @router.get("/page/{slug:path}", response_model=ContentPage)
-def render_page(slug: str, db: Session = Depends(get_db)) -> ContentPage:
-    page = get_page_schema(db, slug)
-    if page is None:
+def render_page(slug: str, response: Response, db: Session = Depends(get_db)) -> ContentPage:
+    page_record = _published_content_page_record(db, slug)
+    if page_record is None:
         raise HTTPException(status_code=404, detail="Renderable page not found")
+    private_page = ContentPage.model_validate(page_record.schema_json)
+    page = public_content_page_schema(private_page)
+    blocked_sandbox_ids = _blocked_script_sandbox_ids(db, private_page)
+    _apply_script_sandbox_embed_descriptors(page, blocked_sandbox_ids=blocked_sandbox_ids)
+    _apply_script_contract_headers(response, page)
     return page
+
+
+def _apply_script_sandbox_embed_descriptors(page: ContentPage, *, blocked_sandbox_ids: set[str] | None = None) -> None:
+    payload = page.model_dump(mode="json")
+    sandbox_id_counts = _script_manifest_sandbox_id_counts(payload)
+    _inject_script_sandbox_embed_descriptors(
+        payload,
+        slug=page.slug,
+        sandbox_id_counts=sandbox_id_counts,
+        blocked_sandbox_ids=blocked_sandbox_ids or set(),
+    )
+    updated = ContentPage.model_validate(payload)
+    page.sections = updated.sections
+
+
+def _script_manifest_sandbox_id_counts(payload: dict[str, Any]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for manifest in _collect_script_manifests(payload):
+        sandbox_id = manifest.get("sandboxId")
+        if isinstance(sandbox_id, str):
+            counts[sandbox_id] = counts.get(sandbox_id, 0) + 1
+    return counts
+
+
+def _inject_script_sandbox_embed_descriptors(
+    value: Any,
+    *,
+    slug: str,
+    sandbox_id_counts: dict[str, int],
+    blocked_sandbox_ids: set[str],
+) -> None:
+    if isinstance(value, list):
+        for item in value:
+            _inject_script_sandbox_embed_descriptors(
+                item,
+                slug=slug,
+                sandbox_id_counts=sandbox_id_counts,
+                blocked_sandbox_ids=blocked_sandbox_ids,
+            )
+        return
+    if not isinstance(value, dict):
+        return
+    manifest = value.get("scriptManifest")
+    if isinstance(manifest, dict):
+        descriptor = _script_sandbox_iframe_descriptor(
+            slug=slug,
+            manifest=manifest,
+            sandbox_id_counts=sandbox_id_counts,
+            blocked_sandbox_ids=blocked_sandbox_ids,
+        )
+        if descriptor is not None:
+            manifest["embed"] = descriptor
+    for item in value.values():
+        _inject_script_sandbox_embed_descriptors(
+            item,
+            slug=slug,
+            sandbox_id_counts=sandbox_id_counts,
+            blocked_sandbox_ids=blocked_sandbox_ids,
+        )
+
+
+def _script_sandbox_iframe_descriptor(
+    *,
+    slug: str,
+    manifest: dict[str, Any],
+    sandbox_id_counts: dict[str, int],
+    blocked_sandbox_ids: set[str],
+) -> dict[str, Any] | None:
+    sandbox_id = manifest.get("sandboxId")
+    sandbox = manifest.get("sandbox")
+    references = manifest.get("references")
+    if (
+        not isinstance(sandbox_id, str)
+        or sandbox_id_counts.get(sandbox_id, 0) != 1
+        or not isinstance(sandbox, dict)
+        or sandbox.get("status") != "isolated"
+        or not isinstance(sandbox.get("iframeSandbox"), str)
+        or not isinstance(sandbox.get("csp"), str)
+        or not isinstance(references, list)
+        or not references
+    ):
+        return None
+    if sandbox_id in blocked_sandbox_ids:
+        return None
+    if not all(isinstance(reference, dict) and _is_valid_sha256(reference.get("valueSha256")) for reference in references):
+        return None
+    try:
+        document = resolve_script_sandbox_document(sandbox.get("document"))
+    except ScriptSandboxDocumentError:
+        return None
+    capabilities = sandbox.get("capabilities") if isinstance(sandbox.get("capabilities"), dict) else {}
+    system_message_types = [
+        "bootstrap-ready",
+        "assets-ready",
+        "ready",
+        "error",
+        "unhandledrejection",
+    ]
+    return {
+        "descriptorVersion": "astra-script-sandbox-embed-v1",
+        "status": "embeddable",
+        "sandboxId": sandbox_id,
+        "iframe": {
+            "src": _script_sandbox_page_url(slug=slug, sandbox_id=sandbox_id),
+            "sandbox": sandbox["iframeSandbox"],
+            "referrerPolicy": "no-referrer",
+            "loading": "lazy",
+            "title": "Astra Script Sandbox",
+        },
+        "requiredContentSecurityPolicy": sandbox["csp"],
+        "originModel": "opaque",
+        "capabilities": capabilities,
+        "messageProtocol": {
+            "source": "astra-content-script-sandbox",
+            "sandboxId": sandbox_id,
+            "bootstrapProtocolVersion": "astra-script-sandbox-bootstrap-v1",
+            "systemMessageTypes": system_message_types,
+        },
+        "assetCount": len(references),
+        "document": {
+            "contractVersion": document.contract_version,
+            "templateId": document.template_id,
+        },
+    }
+
+
+def _apply_script_contract_headers(response: Response, page: ContentPage) -> None:
+    manifests = _collect_script_manifests(page.model_dump(mode="json"))
+    response.headers["X-Astra-Content-Script-Sandbox"] = "required" if manifests else "not-required"
+    response.headers["X-Astra-Content-Script-Manifest-Count"] = str(len(manifests))
+    if not manifests:
+        return
+    iframe_sandbox = _uniform_script_contract_value(manifests, "iframeSandbox")
+    if iframe_sandbox is not None:
+        response.headers["X-Astra-Content-Script-Iframe-Sandbox"] = iframe_sandbox
+    content_security_policy = _uniform_script_contract_value(manifests, "csp")
+    if content_security_policy is not None:
+        response.headers["X-Astra-Content-Script-CSP"] = content_security_policy
+
+
+def _uniform_script_contract_value(manifests: list[dict[str, Any]], key: str) -> str | None:
+    values = []
+    for manifest in manifests:
+        sandbox = manifest.get("sandbox")
+        if not isinstance(sandbox, dict):
+            return None
+        value = sandbox.get(key)
+        if not isinstance(value, str):
+            return None
+        values.append(value)
+    unique_values = set(values)
+    if len(unique_values) != 1:
+        return None
+    return values[0]
+
+
+def _collect_script_manifests(value: Any) -> list[dict[str, Any]]:
+    manifests: list[dict[str, Any]] = []
+    if isinstance(value, list):
+        for item in value:
+            manifests.extend(_collect_script_manifests(item))
+        return manifests
+    if not isinstance(value, dict):
+        return manifests
+    manifest = value.get("scriptManifest")
+    if isinstance(manifest, dict):
+        manifests.append(manifest)
+    for item in value.values():
+        manifests.extend(_collect_script_manifests(item))
+    return manifests
+
+
+def _find_script_sandbox_manifest(page: ContentPage, sandbox_id: str) -> dict[str, Any]:
+    manifests = [
+        manifest
+        for manifest in collect_content_script_manifests(page, include_private_values=True)
+        if manifest.get("sandboxId") == sandbox_id
+    ]
+    if not manifests:
+        raise HTTPException(status_code=404, detail="Script sandbox manifest not found")
+    if len(manifests) > 1:
+        raise HTTPException(status_code=409, detail="Script sandbox manifest is ambiguous")
+    manifest = manifests[0]
+    sandbox = manifest.get("sandbox")
+    if not isinstance(sandbox, dict) or sandbox.get("status") != "isolated":
+        if isinstance(sandbox, dict) and isinstance(sandbox.get("code"), str):
+            raise HTTPException(
+                status_code=409,
+                detail={"code": sandbox["code"], "message": "Script sandbox document contract is not executable"},
+            )
+        raise HTTPException(status_code=409, detail="Script sandbox manifest is not executable")
+    if not isinstance(sandbox.get("csp"), str) or not isinstance(sandbox.get("iframeSandbox"), str):
+        raise HTTPException(status_code=409, detail="Script sandbox manifest is incomplete")
+    references = manifest.get("references")
+    if not isinstance(references, list) or not references:
+        raise HTTPException(status_code=409, detail="Script sandbox manifest has no executable references")
+    return manifest
+
+
+def _script_sandbox_document_contract(manifest: dict[str, Any]) -> ResolvedScriptSandboxDocument:
+    sandbox = manifest.get("sandbox")
+    value = sandbox.get("document") if isinstance(sandbox, dict) else None
+    try:
+        return resolve_script_sandbox_document(value)
+    except ScriptSandboxDocumentError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": exc.code, "message": exc.message},
+        ) from exc
+
+
+def _published_content_page_record(db: Session, slug: str) -> ContentPageRecord | None:
+    return db.scalar(
+        select(ContentPageRecord).where(
+            ContentPageRecord.slug == slug.strip("/"),
+            ContentPageRecord.status == "published",
+        )
+    )
+
+
+def _script_manifest_references(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    references = manifest.get("references")
+    if not isinstance(references, list) or not references:
+        raise HTTPException(status_code=409, detail="Script sandbox manifest has no executable references")
+    if not all(isinstance(reference, dict) for reference in references):
+        raise HTTPException(status_code=409, detail="Script sandbox manifest references are invalid")
+    if not all(_is_valid_sha256(reference.get("valueSha256")) for reference in references):
+        raise HTTPException(status_code=409, detail="Script sandbox manifest references are invalid")
+    return references
+
+
+def _script_reference_by_sha256(references: list[dict[str, Any]], asset_sha256: str) -> dict[str, Any] | None:
+    normalized_asset_sha256 = asset_sha256.strip().lower()
+    if not _is_valid_sha256(normalized_asset_sha256):
+        return None
+    for reference in references:
+        value_sha256 = reference.get("valueSha256")
+        if isinstance(value_sha256, str) and value_sha256.lower() == normalized_asset_sha256:
+            return reference
+    return None
+
+
+def _is_valid_sha256(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    normalized = value.strip().lower()
+    return len(normalized) == 64 and all(char in "0123456789abcdef" for char in normalized)
+
+
+def _local_script_source_from_reference(reference: dict[str, Any]) -> str:
+    key = str(reference.get("key", ""))
+    normalized_key = key.replace("_", "").replace("-", "").lower()
+    if normalized_key == "inlinescript":
+        raise HTTPException(status_code=409, detail="Inline scripts cannot be rendered in a sandbox document")
+    value = reference.get("value")
+    if not isinstance(value, str) or not value.strip():
+        raise HTTPException(status_code=409, detail="Script sandbox reference is missing a source")
+    source = value.strip()
+    lowered = source.lower()
+    if lowered.startswith(("http://", "https://", "//")):
+        raise HTTPException(status_code=409, detail="External script sandbox documents require mirrored assets")
+    if lowered.startswith(("javascript:", "data:", "vbscript:", "blob:")):
+        raise HTTPException(status_code=409, detail="Script sandbox reference uses a blocked protocol")
+    decoded = unquote(source).replace("\\", "/")
+    normalized_path = decoded.lstrip("/")
+    if not normalized_path or any(part in {"", ".", ".."} for part in normalized_path.split("/")):
+        raise HTTPException(status_code=409, detail="Script sandbox reference path is unsafe")
+    path = f"/{normalized_path}"
+    if not path.endswith(".js"):
+        raise HTTPException(status_code=409, detail="Script sandbox reference must point to a JavaScript asset")
+    return path
+
+
+def _script_asset_binding(
+    db: Session,
+    page: ContentPageRecord,
+    sandbox_id: str,
+    reference: dict[str, Any],
+) -> Path | ContentScriptAsset:
+    if _is_external_script_reference(reference):
+        return _external_script_asset(db, page, sandbox_id, reference)
+    return _local_script_asset_path(reference)
+
+
+def _is_external_script_reference(reference: dict[str, Any]) -> bool:
+    value = reference.get("value")
+    if not isinstance(value, str):
+        return False
+    return value.strip().lower().startswith(("http://", "https://", "//"))
+
+
+def _external_script_asset(
+    db: Session,
+    page: ContentPageRecord,
+    sandbox_id: str,
+    reference: dict[str, Any],
+) -> ContentScriptAsset:
+    if page.current_version_id is None:
+        raise HTTPException(status_code=409, detail="External script sandbox asset is not bound to a published version")
+    value_sha256 = reference.get("valueSha256")
+    if not _is_valid_sha256(value_sha256):
+        raise HTTPException(status_code=409, detail="Script sandbox manifest references are invalid")
+    value = reference.get("value")
+    integrity = reference.get("integrity")
+    crossorigin = reference.get("crossorigin")
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or not value.strip().lower().startswith("https://")
+        or not isinstance(integrity, str)
+        or not integrity.strip()
+        or not isinstance(crossorigin, str)
+        or crossorigin.strip().lower() != "anonymous"
+    ):
+        raise HTTPException(status_code=409, detail="External script sandbox asset metadata is incomplete")
+    asset = get_bound_content_script_asset(
+        db,
+        page_version_id=page.current_version_id,
+        sandbox_id=sandbox_id,
+        reference_value_sha256=str(value_sha256),
+    )
+    if asset is None:
+        raise HTTPException(status_code=409, detail="External script sandbox asset is not mirrored")
+    if asset.slug != page.slug or asset.source_url != value.strip() or asset.integrity != integrity.strip():
+        raise HTTPException(status_code=409, detail="External script sandbox asset binding is stale")
+    if _content_script_source_host_blocked(db, asset.source_host):
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "content_script_host_blocked", "source_hosts": [asset.source_host]},
+        )
+    return asset
+
+
+def _blocked_script_sandbox_ids(db: Session, page: ContentPage) -> set[str]:
+    blocked: set[str] = set()
+    for manifest in collect_content_script_manifests(page, include_private_values=True):
+        sandbox_id = manifest.get("sandboxId")
+        references = manifest.get("references")
+        if not isinstance(sandbox_id, str) or not isinstance(references, list):
+            continue
+        for reference in references:
+            if not isinstance(reference, dict):
+                continue
+            value = reference.get("value")
+            if not isinstance(value, str):
+                continue
+            source = value.strip()
+            if not source.lower().startswith(("http://", "https://", "//")):
+                continue
+            source_host = _external_reference_host(source)
+            if source_host and _content_script_source_host_blocked(db, source_host):
+                blocked.add(sandbox_id)
+                break
+    return blocked
+
+
+def _content_script_source_host_blocked(db: Session, source_host: str | None) -> bool:
+    if not source_host:
+        return False
+    return (
+        db.scalar(
+            select(ContentScriptHostPolicy).where(
+                ContentScriptHostPolicy.source_host == source_host.strip().lower(),
+                ContentScriptHostPolicy.status == "blocked",
+            )
+        )
+        is not None
+    )
+
+
+def _external_reference_host(source: str) -> str | None:
+    from urllib.parse import urlsplit
+
+    parsed = urlsplit(source if not source.startswith("//") else f"https:{source}")
+    return parsed.hostname.lower() if parsed.hostname else None
+
+
+def _local_script_asset_path(reference: dict[str, Any]) -> Path:
+    source = _local_script_source_from_reference(reference)
+    asset_path = _script_asset_path(source)
+    if not asset_path.is_file():
+        raise HTTPException(status_code=404, detail="Script sandbox asset file not found")
+    return asset_path
+
+
+def _script_asset_path(source: str) -> Path:
+    relative_source = source.lstrip("/")
+    candidate = (PROJECT_ROOT / relative_source).resolve()
+    try:
+        candidate.relative_to(PROJECT_ROOT)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail="Script sandbox reference path is outside the project") from exc
+    if not _is_allowed_local_script_asset(candidate):
+        raise HTTPException(status_code=409, detail="Script sandbox asset path is outside allowed roots")
+    return candidate
+
+
+def _is_allowed_local_script_asset(candidate: Path) -> bool:
+    for root in LOCAL_SCRIPT_ASSET_ROOTS:
+        try:
+            candidate.relative_to(root.resolve())
+            return True
+        except ValueError:
+            continue
+    return False
+
+
+def _harden_sandbox_csp(
+    csp: str,
+    *,
+    nonce: str,
+    script_hashes: list[str] | None = None,
+    frame_ancestors: list[str] | None = None,
+) -> str:
+    directives = _parse_csp_directives(csp)
+    _upsert_script_src_nonce(directives, nonce=nonce, script_hashes=script_hashes or [])
+    ancestors = frame_ancestors or ["'self'"]
+    for name, values in [
+        ("base-uri", ["'none'"]),
+        ("object-src", ["'none'"]),
+        ("frame-ancestors", ancestors),
+        ("form-action", ["'none'"]),
+    ]:
+        directives[name] = values
+    return "; ".join(
+        f"{name} {' '.join(values)}" if values else name
+        for name, values in directives.items()
+    )
+
+
+def _parse_csp_directives(csp: str) -> dict[str, list[str]]:
+    directives: dict[str, list[str]] = {}
+    for raw_directive in csp.split(";"):
+        parts = raw_directive.strip().split()
+        if not parts:
+            continue
+        name = parts[0].lower()
+        if name in directives:
+            continue
+        directives[name] = parts[1:]
+    return directives
+
+
+def _upsert_script_src_nonce(
+    directives: dict[str, list[str]],
+    *,
+    nonce: str,
+    script_hashes: list[str],
+) -> None:
+    nonce_source = f"'nonce-{nonce}'"
+    hash_sources = [f"'{value}'" for value in script_hashes if value.startswith("sha256-")]
+    directives["script-src"] = [nonce_source, *dict.fromkeys(hash_sources)]
+
+
+def _sandbox_frame_ancestors() -> list[str]:
+    ancestors = ["'self'"]
+    for origin in get_settings().cors_origin_list:
+        normalized = _frame_ancestor_origin(origin)
+        if normalized and normalized not in ancestors:
+            ancestors.append(normalized)
+    return ancestors
+
+
+def _frame_ancestor_origin(value: str) -> str:
+    stripped = value.strip()
+    if stripped in {"*", "null"}:
+        return ""
+    parsed = urlsplit(stripped)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _script_sandbox_nonce() -> str:
+    return secrets.token_urlsafe(24)
+
+
+def _script_sandbox_html(
+    *,
+    slug: str,
+    sandbox_id: str,
+    nonce: str,
+    document: ResolvedScriptSandboxDocument,
+) -> str:
+    bootstrap_url = _script_sandbox_bootstrap_url(slug=slug, sandbox_id=sandbox_id)
+    return (
+        "<!doctype html>\n"
+        '<html lang="zh-CN">\n'
+        "  <head>\n"
+        '    <meta charset="utf-8">\n'
+        '    <meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        f'    <meta name="astra-content-slug" content="{escape(slug, quote=True)}">\n'
+        f'    <meta name="astra-script-sandbox-id" content="{escape(sandbox_id, quote=True)}">\n'
+        f'    <meta name="astra-script-sandbox-template-id" content="{escape(document.template_id, quote=True)}">\n'
+        "    <title>Astra Script Sandbox</title>\n"
+        f"    <style>{document.stylesheet}</style>\n"
+        "  </head>\n"
+        "  <body>\n"
+        f'    <div id="astra-sandbox-root" data-slug="{escape(slug, quote=True)}" '
+        f'data-sandbox-id="{escape(sandbox_id, quote=True)}" '
+        f'data-template-id="{escape(document.template_id, quote=True)}">\n'
+        f"{document.body_html}"
+        "    </div>\n"
+        f'    <script src="{escape(bootstrap_url, quote=True)}" nonce="{escape(nonce, quote=True)}" defer></script>\n'
+        "  </body>\n"
+        "</html>\n"
+    )
+
+
+def _script_sandbox_bootstrap_js(
+    *,
+    slug: str,
+    sandbox_id: str,
+    asset_descriptors: list[dict[str, str]],
+    document: ResolvedScriptSandboxDocument,
+) -> str:
+    slug_literal = _js_string_literal(slug)
+    sandbox_id_literal = _js_string_literal(sandbox_id)
+    asset_descriptors_literal = json.dumps(asset_descriptors, separators=(",", ":"))
+    template_id_literal = _js_string_literal(document.template_id)
+    contract_version_literal = _js_string_literal(document.contract_version)
+    initializer_literal = _js_string_literal(document.initializer)
+    config_literal = json.dumps(document.config, ensure_ascii=False, separators=(",", ":"))
+    return (
+        "(() => {\n"
+        '  "use strict";\n'
+        "  const metadata = Object.freeze({\n"
+        "    protocolVersion: \"astra-script-sandbox-bootstrap-v1\",\n"
+        f"    slug: {slug_literal},\n"
+        f"    sandboxId: {sandbox_id_literal},\n"
+        f"    assetCount: {len(asset_descriptors)},\n"
+        f"    documentContractVersion: {contract_version_literal},\n"
+        f"    templateId: {template_id_literal},\n"
+        "  });\n"
+        f"  const assetDescriptors = Object.freeze({asset_descriptors_literal}.map((asset) => Object.freeze(asset)));\n"
+        "  const assetUrls = Object.freeze(assetDescriptors.map((asset) => asset.url));\n"
+        f"  const documentConfig = Object.freeze({config_literal});\n"
+        f"  const initializerName = {initializer_literal};\n"
+        '  const root = document.getElementById("astra-sandbox-root");\n'
+        "  const post = (type, payload = {}) => {\n"
+        "    if (window.parent === window) return;\n"
+        "    window.parent.postMessage({ source: \"astra-content-script-sandbox\", type, metadata, payload }, \"*\");\n"
+        "  };\n"
+        "  const normalizeError = (value) => {\n"
+        "    if (!value) return \"\";\n"
+        "    if (typeof value === \"string\") return value.slice(0, 500);\n"
+        "    if (value && typeof value.message === \"string\") return value.message.slice(0, 500);\n"
+        "    return String(value).slice(0, 500);\n"
+        "  };\n"
+        "  const isBenignResizeObserverError = (value) => {\n"
+        "    const message = normalizeError(value);\n"
+        "    return message === \"ResizeObserver loop limit exceeded\"\n"
+        "      || message === \"ResizeObserver loop completed with undelivered notifications.\";\n"
+        "  };\n"
+        "  window.__ASTRA_SCRIPT_SANDBOX__ = Object.freeze({\n"
+        "    metadata,\n"
+        "    assetUrls,\n"
+        "    documentConfig,\n"
+        "    root,\n"
+        "    ready(payload = {}) { post(\"ready\", payload); },\n"
+        "    error(payload = {}) { post(\"error\", payload); },\n"
+        "    post(type, payload = {}) { post(String(type || \"message\"), payload); },\n"
+        "  });\n"
+        "  const loadAsset = (asset) => new Promise((resolve, reject) => {\n"
+        "    const script = document.createElement(\"script\");\n"
+        "    script.src = asset.url;\n"
+        "    script.integrity = asset.integrity;\n"
+        "    script.crossOrigin = \"anonymous\";\n"
+        "    script.defer = true;\n"
+        "    script.onload = () => resolve(asset.url);\n"
+        "    script.onerror = () => reject(new Error(\"Failed to load an approved sandbox asset.\"));\n"
+        "    document.head.appendChild(script);\n"
+        "  });\n"
+        "  const loadAssets = async () => {\n"
+        "    for (const asset of assetDescriptors) {\n"
+        "      await loadAsset(asset);\n"
+        "    }\n"
+        "  };\n"
+        "  const initializeDocument = async () => {\n"
+        "    if (!root) throw new Error(\"Sandbox root is missing.\");\n"
+        "    const initializer = window[initializerName];\n"
+        "    if (typeof initializer !== \"function\") throw new Error(\"Registered sandbox initializer is unavailable.\");\n"
+        "    const result = await initializer({ root, config: documentConfig, metadata });\n"
+        "    const ready = result === true || (result && result.ready === true);\n"
+        "    if (!ready) throw new Error(\"Registered sandbox initializer did not confirm readiness.\");\n"
+        "    return result;\n"
+        "  };\n"
+        "  window.addEventListener(\"error\", (event) => {\n"
+        "    if (isBenignResizeObserverError(event.message)) return;\n"
+        "    post(\"error\", {\n"
+        "      message: normalizeError(event.message),\n"
+        "      filename: event.filename || \"\",\n"
+        "      lineno: event.lineno || 0,\n"
+        "      colno: event.colno || 0,\n"
+        "    });\n"
+        "  });\n"
+        "  window.addEventListener(\"unhandledrejection\", (event) => {\n"
+        "    post(\"unhandledrejection\", { message: normalizeError(event.reason) });\n"
+        "  });\n"
+        "  post(\"bootstrap-ready\");\n"
+        "  loadAssets()\n"
+        "    .then(() => {\n"
+        "      post(\"assets-ready\", { assetCount: assetUrls.length });\n"
+        "      return initializeDocument();\n"
+        "    })\n"
+        "    .then(() => post(\"ready\", { templateId: metadata.templateId }))\n"
+        "    .catch((error) => post(\"error\", { code: \"content_script_sandbox_bootstrap_failed\", message: normalizeError(error) }));\n"
+        "})();\n"
+    )
+
+
+def _script_sandbox_asset_descriptors(
+    db: Session,
+    page: ContentPageRecord,
+    sandbox_id: str,
+    references: list[dict[str, Any]],
+) -> list[dict[str, str]]:
+    descriptors: list[dict[str, str]] = []
+    for reference in references:
+        binding = _script_asset_binding(db, page, sandbox_id, reference)
+        payload = binding.content_bytes if isinstance(binding, ContentScriptAsset) else binding.read_bytes()
+        integrity = "sha256-" + base64.b64encode(hashlib.sha256(payload).digest()).decode("ascii")
+        descriptors.append(
+            {
+                "url": _script_sandbox_asset_url(
+                    slug=page.slug,
+                    sandbox_id=sandbox_id,
+                    asset_sha256=str(reference["valueSha256"]),
+                ),
+                "integrity": integrity,
+            }
+        )
+    return descriptors
+
+
+def _js_string_literal(value: str) -> str:
+    return json.dumps(value)
+
+
+def _script_sandbox_bootstrap_url(*, slug: str, sandbox_id: str) -> str:
+    api_prefix = get_settings().api_prefix.rstrip("/")
+    encoded_slug = quote(slug, safe="/")
+    return f"{api_prefix}/render/script-sandboxes/{sandbox_id}/bootstrap/page/{encoded_slug}"
+
+
+def _script_sandbox_page_url(*, slug: str, sandbox_id: str) -> str:
+    api_prefix = get_settings().api_prefix.rstrip("/")
+    encoded_slug = quote(slug, safe="/")
+    return f"{api_prefix}/render/script-sandboxes/{sandbox_id}/page/{encoded_slug}"
+
+
+def _script_sandbox_asset_url(*, slug: str, sandbox_id: str, asset_sha256: str) -> str:
+    api_prefix = get_settings().api_prefix.rstrip("/")
+    encoded_slug = quote(slug, safe="/")
+    return f"{api_prefix}/render/script-sandboxes/{sandbox_id}/assets/{asset_sha256}/page/{encoded_slug}"

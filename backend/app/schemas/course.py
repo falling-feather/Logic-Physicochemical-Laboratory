@@ -3,13 +3,20 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.school import ClassRead
+
 
 CourseStatus = Literal["draft", "published", "archived"]
 UnitStatus = Literal["draft", "published", "archived"]
 AssignmentStatus = Literal["active", "closed", "archived"]
+AssignmentAudienceMode = Literal["all_attached_classes", "selected_classes"]
 SubmissionStatus = Literal["submitted", "graded", "returned"]
 SubmissionGradeStatus = Literal["graded", "returned"]
 LearningEventType = Literal["visit", "start", "submit", "complete"]
+AssignmentPointRuleSource = Literal["default", "custom", "class_override"]
+CourseCollaboratorRole = Literal["editor", "content_editor", "assessment_editor", "viewer"]
+CourseCollaboratorStatus = Literal["active", "inactive"]
+StudentAssignmentFilter = Literal["all", "active", "feedback", "history"]
 
 
 class CourseCreate(BaseModel):
@@ -43,6 +50,62 @@ class CourseClassRead(BaseModel):
     status: str
 
 
+class CourseCollaboratorCreate(BaseModel):
+    user_id: int
+    role: CourseCollaboratorRole = "editor"
+
+
+class CourseCollaboratorUpdate(BaseModel):
+    role: CourseCollaboratorRole | None = None
+    status: CourseCollaboratorStatus | None = None
+
+
+class CourseCollaboratorRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    course_id: int
+    user_id: int
+    role: str
+    status: str
+
+
+class CourseCollaboratorBatchItem(BaseModel):
+    user_id: int
+    role: CourseCollaboratorRole = "editor"
+    status: CourseCollaboratorStatus = "active"
+    client_ref: str | None = Field(default=None, max_length=64)
+
+
+class CourseCollaboratorBatchUpdate(BaseModel):
+    items: list[CourseCollaboratorBatchItem] = Field(min_length=1, max_length=100)
+
+
+class CourseCollaboratorBatchResult(BaseModel):
+    user_id: int
+    client_ref: str | None = None
+    outcome: Literal["created", "updated", "unchanged", "failed"]
+    collaborator: CourseCollaboratorRead | None = None
+    error_code: Literal[
+        "duplicate_item",
+        "collaborator_not_eligible",
+        "course_owner_conflict",
+        "collaborator_not_found",
+    ] | None = None
+
+
+class CourseCollaboratorBatchRead(BaseModel):
+    items: list[CourseCollaboratorBatchResult]
+    created_count: int
+    updated_count: int
+    unchanged_count: int
+    failed_count: int
+
+
+class CourseOwnerTransfer(BaseModel):
+    target_user_id: int
+
+
 class CourseUnitCreate(BaseModel):
     title: str = Field(min_length=1, max_length=180)
     position: int = Field(ge=1)
@@ -67,6 +130,7 @@ class AssignmentCreate(BaseModel):
     due_at: datetime | None = None
     max_score: int = Field(default=100, ge=0, le=1000)
     status: AssignmentStatus = "active"
+    audience_mode: AssignmentAudienceMode = "all_attached_classes"
 
 
 class AssignmentRead(BaseModel):
@@ -79,6 +143,13 @@ class AssignmentRead(BaseModel):
     due_at: datetime | None = None
     max_score: int
     status: str
+    audience_mode: str = "all_attached_classes"
+    effective_class_id: int | None = None
+    policy_source: Literal["base", "class_policy"] = "base"
+
+
+class AssignmentAudienceUpdate(BaseModel):
+    audience_mode: AssignmentAudienceMode
 
 
 class LearningEventCreate(BaseModel):
@@ -87,6 +158,7 @@ class LearningEventCreate(BaseModel):
     course_id: int | None = None
     unit_id: int | None = None
     assignment_id: int | None = None
+    knowledge_code: str | None = Field(default=None, max_length=120)
     payload: dict[str, Any] = Field(default_factory=dict)
     occurred_at: datetime | None = None
 
@@ -101,6 +173,7 @@ class LearningEventRead(BaseModel):
     course_id: int | None = None
     unit_id: int | None = None
     assignment_id: int | None = None
+    knowledge_code: str | None = None
     event_type: str
     payload: dict[str, Any]
     occurred_at: datetime
@@ -127,6 +200,37 @@ class SubmissionRead(BaseModel):
     graded_at: datetime | None = None
 
 
+class AssignmentReviewRead(BaseModel):
+    course_id: int
+    unit_id: int
+    assignment: AssignmentRead
+    submission: SubmissionRead | None = None
+    can_submit: bool
+    read_only: bool
+    submit_block_reason: str | None = None
+
+
+class StudentAssignmentCenterItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    class_: ClassRead = Field(alias="class")
+    course: CourseRead
+    unit: CourseUnitRead
+    assignment: AssignmentRead
+    submission: SubmissionRead | None = None
+    can_submit: bool
+    read_only: bool
+    submit_block_reason: str | None = None
+
+
+class StudentAssignmentCenterPage(BaseModel):
+    items: list[StudentAssignmentCenterItem]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
 class SubmissionGrade(BaseModel):
     score: int = Field(ge=0, le=1000)
     feedback: str | None = Field(default=None, max_length=4000)
@@ -146,6 +250,41 @@ class PointLedgerRead(BaseModel):
     reason: str
     note: str | None = None
     created_by_user_id: int | None = None
+
+
+class AssignmentPointRuleUpdate(BaseModel):
+    enabled: bool = True
+    points_per_score: int = Field(default=1, ge=0, le=1000)
+    max_points: int | None = Field(default=None, ge=0, le=100000)
+
+
+class AssignmentPointRuleRead(BaseModel):
+    assignment_id: int
+    enabled: bool
+    points_per_score: int
+    max_points: int | None = None
+    source: AssignmentPointRuleSource
+
+
+class AssignmentClassPolicyUpdate(BaseModel):
+    assigned: bool = True
+    status_override: AssignmentStatus | None = None
+    due_at_overridden: bool = False
+    due_at_override: datetime | None = None
+    point_rule: AssignmentPointRuleUpdate | None = None
+
+
+class AssignmentClassPolicyRead(BaseModel):
+    id: int | None = None
+    persisted: bool
+    assignment_id: int
+    class_id: int
+    assigned: bool
+    status_override: str | None = None
+    due_at_overridden: bool
+    due_at_override: datetime | None = None
+    point_rule: AssignmentPointRuleRead
+    effective_assignment: AssignmentRead
 
 
 class ProgressSummary(BaseModel):

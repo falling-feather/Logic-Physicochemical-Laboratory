@@ -1,22 +1,30 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
 from app.db.session import get_db
 from app.models import (
     Assignment,
+    AssignmentClassPolicy,
     ClassGroup,
-    ClassMembership,
     Course,
-    CourseClass,
     CourseUnit,
     LearningEvent,
-    SchoolMembership,
     User,
 )
 from app.models.base import utc_now
 from app.schemas.course import LearningEventCreate, LearningEventRead
+from app.services.access_control import (
+    course_attached_to_class,
+    get_class,
+    require_class_member,
+    require_class_teacher_or_admin,
+    require_course_visible,
+    require_student_unit_published,
+    teacher_class_ids,
+)
+from app.services.assignment_policies import resolve_assignment_class_policy
 
 
 router = APIRouter()
@@ -33,15 +41,23 @@ def create_learning_event(
     course, unit, assignment = _resolve_learning_scope(db, payload)
     if course is None:
         raise HTTPException(status_code=422, detail="Learning event must target a course, unit, or assignment")
-    _require_course_visible(db, current_user, course.id)
+    require_course_visible(db, current_user, course.id)
+    if unit is not None:
+        require_student_unit_published(current_user, unit)
 
     class_group: ClassGroup | None = None
     if payload.class_id is not None:
-        class_group = _require_class_member(db, current_user, payload.class_id)
+        class_group = require_class_member(db, current_user, payload.class_id)
         if class_group.school_id != course.school_id:
             raise HTTPException(status_code=422, detail="Class does not belong to course school")
-        if not _course_attached_to_class(db, course.id, class_group.id):
+        if not course_attached_to_class(db, course.id, class_group.id):
             raise HTTPException(status_code=403, detail="Course is not attached to this class")
+    if assignment is not None and class_group is not None:
+        effective = resolve_assignment_class_policy(db, assignment, class_group.id)
+        if not effective.assigned:
+            raise HTTPException(status_code=403, detail="Assignment is not assigned to this class")
+        if current_user.role == "student" and effective.status != "active":
+            raise HTTPException(status_code=409, detail="Assignment is not active")
 
     event = LearningEvent(
         user_id=current_user.id,
@@ -50,6 +66,7 @@ def create_learning_event(
         course_id=course.id,
         unit_id=unit.id if unit is not None else None,
         assignment_id=assignment.id if assignment is not None else None,
+        knowledge_code=(payload.knowledge_code or "").strip().lower() or None,
         event_type=payload.event_type,
         payload=payload.payload,
         occurred_at=payload.occurred_at or utc_now(),
@@ -80,22 +97,28 @@ def list_learning_events(
             raise HTTPException(status_code=403, detail="Students can only view their own learning events")
         statement = statement.where(LearningEvent.user_id == current_user.id)
         if class_id is not None:
-            _require_class_member(db, current_user, class_id)
+            require_class_member(db, current_user, class_id)
             statement = statement.where(LearningEvent.class_id == class_id)
+        statement = _apply_student_visible_event_filters(statement)
         return list(db.scalars(statement).all())
 
     if class_id is not None:
-        class_group = _get_class(db, class_id)
-        _require_school_role(db, current_user, class_group.school_id, {"admin", "teacher"})
+        class_group = get_class(db, class_id)
+        require_class_teacher_or_admin(
+            db,
+            current_user,
+            class_group,
+            detail="Learning events require class teacher scope",
+        )
         statement = statement.where(LearningEvent.class_id == class_id)
         if user_id is not None:
             statement = statement.where(LearningEvent.user_id == user_id)
         return list(db.scalars(statement).all())
 
-    school_ids = _teacher_school_ids(db, current_user.id)
-    if not school_ids:
+    class_ids = teacher_class_ids(db, current_user.id)
+    if not class_ids:
         return []
-    statement = statement.where(LearningEvent.school_id.in_(school_ids))
+    statement = statement.where(LearningEvent.class_id.in_(class_ids))
     if user_id is not None:
         statement = statement.where(LearningEvent.user_id == user_id)
     return list(db.scalars(statement).all())
@@ -134,105 +157,36 @@ def _resolve_learning_scope(
     return course, unit, assignment
 
 
-def _get_class(db: Session, class_id: int) -> ClassGroup:
-    class_group = db.get(ClassGroup, class_id)
-    if class_group is None:
-        raise HTTPException(status_code=404, detail="Class not found")
-    return class_group
-
-
-def _teacher_school_ids(db: Session, user_id: int) -> list[int]:
-    return list(
-        db.scalars(
-            select(SchoolMembership.school_id).where(
-                SchoolMembership.user_id == user_id,
-                SchoolMembership.role.in_(["admin", "teacher"]),
-                SchoolMembership.status == "active",
-            )
-        ).all()
+def _apply_student_visible_event_filters(statement):
+    effective_assignment_status = func.coalesce(AssignmentClassPolicy.status_override, Assignment.status)
+    assignment_is_visible = or_(
+        and_(
+            Assignment.audience_mode == "selected_classes",
+            AssignmentClassPolicy.id.is_not(None),
+            AssignmentClassPolicy.assigned.is_(True),
+        ),
+        and_(
+            Assignment.audience_mode == "all_attached_classes",
+            or_(AssignmentClassPolicy.id.is_(None), AssignmentClassPolicy.assigned.is_(True)),
+        ),
     )
-
-
-def _visible_class_ids(db: Session, user_id: int) -> list[int]:
-    return list(
-        db.scalars(
-            select(ClassMembership.class_id).where(
-                ClassMembership.user_id == user_id,
-                ClassMembership.status == "active",
-            )
-        ).all()
-    )
-
-
-def _require_course_visible(db: Session, user: User, course_id: int) -> Course:
-    course = db.get(Course, course_id)
-    if course is None:
-        raise HTTPException(status_code=404, detail="Course not found")
-    if user.role == "admin":
-        return course
-    school_membership = db.scalar(
-        select(SchoolMembership).where(
-            SchoolMembership.school_id == course.school_id,
-            SchoolMembership.user_id == user.id,
-            SchoolMembership.role.in_(["admin", "teacher"]),
-            SchoolMembership.status == "active",
-        )
-    )
-    if school_membership is not None:
-        return course
-    class_ids = _visible_class_ids(db, user.id)
-    if class_ids:
-        course_class = db.scalar(
-            select(CourseClass).where(
-                CourseClass.course_id == course.id,
-                CourseClass.class_id.in_(class_ids),
-                CourseClass.status == "active",
-            )
-        )
-        if course_class is not None:
-            return course
-    raise HTTPException(status_code=403, detail="Course is outside current user scope")
-
-
-def _require_class_member(db: Session, user: User, class_id: int) -> ClassGroup:
-    class_group = _get_class(db, class_id)
-    if user.role == "admin":
-        return class_group
-    membership = db.scalar(
-        select(ClassMembership).where(
-            ClassMembership.class_id == class_id,
-            ClassMembership.user_id == user.id,
-            ClassMembership.status == "active",
-        )
-    )
-    if membership is None:
-        raise HTTPException(status_code=403, detail="Class is outside current user scope")
-    return class_group
-
-
-def _require_school_role(db: Session, user: User, school_id: int, roles: set[str]) -> None:
-    if user.role == "admin":
-        return
-    membership = db.scalar(
-        select(SchoolMembership).where(
-            SchoolMembership.school_id == school_id,
-            SchoolMembership.user_id == user.id,
-            SchoolMembership.role.in_(roles),
-            SchoolMembership.status == "active",
-        )
-    )
-    if membership is None:
-        raise HTTPException(status_code=403, detail="School role is outside current user scope")
-
-
-def _course_attached_to_class(db: Session, course_id: int, class_id: int) -> bool:
     return (
-        db.scalar(
-            select(CourseClass).where(
-                CourseClass.course_id == course_id,
-                CourseClass.class_id == class_id,
-                CourseClass.status == "active",
-            )
+        statement.outerjoin(Course, Course.id == LearningEvent.course_id)
+        .outerjoin(CourseUnit, CourseUnit.id == LearningEvent.unit_id)
+        .outerjoin(Assignment, Assignment.id == LearningEvent.assignment_id)
+        .outerjoin(
+            AssignmentClassPolicy,
+            and_(
+                AssignmentClassPolicy.assignment_id == LearningEvent.assignment_id,
+                AssignmentClassPolicy.class_id == LearningEvent.class_id,
+            ),
         )
-        is not None
+        .where(
+            or_(LearningEvent.course_id.is_(None), Course.status == "published"),
+            or_(LearningEvent.unit_id.is_(None), CourseUnit.status == "published"),
+            or_(
+                LearningEvent.assignment_id.is_(None),
+                and_(assignment_is_visible, effective_assignment_status == "active"),
+            ),
+        )
     )

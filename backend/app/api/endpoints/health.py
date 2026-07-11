@@ -10,7 +10,9 @@ router = APIRouter()
 @router.get("/health")
 def health_check() -> dict:
     settings = get_settings()
-    database = check_database(settings.database_url)
+    database_check = check_database(settings.database_url)
+    database = {key: value for key, value in database_check.items() if key != "url"}
+    database["url_returned"] = False
     return {
         "status": "ok" if database["ok"] else "degraded",
         "service": "astra-backend",

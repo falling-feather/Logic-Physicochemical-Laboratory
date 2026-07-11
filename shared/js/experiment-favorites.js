@@ -6,6 +6,7 @@ const ExperimentFavorites = {
     _btn: null,
     _currentModule: null,
     _storageKey: 'englab-favorites',
+    _favorites: [],
 
     init() {
         // Nothing global — per-experiment show/hide via show()/hide()
@@ -52,13 +53,11 @@ const ExperimentFavorites = {
     // ── Internal ──
 
     _getFavorites() {
-        try {
-            return JSON.parse(localStorage.getItem(this._storageKey)) || [];
-        } catch (e) { return []; }
+        return this._favorites.slice();
     },
 
     _setFavorites(arr) {
-        localStorage.setItem(this._storageKey, JSON.stringify(arr));
+        this._favorites = arr.slice();
     },
 
     _toggle(moduleId) {
