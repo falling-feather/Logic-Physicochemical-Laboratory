@@ -48,6 +48,7 @@ std::string get_mime_type(const std::string& path) {
         {".css", "text/css; charset=utf-8"},
         {".js", "application/javascript; charset=utf-8"},
         {".json", "application/json; charset=utf-8"},
+        {".md", "text/markdown; charset=utf-8"},
         {".png", "image/png"},
         {".jpg", "image/jpeg"},
         {".jpeg", "image/jpeg"},
@@ -152,6 +153,9 @@ int main(int argc, char* argv[]) {
     server.Get("/sw.js", [&serve_root_file](const httplib::Request&, httplib::Response& response) {
         serve_root_file("sw.js", response);
     });
+    server.Get("/LICENSE.md", [&serve_root_file](const httplib::Request&, httplib::Response& response) {
+        serve_root_file("LICENSE.md", response);
+    });
 
     server.set_logger([](const httplib::Request& request, const httplib::Response& response) {
         log_request(request, response);
@@ -164,7 +168,7 @@ int main(int argc, char* argv[]) {
     });
 
     std::cout << "EngLab C++ static server\n"
-              << "  Public artifact allowlist: index.html, sw.js, pages/, shared/, UI/, codevis/\n"
+              << "  Public artifact allowlist: index.html, sw.js, LICENSE.md, pages/, shared/, UI/, codevis/\n"
               << "  URL: http://" << host << ":" << port << "\n";
     if (!server.listen(host, port)) {
         std::cerr << "ERROR: Failed to start server on " << host << ":" << port << "\n";

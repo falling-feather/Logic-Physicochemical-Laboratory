@@ -7,7 +7,7 @@ const PORT = Number(process.env.PORT || getArg('--port') || getArg('-p') || 8766
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ROOT_REAL = await realpath(ROOT);
 const PUBLIC_DIRECTORIES = new Set(['pages', 'shared', 'UI', 'codevis']);
-const PUBLIC_ROOT_FILES = new Set(['index.html', 'sw.js']);
+const PUBLIC_ROOT_FILES = new Set(['index.html', 'sw.js', 'LICENSE.md']);
 
 const MIME = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -15,6 +15,7 @@ const MIME = new Map([
   ['.js', 'application/javascript; charset=utf-8'],
   ['.mjs', 'application/javascript; charset=utf-8'],
   ['.json', 'application/json; charset=utf-8'],
+  ['.md', 'text/markdown; charset=utf-8'],
   ['.png', 'image/png'],
   ['.jpg', 'image/jpeg'],
   ['.jpeg', 'image/jpeg'],
