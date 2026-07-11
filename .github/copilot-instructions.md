@@ -10,7 +10,7 @@
 - 业务后端：`backend/` 中的 FastAPI + SQLAlchemy + Alembic，生产数据库目标为 MySQL。
 - 静态服务：`server/` 中的 Node 开发服务和 C++ Release 服务，只公开审核后的浏览器资源。
 
-当前基线为 V7.4.10 登录/角色外壳、后端分域及 Python/Node 依赖锁定，V6.6.63 后端阶段完成。外部 Webhook、GitHub issue sync、audit anchor 默认关闭。
+当前基线为 V7.4.11 登录/角色外壳、后端分域及 Python/Node/C++ 依赖与产物追踪，V6.6.63 后端阶段完成。外部 Webhook、GitHub issue sync、audit anchor 默认关闭。
 
 ## 必读入口
 
@@ -63,7 +63,7 @@ npm test
 git diff --check
 ```
 
-Node 工具链固定为 `.node-version` 中的 Node 22.20.0 和 npm 10.9.3，Playwright 必须来自 `package-lock.json`；修改 C++/CMake 时执行 Release configure/build；修改用户可见页面时做桌面和 390×844 浏览器验收，并检查 console、重复 ID、遮罩和横向溢出。
+Node 工具链固定为 `.node-version` 中的 Node 22.20.0 和 npm 10.9.3，Playwright 必须来自 `package-lock.json`；修改 C++/CMake 时执行 Release `verify_build_manifest`，并验证 FetchContent commit 与显式离线缓存边界；修改用户可见页面时做桌面和 390×844 浏览器验收，并检查 console、重复 ID、遮罩和横向溢出。
 
 ## Git 规则
 

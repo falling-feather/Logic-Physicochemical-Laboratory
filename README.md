@@ -11,7 +11,7 @@
 ## 当前状态
 
 - 前端主线已进入 V7.3.1：三角色工作台已接入第一方账号入口，隔离端到端门禁覆盖建课、入班、提交、批改、管理审批、审计对账、越权拒绝和三端 390×844。
-- 后端 V6.6.37–V6.6.63 阶段已完成，真实 MySQL、反向代理/四服务、Release 构建、回滚与 15/15 stage gate 已留证；V7.4.9–V7.4.10 已建立 Python 与 Node 测试工具链锁定门禁。
+- 后端 V6.6.37–V6.6.63 阶段已完成，真实 MySQL、反向代理/四服务、Release 构建、回滚与 15/15 stage gate 已留证；V7.4.9–V7.4.11 已完成 Python、Node 与 C++ 依赖/产物追踪门禁。
 - V7.3.2 已增加目标环境发布证据闸；没有真实域名、owner、TLS、secret、备份恢复、日志监控和七份哈希报告时默认延期，不能用本地基线冒充正式上线。
 - 2026-07-11 全局 review 已修复首页 OffscreenCanvas 重入、协议页 404、全局控件重复初始化和 SQLite 时间适配告警，并补齐持续集成质量门禁。
 - Webhook、GitHub issue sync、audit anchor 等外部通道未进入首个 RC，继续默认关闭；启用前必须单独审批并完成真实 staging 验证。
@@ -58,10 +58,10 @@ http://127.0.0.1:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#hom
 
 ```bash
 cmake -S server -B server/build -DCMAKE_BUILD_TYPE=Release
-cmake --build server/build --config Release
+cmake --build server/build --config Release --target verify_build_manifest
 ```
 
-C++ 进程只承担静态资源和内部存活探针，业务 `/api/*` 必须由反向代理转发到 FastAPI。
+C++ 进程只承担静态资源和内部存活探针，业务 `/api/*` 必须由反向代理转发到 FastAPI。FetchContent 固定 cpp-httplib v0.18.3 的完整 commit；构建旁生成并校验包含产物 SHA-256、工具链和依赖来源的 `englab_server.build-manifest.json`，离线缓存用法见 [`server/README.md`](server/README.md)。
 
 ## 质量门禁
 

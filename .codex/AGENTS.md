@@ -10,7 +10,7 @@
 - Python/FastAPI 业务后端：认证、学校/班级/课程、作业、内容、学习分析、任务与审计。
 - Node/C++ 静态服务：只承担审核后的浏览器资源托管。
 
-V6.6.63 后端阶段已经完成，V7.4.8 已完成登录前置、角色应用外壳、管理领域数据地图及管理 API 全部分域拆分，`admin.py` 只保留路由聚合；V7.4.9–V7.4.10 已建立 Python 3.12 与 Node 22.20.0 测试工具链锁定门禁。当前后续工作以目标环境上线和其余结构性维护为主，详见 `doc/02-更新规划.md`。
+V6.6.63 后端阶段已经完成，V7.4.8 已完成登录前置、角色应用外壳、管理领域数据地图及管理 API 全部分域拆分，`admin.py` 只保留路由聚合；V7.4.9–V7.4.11 已完成 Python、Node 与 C++ 依赖/产物追踪门禁。当前后续工作以目标环境上线和其余结构性维护为主，详见 `doc/02-更新规划.md`。
 
 ## 文档职责
 
@@ -42,7 +42,7 @@ V6.6.63 后端阶段已经完成，V7.4.8 已完成登录前置、角色应用�
 - Node 工具链：使用 `.node-version` 的 Node 22.20.0、npm 10.9.3 和 `npm ci --ignore-scripts`；Playwright 只从 `package-lock.json` 安装，不在安装阶段下载浏览器。
 - 前端契约与 JavaScript 语法：`npm test`，必须覆盖全部 Git 跟踪的 JS/CJS/MJS。
 - 用户界面：桌面与 390×844 浏览器验收，检查页面身份、交互、console、重复 ID、遮罩和溢出。
-- C++/CMake：合格 C++17 工具链 Release 构建。
+- C++/CMake：合格 C++17 工具链构建 `verify_build_manifest`；FetchContent 必须复核完整 commit，离线模式必须显式提供已验证 source，公开面 smoke 保持 `/api/info`、`/api/eval` 和私有路径 404。
 - 提交前：`git diff --check`，并确认无临时数据库、构建目录、截图或本机工作区。
 
 ## Git 提交

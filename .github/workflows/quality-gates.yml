@@ -88,5 +88,22 @@ jobs:
       - uses: actions/checkout@v4
       - name: Configure
         run: cmake -S server -B server/build -DCMAKE_BUILD_TYPE=Release
-      - name: Build
-        run: cmake --build server/build --config Release --parallel 2
+      - name: Build and verify artifact manifest
+        run: cmake --build server/build --config Release --target verify_build_manifest --parallel 2
+      - name: Require explicit offline dependency cache
+        shell: bash
+        run: |
+          if cmake -S server -B server/build-offline-empty \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DASTRA_DEPENDENCIES_OFFLINE=ON; then
+            echo "offline configure unexpectedly accepted an empty dependency cache" >&2
+            exit 1
+          fi
+      - name: Rebuild from verified offline dependency source
+        run: >-
+          cmake -S server -B server/build-offline
+          -DCMAKE_BUILD_TYPE=Release
+          -DASTRA_DEPENDENCIES_OFFLINE=ON
+          -DFETCHCONTENT_SOURCE_DIR_HTTPLIB=${{ github.workspace }}/server/build/_deps/httplib-src
+      - name: Verify offline artifact manifest
+        run: cmake --build server/build-offline --config Release --target verify_build_manifest --parallel 2

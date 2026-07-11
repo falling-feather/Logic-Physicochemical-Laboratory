@@ -10,9 +10,22 @@
 
 ```bash
 cd server
-cmake -B build -S .
-cmake --build build --config Release
+cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --target verify_build_manifest
 ```
+
+首次配置会从官方仓库获取 cpp-httplib，但依赖不再跟随可移动 tag：CMake 固定并复核 v0.18.3 对应提交 `a7bc00e3307fecdb4d67545e93be7b88cfb1e186`。构建结束会在可执行文件旁生成 `englab_server.build-manifest.json`，记录产物大小/SHA-256、CMake/编译器/配置和依赖仓库/版本/commit；`verify_build_manifest` 会重新计算并拒绝清单漂移。
+
+已有通过 commit 复核的 FetchContent checkout 时，可在断网或受控发布机显式复用：
+
+```bash
+cmake -B build-offline -S . -DCMAKE_BUILD_TYPE=Release \
+  -DASTRA_DEPENDENCIES_OFFLINE=ON \
+  -DFETCHCONTENT_SOURCE_DIR_HTTPLIB=/absolute/path/to/verified/httplib-src
+cmake --build build-offline --config Release --target verify_build_manifest
+```
+
+离线模式缺少显式 source、source 不完整或 `git rev-parse HEAD` 与锁定 commit 不同都会在配置阶段失败。依赖升级必须独立审查：先核对官方 tag 的 commit，再同步 `CMakeLists.txt` 中版本/commit、在线与断网构建证据、公开面 smoke 和发布历史。当前 manifest 保证每个产物可追踪，不承诺不同目录/工具链的二进制逐字节相同。
 
 ## 运行
 
@@ -34,4 +47,4 @@ cmake --build build --config Release
 | `/api/health` | GET | 仅供本机/服务守护探测 C++ 静态进程；公网 `/api/*` 必须由反向代理转发到 FastAPI |
 
 ## 依赖
-- [cpp-httplib](https://github.com/yhirose/cpp-httplib) v0.18.3 (通过 CMake FetchContent 自动下载)
+- [cpp-httplib](https://github.com/yhirose/cpp-httplib) v0.18.3，固定 commit `a7bc00e3307fecdb4d67545e93be7b88cfb1e186`（CMake FetchContent 获取并复核）
