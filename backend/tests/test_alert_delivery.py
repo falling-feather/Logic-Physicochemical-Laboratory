@@ -5,7 +5,7 @@ import pytest
 from pydantic import SecretStr
 from sqlalchemy import select
 
-from app.api.endpoints import admin as admin_endpoint
+from app.api.endpoints import admin_alerts as admin_endpoint
 from app.core.config import get_settings
 from app.db.session import get_session_factory
 from app.models import AdminAlertOutboxDispatchPlan, AdminAlertOutboxEntry

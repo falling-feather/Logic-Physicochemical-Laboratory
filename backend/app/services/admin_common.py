@@ -51,3 +51,13 @@ def naive_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value
     return value.astimezone(UTC).replace(tzinfo=None)
+
+
+def oldest_datetime(values: Any) -> datetime | None:
+    items = [value for value in values if value is not None]
+    return min(items, key=naive_utc) if items else None
+
+
+def latest_datetime(values: Any) -> datetime | None:
+    items = [value for value in values if value is not None]
+    return max(items, key=naive_utc) if items else None
