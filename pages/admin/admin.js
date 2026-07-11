@@ -377,6 +377,8 @@
         const dashboard = getDashboard();
         if (dashboard) dashboard.hidden = true;
         if (state.root) {
+            const authContainer = state.root.querySelector('[data-admin-auth-state]');
+            if (authContainer && window.AstraAuthUI) AstraAuthUI.unmount(authContainer);
             state.root.innerHTML = `
                 <div class="admin-loading">
                     <i data-lucide="loader-circle"></i>
@@ -732,6 +734,7 @@
     function renderAuthState(mode, user) {
         const container = state.root.querySelector('[data-admin-auth-state]');
         if (!container) return;
+        if (window.AstraAuthUI) AstraAuthUI.unmount(container);
         if (mode === 'checking') {
             container.innerHTML = `
                 <div class="admin-auth-card admin-auth-card--checking">
@@ -742,6 +745,13 @@
             return;
         }
         if (mode === 'forbidden') {
+            if (window.AstraAuthUI) {
+                AstraAuthUI.mountAccount(container, {
+                    role: 'admin', baseUrl: state.apiBase, user: user || {}, roleMismatch: true,
+                    onSignedOut: () => refreshAll()
+                });
+                return;
+            }
             container.innerHTML = `
                 <div class="admin-auth-card admin-auth-card--blocked">
                     <i data-lucide="shield-x"></i>
@@ -751,6 +761,13 @@
                     </div>
                 </div>
             `;
+            return;
+        }
+        if (window.AstraAuthUI) {
+            AstraAuthUI.mountAccount(container, {
+                role: 'admin', baseUrl: state.apiBase, user: user || {},
+                onSignedOut: () => refreshAll()
+            });
             return;
         }
         container.innerHTML = `
@@ -771,6 +788,14 @@
         const isUnauthenticated = error && error.status === 401;
         const isForbidden = error && error.status === 403;
         const isOffline = error && error.code === 'offline';
+        if (isUnauthenticated && window.AstraAuthUI) {
+            AstraAuthUI.mountGate(container, {
+                role: 'admin', baseUrl: state.apiBase,
+                onAuthenticated: () => refreshAll()
+            });
+            return;
+        }
+        if (window.AstraAuthUI) AstraAuthUI.unmount(container);
         container.innerHTML = `
             <div class="admin-auth-card admin-auth-card--blocked">
                 <i data-lucide="${isUnauthenticated ? 'lock' : isForbidden ? 'shield-x' : isOffline ? 'wifi-off' : 'server-off'}"></i>

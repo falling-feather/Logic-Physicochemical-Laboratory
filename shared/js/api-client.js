@@ -120,7 +120,9 @@
             const payload = parsed.payload;
             if (!response.ok) {
                 const detail = parsed.validJson ? extractDetail(payload) : '';
-                if (response.status === 401) dispatchAuthRequired(responseRequestId);
+                if (response.status === 401 && config.dispatchAuthRequired !== false) {
+                    dispatchAuthRequired(responseRequestId);
+                }
                 throw new AstraApiError(detail || response.statusText || '请求失败', {
                     status: response.status,
                     code: statusCode(response.status),
@@ -148,7 +150,9 @@
         } catch (error) {
             if (error instanceof AstraApiError) throw error;
             if (responseReceived) {
-                if (responseStatus === 401) dispatchAuthRequired(responseRequestId);
+                if (responseStatus === 401 && config.dispatchAuthRequired !== false) {
+                    dispatchAuthRequired(responseRequestId);
+                }
                 if (responseStatus >= 200 && responseStatus < 300) {
                     throw new AstraApiError('服务器已响应，但返回内容未能完整读取', {
                         code: 'invalid_response',

@@ -107,6 +107,8 @@
         state.data = emptyData();
 
         if (state.root) {
+            const authContainer = state.root.querySelector('[data-student-auth-state]');
+            if (authContainer && window.AstraAuthUI) AstraAuthUI.unmount(authContainer);
             state.root.innerHTML = `
                 <div class="student-loading">
                     <i data-lucide="loader-circle"></i>
@@ -846,6 +848,7 @@
     function renderAuthState(mode, user) {
         const container = state.root && state.root.querySelector('[data-student-auth-state]');
         if (!container) return;
+        if (window.AstraAuthUI) AstraAuthUI.unmount(container);
         if (mode === 'checking') {
             container.innerHTML = `
                 <div class="student-auth-card student-auth-card--checking">
@@ -856,6 +859,13 @@
             return;
         }
         if (mode === 'forbidden') {
+            if (window.AstraAuthUI) {
+                AstraAuthUI.mountAccount(container, {
+                    role: 'student', baseUrl: state.apiBase, user: user || {}, roleMismatch: true,
+                    onSignedOut: () => refreshAll()
+                });
+                return;
+            }
             container.innerHTML = `
                 <div class="student-auth-card student-auth-card--blocked">
                     <i data-lucide="shield-x"></i>
@@ -866,6 +876,13 @@
                 </div>
             `;
             refreshIcons();
+            return;
+        }
+        if (window.AstraAuthUI) {
+            AstraAuthUI.mountAccount(container, {
+                role: 'student', baseUrl: state.apiBase, user: user || {},
+                onSignedOut: () => refreshAll()
+            });
             return;
         }
         container.innerHTML = `
@@ -883,10 +900,19 @@
     function renderAuthError(error) {
         const container = state.root && state.root.querySelector('[data-student-auth-state]');
         if (!container) return;
+        const greeting = state.root && state.root.querySelector('[data-student-greeting]');
         const isUnauthenticated = error && error.status === 401;
         const isForbidden = error && error.status === 403;
         const isOffline = error && error.code === 'offline';
-        const greeting = state.root && state.root.querySelector('[data-student-greeting]');
+        if (isUnauthenticated && window.AstraAuthUI) {
+            AstraAuthUI.mountGate(container, {
+                role: 'student', baseUrl: state.apiBase,
+                onAuthenticated: () => refreshAll()
+            });
+            if (greeting) greeting.textContent = '登录后进入学生学习台';
+            return;
+        }
+        if (window.AstraAuthUI) AstraAuthUI.unmount(container);
         if (greeting) {
             greeting.textContent = isUnauthenticated
                 ? '学习会话需要重新登录'
