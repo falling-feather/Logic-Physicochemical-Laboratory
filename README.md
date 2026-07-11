@@ -10,7 +10,7 @@
 
 ## 当前状态
 
-- 前端主线已进入 V7.3.0，三角色工作台已接入第一方登录、学生/教师注册、管理员受控初始化边界、密码重置和活动会话治理。
+- 前端主线已进入 V7.3.1：三角色工作台已接入第一方账号入口，隔离端到端门禁覆盖建课、入班、提交、批改、管理审批、审计对账、越权拒绝和三端 390×844。
 - 后端 V6.6.37–V6.6.63 阶段已完成，真实 MySQL、反向代理/四服务、Release 构建、回滚与 15/15 stage gate 已留证。
 - 2026-07-11 全局 review 已修复首页 OffscreenCanvas 重入、协议页 404、全局控件重复初始化和 SQLite 时间适配告警，并补齐持续集成质量门禁。
 - Webhook、GitHub issue sync、audit anchor 等外部通道未进入首个 RC，继续默认关闭；启用前必须单独审批并完成真实 staging 验证。
@@ -67,6 +67,9 @@ python -m pytest backend
 
 # JavaScript 语法与前端契约
 node tools/tests/run-contracts.cjs
+
+# 三角色业务证明（只允许一次性本地数据库；需先启动静态站和 testing/development API）
+node tools/browser/role-workflows-proof.cjs --api http://127.0.0.1:8000 --web http://127.0.0.1:8766 --confirm-isolated-environment
 
 # 工作区差异检查
 git diff --check

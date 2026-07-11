@@ -237,7 +237,7 @@
                 method: 'POST',
                 body: { username: text(data, 'username'), password: text(data, 'password') }
             });
-            await reconcileSession(state, { successMessage: '登录成功，正在进入工作台' });
+            await reconcileSession(state, { fromMutation: true, successMessage: '登录成功，正在进入工作台' });
         });
     }
 
@@ -263,7 +263,7 @@
                 method: 'POST',
                 body: { username: text(data, 'username'), password }
             });
-            await reconcileSession(state, { successMessage: '注册成功，正在进入工作台' });
+            await reconcileSession(state, { fromMutation: true, successMessage: '注册成功，正在进入工作台' });
         });
     }
 

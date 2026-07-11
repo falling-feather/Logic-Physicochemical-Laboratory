@@ -31,6 +31,9 @@ function main() {
     assert.match(teacher, /hasCourseCapability\(\['editor', 'content_editor', 'assessment_editor'\]\)/);
     assert.match(teacher, /hasCourseCapability\(\['editor', 'assessment_editor'\]\)/);
     assert.match(teacher, /canManageCourseOwnership\(\)/);
+    assert.match(teacher, /fetchClassKnowledge\(classId\)/);
+    assert.match(teacher, /params:\s*\{\s*class_id:\s*classId\s*\}/);
+    assert.match(teacher, /attachedCourses\.some/);
 
     assert.match(student, /dimension === 'knowledge_point'/);
     assert.match(student, /优先复习知识点/);

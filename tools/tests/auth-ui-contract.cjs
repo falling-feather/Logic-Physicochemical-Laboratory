@@ -34,6 +34,7 @@ assert.match(authUi, /管理员不开放公开注册/);
 assert.match(authUi, /HttpOnly Cookie/);
 assert.match(authUi, /AstraApiClient\.isAmbiguousMutation/);
 assert.match(authUi, /dispatchAuthRequired:\s*state\.view === 'account'/);
+assert.equal((authUi.match(/reconcileSession\(state, \{ fromMutation: true,/g) || []).length, 2);
 assert.doesNotMatch(authUi, /localStorage|sessionStorage|Authorization\s*:/);
 assert.doesNotMatch(authUi, /\.access_token/);
 

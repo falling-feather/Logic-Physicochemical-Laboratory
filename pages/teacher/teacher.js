@@ -355,14 +355,11 @@
             limit: 50,
             offset: 0
         };
-        const knowledgeParams = {
-            course_id: state.selected.courseId || undefined
-        };
         const [membersResult, activeStudentsResult, submissionsResult, knowledgeResult] = await Promise.allSettled([
             fetchJson(`/api/classes/${classId}/members`, { params: memberParams }),
             fetchJson(`/api/classes/${classId}/members`, { params: { role: 'student', status: 'active' } }),
             fetchJson('/api/admin/submissions/pending', { params: submissionParams }),
-            fetchJson(`/api/classes/${classId}/knowledge`, { params: knowledgeParams })
+            fetchClassKnowledge(classId)
         ]);
         if (!isCurrentRequest(generation)) return;
         if (membersResult.status === 'fulfilled') {
@@ -390,6 +387,18 @@
             state.errors.knowledge = knowledgeResult.reason;
         }
         await loadStudentProgress(generation);
+    }
+
+    async function fetchClassKnowledge(classId) {
+        const courseId = state.selected.courseId;
+        if (courseId) {
+            const attachedCourses = await fetchJson('/api/courses', { params: { class_id: classId } });
+            const attached = attachedCourses.some((course) => String(course.id) === String(courseId));
+            if (!attached) return null;
+        }
+        return fetchJson(`/api/classes/${classId}/knowledge`, {
+            params: { course_id: courseId || undefined }
+        });
     }
 
     async function loadStudentProgress(generation = state.requestGeneration) {
