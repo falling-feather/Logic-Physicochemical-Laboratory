@@ -1,0 +1,19 @@
+{
+  "name": "astra-quality-tools",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reproducible Node.js quality gates and browser proof tooling for Astra.",
+  "engines": {
+    "node": "22.20.0",
+    "npm": "10.9.3"
+  },
+  "packageManager": "npm@10.9.3",
+  "scripts": {
+    "check:syntax": "node tools/quality/check-tracked-javascript.cjs",
+    "test:contracts": "node tools/tests/run-contracts.cjs",
+    "test": "npm run check:syntax && npm run test:contracts"
+  },
+  "devDependencies": {
+    "playwright": "1.60.0"
+  }
+}

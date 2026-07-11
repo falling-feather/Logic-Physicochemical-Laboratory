@@ -73,12 +73,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
-      - name: Check JavaScript syntax
-        shell: bash
-        run: git ls-files -z '*.js' '*.mjs' '*.cjs' | xargs -0 -n1 node --check
-      - name: Run frontend contracts
-        run: node tools/tests/run-contracts.cjs
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install locked Node test tools
+        run: npm ci --ignore-scripts
+      - name: Run JavaScript syntax and frontend contracts
+        run: npm test
 
   cpp-static-server:
     name: C++ · release build

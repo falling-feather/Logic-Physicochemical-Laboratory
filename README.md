@@ -11,7 +11,7 @@
 ## 当前状态
 
 - 前端主线已进入 V7.3.1：三角色工作台已接入第一方账号入口，隔离端到端门禁覆盖建课、入班、提交、批改、管理审批、审计对账、越权拒绝和三端 390×844。
-- 后端 V6.6.37–V6.6.63 阶段已完成，真实 MySQL、反向代理/四服务、Release 构建、回滚与 15/15 stage gate 已留证；V7.4.9 已建立 Python 3.12 通用哈希锁和 CI 漂移门禁。
+- 后端 V6.6.37–V6.6.63 阶段已完成，真实 MySQL、反向代理/四服务、Release 构建、回滚与 15/15 stage gate 已留证；V7.4.9–V7.4.10 已建立 Python 与 Node 测试工具链锁定门禁。
 - V7.3.2 已增加目标环境发布证据闸；没有真实域名、owner、TLS、secret、备份恢复、日志监控和七份哈希报告时默认延期，不能用本地基线冒充正式上线。
 - 2026-07-11 全局 review 已修复首页 OffscreenCanvas 重入、协议页 404、全局控件重复初始化和 SQLite 时间适配告警，并补齐持续集成质量门禁。
 - Webhook、GitHub issue sync、audit anchor 等外部通道未进入首个 RC，继续默认关闭；启用前必须单独审批并完成真实 staging 验证。
@@ -22,9 +22,10 @@
 
 ### 1. 启动静态主站
 
-需要 Node.js 22 或兼容版本：
+需要 `.node-version` 指定的 Node.js 22.20.0（配套 npm 10.9.3）。先按锁安装测试/浏览器证明工具，不执行依赖安装脚本：
 
 ```bash
+npm ci --ignore-scripts
 node server/dev-static-server.mjs --port 8766
 ```
 
@@ -68,8 +69,9 @@ C++ 进程只承担静态资源和内部存活探针，业务 `/api/*` 必须由
 # 后端全量回归；真实 MySQL 专项在未提供隔离数据库时会显式跳过
 python -m pytest backend
 
-# JavaScript 语法与前端契约
-node tools/tests/run-contracts.cjs
+# 精确 Node/npm + package-lock；覆盖全部跟踪脚本语法与前端契约
+npm ci --ignore-scripts
+npm test
 
 # 三角色业务证明（只允许一次性本地数据库；需先启动静态站和 testing/development API）
 node tools/browser/role-workflows-proof.cjs --api http://127.0.0.1:8000 --web http://127.0.0.1:8766 --confirm-isolated-environment
@@ -85,11 +87,13 @@ GitHub Actions 还会执行独立 MySQL 8.4 发布证据和 C++ Release 构建�
 ```text
 .
 ├── index.html                 # 主站 SPA 外壳
+├── package.json/package-lock.json # Node 质量工具入口与 integrity 锁
 ├── pages/                     # 首页、星系、学科、实验与三端页面
 ├── shared/                    # 主站路由、组件、API client 与设计系统
 ├── codevis/                   # 代码空间独立子站
 ├── backend/                   # FastAPI、SQLAlchemy、Alembic、脚本与 pytest
 ├── server/                    # Node 开发静态服务与 C++ Release 静态服务
+├── tools/quality/             # 跨平台跟踪脚本语法门禁
 ├── tools/tests/               # 前端/静态公开面契约
 ├── doc/                       # 开发、规划、历史、部署、UI、审查与索引文档
 └── .github/workflows/         # 持续集成质量门禁
