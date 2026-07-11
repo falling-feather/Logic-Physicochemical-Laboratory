@@ -8,14 +8,17 @@ const ExperimentExport = {
     _menuOpen: false,
     _currentPage: null,
     _currentModule: null,
+    _initialized: false,
 
     // Experiments can register CSV data providers:
     // ExperimentExport.registerCSV('moduleId', () => ({ headers: [...], rows: [[...], ...] }))
     _csvProviders: {},
 
     init() {
+        if (this._initialized) return;
         this._createButton();
         this._createMenu();
+        this._initialized = true;
     },
 
     // Show button when experiment opens
