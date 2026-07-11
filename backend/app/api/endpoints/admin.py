@@ -9,17 +9,15 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, Response, status
 from sqlalchemy import and_, case, func, or_, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
+from app.api.endpoints import admin_users
 from app.core.config import get_settings
-from app.core.security import hash_password, password_strength_errors
 from app.db.session import get_db
 from app.models import (
     AdminAlertOutboxDispatchPlan,
     AdminAlertOutboxEntry,
-    AuthSession,
     AuditLog,
     Assignment,
     AssignmentClassPolicy,
@@ -39,7 +37,6 @@ from app.models import (
     CourseClass,
     CourseUnit,
     LearningEvent,
-    LoginAttempt,
     KnowledgeSnapshotRun,
     PointLedger,
     School,
@@ -48,7 +45,6 @@ from app.models import (
     User,
 )
 from app.schemas.admin import (
-    AdminBootstrapRequest,
     AdminClassJoinRequestPage,
     AdminClassJoinRequestRead,
     AdminClassJoinRequestReview,
@@ -102,11 +98,6 @@ from app.schemas.admin import (
     AdminSchoolPage,
     AdminSchoolStats,
     AdminStats,
-    AdminUserPage,
-    AdminUserPasswordReset,
-    AdminUserPasswordResetResponse,
-    AdminUserRead,
-    AdminUserUpdate,
     AdminAlertOutboxBulkReviewRequest,
     AdminAlertOutboxBulkReviewResponse,
     AdminAlertOutboxDispatchDryRunItem,
@@ -158,6 +149,13 @@ from app.schemas.admin import (
     BugRecordRead,
     BugRecordUpdate,
 )
+from app.services.admin_common import (
+    change_snapshot as _change_snapshot,
+    count_rows as _count,
+    next_offset as _next_offset,
+    require_admin as _require_admin,
+    statement_count as _statement_count,
+)
 from app.services.audit import record_audit_log
 from app.services.bug_external_sync import (
     BugExternalSyncError,
@@ -191,10 +189,8 @@ from app.services.external_issue_providers import (
     build_issue_provider_adapter,
     external_issue_sync_posture,
 )
-from app.services.security_control_locks import ADMIN_AUTHORITY_LOCK, acquire_security_control_lock
 from app.services.backend_performance import build_backend_performance_report
 from app.services.access_control import (
-    deactivate_incompatible_authority_rows,
     require_class_teacher_or_admin_by_id,
     require_school_teacher_or_admin,
     teacher_class_ids,
@@ -206,7 +202,6 @@ from app.services.class_join_requests import (
     normalize_join_request_status,
 )
 from app.services.text import require_trimmed_text
-from app.services.users import find_user_by_normalized_username, require_normalized_username
 from app.services.knowledge_snapshot_runs import (
     cancel_knowledge_snapshot_run,
     requeue_knowledge_snapshot_run,
@@ -259,6 +254,7 @@ from app.services.content_script_host_policies import (
 
 
 router = APIRouter()
+router.include_router(admin_users.router)
 PENDING_SUBMISSION_STATUSES = ["submitted", "returned"]
 _DIFF_MISSING = object()
 _CONTENT_METADATA_FIELDS = ("slug", "galaxy", "subject", "title", "layout", "status", "version", "summary")
@@ -305,179 +301,6 @@ _AUDIT_LOG_CSV_FIELDS = (
     "created_at",
 )
 _AUDIT_LOG_REPORT_CSV_FIELDS = ("section", "key", "total", "success", "failure", "other", "latest_at")
-
-
-@router.post("/bootstrap", response_model=AdminUserRead, status_code=status.HTTP_201_CREATED)
-def bootstrap_admin(payload: AdminBootstrapRequest, request: Request, db: Session = Depends(get_db)) -> User:
-    acquire_security_control_lock(db, ADMIN_AUTHORITY_LOCK)
-    if _active_admin_count(db) > 0:
-        raise HTTPException(status_code=409, detail="Admin bootstrap is already complete")
-
-    settings = get_settings()
-    if not settings.admin_bootstrap_enabled:
-        raise HTTPException(status_code=403, detail="Admin bootstrap is disabled")
-    if settings.admin_bootstrap_token:
-        if payload.bootstrap_token != settings.admin_bootstrap_token:
-            raise HTTPException(status_code=403, detail="Invalid admin bootstrap token")
-    elif not settings.is_local_development:
-        raise HTTPException(status_code=403, detail="Admin bootstrap token is required outside local development")
-
-    username = require_normalized_username(payload.username, min_length=3)
-    display_name = require_trimmed_text(payload.display_name, "Display name is required")
-    _enforce_password_strength(payload.password, username)
-    existing = find_user_by_normalized_username(db, username)
-    if existing is not None:
-        raise HTTPException(status_code=409, detail="Username already exists")
-
-    user = User(
-        username=username,
-        normalized_username=username,
-        display_name=display_name,
-        role="admin",
-        status="active",
-        password_hash=hash_password(payload.password),
-    )
-    db.add(user)
-    try:
-        db.flush()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code=409, detail="Username already exists")
-    record_audit_log(
-        db,
-        actor=user,
-        action="admin.bootstrap",
-        resource_type="user",
-        resource_id=user.id,
-        event_result="success",
-        request=request,
-        snapshot={"after": {"username": user.username, "role": user.role, "status": user.status}},
-    )
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code=409, detail="Username already exists")
-    db.refresh(user)
-    return user
-
-
-@router.get("/users", response_model=AdminUserPage)
-def list_users(
-    role: str | None = Query(default=None),
-    status_filter: str | None = Query(default=None, alias="status"),
-    q: str | None = Query(default=None, max_length=120),
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> AdminUserPage:
-    _require_admin(current_user)
-    statement = select(User).order_by(User.id)
-    if role is not None:
-        statement = statement.where(User.role == role.strip().lower())
-    if status_filter is not None:
-        statement = statement.where(User.status == status_filter.strip().lower())
-    if q is not None and q.strip():
-        pattern = f"%{q.strip()}%"
-        statement = statement.where(or_(User.username.ilike(pattern), User.display_name.ilike(pattern)))
-    total = _statement_count(db, statement)
-    items = list(db.scalars(statement.offset(offset).limit(limit)).all())
-    return AdminUserPage(items=items, total=total, limit=limit, offset=offset, next_offset=_next_offset(total, offset, len(items)))
-
-
-@router.patch("/users/{user_id}", response_model=AdminUserRead)
-def update_user(
-    user_id: int,
-    payload: AdminUserUpdate,
-    request: Request,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> User:
-    _require_admin(current_user)
-    acquire_security_control_lock(db, ADMIN_AUTHORITY_LOCK)
-    user = db.scalar(select(User).where(User.id == user_id).with_for_update())
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    before = _user_snapshot(user)
-    next_role = payload.role or user.role
-    next_status = payload.status or user.status
-    if user.role == "admin" and (next_role != "admin" or next_status != "active"):
-        if _active_admin_count(db) <= 1:
-            raise HTTPException(status_code=409, detail="Cannot remove the last active admin")
-    if next_role == "student" and user.role != "student":
-        owned_course_count = _count(db, Course, Course.creator_user_id == user.id)
-        if owned_course_count:
-            raise HTTPException(status_code=409, detail="Transfer owned courses before changing user to student")
-
-    if payload.display_name is not None:
-        user.display_name = require_trimmed_text(payload.display_name, "Display name is required")
-    if payload.role is not None:
-        user.role = payload.role
-    if payload.status is not None:
-        user.status = payload.status
-
-    after = _user_snapshot(user)
-    snapshot = _change_snapshot(before, after)
-    authority_changed = payload.role is not None and before["role"] != after["role"]
-    if authority_changed:
-        snapshot["deactivated_authority_rows"] = deactivate_incompatible_authority_rows(db, user)
-    revoked_sessions = _revoke_user_sessions(db, user) if authority_changed or payload.status == "disabled" else 0
-    if revoked_sessions:
-        snapshot["revoked_sessions"] = revoked_sessions
-    record_audit_log(
-        db,
-        actor=current_user,
-        action="admin.user.update",
-        resource_type="user",
-        resource_id=user.id,
-        event_result="success",
-        request=request,
-        snapshot=snapshot,
-    )
-    db.commit()
-    db.refresh(user)
-    return user
-
-
-@router.post("/users/{user_id}/password-reset", response_model=AdminUserPasswordResetResponse)
-def reset_user_password(
-    user_id: int,
-    payload: AdminUserPasswordReset,
-    request: Request,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> AdminUserPasswordResetResponse:
-    _require_admin(current_user)
-    user = db.scalar(select(User).where(User.id == user_id).with_for_update())
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    _enforce_password_strength(payload.password, user.username)
-    user.password_hash = hash_password(payload.password)
-    cleared_login_attempt = _clear_user_login_attempt(db, user)
-    revoked_sessions = _revoke_user_sessions(db, user)
-    record_audit_log(
-        db,
-        actor=current_user,
-        action="admin.user.password_reset",
-        resource_type="user",
-        resource_id=user.id,
-        event_result="success",
-        request=request,
-        snapshot={
-            "user": _user_snapshot(user),
-            "revoked_sessions": revoked_sessions,
-            "cleared_login_attempt": cleared_login_attempt,
-        },
-    )
-    db.commit()
-    return AdminUserPasswordResetResponse(
-        user_id=user.id,
-        revoked_sessions=revoked_sessions,
-        cleared_login_attempt=cleared_login_attempt,
-    )
 
 
 @router.get("/schools", response_model=AdminSchoolPage)
@@ -6998,33 +6821,6 @@ def _percent(numerator: int | float, denominator: int | float) -> float:
     return round(_divide(numerator, denominator) * 100, 2)
 
 
-def _require_admin(user: User) -> None:
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin role required")
-
-
-def _enforce_password_strength(password: str, username: str) -> None:
-    errors = password_strength_errors(password, username=username)
-    if errors:
-        raise HTTPException(status_code=422, detail={"password": errors})
-
-
-def _active_admin_count(db: Session) -> int:
-    return _count(db, User, User.role == "admin", User.status == "active")
-
-
-def _count(db: Session, model, *criteria: Any) -> int:
-    statement = select(func.count()).select_from(model)
-    for criterion in criteria:
-        statement = statement.where(criterion)
-    return int(db.scalar(statement) or 0)
-
-
-def _statement_count(db: Session, statement: Any) -> int:
-    count_statement = select(func.count()).select_from(statement.order_by(None).subquery())
-    return int(db.scalar(count_statement) or 0)
-
-
 def _audit_log_statement(
     *,
     actor_user_id: int | None,
@@ -7703,11 +7499,6 @@ def _audit_log_export_snapshot(
     }
 
 
-def _next_offset(total: int, offset: int, item_count: int) -> int | None:
-    next_offset = offset + item_count
-    return next_offset if next_offset < total else None
-
-
 def _strip_optional(value: str | None) -> str | None:
     if value is None:
         return None
@@ -7728,15 +7519,6 @@ def _contains_pattern(value: str) -> str:
 
 def _content_page_schema_text(field: str) -> Any:
     return func.coalesce(ContentPageRecord.schema_json[field].as_string(), "")
-
-
-def _user_snapshot(user: User) -> dict[str, str]:
-    return {
-        "username": user.username,
-        "display_name": user.display_name,
-        "role": user.role,
-        "status": user.status,
-    }
 
 
 def _bug_snapshot(bug: BugRecord) -> dict[str, Any]:
@@ -7770,30 +7552,3 @@ def _bug_authority_snapshot(bug: BugRecord) -> tuple[str | None, ...]:
         bug.external_issue_id,
         bug.external_issue_url,
     )
-
-
-def _change_snapshot(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
-    changes = {
-        key: {"from": before.get(key), "to": after.get(key)}
-        for key in sorted(set(before) | set(after))
-        if before.get(key) != after.get(key)
-    }
-    return {"before": before, "after": after, "changes": changes}
-
-
-def _revoke_user_sessions(db: Session, user: User) -> int:
-    now = datetime.now(UTC)
-    sessions = db.scalars(
-        select(AuthSession).where(AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None))
-    ).all()
-    for auth_session in sessions:
-        auth_session.revoked_at = now
-    return len(sessions)
-
-
-def _clear_user_login_attempt(db: Session, user: User) -> bool:
-    attempt = db.scalar(select(LoginAttempt).where(LoginAttempt.normalized_username == user.normalized_username))
-    if attempt is None:
-        return False
-    db.delete(attempt)
-    return True
