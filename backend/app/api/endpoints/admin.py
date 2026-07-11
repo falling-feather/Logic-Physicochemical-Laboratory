@@ -12,7 +12,7 @@ from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
-from app.api.endpoints import admin_users
+from app.api.endpoints import admin_organizations, admin_users
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.models import (
@@ -20,36 +20,27 @@ from app.models import (
     AdminAlertOutboxEntry,
     AuditLog,
     Assignment,
-    AssignmentClassPolicy,
     BackgroundTask,
     BackgroundTaskAttempt,
     BugExternalSyncOperation,
     BugRecord,
     ClassGroup,
     ClassJoinRequest,
-    ClassMembership,
     ContentDraft,
     ContentPageRecord,
     ContentPageVersion,
     ContentScriptAsset,
     ContentScriptAssetScanRun,
     Course,
-    CourseClass,
     CourseUnit,
     LearningEvent,
     KnowledgeSnapshotRun,
     PointLedger,
     School,
-    SchoolMembership,
     Submission,
     User,
 )
 from app.schemas.admin import (
-    AdminClassJoinRequestPage,
-    AdminClassJoinRequestRead,
-    AdminClassJoinRequestReview,
-    AdminClassPage,
-    AdminClassStats,
     AdminContentPagePage,
     AdminContentPageRead,
     AdminContentScriptAssetAuditIssueRead,
@@ -95,8 +86,6 @@ from app.schemas.admin import (
     AdminContentDraftRead,
     AdminPendingSubmissionQueue,
     AdminPendingSubmissionRead,
-    AdminSchoolPage,
-    AdminSchoolStats,
     AdminStats,
     AdminAlertOutboxBulkReviewRequest,
     AdminAlertOutboxBulkReviewResponse,
@@ -150,6 +139,7 @@ from app.schemas.admin import (
     BugRecordUpdate,
 )
 from app.services.admin_common import (
+    PENDING_SUBMISSION_STATUSES,
     change_snapshot as _change_snapshot,
     count_rows as _count,
     next_offset as _next_offset,
@@ -164,10 +154,6 @@ from app.services.bug_external_sync import (
     create_external_issue_for_bug,
     sync_external_issue_comment_for_bug,
     sync_external_issue_status_for_bug,
-)
-from app.services.assignment_policies import (
-    assignment_class_effective_status_expression,
-    assignment_class_is_assigned_expression,
 )
 from app.services.admin_alert_outbox import (
     admin_alert_outbox_write_snapshot,
@@ -192,15 +178,9 @@ from app.services.external_issue_providers import (
 from app.services.backend_performance import build_backend_performance_report
 from app.services.access_control import (
     require_class_teacher_or_admin_by_id,
-    require_school_teacher_or_admin,
     teacher_class_ids,
 )
 from app.services.audit_chain import verify_audit_log_chain
-from app.services.class_join_requests import (
-    apply_class_join_request_review,
-    normalize_class_role,
-    normalize_join_request_status,
-)
 from app.services.text import require_trimmed_text
 from app.services.knowledge_snapshot_runs import (
     cancel_knowledge_snapshot_run,
@@ -255,7 +235,7 @@ from app.services.content_script_host_policies import (
 
 router = APIRouter()
 router.include_router(admin_users.router)
-PENDING_SUBMISSION_STATUSES = ["submitted", "returned"]
+router.include_router(admin_organizations.router)
 _DIFF_MISSING = object()
 _CONTENT_METADATA_FIELDS = ("slug", "galaxy", "subject", "title", "layout", "status", "version", "summary")
 _CONTENT_SECTION_FIELDS = ("sectionId", "type", "title", "summary", "experimentId", "questionSetId")
@@ -301,272 +281,6 @@ _AUDIT_LOG_CSV_FIELDS = (
     "created_at",
 )
 _AUDIT_LOG_REPORT_CSV_FIELDS = ("section", "key", "total", "success", "failure", "other", "latest_at")
-
-
-@router.get("/schools", response_model=AdminSchoolPage)
-def list_admin_schools(
-    status_filter: str | None = Query(default=None, alias="status"),
-    q: str | None = Query(default=None, max_length=160),
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> AdminSchoolPage:
-    _require_admin(current_user)
-    statement = select(School).order_by(School.id)
-    if status_filter is not None:
-        statement = statement.where(School.status == status_filter.strip().lower())
-    if q is not None and q.strip():
-        pattern = f"%{q.strip()}%"
-        statement = statement.where(or_(School.name.ilike(pattern), School.region.ilike(pattern)))
-    total = _statement_count(db, statement)
-    items = list(db.scalars(statement.offset(offset).limit(limit)).all())
-    return AdminSchoolPage(items=items, total=total, limit=limit, offset=offset, next_offset=_next_offset(total, offset, len(items)))
-
-
-@router.get("/schools/{school_id}/stats", response_model=AdminSchoolStats)
-def read_admin_school_stats(
-    school_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> AdminSchoolStats:
-    school = require_school_teacher_or_admin(db, current_user, school_id)
-    return AdminSchoolStats(
-        school_id=school.id,
-        school_name=school.name,
-        region=school.region,
-        status=school.status,
-        total_classes=_count(db, ClassGroup, ClassGroup.school_id == school.id),
-        active_classes=_count(db, ClassGroup, ClassGroup.school_id == school.id, ClassGroup.status == "active"),
-        active_students=_distinct_count(
-            db,
-            SchoolMembership.user_id,
-            SchoolMembership.school_id == school.id,
-            SchoolMembership.role == "student",
-            SchoolMembership.status == "active",
-        ),
-        active_teachers=_distinct_count(
-            db,
-            SchoolMembership.user_id,
-            SchoolMembership.school_id == school.id,
-            SchoolMembership.role.in_(["admin", "teacher"]),
-            SchoolMembership.status == "active",
-        ),
-        total_courses=_count(db, Course, Course.school_id == school.id),
-        active_courses=_count(db, Course, Course.school_id == school.id, Course.status != "archived"),
-        total_assignments=_school_assignment_count(db, school.id),
-        active_assignments=_school_assignment_count(db, school.id, active_only=True),
-        total_learning_events=_count(db, LearningEvent, LearningEvent.school_id == school.id),
-        complete_learning_events=_count(
-            db,
-            LearningEvent,
-            LearningEvent.school_id == school.id,
-            LearningEvent.event_type == "complete",
-        ),
-        total_submissions=_school_submission_count(db, school.id),
-        graded_submissions=_school_submission_count(db, school.id, statuses=["graded"]),
-        returned_submissions=_school_submission_count(db, school.id, statuses=["returned"]),
-        pending_submissions=_school_submission_count(db, school.id, statuses=PENDING_SUBMISSION_STATUSES),
-        total_points=_sum_int(db, PointLedger.delta, PointLedger.school_id == school.id),
-    )
-
-
-@router.get("/classes", response_model=AdminClassPage)
-def list_admin_classes(
-    school_id: int | None = Query(default=None),
-    status_filter: str | None = Query(default=None, alias="status"),
-    q: str | None = Query(default=None, max_length=160),
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> AdminClassPage:
-    _require_admin(current_user)
-    statement = select(ClassGroup).order_by(ClassGroup.id)
-    if school_id is not None:
-        statement = statement.where(ClassGroup.school_id == school_id)
-    if status_filter is not None:
-        statement = statement.where(ClassGroup.status == status_filter.strip().lower())
-    if q is not None and q.strip():
-        pattern = f"%{q.strip()}%"
-        statement = statement.where(
-            or_(
-                ClassGroup.name.ilike(pattern),
-                ClassGroup.grade.ilike(pattern),
-                ClassGroup.term.ilike(pattern),
-            )
-        )
-    total = _statement_count(db, statement)
-    items = list(db.scalars(statement.offset(offset).limit(limit)).all())
-    return AdminClassPage(items=items, total=total, limit=limit, offset=offset, next_offset=_next_offset(total, offset, len(items)))
-
-
-@router.get("/classes/{class_id}/stats", response_model=AdminClassStats)
-def read_admin_class_stats(
-    class_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> AdminClassStats:
-    class_group = require_class_teacher_or_admin_by_id(db, current_user, class_id)
-    active_students = _distinct_count(
-        db,
-        ClassMembership.user_id,
-        ClassMembership.class_id == class_group.id,
-        ClassMembership.role == "student",
-        ClassMembership.status == "active",
-    )
-    active_assignments = _class_assignment_count(db, class_group.id, active_only=True)
-    expected_submissions = active_students * active_assignments
-    pending_submissions = _count(
-        db,
-        Submission,
-        Submission.class_id == class_group.id,
-        Submission.status.in_(PENDING_SUBMISSION_STATUSES),
-    )
-    total_points = _sum_int(db, PointLedger.delta, PointLedger.class_id == class_group.id)
-    return AdminClassStats(
-        class_id=class_group.id,
-        class_name=class_group.name,
-        school_id=class_group.school_id,
-        grade=class_group.grade,
-        term=class_group.term,
-        status=class_group.status,
-        active_students=active_students,
-        active_teachers=_distinct_count(
-            db,
-            ClassMembership.user_id,
-            ClassMembership.class_id == class_group.id,
-            ClassMembership.role.in_(["admin", "teacher"]),
-            ClassMembership.status == "active",
-        ),
-        active_courses=_class_course_count(db, class_group.id),
-        active_assignments=active_assignments,
-        expected_submissions=expected_submissions,
-        total_learning_events=_count(db, LearningEvent, LearningEvent.class_id == class_group.id),
-        complete_learning_events=_count(
-            db,
-            LearningEvent,
-            LearningEvent.class_id == class_group.id,
-            LearningEvent.event_type == "complete",
-        ),
-        total_submissions=_count(db, Submission, Submission.class_id == class_group.id),
-        graded_submissions=_count(
-            db,
-            Submission,
-            Submission.class_id == class_group.id,
-            Submission.status == "graded",
-        ),
-        returned_submissions=_count(
-            db,
-            Submission,
-            Submission.class_id == class_group.id,
-            Submission.status == "returned",
-        ),
-        pending_submissions=pending_submissions,
-        pending_submission_ratio=_divide(pending_submissions, expected_submissions),
-        total_points=total_points,
-        average_points_per_student=_divide(total_points, active_students),
-        average_score_percent=_class_average_score_percent(db, class_group.id),
-    )
-
-
-@router.get("/class-join-requests", response_model=AdminClassJoinRequestPage)
-def list_admin_class_join_requests(
-    school_id: int | None = Query(default=None),
-    class_id: int | None = Query(default=None),
-    user_id: int | None = Query(default=None),
-    role: str | None = Query(default=None),
-    status_filter: str | None = Query(default="pending", alias="status"),
-    q: str | None = Query(default=None, max_length=160),
-    from_at: datetime | None = Query(default=None, alias="from"),
-    to_at: datetime | None = Query(default=None, alias="to"),
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> AdminClassJoinRequestPage:
-    _require_admin(current_user)
-    if from_at is not None and to_at is not None and from_at > to_at:
-        raise HTTPException(status_code=422, detail="from must be earlier than to")
-    statement = (
-        select(ClassJoinRequest, School, ClassGroup, User)
-        .join(School, School.id == ClassJoinRequest.school_id)
-        .join(ClassGroup, ClassGroup.id == ClassJoinRequest.class_id)
-        .join(User, User.id == ClassJoinRequest.user_id)
-        .order_by(ClassJoinRequest.created_at.desc(), ClassJoinRequest.id.desc())
-    )
-    if school_id is not None:
-        statement = statement.where(ClassJoinRequest.school_id == school_id)
-    if class_id is not None:
-        statement = statement.where(ClassJoinRequest.class_id == class_id)
-    if user_id is not None:
-        statement = statement.where(ClassJoinRequest.user_id == user_id)
-    if role is not None:
-        statement = statement.where(ClassJoinRequest.role == normalize_class_role(role))
-    if status_filter is not None:
-        statement = statement.where(ClassJoinRequest.status == normalize_join_request_status(status_filter))
-    if from_at is not None:
-        statement = statement.where(ClassJoinRequest.created_at >= from_at)
-    if to_at is not None:
-        statement = statement.where(ClassJoinRequest.created_at <= to_at)
-    if q is not None and q.strip():
-        pattern = f"%{q.strip()}%"
-        statement = statement.where(
-            or_(
-                School.name.ilike(pattern),
-                ClassGroup.name.ilike(pattern),
-                User.username.ilike(pattern),
-                User.display_name.ilike(pattern),
-                ClassJoinRequest.message.ilike(pattern),
-            )
-        )
-    total = _statement_count(db, statement)
-    rows = db.execute(statement.offset(offset).limit(limit)).all()
-    items = [
-        _admin_class_join_request_read(join_request, school, class_group, user)
-        for join_request, school, class_group, user in rows
-    ]
-    return AdminClassJoinRequestPage(
-        items=items,
-        total=total,
-        limit=limit,
-        offset=offset,
-        next_offset=_next_offset(total, offset, len(items)),
-    )
-
-
-@router.patch("/class-join-requests/{join_request_id}", response_model=AdminClassJoinRequestRead)
-def review_admin_class_join_request(
-    join_request_id: int,
-    payload: AdminClassJoinRequestReview,
-    request: Request,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> AdminClassJoinRequestRead:
-    _require_admin(current_user)
-    row = db.execute(
-        select(ClassJoinRequest, School, ClassGroup, User)
-        .join(School, School.id == ClassJoinRequest.school_id)
-        .join(ClassGroup, ClassGroup.id == ClassJoinRequest.class_id)
-        .join(User, User.id == ClassJoinRequest.user_id)
-        .where(ClassJoinRequest.id == join_request_id)
-    ).first()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Class join request not found")
-
-    join_request, school, class_group, applicant = row
-    apply_class_join_request_review(
-        db,
-        join_request=join_request,
-        reviewer=current_user,
-        request=request,
-        next_status=payload.status,
-        note=payload.note,
-        approval_source="admin_queue",
-    )
-    db.commit()
-    db.refresh(join_request)
-    return _admin_class_join_request_read(join_request, school, class_group, applicant)
 
 
 @router.get("/content/pages", response_model=AdminContentPagePage)
@@ -3965,33 +3679,6 @@ def _get_class(db: Session, class_id: int) -> ClassGroup:
     return class_group
 
 
-def _admin_class_join_request_read(
-    join_request: ClassJoinRequest,
-    school: School,
-    class_group: ClassGroup,
-    applicant: User,
-) -> AdminClassJoinRequestRead:
-    return AdminClassJoinRequestRead(
-        id=join_request.id,
-        school_id=join_request.school_id,
-        school_name=school.name,
-        class_id=join_request.class_id,
-        class_name=class_group.name,
-        user_id=join_request.user_id,
-        user_username=applicant.username,
-        user_display_name=applicant.display_name,
-        role=join_request.role,
-        status=join_request.status,
-        message=join_request.message,
-        requested_by_user_id=join_request.requested_by_user_id,
-        reviewed_by_user_id=join_request.reviewed_by_user_id,
-        reviewed_at=join_request.reviewed_at,
-        review_note=join_request.review_note,
-        created_at=join_request.created_at,
-        updated_at=join_request.updated_at,
-    )
-
-
 def _knowledge_snapshot_run_statement(
     *,
     granularity: str | None,
@@ -6615,105 +6302,6 @@ def _redacted_diff_value(value: Any) -> dict[str, Any]:
     if isinstance(value, (str, bytes, list, dict, tuple, set)):
         preview["length"] = len(value)
     return preview
-
-
-def _distinct_count(db: Session, column: Any, *criteria: Any) -> int:
-    statement = select(func.count(func.distinct(column)))
-    for criterion in criteria:
-        statement = statement.where(criterion)
-    return int(db.scalar(statement) or 0)
-
-
-def _sum_int(db: Session, column: Any, *criteria: Any) -> int:
-    statement = select(func.coalesce(func.sum(column), 0))
-    for criterion in criteria:
-        statement = statement.where(criterion)
-    return int(db.scalar(statement) or 0)
-
-
-def _school_assignment_count(db: Session, school_id: int, active_only: bool = False) -> int:
-    statement = (
-        select(func.count(func.distinct(Assignment.id)))
-        .select_from(Assignment)
-        .join(CourseUnit, CourseUnit.id == Assignment.unit_id)
-        .join(Course, Course.id == CourseUnit.course_id)
-        .where(Course.school_id == school_id)
-    )
-    if active_only:
-        statement = statement.where(Assignment.status == "active", Course.status != "archived")
-    return int(db.scalar(statement) or 0)
-
-
-def _class_course_count(db: Session, class_id: int) -> int:
-    return int(
-        db.scalar(
-            select(func.count(func.distinct(Course.id)))
-            .select_from(Course)
-            .join(CourseClass, CourseClass.course_id == Course.id)
-            .where(
-                CourseClass.class_id == class_id,
-                CourseClass.status == "active",
-                Course.status != "archived",
-            )
-        )
-        or 0
-    )
-
-
-def _class_assignment_count(db: Session, class_id: int, active_only: bool = False) -> int:
-    statement = (
-        select(func.count(func.distinct(Assignment.id)))
-        .select_from(Assignment)
-        .join(CourseUnit, CourseUnit.id == Assignment.unit_id)
-        .join(Course, Course.id == CourseUnit.course_id)
-        .join(CourseClass, CourseClass.course_id == Course.id)
-        .outerjoin(
-            AssignmentClassPolicy,
-            and_(
-                AssignmentClassPolicy.assignment_id == Assignment.id,
-                AssignmentClassPolicy.class_id == CourseClass.class_id,
-            ),
-        )
-        .where(
-            CourseClass.class_id == class_id,
-            CourseClass.status == "active",
-            assignment_class_is_assigned_expression(),
-        )
-    )
-    if active_only:
-        statement = statement.where(
-            assignment_class_effective_status_expression() == "active",
-            Course.status == "published",
-            CourseUnit.status == "published",
-        )
-    return int(db.scalar(statement) or 0)
-
-
-def _school_submission_count(db: Session, school_id: int, statuses: list[str] | None = None) -> int:
-    statement = (
-        select(func.count(func.distinct(Submission.id)))
-        .select_from(Submission)
-        .join(Assignment, Assignment.id == Submission.assignment_id)
-        .join(CourseUnit, CourseUnit.id == Assignment.unit_id)
-        .join(Course, Course.id == CourseUnit.course_id)
-        .where(Course.school_id == school_id)
-    )
-    if statuses is not None:
-        statement = statement.where(Submission.status.in_(statuses))
-    return int(db.scalar(statement) or 0)
-
-
-def _class_average_score_percent(db: Session, class_id: int) -> float:
-    score_total, max_score_total = db.execute(
-        select(
-            func.coalesce(func.sum(Submission.score), 0),
-            func.coalesce(func.sum(Assignment.max_score), 0),
-        )
-        .select_from(Submission)
-        .join(Assignment, Assignment.id == Submission.assignment_id)
-        .where(Submission.class_id == class_id, Submission.status == "graded")
-    ).one()
-    return _percent(float(score_total or 0), float(max_score_total or 0))
 
 
 def _pending_submission_criteria(

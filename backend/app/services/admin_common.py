@@ -7,6 +7,9 @@ from sqlalchemy.orm import Session
 from app.models import User
 
 
+PENDING_SUBMISSION_STATUSES = ("submitted", "returned")
+
+
 def require_admin(user: User) -> None:
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin role required")
