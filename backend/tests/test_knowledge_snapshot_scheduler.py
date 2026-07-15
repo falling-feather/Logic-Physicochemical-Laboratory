@@ -775,6 +775,7 @@ def test_snapshot_rebuild_script_skips_when_lease_is_unavailable(client):
         granularity="day",
         reference_date=reference_date,
         database_url=get_settings().database_url,
+        now=datetime(2026, 7, 13, 3, 30),
     )
 
     assert report == {

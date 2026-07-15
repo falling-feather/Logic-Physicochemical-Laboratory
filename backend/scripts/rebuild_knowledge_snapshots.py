@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import date
+from datetime import date, datetime
 import json
 import sys
 from uuid import uuid4
@@ -35,14 +35,16 @@ def run_rebuild(
     granularity: str,
     reference_date: date | None = None,
     database_url: str | None = None,
+    now: datetime | None = None,
 ) -> dict:
     settings = get_settings()
     url = database_url or settings.database_url
     session_factory = get_session_factory(url)
+    now_value = now or utc_now()
     with session_factory() as db:
         job = SnapshotScheduleJob(
             granularity=granularity,
-            reference_date=reference_date or utc_now().date(),
+            reference_date=reference_date or now_value.date(),
         )
         lease = acquire_snapshot_job_lease(
             db,
@@ -51,6 +53,7 @@ def run_rebuild(
             lease_owner=f"script:{uuid4().hex[:24]}",
             lease_seconds=settings.knowledge_snapshot_scheduler_lease_seconds,
             trigger_source="script",
+            now=now_value,
         )
         if lease is None:
             return {
