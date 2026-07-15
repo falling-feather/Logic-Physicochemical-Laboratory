@@ -16,10 +16,17 @@ const CellStructure = {
     // Animation
     time: 0,
     animId: null,
+    _ro: null,
+    _listeners: [],
+    _lpTimer: null,
+    _lpStartXY: null,
+    _lpOrg: null,
+    _lpPreview: false,
 
     /* ═══════════ Core ═══════════ */
 
     init() {
+        this.destroy();
         this.canvas = document.getElementById('cell-canvas');
         if (!this.canvas) return;
         this.ctx = this.canvas.getContext('2d');
@@ -33,12 +40,47 @@ const CellStructure = {
         this._updateInfo();
 
         if (typeof ResizeObserver !== 'undefined') {
-            new ResizeObserver(() => this.resize()).observe(this.canvas.parentElement);
+            this._ro = new ResizeObserver(() => this.resize());
+            this._ro.observe(this.canvas.parentElement);
+        } else {
+            this._on(window, 'resize', () => this.resize());
         }
-        window.addEventListener('resize', () => this.resize());
+    },
+
+    destroy() {
+        if (this.animId) cancelAnimationFrame(this.animId);
+        this.animId = null;
+        if (this._lpTimer) clearTimeout(this._lpTimer);
+        this._lpTimer = null;
+        if (this._ro) this._ro.disconnect();
+        this._ro = null;
+        this._listeners.forEach(({ el, event, handler, options }) => {
+            el.removeEventListener(event, handler, options);
+        });
+        this._listeners.length = 0;
+        if (this.canvas) this.canvas.style.cursor = '';
+        this.hoveredOrganelle = null;
+        this.zoomed = null;
+        this.zoomProgress = 0;
+        this.zoomTarget = 0;
+        this._lpStartXY = null;
+        this._lpOrg = null;
+        this._lpPreview = false;
+        this.canvas = null;
+        this.ctx = null;
+        this.info = null;
+        this.W = 0;
+        this.H = 0;
+    },
+
+    _on(el, event, handler, options) {
+        if (!el) return;
+        el.addEventListener(event, handler, options);
+        this._listeners.push({ el, event, handler, options });
     },
 
     resize() {
+        if (!this.canvas || !this.ctx) return;
         const wrap = this.canvas.parentElement;
         if (!wrap) return;
         const w = wrap.clientWidth;
@@ -56,15 +98,15 @@ const CellStructure = {
 
     bindControls() {
         const toggleBtn = document.getElementById('bio-cell-toggle');
-        if (toggleBtn) toggleBtn.addEventListener('click', () => {
+        this._on(toggleBtn, 'click', () => {
             this.isPlant = !this.isPlant;
             this.hoveredOrganelle = null;
             this.zoomOut();
             this._updateInfo();
         });
         const labelBtn = document.getElementById('bio-cell-label-toggle');
-        if (labelBtn) labelBtn.addEventListener('click', () => { this.showLabels = !this.showLabels; });
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && this.zoomed) this.zoomOut(); });
+        this._on(labelBtn, 'click', () => { this.showLabels = !this.showLabels; });
+        this._on(document, 'keydown', (e) => { if (e.key === 'Escape' && this.zoomed) this.zoomOut(); });
     },
 
     bindCanvas() {
@@ -78,21 +120,21 @@ const CellStructure = {
             return null;
         };
 
-        this.canvas.addEventListener('mousemove', (e) => {
+        this._on(this.canvas, 'mousemove', (e) => {
             if (this.zoomed) { this.canvas.style.cursor = 'zoom-out'; return; }
             const r = this.canvas.getBoundingClientRect();
             this.hoveredOrganelle = hitTest((e.clientX - r.left) / this.W, (e.clientY - r.top) / this.H);
             this.canvas.style.cursor = this.hoveredOrganelle ? 'zoom-in' : 'default';
         });
 
-        this.canvas.addEventListener('mouseleave', () => { this.hoveredOrganelle = null; });
+        this._on(this.canvas, 'mouseleave', () => { this.hoveredOrganelle = null; });
 
-        this.canvas.addEventListener('click', () => {
+        this._on(this.canvas, 'click', () => {
             if (this.zoomed) { this.zoomOut(); return; }
             if (this.hoveredOrganelle) this.zoomTo(this.hoveredOrganelle);
         });
 
-        this.canvas.addEventListener('touchstart', (e) => {
+        this._on(this.canvas, 'touchstart', (e) => {
             e.preventDefault();
             if (this.zoomed) { this.zoomOut(); return; }
             const r = this.canvas.getBoundingClientRect();
@@ -111,7 +153,7 @@ const CellStructure = {
             }, 350);
         }, { passive: false });
 
-        this.canvas.addEventListener('touchmove', (e) => {
+        this._on(this.canvas, 'touchmove', (e) => {
             if (!this._lpStartXY || !e.touches[0]) return;
             const dx = e.touches[0].clientX - this._lpStartXY.x;
             const dy = e.touches[0].clientY - this._lpStartXY.y;
@@ -122,11 +164,21 @@ const CellStructure = {
             }
         }, { passive: true });
 
-        this.canvas.addEventListener('touchend', () => {
+        this._on(this.canvas, 'touchend', () => {
             if (this._lpTimer) {
                 clearTimeout(this._lpTimer); this._lpTimer = null;
                 if (this._lpOrg) this.zoomTo(this._lpOrg);
             } else if (this._lpPreview) {
+                this.hoveredOrganelle = null;
+                this._lpPreview = false;
+            }
+            this._lpStartXY = null;
+            this._lpOrg = null;
+        });
+
+        this._on(this.canvas, 'touchcancel', () => {
+            if (this._lpTimer) { clearTimeout(this._lpTimer); this._lpTimer = null; }
+            if (this._lpPreview) {
                 this.hoveredOrganelle = null;
                 this._lpPreview = false;
             }
@@ -150,7 +202,9 @@ const CellStructure = {
     },
 
     startLoop() {
+        if (this.animId) cancelAnimationFrame(this.animId);
         const loop = () => {
+            if (!this.ctx) { this.animId = null; return; }
             this.time += 0.016;
             this.zoomProgress += (this.zoomTarget - this.zoomProgress) * 0.12;
             if (Math.abs(this.zoomProgress - this.zoomTarget) < 0.002) this.zoomProgress = this.zoomTarget;

@@ -3,12 +3,47 @@
 // ===== 桶排序 =====
 let sortArray = [], isSorting = false;
 let sortSpeed = 500; // 全局变量，供main.js使用
+let sortEpoch = 0;
+const sortTimeouts = new Map();
 
 // 确保sortSpeed是全局的
 window.sortSpeed = sortSpeed;
 
-function sleep(ms) { 
-    return new Promise(r => setTimeout(r, ms)); 
+function isCurrentSort(epoch) {
+    return epoch === sortEpoch;
+}
+
+function sleep(ms, epoch) {
+    return new Promise((resolve) => {
+        if (!isCurrentSort(epoch)) { resolve(false); return; }
+        const timer = setTimeout(() => {
+            sortTimeouts.delete(timer);
+            resolve(isCurrentSort(epoch));
+        }, ms);
+        sortTimeouts.set(timer, () => resolve(false));
+    });
+}
+
+function scheduleSortTask(callback, ms, epoch) {
+    if (!isCurrentSort(epoch)) return null;
+    const timer = setTimeout(() => {
+        sortTimeouts.delete(timer);
+        if (isCurrentSort(epoch)) callback();
+    }, ms);
+    sortTimeouts.set(timer, null);
+    return timer;
+}
+
+function cancelSortTasks() {
+    sortTimeouts.forEach((cancel, timer) => {
+        clearTimeout(timer);
+        if (typeof cancel === 'function') cancel();
+    });
+    sortTimeouts.clear();
+}
+
+function setSortToolbarDisabled(disabled) {
+    document.querySelectorAll('.sort-toolbar .btn').forEach(b => { b.disabled = disabled; });
 }
 
 function updateSortInfo(t) { 
@@ -23,6 +58,7 @@ function clearBuckets() {
 
 function generateRandomArray() {
     if(isSorting) return;
+    cancelSortTasks();
     sortArray = Array.from({length:15}, () => Math.floor(Math.random()*100)+1);
     renderArray('original-array', sortArray);
     renderArray('sorted-array', []);
@@ -62,57 +98,65 @@ function highlightBar(id, idx, on) {
 }
 
 async function startBucketSort() {
-    if(isSorting || !sortArray.length) { 
-        if(!sortArray.length) { 
-            generateRandomArray(); 
-            await sleep(500); 
-        } else return; 
-    }
+    if (isSorting) return;
+    cancelSortTasks();
+    const generated = !sortArray.length;
+    if (generated) generateRandomArray();
+    const epoch = sortEpoch;
+    if (!isCurrentSort(epoch)) return;
     isSorting = true;
-    document.querySelectorAll('.sort-toolbar .btn').forEach(b => b.disabled = true);
+    setSortToolbarDisabled(true);
     
     const arr = [...sortArray];
     const buckets = Array(10).fill(null).map(()=>[]);
     const max = Math.max(...arr);
-    const currentSpeed = window.sortSpeed || sortSpeed; // 使用全局变量
-    
-    updateSortInfo('步骤1: 分配到桶...');
-    for(let i=0; i<arr.length; i++) {
-        const v = arr[i];
-        const bi = Math.floor((v/(max+1))*10);
-        buckets[bi].push(v);
-        highlightBar('original-array', i, true);
-        await sleep(currentSpeed);
-        renderBuckets(buckets);
-        updateSortInfo(`将 ${v} 放入桶 ${bi+1}`);
-        await sleep(currentSpeed);
-        highlightBar('original-array', i, false);
-    }
-    
-    updateSortInfo('步骤2: 桶内排序...');
-    for(let i=0; i<buckets.length; i++) {
-        if(buckets[i].length) {
-            buckets[i].sort((a,b)=>a-b);
+    const currentSpeed = sortSpeed;
+
+    try {
+        if (generated && !await sleep(500, epoch)) return;
+        updateSortInfo('步骤1: 分配到桶...');
+        for(let i=0; i<arr.length; i++) {
+            const v = arr[i];
+            const bi = Math.floor((v/(max+1))*10);
+            buckets[bi].push(v);
+            highlightBar('original-array', i, true);
+            if (!await sleep(currentSpeed, epoch)) return;
             renderBuckets(buckets);
-            updateSortInfo(`桶 ${i+1} 排序完成`);
-            await sleep(currentSpeed);
+            updateSortInfo(`将 ${v} 放入桶 ${bi+1}`);
+            if (!await sleep(currentSpeed, epoch)) return;
+            highlightBar('original-array', i, false);
+        }
+
+        updateSortInfo('步骤2: 桶内排序...');
+        for(let i=0; i<buckets.length; i++) {
+            if(buckets[i].length) {
+                buckets[i].sort((a,b)=>a-b);
+                renderBuckets(buckets);
+                updateSortInfo(`桶 ${i+1} 排序完成`);
+                if (!await sleep(currentSpeed, epoch)) return;
+            }
+        }
+
+        updateSortInfo('步骤3: 合并...');
+        const sorted = [];
+        for(let b of buckets) {
+            for(let v of b) {
+                sorted.push(v);
+                renderArray('sorted-array', sorted);
+                if (!await sleep(currentSpeed/2, epoch)) return;
+            }
+        }
+        updateSortInfo('完成！');
+        updateSortEdu(arr.length, buckets);
+        document.querySelectorAll('#sorted-array .array-bar').forEach((b,i) => {
+            scheduleSortTask(() => b.classList.add('sorted'), i * 50, epoch);
+        });
+    } finally {
+        if (isCurrentSort(epoch)) {
+            isSorting = false;
+            setSortToolbarDisabled(false);
         }
     }
-    
-    updateSortInfo('步骤3: 合并...');
-    const sorted = [];
-    for(let b of buckets) {
-        for(let v of b) {
-            sorted.push(v);
-            renderArray('sorted-array', sorted);
-            await sleep(currentSpeed/2);
-        }
-    }
-    updateSortInfo('完成！');
-    updateSortEdu(arr.length, buckets);
-    document.querySelectorAll('#sorted-array .array-bar').forEach((b,i)=>setTimeout(()=>b.classList.add('sorted'), i*50));
-    isSorting = false;
-    document.querySelectorAll('.sort-toolbar .btn').forEach(b => b.disabled = false);
 }
 
 function updateSortEdu(n, buckets) {
@@ -137,6 +181,7 @@ function updateSortEdu(n, buckets) {
 
 function resetBucketSort() {
     if(isSorting) return;
+    cancelSortTasks();
     sortArray = [];
     renderArray('original-array', []); 
     renderArray('sorted-array', []); 
@@ -146,18 +191,32 @@ function resetBucketSort() {
 
 // ===== 算法页面初始化 =====
 function initAlgorithms() {
+    destroyAlgorithms();
     const speedInput = document.getElementById('sort-speed');
     if (speedInput) {
-        speedInput.addEventListener('input', (e) => {
-            sortSpeed = parseInt(e.target.value);
-            const speedValue = document.getElementById('speed-value');
-            if(speedValue) speedValue.textContent = sortSpeed + 'ms';
-        });
+        sortSpeed = parseInt(speedInput.value, 10) || 500;
+        window.sortSpeed = sortSpeed;
     }
+    setSortToolbarDisabled(false);
 }
+
+function destroyAlgorithms() {
+    sortEpoch += 1;
+    cancelSortTasks();
+    isSorting = false;
+    setSortToolbarDisabled(false);
+    document.querySelectorAll('#original-array .array-bar.active').forEach(b => b.classList.remove('active'));
+}
+
+const SortingLab = {
+    init: initAlgorithms,
+    destroy: destroyAlgorithms
+};
 
 // 导出全局
 window.generateRandomArray = generateRandomArray;
 window.startBucketSort = startBucketSort;
 window.resetBucketSort = resetBucketSort;
+window.initAlgorithms = initAlgorithms;
+window.SortingLab = SortingLab;
 

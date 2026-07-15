@@ -146,7 +146,7 @@
         define('chemistry', 'experiments', 'pages/chemistry/virtual-experiments.js?v=20260618refsP1', 'initChemVirtualExperiments', validatedMethod('ChemVirtualExperiments', () => ChemVirtualExperiments)),
 
         // Algorithms — CONFIG order
-        define('algorithms', 'sorting', 'pages/algorithms/algorithms.js', 'initAlgorithms', missing('sorting-lifecycle'), 'legacy-bypass'),
+        define('algorithms', 'sorting', 'pages/algorithms/algorithms.js?v=20260715v7418MissingCleanupP3', 'initAlgorithms', validatedMethod('SortingLab', () => SortingLab)),
         define('algorithms', 'searching', 'pages/algorithms/search-algorithms.js', 'initSearchAlgorithms', legacyComposite(
             ['SearchComparison', 'TreeTraversal', 'HashSearch'],
             [invokeMethod(() => SearchComparison), invokeMethod(() => TreeTraversal), invokeMethod(() => HashSearch)]
@@ -163,7 +163,7 @@
         define('algorithms', 'string-matching', 'pages/algorithms/string-matching.js?v=20260618algoTextP1', 'initStringMatch', legacyMethod('StringMatch', () => StringMatch)),
 
         // Biology — CONFIG order
-        define('biology', 'cell-structure', 'pages/biology/cell-structure.js?v=20260617gasP1b', 'initCellStructure', missing('CellStructure.destroy')),
+        define('biology', 'cell-structure', 'pages/biology/cell-structure.js?v=20260715v7418MissingCleanupP3', 'initCellStructure', validatedMethod('CellStructure', () => CellStructure)),
         define('biology', 'dna', 'pages/biology/dna-helix.js?v=20260715v7417CandidateCleanupP1', 'initDNAHelix', validatedMethod('DNAHelix', () => DNAHelix)),
         define('biology', 'photosynthesis', 'pages/biology/photosynthesis.js?v=20260715v7417CandidateCleanupP1', 'initPhotosynthesis', validatedMethod('Photosynthesis', () => Photosynthesis)),
         define('biology', 'enzyme-properties', 'pages/biology/enzyme-properties.js?v=20260618enzymeSourceP1b', 'initEnzymeProperties', validatedMethod('EnzymeProperties', () => EnzymeProperties)),

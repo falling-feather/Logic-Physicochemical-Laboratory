@@ -80,11 +80,13 @@ const initModeCounts = definitions.reduce((counts, entry) => {
     counts[entry.init.mode] = (counts[entry.init.mode] || 0) + 1;
     return counts;
 }, {});
-assert.deepEqual(initModeCounts, { 'global-hook': 87, 'legacy-bypass': 1 });
+assert.deepEqual(initModeCounts, { 'global-hook': 88 });
 const sorting = registry.get('algorithms', 'sorting');
 assert.equal(sorting.init.hook, 'initAlgorithms');
-assert.equal(sorting.init.invoke, false);
+assert.equal(sorting.init.invoke, true);
+context.window.initAlgorithms = () => { context.sortingInitCalls = (context.sortingInitCalls || 0) + 1; };
 assert.equal(registry.init('algorithms', 'sorting'), true);
+assert.equal(context.sortingInitCalls, 1);
 
 context.window.initFunctionGraph = () => { context.initCalls = (context.initCalls || 0) + 1; };
 assert.equal(registry.init('mathematics', 'function-graph'), true);
@@ -97,8 +99,7 @@ const cleanupStateCounts = definitions.reduce((counts, entry) => {
 }, {});
 assert.deepEqual(cleanupStateCounts, {
     'legacy-callback': 65,
-    'validated-callback': 21,
-    missing: 2
+    'validated-callback': 23
 });
 
 const expectedValidated = {
@@ -142,6 +143,11 @@ const expectedValidated = {
         initHook: 'initChemVirtualExperiments',
         owner: 'ChemVirtualExperiments'
     },
+    'algorithms:sorting': {
+        script: 'pages/algorithms/algorithms.js?v=20260715v7418MissingCleanupP3',
+        initHook: 'initAlgorithms',
+        owner: 'SortingLab'
+    },
     'algorithms:hash-tables': {
         script: 'pages/algorithms/hash-tables.js?v=20260617bstP1b',
         initHook: 'initHashTablesLab',
@@ -161,6 +167,11 @@ const expectedValidated = {
         script: 'pages/algorithms/greedy-scheduling.js?v=20260618refsP1',
         initHook: 'initGreedyScheduling',
         owner: 'GreedyScheduling'
+    },
+    'biology:cell-structure': {
+        script: 'pages/biology/cell-structure.js?v=20260715v7418MissingCleanupP3',
+        initHook: 'initCellStructure',
+        owner: 'CellStructure'
     },
     'biology:dna': {
         script: 'pages/biology/dna-helix.js?v=20260715v7417CandidateCleanupP1',
@@ -230,11 +241,8 @@ assert.deepEqual(
         .filter(entry => entry.cleanup.state === 'missing')
         .map(entry => `${entry.subject}:${entry.id}`)
         .sort(),
-    ['algorithms:sorting', 'biology:cell-structure']
+    []
 );
-definitions
-    .filter(entry => entry.cleanup.state === 'missing')
-    .forEach(entry => assert.equal(entry.cleanup.run, null, `${entry.id} must not carry a fake cleanup`));
 
 const searching = registry.get('algorithms', 'searching');
 assert.equal(searching.cleanup.kind, 'composite');
@@ -262,7 +270,7 @@ assert.equal(cleanupReport.executed, 3);
 assert.equal(cleanupReport.failed, 0);
 assert.equal(context.destroyCalls, 1);
 assert.equal(context.calculusDestroyCalls, 1, 'cleanup closure must resolve a later global lexical binding');
-const expectedAttempts = { mathematics: 20, physics: 20, chemistry: 17, algorithms: 11, biology: 18 };
+const expectedAttempts = { mathematics: 20, physics: 20, chemistry: 17, algorithms: 12, biology: 19 };
 for (const subject of subjects.slice(1)) {
     const report = registry.cleanupPage(subject);
     assert.equal(report.attempted, expectedAttempts[subject], `${subject} executable cleanup count must remain exact`);
@@ -341,9 +349,9 @@ assert.ok(
 assert.doesNotMatch(router, /\bconst destroyMap\s*=/);
 assert.match(router, /ModuleSelector\.leavePage\(page, \{ preserveHash: true \}\)/);
 assert.match(html, /config\.js[\s\S]*experiment-registry\.js[\s\S]*page-registry\.js[\s\S]*router\.js[\s\S]*main\.js/);
-assert.match(main, /experiment-registry\.js\?v=20260715v7417CandidateCleanupP1/);
-assert.match(main, /module-selector\.js\?v=20260715v7417CandidateCleanupP1/);
-assert.match(serviceWorker, /experiment-registry\.js\?v=20260715v7417CandidateCleanupP1/);
-assert.match(serviceWorker, /astra-static-v20260715v7417CandidateCleanupP1/);
+assert.match(main, /experiment-registry\.js\?v=20260715v7418MissingCleanupP3/);
+assert.match(main, /module-selector\.js\?v=20260715v7418MissingCleanupP3/);
+assert.match(serviceWorker, /experiment-registry\.js\?v=20260715v7418MissingCleanupP3/);
+assert.match(serviceWorker, /astra-static-v20260715v7418MissingCleanupP3/);
 
 console.log('experiment-registry-contract: ok');

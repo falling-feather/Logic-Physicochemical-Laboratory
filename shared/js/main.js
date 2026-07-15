@@ -224,7 +224,7 @@ function updateFooterVisibility() {
 
 window.updateFooterVisibility = updateFooterVisibility;
 
-const ENGLAB_ASSET_VERSION = '20260715v7417CandidateCleanupP1';
+const ENGLAB_ASSET_VERSION = '20260715v7418MissingCleanupP3';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',
@@ -238,10 +238,10 @@ const CORE_HTTP_FALLBACK_ASSETS = [
     './shared/js/config.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/api-client.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/app-session.js?v=' + ENGLAB_ASSET_VERSION,
-    './shared/js/experiment-registry.js?v=20260715v7417CandidateCleanupP1',
-    './shared/js/page-registry.js?v=20260715v7417CandidateCleanupP1',
-    './shared/js/router.js?v=20260715v7417CandidateCleanupP1',
-    './shared/js/main.js?v=20260715v7417CandidateCleanupP1',
+    './shared/js/experiment-registry.js?v=20260715v7418MissingCleanupP3',
+    './shared/js/page-registry.js?v=20260715v7418MissingCleanupP3',
+    './shared/js/router.js?v=20260715v7418MissingCleanupP3',
+    './shared/js/main.js?v=20260715v7418MissingCleanupP3',
     './shared/js/backend-content.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/css/backend-content.css?v=' + ENGLAB_ASSET_VERSION,
     './shared/css/auth-ui.css?v=' + ENGLAB_ASSET_VERSION,
@@ -274,7 +274,7 @@ const GALAXY_HTTP_FALLBACK_ASSETS = {
         './pages/admin/admin.css?v=' + ENGLAB_ASSET_VERSION,
         './pages/teacher/teacher.css?v=' + ENGLAB_ASSET_VERSION,
         './pages/student/student.css?v=' + ENGLAB_ASSET_VERSION,
-        './shared/js/module-selector.js?v=20260715v7417CandidateCleanupP1',
+        './shared/js/module-selector.js?v=20260715v7418MissingCleanupP3',
         './shared/js/experiment-guide.js?v=20260630mainV64',
         './shared/js/experiment-export.js?v=20260528v61f',
         './shared/js/quiz-data.js?v=20260618refsP1',
