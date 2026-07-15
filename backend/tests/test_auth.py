@@ -11,7 +11,7 @@ from app.models import AuditLog, AuthSession, LoginAttempt, PasswordResetToken, 
 
 
 def _auth_header(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": f"Bearer {token}", "Cookie": ""}
 
 
 def test_register_login_me_logout(client):
@@ -45,6 +45,185 @@ def test_register_login_me_logout(client):
     assert after_logout.status_code == 401
 
 
+def test_login_openapi_marks_token_as_non_browser_compatibility_only(client):
+    schema = client.get("/api/openapi.json").json()["components"]["schemas"]["LoginResponse"]
+    token_schema = schema["properties"]["access_token"]
+
+    assert "non-browser API clients" in token_schema["description"]
+    assert "Browser clients must ignore" in token_schema["description"]
+
+
+def test_cookie_only_session_lifecycle(client):
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "cookie_session_owner",
+            "password": "secret123",
+            "display_name": "Cookie Session Owner",
+            "role": "student",
+        },
+    )
+    assert register.status_code == 201
+
+    login = client.post(
+        "/api/auth/login",
+        json={"username": "cookie_session_owner", "password": "secret123"},
+    )
+    assert login.status_code == 200
+
+    me = client.get("/api/users/me")
+    assert me.status_code == 200
+    assert me.json()["username"] == "cookie_session_owner"
+
+    logout = client.post("/api/auth/logout")
+    assert logout.status_code == 200
+    assert client.get("/api/users/me").status_code == 401
+
+
+def test_mixed_cookie_and_bearer_credentials_fail_closed(client):
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "mixed_credential_owner",
+            "password": "secret123",
+            "display_name": "Mixed Credential Owner",
+            "role": "teacher",
+        },
+    )
+    assert register.status_code == 201
+    login = client.post(
+        "/api/auth/login",
+        json={"username": "mixed_credential_owner", "password": "secret123"},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+
+    response = client.get(
+        "/api/users/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Multiple authentication credentials"}
+    assert token not in response.text
+
+    client.cookies.clear()
+    empty_cookie_response = client.get(
+        "/api/users/me",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Cookie": f"{get_settings().session_cookie_name}=",
+        },
+    )
+    assert empty_cookie_response.status_code == 400
+    assert empty_cookie_response.json() == {"detail": "Multiple authentication credentials"}
+    assert token not in empty_cookie_response.text
+
+
+def test_repeated_authorization_headers_fail_closed(client):
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "repeated_authorization_owner",
+            "password": "secret123",
+            "display_name": "Repeated Authorization Owner",
+            "role": "teacher",
+        },
+    )
+    assert register.status_code == 201
+    login = client.post(
+        "/api/auth/login",
+        json={"username": "repeated_authorization_owner", "password": "secret123"},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+    client.cookies.clear()
+
+    response = client.get(
+        "/api/users/me",
+        headers=[
+            ("Authorization", f"Bearer {token}"),
+            ("Authorization", f"Bearer {token}"),
+        ],
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Multiple authentication credentials"}
+    assert token not in response.text
+
+
+@pytest.mark.parametrize("split_headers", [False, True])
+def test_repeated_session_cookies_fail_closed(client, split_headers):
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "repeated_cookie_owner",
+            "password": "secret123",
+            "display_name": "Repeated Cookie Owner",
+            "role": "student",
+        },
+    )
+    assert register.status_code == 201
+    login = client.post(
+        "/api/auth/login",
+        json={"username": "repeated_cookie_owner", "password": "secret123"},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+    cookie_name = get_settings().session_cookie_name
+    client.cookies.clear()
+    cookie_value = f"{cookie_name}={token}"
+    cookie_headers = (
+        [("Cookie", cookie_value), ("Cookie", cookie_value)]
+        if split_headers
+        else [("Cookie", f"{cookie_value}; {cookie_value}")]
+    )
+
+    response = client.get("/api/users/me", headers=cookie_headers)
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Multiple authentication credentials"}
+    assert token not in response.text
+
+
+@pytest.mark.parametrize(
+    "authorization",
+    [
+        "",
+        "Basic unsupported-credential",
+        "Bearer",
+        "Bearer ",
+        "Bearer token with spaces",
+    ],
+)
+def test_malformed_authorization_never_falls_back_to_cookie(client, authorization):
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "malformed_header_owner",
+            "password": "secret123",
+            "display_name": "Malformed Header Owner",
+            "role": "student",
+        },
+    )
+    assert register.status_code == 201
+    login = client.post(
+        "/api/auth/login",
+        json={"username": "malformed_header_owner", "password": "secret123"},
+    )
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+
+    response = client.get(
+        "/api/users/me",
+        headers={"Authorization": authorization},
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Invalid authorization header"}
+    assert token not in response.text
+
+
 def test_session_management_requires_authentication(client):
     sessions = client.get("/api/auth/sessions")
     assert sessions.status_code == 401
@@ -75,6 +254,7 @@ def test_login_records_session_device_metadata_and_last_seen(client):
     )
     assert login.status_code == 200
     token = login.json()["access_token"]
+    assert login.json()["token_type"] == "bearer"
 
     sessions_response = client.get(
         "/api/auth/sessions",

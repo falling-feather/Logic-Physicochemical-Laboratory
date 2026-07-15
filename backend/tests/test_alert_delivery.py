@@ -14,7 +14,7 @@ from app.services import alert_delivery
 
 
 def _auth_header(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": f"Bearer {token}", "Cookie": ""}
 
 
 def _bootstrap_admin(client) -> str:

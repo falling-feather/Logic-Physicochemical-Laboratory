@@ -19,7 +19,7 @@ from app.services.background_tasks import enqueue_background_task
 
 
 def _auth_header(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": f"Bearer {token}", "Cookie": ""}
 
 
 def _bootstrap_admin(client, username: str = "background_task_admin") -> str:

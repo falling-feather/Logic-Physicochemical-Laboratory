@@ -8,7 +8,7 @@ from app.models import ContentDraft, ContentPageRecord, User
 
 
 def _auth_header(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": f"Bearer {token}", "Cookie": ""}
 
 
 def _bootstrap_admin(client, username: str = "admin_content") -> str:

@@ -22,7 +22,7 @@ from scripts.scan_content_script_asset_remote_drift import run_scan
 
 
 def _auth_header(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": f"Bearer {token}", "Cookie": ""}
 
 
 def _bootstrap_admin(client) -> str:

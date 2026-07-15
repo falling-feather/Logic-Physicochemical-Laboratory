@@ -27,8 +27,13 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     user: UserPublic
-    access_token: str
-    token_type: str = "bearer"
+    access_token: str = Field(
+        description=(
+            "Compatibility credential for explicit non-browser API clients. "
+            "Browser clients must ignore it and must never store or resend it."
+        )
+    )
+    token_type: str = Field(default="bearer", description="Compatibility credential scheme.")
 
 
 class PasswordResetRequest(BaseModel):

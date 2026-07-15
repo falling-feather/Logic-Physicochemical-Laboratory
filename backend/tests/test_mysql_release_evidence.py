@@ -708,7 +708,7 @@ def test_mysql_connection_pool_timeout_is_bounded_and_recovers(mysql_url: str):
 
 
 def _auth_header(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": f"Bearer {token}", "Cookie": ""}
 
 
 def _performance_knowledge_run(run_token: str, index: int, now) -> KnowledgeSnapshotRun:

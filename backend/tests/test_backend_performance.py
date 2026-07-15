@@ -11,7 +11,7 @@ from app.services.backend_performance import QUERY_PROFILES, performance_posture
 
 
 def _auth_header(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": f"Bearer {token}", "Cookie": ""}
 
 
 def _bootstrap_admin(client) -> str:

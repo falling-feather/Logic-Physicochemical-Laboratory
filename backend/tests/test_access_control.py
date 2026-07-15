@@ -17,7 +17,7 @@ from app.services import knowledge_snapshot_runs
 
 
 def _auth_header(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": f"Bearer {token}", "Cookie": ""}
 
 
 def _register_and_login(client, username: str, role: str) -> dict:

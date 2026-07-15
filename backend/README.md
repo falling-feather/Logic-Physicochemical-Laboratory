@@ -1,10 +1,10 @@
 # 星序 Astra · Python 业务后端
 
-> **文档定位**：后端本地开发、API/服务边界、配置、迁移、运维脚本和验证入口。版本流水与实机证据见 [`../doc/03-发布历史.md`](../doc/03-发布历史.md)，未来任务见 [`../doc/02-更新规划.md`](../doc/02-更新规划.md)。
+> **文档定位**：后端本地开发、API/服务边界、配置、迁移、运维脚本和验证入口。V7.4.12 起完成事实见 [`../doc/03-开发历史.md`](../doc/03-开发历史.md)，更早实机证据见 [`../doc/03-发布历史.md`](../doc/03-发布历史.md)，未来任务见 [`../doc/02-项目规划.md`](../doc/02-项目规划.md)。
 >
-> **当前基线**：FastAPI + SQLAlchemy + Alembic 0046；SQLite 为安全本地默认，MySQL 为发布目标。V7.4.9 已建立 Python 3.12 通用哈希锁和 CI 漂移门禁；V7.4.8 已完成管理 API 全部分域拆分，`admin.py` 为纯路由聚合器；V6.6.63 后端阶段、真实 MySQL、四服务拓扑、Release 构建/回滚和 15/15 stage gate 已完成。
+> **当前基线**：FastAPI + SQLAlchemy + Alembic 0046；SQLite 为安全本地默认，MySQL 为发布目标。V7.4.22 已硬化浏览器 Cookie-only/非浏览器 Bearer 双通道契约；V7.4.9 已建立 Python 3.12 通用哈希锁和 CI 漂移门禁；V7.4.8 已完成管理 API 全部分域拆分，`admin.py` 为纯路由聚合器；V6.6.63 后端阶段、真实 MySQL、四服务拓扑、Release 构建/回滚和 15/15 stage gate 已完成。
 >
-> **最后更新**：2026-07-11
+> **最后更新**：2026-07-15
 
 后端当前承担认证与会话、学校/班级/课程、作业/提交/批改、积分与知识状态、内容草稿/审核/发布/回滚、脚本隔离、管理治理、DB-backed 任务和审计链。`server/` 中的 Node/C++ 进程只承担显式白名单静态资源，不是业务 API。
 
@@ -126,7 +126,7 @@ python -m scripts.rc_external_scope_gate \
 | 方法 | 路径 | 说明 |
 | ---- | ---- | ---- |
 | POST | `/api/auth/register` | 本地账号注册；用户名会修剪并小写落库，重复校验大小写不敏感；拒绝短密码、纯数字/纯字母、常见弱口令和包含用户名的密码 |
-| POST | `/api/auth/login` | 登录响应保留 API 兼容 token，同时写入 HttpOnly cookie；浏览器三端必须采用 cookie-only，不读取、发送或持久化响应中的 Bearer token。生产环境 cookie 预期带 `Secure/HttpOnly/SameSite=Lax`；用户名按规范化值大小写不敏感匹配，连续失败达到阈值返回 `429` 与 `Retry-After`；成功登录会记录 best-effort 设备标识、登录 user-agent、`last_seen_at` 和 IP 哈希；成功、失败和锁定事件写入审计 |
+| POST | `/api/auth/login` | 登录响应保留只供显式非浏览器 API 客户端使用的兼容 token，同时写入 HttpOnly cookie；浏览器三端必须采用 cookie-only，不读取、发送或持久化响应中的 Bearer token。Cookie+Bearer、重复同名会话 Cookie、重复 Authorization 和畸形 Authorization 均在会话查询前 fail closed，任何凭据不得静默覆盖另一凭据。生产环境 cookie 预期带 `Secure/HttpOnly/SameSite=Lax`；用户名按规范化值大小写不敏感匹配，连续失败达到阈值返回 `429` 与 `Retry-After`；成功登录会记录 best-effort 设备标识、登录 user-agent、`last_seen_at` 和 IP 哈希；成功、失败和锁定事件写入审计 |
 | POST | `/api/auth/logout` | 注销当前用户所有活动会话，并写入审计 |
 | POST | `/api/auth/password-reset/request` | 用户自助密码重置请求；响应始终泛化为 `ok`，active 用户会生成哈希存储的一次性 token，并按账号哈希/IP 哈希冷却；生产环境不返回 token，本地调试也必须显式开启 `ASTRA_PASSWORD_RESET_RETURN_TOKEN_FOR_DEV=true` |
 | POST | `/api/auth/password-reset/confirm` | 使用一次性 token 重置密码；行锁消费 token，复用密码强度策略，成功后撤销用户未撤销会话、清理登录失败桶，并写入不含明文密码或 token 的 `auth.password_reset.*` 审计 |
@@ -255,6 +255,7 @@ python -m scripts.rc_external_scope_gate \
 
 - `shared/js/api-client.js` 是管理、教师、学生三端和后端 schema adapter 的统一请求入口。它只接受同源、显式配置的精确 HTTP(S) origin 或本地开发 origin，拒绝路径、query、fragment、userinfo 与 HTTPS 降级；无效非空配置不会静默回退同源。
 - 浏览器鉴权只使用 HttpOnly Cookie。统一 client 强制删除调用方 `Authorization`，并在模块加载、主应用启动和三端进入时幂等清理已知历史 token key；token、提交正文、成绩、反馈、学习事件、知识状态和快照不得进入 localStorage/sessionStorage。
+- 后端同时保留显式非浏览器 Bearer 兼容，但单个请求只能选择一种认证通道。混合 Cookie+Bearer、重复目标 Cookie、重复 Authorization 或格式畸形的 Authorization 均使用不含凭据的稳定错误响应拒绝；自动化 Bearer 测试必须显式清空测试客户端 Cookie jar。
 - GET 只做一次权威读取，不使用持久化 API 缓存；写请求不自动重试。发送后发生超时、取消或网络错误时标记结果未知，UI 必须锁定相关写入口并通过权威 GET 对账；收到 HTTP 状态或成功响应后 body/protocol 失败不应伪装为“可以安全重试”。
 - 未登录、无权限、服务端错误、超时、离线和网络故障使用稳定产品文案；失去认证或实时连接时立即清空内存数据和 dashboard DOM，不能把旧数据伪装为实时状态。恢复在线后只允许重新读取，不自动重放写入。
 - Service Worker 在导航和扩展名判断之前旁路精确 `/api` 与 `/api/*`，不调用 `respondWith`、CacheStorage 或离线 fallback；FastAPI 外层中间件为 API 的 2xx/4xx/5xx/OPTIONS 统一补 `Cache-Control: no-store`、`Pragma: no-cache` 和 `X-Request-ID`。

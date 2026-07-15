@@ -31,7 +31,7 @@ from app.services.audit import audit_log_chain_hash, record_audit_log
 
 
 def _auth_header(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": f"Bearer {token}", "Cookie": ""}
 
 
 def _bootstrap_admin(client) -> str:
