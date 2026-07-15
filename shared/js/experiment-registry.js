@@ -52,12 +52,12 @@
         run: invokeComposite(...runners)
     });
 
-    const candidate = (owner) => ({
-        state: 'candidate-unwired',
+    const validatedMethod = (owner, getter) => ({
+        state: 'validated-callback',
         kind: 'object',
         owners: [owner],
-        verified: false,
-        run: null
+        verified: true,
+        run: invokeMethod(getter)
     });
 
     const missing = (owner) => ({
@@ -100,14 +100,14 @@
         define('mathematics', 'exp-log', 'pages/mathematics/exp-log.js', 'initExpLog', legacyMethod('ExpLog', () => ExpLog)),
         define('mathematics', 'binomial-theorem', 'pages/mathematics/binomial-theorem.js', 'initBinomial', legacyMethod('Binomial', () => Binomial)),
         define('mathematics', 'statistics-regression', 'pages/mathematics/statistics-regression.js', 'initStatReg', legacyMethod('StatReg', () => StatReg)),
-        define('mathematics', 'modeling-numerical', 'pages/mathematics/modeling-numerical.js?v=20260618mathModelP1', 'initModelingNumerical', candidate('ModelingNumerical')),
+        define('mathematics', 'modeling-numerical', 'pages/mathematics/modeling-numerical.js?v=20260618mathModelP1', 'initModelingNumerical', validatedMethod('ModelingNumerical', () => ModelingNumerical)),
         define('mathematics', 'spatial-vector', 'pages/mathematics/spatial-vector.js', 'initSpatialVec', legacyMethod('SpatialVec', () => SpatialVec)),
         define('mathematics', 'derivative-application', 'pages/mathematics/derivative-application.js?v=20260606fix1', 'initDerivApp', legacyMethod('DerivApp', () => DerivApp)),
 
         // Physics — CONFIG order
-        define('physics', 'mechanics', 'pages/physics/physics.js', 'initPhysics', candidate('PhysicsSim')),
-        define('physics', 'gas-laws', 'pages/physics/gas-laws.js?v=20260618publicClean1', 'initGasLaws', candidate('GasLaws')),
-        define('physics', 'thermodynamics', 'pages/physics/thermodynamics.js?v=20260618thermoP1', 'initThermodynamics', candidate('Thermodynamics')),
+        define('physics', 'mechanics', 'pages/physics/physics.js?v=20260715v7417CandidateCleanupP1', 'initPhysics', validatedMethod('PhysicsSim', () => PhysicsSim)),
+        define('physics', 'gas-laws', 'pages/physics/gas-laws.js?v=20260618publicClean1', 'initGasLaws', validatedMethod('GasLaws', () => GasLaws)),
+        define('physics', 'thermodynamics', 'pages/physics/thermodynamics.js?v=20260618thermoP1', 'initThermodynamics', validatedMethod('Thermodynamics', () => Thermodynamics)),
         define('physics', 'electromagnetism', 'pages/physics/electromagnetic.js', 'initElectromagnetic', legacyMethod('EMField', () => EMField)),
         define('physics', 'waves', 'pages/physics/waves.js', 'initWaves', legacyMethod('WaveDemo', () => WaveDemo)),
         define('physics', 'relativity', 'pages/physics/relativity.js', 'initRelativity', legacyMethod('RelativityDemo', () => RelativityDemo)),
@@ -124,13 +124,13 @@
         define('physics', 'force-composition', 'pages/physics/force-composition.js?v=20260424v46a', 'initForceComposition', legacyMethod('ForceComposition', () => ForceComposition)),
         define('physics', 'momentum-conservation', 'pages/physics/momentum-conservation.js?v=20260424v46c', 'initMomentumConservation', legacyMethod('MomentumConservation', () => MomentumConservation)),
         define('physics', 'charged-particle', 'pages/physics/charged-particle.js', 'initChargedParticle', legacyMethod('ChargedParticle', () => ChargedParticle)),
-        define('physics', 'atomic-physics', 'pages/physics/atomic-physics.js?v=20260618publicClean1', 'initAtomicPhysics', candidate('AtomicPhysics')),
+        define('physics', 'atomic-physics', 'pages/physics/atomic-physics.js?v=20260618publicClean1', 'initAtomicPhysics', validatedMethod('AtomicPhysics', () => AtomicPhysics)),
 
         // Chemistry — CONFIG order
         define('chemistry', 'periodic-table', 'pages/chemistry/periodic-table.js?v=20260618ptNames1', 'initPeriodicTable', legacyMethod('PeriodicTable', () => PeriodicTable)),
         define('chemistry', 'molecular-structure', 'pages/chemistry/molecular-structure.js?v=20260424v45e', 'initMoleculeVis', legacyMethod('MoleculeVis', () => MoleculeVis)),
-        define('chemistry', 'hybrid-orbitals', 'pages/chemistry/hybrid-orbitals.js?v=20260618hybFix1', 'initHybridOrbitals', candidate('HybridOrbitals')),
-        define('chemistry', 'crystal-structures', 'pages/chemistry/crystal-structures.js?v=20260617crystalP2', 'initCrystalStructures', candidate('CrystalStructures')),
+        define('chemistry', 'hybrid-orbitals', 'pages/chemistry/hybrid-orbitals.js?v=20260618hybFix1', 'initHybridOrbitals', validatedMethod('HybridOrbitals', () => HybridOrbitals)),
+        define('chemistry', 'crystal-structures', 'pages/chemistry/crystal-structures.js?v=20260617crystalP2', 'initCrystalStructures', validatedMethod('CrystalStructures', () => CrystalStructures)),
         define('chemistry', 'reactions', 'pages/chemistry/chemical-reactions.js?v=20260424v45g', 'initChemReaction', legacyMethod('ChemReaction', () => ChemReaction)),
         define('chemistry', 'chemical-equilibrium', 'pages/chemistry/chemical-equilibrium.js?v=20260606chem1', 'initChemEquilibrium', legacyMethod('ChemEquilibrium', () => ChemEquilibrium)),
         define('chemistry', 'electrochemistry', 'pages/chemistry/electrochemistry.js?v=20260606chem1', 'initElectrochemistry', legacyMethod('Electrochemistry', () => Electrochemistry)),
@@ -143,7 +143,7 @@
         define('chemistry', 'atomic-structure', 'pages/chemistry/atomic-structure.js', 'initAtomicStructure', legacyMethod('AtomicStructure', () => AtomicStructure)),
         define('chemistry', 'element-compounds', 'pages/chemistry/element-compounds.js?v=20260530v62a', 'initElementCompounds', legacyMethod('ElementCompounds', () => ElementCompounds)),
         define('chemistry', 'intermolecular-forces', 'pages/chemistry/intermolecular-forces.js?v=20260617gasP1b', 'initIntermolecular', legacyMethod('Intermolecular', () => Intermolecular)),
-        define('chemistry', 'experiments', 'pages/chemistry/virtual-experiments.js?v=20260618refsP1', 'initChemVirtualExperiments', candidate('ChemVirtualExperiments')),
+        define('chemistry', 'experiments', 'pages/chemistry/virtual-experiments.js?v=20260618refsP1', 'initChemVirtualExperiments', validatedMethod('ChemVirtualExperiments', () => ChemVirtualExperiments)),
 
         // Algorithms — CONFIG order
         define('algorithms', 'sorting', 'pages/algorithms/algorithms.js', 'initAlgorithms', missing('sorting-lifecycle'), 'legacy-bypass'),
@@ -151,11 +151,11 @@
             ['SearchComparison', 'TreeTraversal', 'HashSearch'],
             [invokeMethod(() => SearchComparison), invokeMethod(() => TreeTraversal), invokeMethod(() => HashSearch)]
         )),
-        define('algorithms', 'hash-tables', 'pages/algorithms/hash-tables.js?v=20260617bstP1b', 'initHashTablesLab', candidate('HashTablesLab')),
-        define('algorithms', 'bst-avl', 'pages/algorithms/bst-avl.js?v=20260617bstP1b', 'initBSTAVL', candidate('BSTAVL')),
+        define('algorithms', 'hash-tables', 'pages/algorithms/hash-tables.js?v=20260617bstP1b', 'initHashTablesLab', validatedMethod('HashTablesLab', () => HashTablesLab)),
+        define('algorithms', 'bst-avl', 'pages/algorithms/bst-avl.js?v=20260617bstP1b', 'initBSTAVL', validatedMethod('BSTAVL', () => BSTAVL)),
         define('algorithms', 'graph', 'pages/algorithms/graph-algo.js', 'initGraphAlgo', legacyMethod('GraphAlgo', () => GraphAlgo)),
-        define('algorithms', 'mst-compare', 'pages/algorithms/mst-compare.js?v=20260618mstP1', 'initMSTCompare', candidate('MSTCompare')),
-        define('algorithms', 'greedy-scheduling', 'pages/algorithms/greedy-scheduling.js?v=20260618refsP1', 'initGreedyScheduling', candidate('GreedyScheduling')),
+        define('algorithms', 'mst-compare', 'pages/algorithms/mst-compare.js?v=20260618mstP1', 'initMSTCompare', validatedMethod('MSTCompare', () => MSTCompare)),
+        define('algorithms', 'greedy-scheduling', 'pages/algorithms/greedy-scheduling.js?v=20260618refsP1', 'initGreedyScheduling', validatedMethod('GreedyScheduling', () => GreedyScheduling)),
         define('algorithms', 'data-structures', 'pages/algorithms/data-structures.js', 'initDataStructVis', legacyMethod('DataStructVis', () => DataStructVis)),
         define('algorithms', 'sorting-compare', 'pages/algorithms/sorting-compare.js', 'initSortCompare', legacyMethod('SortCompare', () => SortCompare)),
         define('algorithms', 'recursion-vis', 'pages/algorithms/recursion-vis.js', 'initRecursionVis', legacyMethod('RecursionVis', () => RecursionVis)),
@@ -164,21 +164,21 @@
 
         // Biology — CONFIG order
         define('biology', 'cell-structure', 'pages/biology/cell-structure.js?v=20260617gasP1b', 'initCellStructure', missing('CellStructure.destroy')),
-        define('biology', 'dna', 'pages/biology/dna-helix.js?v=20260416b', 'initDNAHelix', candidate('DNAHelix')),
-        define('biology', 'photosynthesis', 'pages/biology/photosynthesis.js?v=20260618photoSourceP1d', 'initPhotosynthesis', candidate('Photosynthesis')),
-        define('biology', 'enzyme-properties', 'pages/biology/enzyme-properties.js?v=20260618enzymeSourceP1b', 'initEnzymeProperties', candidate('EnzymeProperties')),
-        define('biology', 'homeostasis', 'pages/biology/homeostasis.js?v=20260618homeostasisP1', 'initHomeostasis', candidate('Homeostasis')),
-        define('biology', 'humoral-regulation', 'pages/biology/humoral-regulation.js?v=20260618humoralP2', 'initHumoralRegulation', candidate('HumoralRegulation')),
-        define('biology', 'genetics', 'pages/biology/genetics.js?v=20260416b', 'initGenetics', candidate('Genetics')),
+        define('biology', 'dna', 'pages/biology/dna-helix.js?v=20260715v7417CandidateCleanupP1', 'initDNAHelix', validatedMethod('DNAHelix', () => DNAHelix)),
+        define('biology', 'photosynthesis', 'pages/biology/photosynthesis.js?v=20260715v7417CandidateCleanupP1', 'initPhotosynthesis', validatedMethod('Photosynthesis', () => Photosynthesis)),
+        define('biology', 'enzyme-properties', 'pages/biology/enzyme-properties.js?v=20260618enzymeSourceP1b', 'initEnzymeProperties', validatedMethod('EnzymeProperties', () => EnzymeProperties)),
+        define('biology', 'homeostasis', 'pages/biology/homeostasis.js?v=20260618homeostasisP1', 'initHomeostasis', validatedMethod('Homeostasis', () => Homeostasis)),
+        define('biology', 'humoral-regulation', 'pages/biology/humoral-regulation.js?v=20260618humoralP2', 'initHumoralRegulation', validatedMethod('HumoralRegulation', () => HumoralRegulation)),
+        define('biology', 'genetics', 'pages/biology/genetics.js?v=20260715v7417CandidateCleanupP1', 'initGenetics', validatedMethod('Genetics', () => Genetics)),
         define('biology', 'mitosis', 'pages/biology/mitosis.js?v=20260617gasP1b', 'initMitosis', legacyMethod('Mitosis', () => Mitosis)),
         define('biology', 'neural-regulation', 'pages/biology/neural-regulation.js?v=20260618neuralP1', 'initNeuralReg', legacyMethod('NeuralReg', () => NeuralReg)),
         define('biology', 'immune-system', 'pages/biology/immune-system.js?v=20260618immuneP2', 'initImmuneSystem', legacyMethod('ImmuneSystem', () => ImmuneSystem)),
-        define('biology', 'population-community', 'pages/biology/population-community.js?v=20260618popcommP1', 'initPopulationCommunity', candidate('PopulationCommunity')),
-        define('biology', 'material-cycles', 'pages/biology/material-cycles.js?v=20260618cyclesP1', 'initMaterialCycles', candidate('MaterialCycles')),
+        define('biology', 'population-community', 'pages/biology/population-community.js?v=20260618popcommP1', 'initPopulationCommunity', validatedMethod('PopulationCommunity', () => PopulationCommunity)),
+        define('biology', 'material-cycles', 'pages/biology/material-cycles.js?v=20260618cyclesP1', 'initMaterialCycles', validatedMethod('MaterialCycles', () => MaterialCycles)),
         define('biology', 'ecosystem', 'pages/biology/ecosystem.js?v=20260423a', 'initEcosystem', legacyMethod('Ecosystem', () => Ecosystem)),
         define('biology', 'meiosis', 'pages/biology/meiosis.js?v=20260617gasP1b', 'initMeiosis', legacyMethod('Meiosis', () => Meiosis)),
         define('biology', 'gene-expression', 'pages/biology/gene-expression.js?v=20260618genexpP1', 'initGeneExpression', legacyMethod('GeneExpression', () => GeneExpression)),
-        define('biology', 'gene-engineering', 'pages/biology/gene-engineering.js?v=20260618gengP1', 'initGeneEngineering', candidate('GeneEngineering')),
+        define('biology', 'gene-engineering', 'pages/biology/gene-engineering.js?v=20260618gengP1', 'initGeneEngineering', validatedMethod('GeneEngineering', () => GeneEngineering)),
         define('biology', 'cellular-respiration', 'pages/biology/cellular-respiration.js?v=20260618cellRespSourceP1', 'initCellularResp', legacyMethod('CellularResp', () => CellularResp)),
         define('biology', 'substance-transport', 'pages/biology/substance-transport.js?v=20260618transportSourceP1', 'initSubstanceTransport', legacyMethod('SubstanceTransport', () => SubstanceTransport)),
         define('biology', 'gene-mutation', 'pages/biology/gene-mutation.js?v=20260618gmutP3', 'initGeneMutation', legacyMethod('GeneMutation', () => GeneMutation))

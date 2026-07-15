@@ -22,7 +22,7 @@ const Router = {
     _galaxyCacheVersion: '20260704qianduanV70',
     courseSupportScripts: [
         'shared/js/lucide.min.js?v=20260417d',
-        'shared/js/module-selector.js?v=20260715v7416ExperimentRegistryP1'
+        'shared/js/module-selector.js?v=20260715v7417CandidateCleanupP1'
     ],
     galaxySupportScripts: {
         astra: [

@@ -69,7 +69,11 @@ for (const definition of definitions) {
     assert.ok(Object.isFrozen(definition.cleanup.owners));
     const scriptPath = definition.script.split('?')[0];
     assert.ok(fs.existsSync(path.join(root, scriptPath)), `${definition.id} script must exist: ${scriptPath}`);
-    assert.equal(definition.cleanup.verified, false, `${definition.id} cleanup must not be overstated as verified`);
+    assert.equal(
+        definition.cleanup.verified,
+        definition.cleanup.state === 'validated-callback',
+        `${definition.id} verified flag must match its validated state`
+    );
 }
 
 const initModeCounts = definitions.reduce((counts, entry) => {
@@ -93,40 +97,134 @@ const cleanupStateCounts = definitions.reduce((counts, entry) => {
 }, {});
 assert.deepEqual(cleanupStateCounts, {
     'legacy-callback': 65,
-    'candidate-unwired': 21,
+    'validated-callback': 21,
     missing: 2
 });
 
-const expectedCandidates = [
-    'algorithms:bst-avl',
-    'algorithms:greedy-scheduling',
-    'algorithms:hash-tables',
-    'algorithms:mst-compare',
-    'biology:dna',
-    'biology:enzyme-properties',
-    'biology:gene-engineering',
-    'biology:genetics',
-    'biology:homeostasis',
-    'biology:humoral-regulation',
-    'biology:material-cycles',
-    'biology:photosynthesis',
-    'biology:population-community',
-    'chemistry:crystal-structures',
-    'chemistry:experiments',
-    'chemistry:hybrid-orbitals',
-    'mathematics:modeling-numerical',
-    'physics:atomic-physics',
-    'physics:gas-laws',
-    'physics:mechanics',
-    'physics:thermodynamics'
-];
+const expectedValidated = {
+    'mathematics:modeling-numerical': {
+        script: 'pages/mathematics/modeling-numerical.js?v=20260618mathModelP1',
+        initHook: 'initModelingNumerical',
+        owner: 'ModelingNumerical'
+    },
+    'physics:mechanics': {
+        script: 'pages/physics/physics.js?v=20260715v7417CandidateCleanupP1',
+        initHook: 'initPhysics',
+        owner: 'PhysicsSim'
+    },
+    'physics:gas-laws': {
+        script: 'pages/physics/gas-laws.js?v=20260618publicClean1',
+        initHook: 'initGasLaws',
+        owner: 'GasLaws'
+    },
+    'physics:thermodynamics': {
+        script: 'pages/physics/thermodynamics.js?v=20260618thermoP1',
+        initHook: 'initThermodynamics',
+        owner: 'Thermodynamics'
+    },
+    'physics:atomic-physics': {
+        script: 'pages/physics/atomic-physics.js?v=20260618publicClean1',
+        initHook: 'initAtomicPhysics',
+        owner: 'AtomicPhysics'
+    },
+    'chemistry:hybrid-orbitals': {
+        script: 'pages/chemistry/hybrid-orbitals.js?v=20260618hybFix1',
+        initHook: 'initHybridOrbitals',
+        owner: 'HybridOrbitals'
+    },
+    'chemistry:crystal-structures': {
+        script: 'pages/chemistry/crystal-structures.js?v=20260617crystalP2',
+        initHook: 'initCrystalStructures',
+        owner: 'CrystalStructures'
+    },
+    'chemistry:experiments': {
+        script: 'pages/chemistry/virtual-experiments.js?v=20260618refsP1',
+        initHook: 'initChemVirtualExperiments',
+        owner: 'ChemVirtualExperiments'
+    },
+    'algorithms:hash-tables': {
+        script: 'pages/algorithms/hash-tables.js?v=20260617bstP1b',
+        initHook: 'initHashTablesLab',
+        owner: 'HashTablesLab'
+    },
+    'algorithms:bst-avl': {
+        script: 'pages/algorithms/bst-avl.js?v=20260617bstP1b',
+        initHook: 'initBSTAVL',
+        owner: 'BSTAVL'
+    },
+    'algorithms:mst-compare': {
+        script: 'pages/algorithms/mst-compare.js?v=20260618mstP1',
+        initHook: 'initMSTCompare',
+        owner: 'MSTCompare'
+    },
+    'algorithms:greedy-scheduling': {
+        script: 'pages/algorithms/greedy-scheduling.js?v=20260618refsP1',
+        initHook: 'initGreedyScheduling',
+        owner: 'GreedyScheduling'
+    },
+    'biology:dna': {
+        script: 'pages/biology/dna-helix.js?v=20260715v7417CandidateCleanupP1',
+        initHook: 'initDNAHelix',
+        owner: 'DNAHelix'
+    },
+    'biology:photosynthesis': {
+        script: 'pages/biology/photosynthesis.js?v=20260715v7417CandidateCleanupP1',
+        initHook: 'initPhotosynthesis',
+        owner: 'Photosynthesis'
+    },
+    'biology:enzyme-properties': {
+        script: 'pages/biology/enzyme-properties.js?v=20260618enzymeSourceP1b',
+        initHook: 'initEnzymeProperties',
+        owner: 'EnzymeProperties'
+    },
+    'biology:homeostasis': {
+        script: 'pages/biology/homeostasis.js?v=20260618homeostasisP1',
+        initHook: 'initHomeostasis',
+        owner: 'Homeostasis'
+    },
+    'biology:humoral-regulation': {
+        script: 'pages/biology/humoral-regulation.js?v=20260618humoralP2',
+        initHook: 'initHumoralRegulation',
+        owner: 'HumoralRegulation'
+    },
+    'biology:genetics': {
+        script: 'pages/biology/genetics.js?v=20260715v7417CandidateCleanupP1',
+        initHook: 'initGenetics',
+        owner: 'Genetics'
+    },
+    'biology:population-community': {
+        script: 'pages/biology/population-community.js?v=20260618popcommP1',
+        initHook: 'initPopulationCommunity',
+        owner: 'PopulationCommunity'
+    },
+    'biology:material-cycles': {
+        script: 'pages/biology/material-cycles.js?v=20260618cyclesP1',
+        initHook: 'initMaterialCycles',
+        owner: 'MaterialCycles'
+    },
+    'biology:gene-engineering': {
+        script: 'pages/biology/gene-engineering.js?v=20260618gengP1',
+        initHook: 'initGeneEngineering',
+        owner: 'GeneEngineering'
+    }
+};
 assert.deepEqual(
     definitions
-        .filter(entry => entry.cleanup.state === 'candidate-unwired')
+        .filter(entry => entry.cleanup.state === 'validated-callback')
         .map(entry => `${entry.subject}:${entry.id}`)
         .sort(),
-    expectedCandidates
+    Object.keys(expectedValidated).sort()
 );
+for (const [key, expected] of Object.entries(expectedValidated)) {
+    const [subject, id] = key.split(':');
+    const definition = registry.get(subject, id);
+    assert.equal(definition.script, expected.script, `${key} script must remain exact`);
+    assert.equal(definition.init.hook, expected.initHook, `${key} init hook must remain exact`);
+    assert.deepEqual(Array.from(definition.cleanup.owners), [expected.owner], `${key} owner must remain exact`);
+    assert.equal(definition.cleanup.kind, 'object');
+    assert.equal(definition.cleanup.verified, true);
+    assert.equal(typeof definition.cleanup.run, 'function');
+}
 assert.deepEqual(
     definitions
         .filter(entry => entry.cleanup.state === 'missing')
@@ -135,7 +233,7 @@ assert.deepEqual(
     ['algorithms:sorting', 'biology:cell-structure']
 );
 definitions
-    .filter(entry => entry.cleanup.state !== 'legacy-callback')
+    .filter(entry => entry.cleanup.state === 'missing')
     .forEach(entry => assert.equal(entry.cleanup.run, null, `${entry.id} must not carry a fake cleanup`));
 
 const searching = registry.get('algorithms', 'searching');
@@ -149,12 +247,30 @@ vm.runInContext(
     'const Calculus = { destroy() { globalThis.calculusDestroyCalls = (globalThis.calculusDestroyCalls || 0) + 1; } };',
     context
 );
+context.validatedDestroyCalls = {};
+vm.runInContext(
+    Object.entries(expectedValidated).map(([key, expected]) => (
+        `const ${expected.owner} = { destroy() { `
+        + `globalThis.validatedDestroyCalls[${JSON.stringify(key)}] = `
+        + `(globalThis.validatedDestroyCalls[${JSON.stringify(key)}] || 0) + 1; } };`
+    )).join('\n'),
+    context
+);
 const cleanupReport = registry.cleanupPage('mathematics');
-assert.equal(cleanupReport.attempted, 19);
-assert.equal(cleanupReport.executed, 2);
+assert.equal(cleanupReport.attempted, 20);
+assert.equal(cleanupReport.executed, 3);
 assert.equal(cleanupReport.failed, 0);
 assert.equal(context.destroyCalls, 1);
 assert.equal(context.calculusDestroyCalls, 1, 'cleanup closure must resolve a later global lexical binding');
+const expectedAttempts = { mathematics: 20, physics: 20, chemistry: 17, algorithms: 11, biology: 18 };
+for (const subject of subjects.slice(1)) {
+    const report = registry.cleanupPage(subject);
+    assert.equal(report.attempted, expectedAttempts[subject], `${subject} executable cleanup count must remain exact`);
+    assert.equal(report.failed, 0);
+}
+for (const key of Object.keys(expectedValidated)) {
+    assert.equal(context.validatedDestroyCalls[key], 1, `${key} must execute its exact lexical owner once`);
+}
 
 assert.doesNotMatch(registrySource, /destroyPhysics|Biology\.destroy/);
 assert.doesNotMatch(moduleSelector, /\b_moduleScripts\s*:|\bconst initMap\s*=/);
@@ -180,16 +296,25 @@ const closeModuleSource = moduleSelector.slice(
 );
 assert.doesNotMatch(openModuleSource, /cleanupPage|\.cleanup\.run/);
 assert.doesNotMatch(closeModuleSource, /cleanupPage|\.cleanup\.run/);
+assert.doesNotMatch(closeModuleSource, /_preparePageCleanup/);
 
 const isolationContext = {
     window: {
+        PhysicsZoom: {
+            close: () => { isolationContext.order.push('physics-zoom'); }
+        },
+        BiologyZoom: {
+            close: () => { isolationContext.order.push('biology-zoom'); }
+        },
         AstraExperimentRegistry: {
-            cleanupPage: () => {
+            cleanupPage: (page) => {
+                isolationContext.order.push(`cleanup:${page}`);
                 isolationContext.cleanupCalls = (isolationContext.cleanupCalls || 0) + 1;
                 return Object.freeze({ attempted: 1, executed: 1, failed: 0 });
             }
         }
-    }
+    },
+    order: []
 };
 vm.createContext(isolationContext);
 vm.runInContext(moduleSelector, isolationContext, { filename: 'shared/js/module-selector.js' });
@@ -203,13 +328,22 @@ assert.equal(isolationContext.hideCalls, 1, 'tool hiding must continue after clo
 assert.equal(isolationContext.cleanupCalls, 1, 'cleanup must continue after closeModule fails');
 assert.equal(isolationContext.resetCalls, 1, 'state reset must continue after closeModule fails');
 assert.equal(isolatedLeaveReport.executed, 1);
+assert.ok(
+    isolationContext.order.indexOf('physics-zoom') < isolationContext.order.indexOf('cleanup:physics'),
+    'PhysicsZoom must restore its canvas before experiment cleanup'
+);
+selector.leavePage('biology', { preserveHash: true });
+assert.ok(
+    isolationContext.order.indexOf('biology-zoom') < isolationContext.order.indexOf('cleanup:biology'),
+    'BiologyZoom must restore its canvas before experiment cleanup'
+);
 
 assert.doesNotMatch(router, /\bconst destroyMap\s*=/);
 assert.match(router, /ModuleSelector\.leavePage\(page, \{ preserveHash: true \}\)/);
 assert.match(html, /config\.js[\s\S]*experiment-registry\.js[\s\S]*page-registry\.js[\s\S]*router\.js[\s\S]*main\.js/);
-assert.match(main, /experiment-registry\.js\?v=20260715v7416ExperimentRegistryP1/);
-assert.match(main, /module-selector\.js\?v=20260715v7416ExperimentRegistryP1/);
-assert.match(serviceWorker, /experiment-registry\.js\?v=20260715v7416ExperimentRegistryP1/);
-assert.match(serviceWorker, /astra-static-v20260715v7416ExperimentRegistryP1/);
+assert.match(main, /experiment-registry\.js\?v=20260715v7417CandidateCleanupP1/);
+assert.match(main, /module-selector\.js\?v=20260715v7417CandidateCleanupP1/);
+assert.match(serviceWorker, /experiment-registry\.js\?v=20260715v7417CandidateCleanupP1/);
+assert.match(serviceWorker, /astra-static-v20260715v7417CandidateCleanupP1/);
 
 console.log('experiment-registry-contract: ok');

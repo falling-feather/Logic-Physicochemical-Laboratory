@@ -60,7 +60,7 @@ assert.equal(registry.enter('mathematics'), false);
 assert.equal(registry.leave('mathematics'), false);
 
 assert.match(html, /app-session\.js[\s\S]*experiment-registry\.js[\s\S]*page-registry\.js[\s\S]*router\.js[\s\S]*main\.js/);
-assert.match(serviceWorker, /page-registry\.js\?v=20260715v7416ExperimentRegistryP1/);
+assert.match(serviceWorker, /page-registry\.js\?v=20260715v7417CandidateCleanupP1/);
 assert.match(router, /AstraPageRegistry\.pagesByTag\('course'\)/);
 assert.match(router, /AstraPageRegistry\.galaxyFor\(page\)/);
 assert.match(router, /AstraPageRegistry\.scriptFor\(page\)/);
@@ -71,11 +71,11 @@ assert.doesNotMatch(router, /\['mathematics', 'physics', 'chemistry', 'algorithm
 assert.match(router, /ModuleSelector\.leavePage\(page, \{ preserveHash: true \}\)/);
 assert.match(moduleSelector, /closeModule\(page, options = \{\}\)/);
 assert.match(moduleSelector, /if \(!options\.preserveHash\)/);
-assert.match(router, /module-selector\.js\?v=20260715v7416ExperimentRegistryP1/);
-assert.match(main, /module-selector\.js\?v=20260715v7416ExperimentRegistryP1/);
-assert.match(main, /page-registry\.js\?v=20260715v7416ExperimentRegistryP1/);
+assert.match(router, /module-selector\.js\?v=20260715v7417CandidateCleanupP1/);
+assert.match(main, /module-selector\.js\?v=20260715v7417CandidateCleanupP1/);
+assert.match(main, /page-registry\.js\?v=20260715v7417CandidateCleanupP1/);
 assert.match(main, /AstraPageRegistry\.galaxyFor\(hash\)/);
-assert.match(main, /const ENGLAB_ASSET_VERSION = '20260715v7416ExperimentRegistryP1'/);
+assert.match(main, /const ENGLAB_ASSET_VERSION = '20260715v7417CandidateCleanupP1'/);
 assert.doesNotMatch(main, /const frontierPages = \[|const englabPages = \[/);
 
 console.log('page-registry-contract: ok');

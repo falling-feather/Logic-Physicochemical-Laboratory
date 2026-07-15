@@ -34,6 +34,7 @@ const Genetics = {
     /* ============ Init / Destroy ============ */
 
     init() {
+        if (this.canvas) this.destroy();
         this.canvas = document.getElementById('genetics-canvas');
         if (!this.canvas) return;
         this.ctx = this.canvas.getContext('2d');
@@ -149,16 +150,16 @@ const Genetics = {
         const controls = this.canvas.parentElement.querySelector('.viz-controls');
         if (!controls) return;
 
-        // Check if already injected
-        if (document.getElementById('bio-genetics-modes')) return;
-
-        const wrap = document.createElement('div');
-        wrap.id = 'bio-genetics-modes';
-        wrap.className = 'genetics-modes';
-        wrap.innerHTML = '<button class="gen-mode-btn active" data-mode="punnett">\u5b5f\u5fb7\u5c14\u6742\u4ea4</button>'
-            + '<button class="gen-mode-btn" data-mode="population">\u79cd\u7fa4\u9057\u4f20</button>'
-            + '<button class="gen-mode-btn" data-mode="pedigree">\u7cfb\u8c31\u56fe</button>';
-        controls.parentElement.insertBefore(wrap, controls);
+        let wrap = document.getElementById('bio-genetics-modes');
+        if (!wrap) {
+            wrap = document.createElement('div');
+            wrap.id = 'bio-genetics-modes';
+            wrap.className = 'genetics-modes';
+            wrap.innerHTML = '<button class="gen-mode-btn active" data-mode="punnett">\u5b5f\u5fb7\u5c14\u6742\u4ea4</button>'
+                + '<button class="gen-mode-btn" data-mode="population">\u79cd\u7fa4\u9057\u4f20</button>'
+                + '<button class="gen-mode-btn" data-mode="pedigree">\u7cfb\u8c31\u56fe</button>';
+            controls.parentElement.insertBefore(wrap, controls);
+        }
 
         wrap.querySelectorAll('.gen-mode-btn').forEach(btn => {
             this._on(btn, 'click', () => {

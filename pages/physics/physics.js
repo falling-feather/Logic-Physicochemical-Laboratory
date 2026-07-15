@@ -30,8 +30,11 @@ const PhysicsSim = {
     ],
 
     _resizeObs: null,
+    _raf: null,
+    _listeners: [],
 
     init() {
+        this.destroy();
         this.canvas = document.getElementById('physics-canvas');
         if (!this.canvas) return;
 
@@ -45,13 +48,29 @@ const PhysicsSim = {
             this._resizeObs = new ResizeObserver(() => this.resizeCanvas());
             this._resizeObs.observe(this.canvas.parentElement);
         } else {
-            window.addEventListener('resize', () => this.resizeCanvas());
+            this._on(window, 'resize', () => this.resizeCanvas());
         }
     },
 
     destroy() {
         this.running = false;
+        if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
         if (this._resizeObs) { this._resizeObs.disconnect(); this._resizeObs = null; }
+        this._listeners.forEach(({ el, event, handler, options }) => {
+            el.removeEventListener(event, handler, options);
+        });
+        this._listeners = [];
+        this.isDragging = false;
+        this.dragStart = null;
+        this.dragEnd = null;
+        this.canvas = null;
+        this.ctx = null;
+    },
+
+    _on(el, event, handler, options) {
+        if (!el) return;
+        el.addEventListener(event, handler, options);
+        this._listeners.push({ el, event, handler, options });
     },
 
     resizeCanvas() {
@@ -79,31 +98,31 @@ const PhysicsSim = {
         const clearBtn = document.getElementById('physics-clear');
         const pauseBtn = document.getElementById('physics-pause');
 
-        if (gravSlider) gravSlider.addEventListener('input', () => {
+        this._on(gravSlider, 'input', () => {
             this.gravity = +gravSlider.value;
             document.getElementById('gravity-value').textContent = gravSlider.value;
         });
 
-        if (restSlider) restSlider.addEventListener('input', () => {
+        this._on(restSlider, 'input', () => {
             this.restitution = +restSlider.value / 100;
             document.getElementById('restitution-value').textContent = this.restitution.toFixed(2);
         });
 
-        if (fricSlider) fricSlider.addEventListener('input', () => {
+        this._on(fricSlider, 'input', () => {
             this.friction = +fricSlider.value / 100;
             document.getElementById('friction-value').textContent = this.friction.toFixed(2);
         });
 
-        if (radSlider) radSlider.addEventListener('input', () => {
+        this._on(radSlider, 'input', () => {
             this.ballRadius = +radSlider.value;
             document.getElementById('radius-value').textContent = radSlider.value;
         });
 
-        if (clearBtn) clearBtn.addEventListener('click', () => {
+        this._on(clearBtn, 'click', () => {
             this.resetScene();
         });
 
-        if (pauseBtn) pauseBtn.addEventListener('click', () => {
+        this._on(pauseBtn, 'click', () => {
             this.paused = !this.paused;
             pauseBtn.textContent = this.paused ? '继续' : '暂停';
         });
@@ -144,16 +163,16 @@ const PhysicsSim = {
         };
 
         // Mouse
-        this.canvas.addEventListener('mousedown', (e) => {
+        this._on(this.canvas, 'mousedown', (e) => {
             this.dragStart = getPos(e);
             this.isDragging = true;
         });
 
-        this.canvas.addEventListener('mousemove', (e) => {
+        this._on(this.canvas, 'mousemove', (e) => {
             if (this.isDragging) this.dragEnd = getPos(e);
         });
 
-        this.canvas.addEventListener('mouseup', (e) => {
+        this._on(this.canvas, 'mouseup', (e) => {
             if (this.isDragging && this.dragStart) {
                 const end = getPos(e);
                 this.launchBall(this.dragStart, end);
@@ -164,18 +183,18 @@ const PhysicsSim = {
         });
 
         // Touch
-        this.canvas.addEventListener('touchstart', (e) => {
+        this._on(this.canvas, 'touchstart', (e) => {
             e.preventDefault();
             this.dragStart = getPos(e);
             this.isDragging = true;
         }, { passive: false });
 
-        this.canvas.addEventListener('touchmove', (e) => {
+        this._on(this.canvas, 'touchmove', (e) => {
             e.preventDefault();
             if (this.isDragging) this.dragEnd = getPos(e);
         }, { passive: false });
 
-        this.canvas.addEventListener('touchend', (e) => {
+        this._on(this.canvas, 'touchend', (e) => {
             if (this.isDragging && this.dragStart) {
                 const end = this.dragEnd || this.dragStart;
                 this.launchBall(this.dragStart, end);
@@ -220,11 +239,12 @@ const PhysicsSim = {
 
     stop() {
         this.running = false;
+        if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
     },
 
     loop() {
         if (!this.running) return;
-        requestAnimationFrame(() => this.loop());
+        this._raf = requestAnimationFrame(() => this.loop());
 
         const now = performance.now();
         const dt = Math.min((now - this.lastTime) / 1000, 0.032); // Cap at ~30fps min

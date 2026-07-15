@@ -52,6 +52,7 @@ const DNAHelix = {
     /* ============ Init / Destroy ============ */
 
     init() {
+        if (this.canvas) this.destroy();
         this.canvas = document.getElementById('dna-canvas');
         if (!this.canvas) return;
         this.ctx = this.canvas.getContext('2d');
@@ -139,16 +140,19 @@ const DNAHelix = {
 
     _injectModeButtons() {
         const controls = this.canvas?.parentElement?.querySelector('.viz-controls');
-        if (!controls || document.getElementById('bio-dna-modes')) return;
+        if (!controls) return;
 
-        const wrap = document.createElement('div');
-        wrap.id = 'bio-dna-modes';
-        wrap.className = 'dna-modes';
-        wrap.innerHTML = '<button class="dna-mode-btn active" data-mode="helix">\u53cc\u87ba\u65cb</button>'
-            + '<button class="dna-mode-btn" data-mode="replication">\u590d\u5236</button>'
-            + '<button class="dna-mode-btn" data-mode="transcription">\u8f6c\u5f55</button>'
-            + '<button class="dna-mode-btn" data-mode="mutation">\u7a81\u53d8</button>';
-        controls.parentElement.insertBefore(wrap, controls);
+        let wrap = document.getElementById('bio-dna-modes');
+        if (!wrap) {
+            wrap = document.createElement('div');
+            wrap.id = 'bio-dna-modes';
+            wrap.className = 'dna-modes';
+            wrap.innerHTML = '<button class="dna-mode-btn active" data-mode="helix">\u53cc\u87ba\u65cb</button>'
+                + '<button class="dna-mode-btn" data-mode="replication">\u590d\u5236</button>'
+                + '<button class="dna-mode-btn" data-mode="transcription">\u8f6c\u5f55</button>'
+                + '<button class="dna-mode-btn" data-mode="mutation">\u7a81\u53d8</button>';
+            controls.parentElement.insertBefore(wrap, controls);
+        }
 
         wrap.querySelectorAll('.dna-mode-btn').forEach(btn => {
             this._on(btn, 'click', () => {

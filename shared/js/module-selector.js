@@ -366,6 +366,17 @@ const ModuleSelector = {
         });
     },
 
+    _preparePageCleanup(page) {
+        const subjectZoom = page === 'physics'
+            ? window.PhysicsZoom
+            : (page === 'biology' ? window.BiologyZoom : null);
+        try {
+            if (subjectZoom && typeof subjectZoom.close === 'function') subjectZoom.close();
+        } catch (error) {
+            // Canvas cleanup must continue even if the shared zoom overlay cannot close.
+        }
+    },
+
     closeModule(page, options = {}) {
         const pageEl = document.getElementById(`page-${page}`);
         if (!pageEl) return;
@@ -433,6 +444,7 @@ const ModuleSelector = {
             // Continue through the same best-effort phases that legacy Router used.
         }
         this._hideModuleTools();
+        this._preparePageCleanup(page);
         let cleanupReport = Object.freeze({ attempted: 0, executed: 0, failed: 0 });
         try {
             cleanupReport = window.AstraExperimentRegistry?.cleanupPage(page) || cleanupReport;

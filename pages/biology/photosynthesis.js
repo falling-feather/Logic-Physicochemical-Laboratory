@@ -39,6 +39,7 @@ const Photosynthesis = {
     /* ============ Init / Destroy ============ */
 
     init() {
+        if (this.canvas) this.destroy();
         this.canvas = document.getElementById('photosynthesis-canvas');
         if (!this.canvas) return;
         this.ctx = this.canvas.getContext('2d');
@@ -178,15 +179,18 @@ const Photosynthesis = {
     _injectModeButtons() {
         const section = this.canvas?.closest('.demo-section');
         const controls = section?.querySelector('#bio-photo-sim-controls') || section?.querySelector('.viz-controls');
-        if (!controls || document.getElementById('bio-photo-modes')) return;
+        if (!controls) return;
 
-        const wrap = document.createElement('div');
-        wrap.id = 'bio-photo-modes';
-        wrap.className = 'photo-modes';
-        wrap.innerHTML = '<button class="photo-mode-btn active" data-mode="simulation">\u53cd\u5e94\u6a21\u62df</button>'
-            + '<button class="photo-mode-btn" data-mode="curve">\u5149\u5408\u66f2\u7ebf</button>'
-            + '<button class="photo-mode-btn" data-mode="comparison">\u547c\u5438\u5bf9\u6bd4</button>';
-        controls.parentElement.insertBefore(wrap, controls);
+        let wrap = document.getElementById('bio-photo-modes');
+        if (!wrap) {
+            wrap = document.createElement('div');
+            wrap.id = 'bio-photo-modes';
+            wrap.className = 'photo-modes';
+            wrap.innerHTML = '<button class="photo-mode-btn active" data-mode="simulation">\u53cd\u5e94\u6a21\u62df</button>'
+                + '<button class="photo-mode-btn" data-mode="curve">\u5149\u5408\u66f2\u7ebf</button>'
+                + '<button class="photo-mode-btn" data-mode="comparison">\u547c\u5438\u5bf9\u6bd4</button>';
+            controls.parentElement.insertBefore(wrap, controls);
+        }
 
         wrap.querySelectorAll('.photo-mode-btn').forEach(btn => {
             this._on(btn, 'click', () => {
