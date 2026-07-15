@@ -5,6 +5,21 @@ const vm = require('node:vm');
 
 const repoRoot = path.resolve(__dirname, '..', '..');
 const source = fs.readFileSync(path.join(repoRoot, 'pages/home/home.js'), 'utf8');
+const homeCss = fs.readFileSync(path.join(repoRoot, 'pages/home/home.css'), 'utf8');
+const indexHtml = fs.readFileSync(path.join(repoRoot, 'index.html'), 'utf8');
+const mainSource = fs.readFileSync(path.join(repoRoot, 'shared/js/main.js'), 'utf8');
+const serviceWorker = fs.readFileSync(path.join(repoRoot, 'sw.js'), 'utf8');
+
+const activeHomeRule = homeCss.match(/\.page\.home-page\.active\s*\{([^}]*)\}/)?.[1] || '';
+assert.match(activeHomeRule, /position:\s*fixed/, 'the active home page must override .page.active positioning');
+assert.match(activeHomeRule, /inset:\s*0/, 'the active home page must stay pinned to the viewport');
+assert.match(activeHomeRule, /^\s*height:\s*100dvh\s*;/m, 'the active home page must track the dynamic viewport height');
+assert.match(activeHomeRule, /overflow:\s*hidden/, 'animated home decoration must be clipped before it reaches root scroll width');
+const homeContainerRule = homeCss.match(/\.home-container\s*\{([^}]*)\}/)?.[1] || '';
+assert.match(homeContainerRule, /^\s*width:\s*100%;\s*height:\s*100%\s*;/m, 'the home scene must inherit the parent dynamic viewport height');
+assert.match(indexHtml, /pages\/home\/home\.css\?v=20260715v7420HomeViewportClipP1/);
+assert.match(mainSource, /pages\/home\/home\.css\?v=20260715v7420HomeViewportClipP1/);
+assert.match(serviceWorker, /astra-static-v20260715v7420HomeViewportClipP1/);
 
 const parent = { clientWidth: 1024, clientHeight: 720 };
 let activeCanvas;
