@@ -449,7 +449,7 @@ const ModuleSelector = {
         }
     },
 
-    closeModule(page) {
+    closeModule(page, options = {}) {
         const pageEl = document.getElementById(`page-${page}`);
         if (!pageEl) return;
         const activeModule = this.activeModule[page];
@@ -499,12 +499,14 @@ const ModuleSelector = {
         this.activeModule[page] = null;
 
         // v6.1：清理深链接，把 #subject/experiment 还原成 #subject
-        try {
-            const newHash = '#' + page;
-            if (window.location.hash !== newHash) {
-                history.replaceState(null, '', newHash);
-            }
-        } catch (e) {}
+        if (!options.preserveHash) {
+            try {
+                const newHash = '#' + page;
+                if (window.location.hash !== newHash) {
+                    history.replaceState(null, '', newHash);
+                }
+            } catch (e) {}
+        }
 
         // Clear sidebar active states
         const sidebar = this._sidebars[page];

@@ -54,5 +54,6 @@ assert.doesNotMatch(admin, /textarea[^>]+sql|execute\s+sql/i);
 assert.match(sessionCss, /@media \(max-width: 860px\)/);
 assert.match(sessionCss, /prefers-reduced-motion/);
 assert.match(sessionCss, /app-auth-locked/);
+assert.match(sessionCss, /\[data-app-roles\]\[hidden\][\s\S]*\.page\[hidden\][\s\S]*display:\s*none\s*!important/);
 
 console.log('app-session-role-shell-contract: ok');

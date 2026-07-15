@@ -15,35 +15,14 @@ const Router = {
     _anchorScrollTimers: [],
     _pageScriptPromises: {},
     _galaxySupportPromises: {},
-    frontierPages: ['frontier', 'cosmos', 'engineering', 'datascience', 'infotech', 'materials', 'humanities'],
-    coursePages: ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology'],
+    frontierPages: window.AstraPageRegistry.pagesByTag('frontier'),
+    coursePages: window.AstraPageRegistry.pagesByTag('course'),
     _activeGalaxy: null,
     _galaxyCacheKey: 'astra-galaxy-cache-meta',
     _galaxyCacheVersion: '20260704qianduanV70',
-    _galaxyPageMap: {
-        planets: 'astra',
-        home: 'englab',
-        mathematics: 'englab',
-        physics: 'englab',
-        chemistry: 'englab',
-        algorithms: 'englab',
-        biology: 'englab',
-        student: 'englab',
-        teacher: 'englab',
-        admin: 'englab',
-        frontier: 'frontier',
-        cosmos: 'frontier',
-        engineering: 'frontier',
-        datascience: 'frontier',
-        infotech: 'frontier',
-        materials: 'frontier',
-        humanities: 'frontier',
-        license: 'englab',
-        changelog: 'englab'
-    },
     courseSupportScripts: [
         'shared/js/lucide.min.js?v=20260417d',
-        'shared/js/module-selector.js?v=20260703v65BackendSchemaP4'
+        'shared/js/module-selector.js?v=20260715v7413PageRegistryP1'
     ],
     galaxySupportScripts: {
         astra: [
@@ -70,36 +49,6 @@ const Router = {
             'shared/js/frontier-learning.js?v=20260630mainV64',
             'shared/js/scroll-animations.js?v=20260630mainV64'
         ]
-    },
-    pageScripts: {
-        home: 'pages/home/home.js?v=20260704qianduanV70',
-        planets: 'pages/planets/planets.js?v=20260704qianduanV72',
-        cosmos: 'pages/cosmos/earth-sun.js?v=20260630mainV64',
-        datascience: 'pages/datascience/linear-regression.js?v=20260630mainV64',
-        infotech: 'pages/infotech/network-layers.js?v=20260630mainV64',
-        materials: 'pages/materials/materials-lab.js?v=20260630mainV64',
-        humanities: 'pages/humanities/text-lab.js?v=20260630mainV64',
-        engineering: 'pages/engineering/bridge-truss.js?v=20260630mainV64',
-        license: 'pages/about/about.js?v=20260630mainV64',
-        changelog: 'pages/about/about.js?v=20260630mainV64',
-        student: 'pages/student/student.js?v=20260711v740RoleShellP0',
-        teacher: 'pages/teacher/teacher.js?v=20260711v740RoleShellP0',
-        admin: 'pages/admin/admin.js?v=20260711v740RoleShellP0'
-    },
-    pageReadyChecks: {
-        home: () => typeof window.initHome === 'function',
-        planets: () => typeof window.initPlanets === 'function',
-        cosmos: () => typeof window.initCosmosSeasons === 'function',
-        datascience: () => typeof window.initLinearRegressionLab === 'function',
-        infotech: () => typeof window.initNetworkLayersLab === 'function',
-        materials: () => typeof window.initMaterialsLab === 'function',
-        humanities: () => typeof window.initHumanitiesLab === 'function',
-        engineering: () => typeof window.initBridgeTruss === 'function',
-        license: () => typeof window.initLicense === 'function',
-        changelog: () => typeof window.initChangelog === 'function',
-        student: () => typeof window.initStudent === 'function',
-        teacher: () => typeof window.initTeacher === 'function',
-        admin: () => typeof window.initAdmin === 'function'
     },
     // Store origin point for radial wipe (set by selectModule or default center)
     transitionOrigin: { x: 50, y: 50 },
@@ -221,7 +170,7 @@ const Router = {
     },
 
     _galaxyForPage(page) {
-        return this._galaxyPageMap[page] || 'englab';
+        return window.AstraPageRegistry.galaxyFor(page);
     },
 
     getActiveGalaxy() {
@@ -439,7 +388,7 @@ const Router = {
         if (previousGalaxy === 'englab' && typeof ModuleSelector !== 'undefined' && ModuleSelector.activeModule) {
             this.coursePages.forEach((subject) => {
                 if (ModuleSelector.activeModule[subject] && typeof ModuleSelector.closeModule === 'function') {
-                    try { ModuleSelector.closeModule(subject); } catch (e) {}
+                    try { ModuleSelector.closeModule(subject, { preserveHash: true }); } catch (e) {}
                 }
             });
             try {
@@ -772,8 +721,7 @@ const Router = {
     },
 
     _isPageScriptReady(page) {
-        const check = this.pageReadyChecks[page];
-        return !check || check();
+        return window.AstraPageRegistry.isReady(page);
     },
 
     _loadScriptOnce(src, markerName, markerValue) {
@@ -815,7 +763,7 @@ const Router = {
         if (window.AstraApplicationSession && !window.AstraApplicationSession.canAccessPage(page)) {
             return Promise.resolve();
         }
-        const src = this.pageScripts[page];
+        const src = window.AstraPageRegistry.scriptFor(page);
         if (!src || this._isPageScriptReady(page)) return Promise.resolve();
         if (this._pageScriptPromises[src]) return this._pageScriptPromises[src];
 
@@ -920,7 +868,7 @@ const Router = {
         document.documentElement.setAttribute('data-theme', 'dark');
 
         // v5.0锛欶AB 浠呭湪瀛︾璇剧▼椤垫樉绀猴紝棣栭〉/澶氭槦绯诲ぇ灞忕瓑灞曠ず椤甸潰涓嶆樉绀?
-        const isCoursePage = ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology'].includes(page);
+        const isCoursePage = this.coursePages.includes(page);
         if (typeof BackToTop !== 'undefined') {
             if (isCoursePage) BackToTop.show(); else BackToTop.hide();
         }
@@ -931,33 +879,7 @@ const Router = {
         // === Page Initialization ===
         // Home page initializes directly; subject pages rely on ModuleSelector
         // for lazy per-experiment initialization (triggered when user opens an experiment).
-        if (page === 'home') {
-            if (typeof initHome === 'function') initHome();
-        } else if (page === 'planets') {
-            if (typeof initPlanets === 'function') initPlanets();
-        } else if (page === 'cosmos') {
-            if (typeof initCosmosSeasons === 'function') initCosmosSeasons();
-        } else if (page === 'datascience') {
-            if (typeof initLinearRegressionLab === 'function') initLinearRegressionLab();
-        } else if (page === 'infotech') {
-            if (typeof initNetworkLayersLab === 'function') initNetworkLayersLab();
-        } else if (page === 'materials') {
-            if (typeof initMaterialsLab === 'function') initMaterialsLab();
-        } else if (page === 'humanities') {
-            if (typeof initHumanitiesLab === 'function') initHumanitiesLab();
-        } else if (page === 'engineering') {
-            if (typeof initBridgeTruss === 'function') initBridgeTruss();
-        } else if (page === 'license') {
-            if (typeof initLicense === 'function') initLicense();
-        } else if (page === 'changelog') {
-            if (typeof initChangelog === 'function') initChangelog();
-        } else if (page === 'student') {
-            if (typeof initStudent === 'function') initStudent();
-        } else if (page === 'teacher') {
-            if (typeof initTeacher === 'function') initTeacher();
-        } else if (page === 'admin') {
-            if (typeof initAdmin === 'function') initAdmin();
-        }
+        window.AstraPageRegistry.enter(page);
         // Subject pages: show sidebar toggle if an experiment was previously open,
         // but don't eagerly initialize any experiments (ModuleSelector handles it).
 
@@ -993,7 +915,7 @@ const Router = {
     _applyPendingModule(page) {
         const moduleId = this._pendingModule;
         if (!moduleId) return;
-        const isCoursePage = ['mathematics', 'physics', 'chemistry', 'algorithms', 'biology'].includes(page);
+        const isCoursePage = this.coursePages.includes(page);
         if (!isCoursePage) { this._pendingModule = null; return; }
         const tryOpen = (retries) => {
             if (typeof ModuleSelector !== 'undefined' && typeof ModuleSelector.openModule === 'function') {
@@ -1082,34 +1004,14 @@ const Router = {
         if (page === 'home') {
             if (typeof ParticleNetwork !== 'undefined' && ParticleNetwork.destroy) ParticleNetwork.destroy();
             if (typeof SatelliteSystem !== 'undefined') SatelliteSystem.isRunning = false;
-        } else if (page === 'planets') {
-            if (typeof destroyPlanets === 'function') destroyPlanets();
-        } else if (page === 'cosmos') {
-            if (typeof destroyCosmosSeasons === 'function') destroyCosmosSeasons();
-        } else if (page === 'datascience') {
-            if (typeof destroyLinearRegressionLab === 'function') destroyLinearRegressionLab();
-        } else if (page === 'infotech') {
-            if (typeof destroyNetworkLayersLab === 'function') destroyNetworkLayersLab();
-        } else if (page === 'materials') {
-            if (typeof destroyMaterialsLab === 'function') destroyMaterialsLab();
-        } else if (page === 'humanities') {
-            if (typeof destroyHumanitiesLab === 'function') destroyHumanitiesLab();
-        } else if (page === 'engineering') {
-            if (typeof destroyBridgeTruss === 'function') destroyBridgeTruss();
-        } else if (page === 'student') {
-            if (typeof destroyStudent === 'function') destroyStudent();
-        } else if (page === 'teacher') {
-            if (typeof destroyTeacher === 'function') destroyTeacher();
-        } else if (page === 'admin') {
-            if (typeof destroyAdmin === 'function') destroyAdmin();
-        } else {
+        } else if (!window.AstraPageRegistry.leave(page)) {
             // v4.2.3 Bug3 淇锛氬厛璋冪敤 closeModule 闅愯棌鍏ㄩ儴娴姩鎺т欢
             // 锛圗xperimentExport / ExperimentQuiz / ExperimentFavorites / ExperimentRating /
             //   ExperimentGuide锛夛紝閬垮厤绂诲紑瀛︾椤甸潰鍚庢帶浠朵粛娈嬬暀鍦ㄩ椤?鏄熺郴澶у睆銆?
             if (typeof ModuleSelector !== 'undefined' && ModuleSelector.activeModule
                 && ModuleSelector.activeModule[page]
                 && typeof ModuleSelector.closeModule === 'function') {
-                try { ModuleSelector.closeModule(page); } catch (e) { /* ignore */ }
+                try { ModuleSelector.closeModule(page, { preserveHash: true }); } catch (e) { /* ignore */ }
             }
             // 鍏滃簳锛氬嵆渚?ModuleSelector 鏈褰?active module锛屼篃寮哄埗闅愯棌鍏ㄩ儴娴姩鎺т欢
             try {

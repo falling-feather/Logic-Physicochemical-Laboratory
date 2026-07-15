@@ -28,6 +28,13 @@
     display: none;
 }
 
+/* Author display rules (for example .nav-item { display: flex }) must not
+   override server-confirmed role pruning or protected page hiding. */
+[data-app-roles][hidden],
+.page[hidden] {
+    display: none !important;
+}
+
 .app-auth-portal {
     width: min(1080px, 100%);
     min-height: min(720px, calc(100vh - clamp(36px, 8vw, 104px)));

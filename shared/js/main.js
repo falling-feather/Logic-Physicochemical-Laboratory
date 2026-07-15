@@ -224,7 +224,7 @@ function updateFooterVisibility() {
 
 window.updateFooterVisibility = updateFooterVisibility;
 
-const ENGLAB_ASSET_VERSION = '20260711v740RoleShellP0';
+const ENGLAB_ASSET_VERSION = '20260715v7413PageRegistryP1';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',
@@ -238,12 +238,13 @@ const CORE_HTTP_FALLBACK_ASSETS = [
     './shared/js/config.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/api-client.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/app-session.js?v=' + ENGLAB_ASSET_VERSION,
-    './shared/js/router.js?v=' + ENGLAB_ASSET_VERSION,
-    './shared/js/main.js?v=' + ENGLAB_ASSET_VERSION,
+    './shared/js/page-registry.js?v=20260715v7413PageRegistryP1',
+    './shared/js/router.js?v=20260715v7413PageRegistryP1',
+    './shared/js/main.js?v=20260715v7413PageRegistryP1',
     './shared/js/backend-content.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/css/backend-content.css?v=' + ENGLAB_ASSET_VERSION,
     './shared/css/auth-ui.css?v=' + ENGLAB_ASSET_VERSION,
-    './shared/css/app-session.css?v=' + ENGLAB_ASSET_VERSION,
+    './shared/css/app-session.css?v=20260715v7413PageRegistryP1',
     './pages/admin/admin.css?v=' + ENGLAB_ASSET_VERSION,
     './pages/teacher/teacher.css?v=' + ENGLAB_ASSET_VERSION,
     './pages/student/student.css?v=' + ENGLAB_ASSET_VERSION
@@ -272,7 +273,7 @@ const GALAXY_HTTP_FALLBACK_ASSETS = {
         './pages/admin/admin.css?v=' + ENGLAB_ASSET_VERSION,
         './pages/teacher/teacher.css?v=' + ENGLAB_ASSET_VERSION,
         './pages/student/student.css?v=' + ENGLAB_ASSET_VERSION,
-        './shared/js/module-selector.js?v=' + ENGLAB_ASSET_VERSION,
+        './shared/js/module-selector.js?v=20260715v7413PageRegistryP1',
         './shared/js/experiment-guide.js?v=20260630mainV64',
         './shared/js/experiment-export.js?v=20260528v61f',
         './shared/js/quiz-data.js?v=20260618refsP1',
@@ -313,11 +314,10 @@ function getFallbackGalaxy() {
     }
     if (window.__astraBoot && window.__astraBoot.galaxy) return window.__astraBoot.galaxy;
     const hash = (window.location.hash || '#planets').slice(1).split('/')[0];
-    const frontierPages = ['frontier', 'cosmos', 'engineering', 'datascience', 'infotech', 'materials', 'humanities'];
-    const englabPages = ['home', 'mathematics', 'physics', 'chemistry', 'algorithms', 'biology', 'teacher', 'student', 'admin', 'license', 'changelog'];
-    if (frontierPages.includes(hash)) return 'frontier';
-    if (englabPages.includes(hash)) return 'englab';
-    return 'astra';
+    if (window.AstraPageRegistry && typeof window.AstraPageRegistry.galaxyFor === 'function') {
+        return window.AstraPageRegistry.galaxyFor(hash);
+    }
+    return hash === 'planets' ? 'astra' : 'englab';
 }
 
 function getFallbackAssetsForGalaxy(galaxy) {
