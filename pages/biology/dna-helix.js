@@ -139,7 +139,8 @@ const DNAHelix = {
     },
 
     _injectModeButtons() {
-        const controls = this.canvas?.parentElement?.querySelector('.viz-controls');
+        const section = this.canvas?.closest('.demo-section');
+        const controls = section?.querySelector('.viz-controls');
         if (!controls) return;
 
         let wrap = document.getElementById('bio-dna-modes');

@@ -179,7 +179,9 @@ verifyModeButtonRebind({
   owner: 'DNAHelix',
   wrapperId: 'bio-dna-modes',
   buttonCount: 4,
-  canvasShape: controls => ({ parentElement: { querySelector: () => controls } })
+  canvasShape: controls => ({
+    closest: selector => selector === '.demo-section' ? { querySelector: () => controls } : null
+  })
 });
 verifyModeButtonRebind({
   file: 'pages/biology/photosynthesis.js',
@@ -193,7 +195,9 @@ verifyModeButtonRebind({
   owner: 'Genetics',
   wrapperId: 'bio-genetics-modes',
   buttonCount: 3,
-  canvasShape: controls => ({ parentElement: { querySelector: () => controls } })
+  canvasShape: controls => ({
+    closest: selector => selector === '.demo-section' ? { querySelector: () => controls } : null
+  })
 });
 
 console.log('candidate-cleanup-contract: ok');

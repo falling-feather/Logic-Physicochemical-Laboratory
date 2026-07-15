@@ -164,12 +164,12 @@
 
         // Biology — CONFIG order
         define('biology', 'cell-structure', 'pages/biology/cell-structure.js?v=20260715v7418MissingCleanupP3', 'initCellStructure', validatedMethod('CellStructure', () => CellStructure)),
-        define('biology', 'dna', 'pages/biology/dna-helix.js?v=20260715v7417CandidateCleanupP1', 'initDNAHelix', validatedMethod('DNAHelix', () => DNAHelix)),
+        define('biology', 'dna', 'pages/biology/dna-helix.js?v=20260715v7419BiologyModeMountP1', 'initDNAHelix', validatedMethod('DNAHelix', () => DNAHelix)),
         define('biology', 'photosynthesis', 'pages/biology/photosynthesis.js?v=20260715v7417CandidateCleanupP1', 'initPhotosynthesis', validatedMethod('Photosynthesis', () => Photosynthesis)),
         define('biology', 'enzyme-properties', 'pages/biology/enzyme-properties.js?v=20260618enzymeSourceP1b', 'initEnzymeProperties', validatedMethod('EnzymeProperties', () => EnzymeProperties)),
         define('biology', 'homeostasis', 'pages/biology/homeostasis.js?v=20260618homeostasisP1', 'initHomeostasis', validatedMethod('Homeostasis', () => Homeostasis)),
         define('biology', 'humoral-regulation', 'pages/biology/humoral-regulation.js?v=20260618humoralP2', 'initHumoralRegulation', validatedMethod('HumoralRegulation', () => HumoralRegulation)),
-        define('biology', 'genetics', 'pages/biology/genetics.js?v=20260715v7417CandidateCleanupP1', 'initGenetics', validatedMethod('Genetics', () => Genetics)),
+        define('biology', 'genetics', 'pages/biology/genetics.js?v=20260715v7419BiologyModeMountP1', 'initGenetics', validatedMethod('Genetics', () => Genetics)),
         define('biology', 'mitosis', 'pages/biology/mitosis.js?v=20260617gasP1b', 'initMitosis', legacyMethod('Mitosis', () => Mitosis)),
         define('biology', 'neural-regulation', 'pages/biology/neural-regulation.js?v=20260618neuralP1', 'initNeuralReg', legacyMethod('NeuralReg', () => NeuralReg)),
         define('biology', 'immune-system', 'pages/biology/immune-system.js?v=20260618immuneP2', 'initImmuneSystem', legacyMethod('ImmuneSystem', () => ImmuneSystem)),

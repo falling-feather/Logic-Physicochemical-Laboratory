@@ -174,7 +174,7 @@ const expectedValidated = {
         owner: 'CellStructure'
     },
     'biology:dna': {
-        script: 'pages/biology/dna-helix.js?v=20260715v7417CandidateCleanupP1',
+        script: 'pages/biology/dna-helix.js?v=20260715v7419BiologyModeMountP1',
         initHook: 'initDNAHelix',
         owner: 'DNAHelix'
     },
@@ -199,7 +199,7 @@ const expectedValidated = {
         owner: 'HumoralRegulation'
     },
     'biology:genetics': {
-        script: 'pages/biology/genetics.js?v=20260715v7417CandidateCleanupP1',
+        script: 'pages/biology/genetics.js?v=20260715v7419BiologyModeMountP1',
         initHook: 'initGenetics',
         owner: 'Genetics'
     },
@@ -349,9 +349,9 @@ assert.ok(
 assert.doesNotMatch(router, /\bconst destroyMap\s*=/);
 assert.match(router, /ModuleSelector\.leavePage\(page, \{ preserveHash: true \}\)/);
 assert.match(html, /config\.js[\s\S]*experiment-registry\.js[\s\S]*page-registry\.js[\s\S]*router\.js[\s\S]*main\.js/);
-assert.match(main, /experiment-registry\.js\?v=20260715v7418MissingCleanupP3/);
-assert.match(main, /module-selector\.js\?v=20260715v7418MissingCleanupP3/);
-assert.match(serviceWorker, /experiment-registry\.js\?v=20260715v7418MissingCleanupP3/);
-assert.match(serviceWorker, /astra-static-v20260715v7418MissingCleanupP3/);
+assert.match(main, /experiment-registry\.js\?v=20260715v7419BiologyModeMountP1/);
+assert.match(main, /module-selector\.js\?v=20260715v7419BiologyModeMountP1/);
+assert.match(serviceWorker, /experiment-registry\.js\?v=20260715v7419BiologyModeMountP1/);
+assert.match(serviceWorker, /astra-static-v20260715v7419BiologyModeMountP1/);
 
 console.log('experiment-registry-contract: ok');
