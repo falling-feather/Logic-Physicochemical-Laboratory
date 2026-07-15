@@ -22,7 +22,7 @@ const Router = {
     _galaxyCacheVersion: '20260704qianduanV70',
     courseSupportScripts: [
         'shared/js/lucide.min.js?v=20260417d',
-        'shared/js/module-selector.js?v=20260715v7413PageRegistryP1'
+        'shared/js/module-selector.js?v=20260715v7416ExperimentRegistryP1'
     ],
     galaxySupportScripts: {
         astra: [
@@ -1005,113 +1005,8 @@ const Router = {
             if (typeof ParticleNetwork !== 'undefined' && ParticleNetwork.destroy) ParticleNetwork.destroy();
             if (typeof SatelliteSystem !== 'undefined') SatelliteSystem.isRunning = false;
         } else if (!window.AstraPageRegistry.leave(page)) {
-            // v4.2.3 Bug3 淇锛氬厛璋冪敤 closeModule 闅愯棌鍏ㄩ儴娴姩鎺т欢
-            // 锛圗xperimentExport / ExperimentQuiz / ExperimentFavorites / ExperimentRating /
-            //   ExperimentGuide锛夛紝閬垮厤绂诲紑瀛︾椤甸潰鍚庢帶浠朵粛娈嬬暀鍦ㄩ椤?鏄熺郴澶у睆銆?
-            if (typeof ModuleSelector !== 'undefined' && ModuleSelector.activeModule
-                && ModuleSelector.activeModule[page]
-                && typeof ModuleSelector.closeModule === 'function') {
-                try { ModuleSelector.closeModule(page, { preserveHash: true }); } catch (e) { /* ignore */ }
-            }
-            // 鍏滃簳锛氬嵆渚?ModuleSelector 鏈褰?active module锛屼篃寮哄埗闅愯棌鍏ㄩ儴娴姩鎺т欢
-            try {
-                const guide = window.ExperimentGuide || (typeof ExperimentGuide !== 'undefined' ? ExperimentGuide : null);
-                if (guide) guide.hideHelpButton();
-            } catch(e){}
-            try { if (window.ExperimentExport) ExperimentExport.hide(); } catch(e){}
-            try { if (window.ExperimentQuiz) ExperimentQuiz.hide(); } catch(e){}
-            try { if (window.ExperimentFavorites) ExperimentFavorites.hide(); } catch(e){}
-            try { if (window.ExperimentRating) ExperimentRating.hide(); } catch(e){}
-
-            // Destroy all modules that were initialized for this page
-            const destroyMap = {
-                mathematics: [
-                    () => { if (typeof destroyFunctionGraph === 'function') destroyFunctionGraph(); },
-                    () => { if (typeof Calculus !== 'undefined' && Calculus.destroy) Calculus.destroy(); },
-                    () => { if (typeof GeoTransform !== 'undefined' && GeoTransform.destroy) GeoTransform.destroy(); },
-                    () => { if (typeof ComplexVis !== 'undefined' && ComplexVis.destroy) ComplexVis.destroy(); },
-                    () => { if (typeof TrigVis !== 'undefined' && TrigVis.destroy) TrigVis.destroy(); },
-                    () => { if (typeof SetOps !== 'undefined' && SetOps.destroy) SetOps.destroy(); },
-                    () => { if (typeof Probability !== 'undefined' && Probability.destroy) Probability.destroy(); },
-                    () => { if (typeof VectorOps !== 'undefined' && VectorOps.destroy) VectorOps.destroy(); },
-                    () => { if (typeof Inequality !== 'undefined' && Inequality.destroy) Inequality.destroy(); },
-                    () => { if (typeof ConicSections !== 'undefined' && ConicSections.destroy) ConicSections.destroy(); },
-                    () => { if (typeof SolidGeom !== 'undefined' && SolidGeom.destroy) SolidGeom.destroy(); },
-                    () => { if (typeof PermComb !== 'undefined' && PermComb.destroy) PermComb.destroy(); },
-                    () => { if (typeof Sequences !== 'undefined' && Sequences.destroy) Sequences.destroy(); },
-                    () => { if (typeof FuncProps !== 'undefined' && FuncProps.destroy) FuncProps.destroy(); },
-                    () => { if (typeof ExpLog !== 'undefined' && ExpLog.destroy) ExpLog.destroy(); },
-                    () => { if (typeof Binomial !== 'undefined' && Binomial.destroy) Binomial.destroy(); },
-                    () => { if (typeof StatReg !== 'undefined' && StatReg.destroy) StatReg.destroy(); },
-                    () => { if (typeof SpatialVec !== 'undefined' && SpatialVec.destroy) SpatialVec.destroy(); },
-                    () => { if (typeof DerivApp !== 'undefined' && DerivApp.destroy) DerivApp.destroy(); },
-                ],
-                physics: [
-                    () => { if (typeof destroyPhysics === 'function') destroyPhysics(); },
-                    () => { if (typeof EMField !== 'undefined' && EMField.destroy) EMField.destroy(); },
-                    () => { if (typeof WaveDemo !== 'undefined' && WaveDemo.destroy) WaveDemo.destroy(); },
-                    () => { if (typeof RelativityDemo !== 'undefined' && RelativityDemo.destroy) RelativityDemo.destroy(); },
-                    () => { if (typeof FluidSim !== 'undefined' && FluidSim.destroy) FluidSim.destroy(); },
-                    () => { if (typeof OpticsLab !== 'undefined' && OpticsLab.destroy) OpticsLab.destroy(); },
-                    () => { if (typeof Kinematics !== 'undefined' && Kinematics.destroy) Kinematics.destroy(); },
-                    () => { if (typeof Projectile !== 'undefined' && Projectile.destroy) Projectile.destroy(); },
-                    () => { if (typeof CircularMotion !== 'undefined' && CircularMotion.destroy) CircularMotion.destroy(); },
-                    () => { if (typeof EnergyConservation !== 'undefined' && EnergyConservation.destroy) EnergyConservation.destroy(); },
-                    () => { if (typeof CircuitAnalysis !== 'undefined' && CircuitAnalysis.destroy) CircuitAnalysis.destroy(); },
-                    () => { if (typeof EMInduction !== 'undefined' && EMInduction.destroy) EMInduction.destroy(); },
-                    () => { if (typeof ACCircuit !== 'undefined' && ACCircuit.destroy) ACCircuit.destroy(); },
-                    () => { if (typeof Gravitation !== 'undefined' && Gravitation.destroy) Gravitation.destroy(); },
-                    () => { if (typeof ForceComposition !== 'undefined' && ForceComposition.destroy) ForceComposition.destroy(); },
-                    () => { if (typeof MomentumConservation !== 'undefined' && MomentumConservation.destroy) MomentumConservation.destroy(); },
-                    () => { if (typeof ChargedParticle !== 'undefined' && ChargedParticle.destroy) ChargedParticle.destroy(); },
-                ],
-                chemistry: [
-                    () => { if (typeof PeriodicTable !== 'undefined' && PeriodicTable.destroy) PeriodicTable.destroy(); },
-                    () => { if (typeof MoleculeVis !== 'undefined' && MoleculeVis.destroy) MoleculeVis.destroy(); },
-                    () => { if (typeof ChemReaction !== 'undefined' && ChemReaction.destroy) ChemReaction.destroy(); },
-                    () => { if (typeof ChemEquilibrium !== 'undefined' && ChemEquilibrium.destroy) ChemEquilibrium.destroy(); },
-                    () => { if (typeof Electrochemistry !== 'undefined' && Electrochemistry.destroy) Electrochemistry.destroy(); },
-                    () => { if (typeof ChemBond !== 'undefined' && ChemBond.destroy) ChemBond.destroy(); },
-                    () => { if (typeof OrganicChem !== 'undefined' && OrganicChem.destroy) OrganicChem.destroy(); },
-                    () => { if (typeof ReactionRate !== 'undefined' && ReactionRate.destroy) ReactionRate.destroy(); },
-                    () => { if (typeof SolutionIon !== 'undefined' && SolutionIon.destroy) SolutionIon.destroy(); },
-                    () => { if (typeof IonicReaction !== 'undefined' && IonicReaction.destroy) IonicReaction.destroy(); },
-                    () => { if (typeof Redox !== 'undefined' && Redox.destroy) Redox.destroy(); },
-                    () => { if (typeof AtomicStructure !== 'undefined' && AtomicStructure.destroy) AtomicStructure.destroy(); },
-                    () => { if (typeof ElementCompounds !== 'undefined' && ElementCompounds.destroy) ElementCompounds.destroy(); },
-                    () => { if (typeof Intermolecular !== 'undefined' && Intermolecular.destroy) Intermolecular.destroy(); },
-                ],
-                algorithms: [
-                    () => { if (typeof SearchComparison !== 'undefined' && SearchComparison.destroy) SearchComparison.destroy(); },
-                    () => { if (typeof TreeTraversal !== 'undefined' && TreeTraversal.destroy) TreeTraversal.destroy(); },
-                    () => { if (typeof HashSearch !== 'undefined' && HashSearch.destroy) HashSearch.destroy(); },
-                    () => { if (typeof GraphAlgo !== 'undefined' && GraphAlgo.destroy) GraphAlgo.destroy(); },
-                    () => { if (typeof DataStructVis !== 'undefined' && DataStructVis.destroy) DataStructVis.destroy(); },
-                    () => { if (typeof SortCompare !== 'undefined' && SortCompare.destroy) SortCompare.destroy(); },
-                    () => { if (typeof RecursionVis !== 'undefined' && RecursionVis.destroy) RecursionVis.destroy(); },
-                    () => { if (typeof DPVis !== 'undefined' && DPVis.destroy) DPVis.destroy(); },
-                    () => { if (typeof StringMatch !== 'undefined' && StringMatch.destroy) StringMatch.destroy(); },
-                ],
-                biology: [
-                    () => { if (typeof Biology !== 'undefined' && Biology.destroy) Biology.destroy(); },
-                    () => { if (typeof Mitosis !== 'undefined' && Mitosis.destroy) Mitosis.destroy(); },
-                    () => { if (typeof NeuralReg !== 'undefined' && NeuralReg.destroy) NeuralReg.destroy(); },
-                    () => { if (typeof ImmuneSystem !== 'undefined' && ImmuneSystem.destroy) ImmuneSystem.destroy(); },
-                    () => { if (typeof Ecosystem !== 'undefined' && Ecosystem.destroy) Ecosystem.destroy(); },
-                    () => { if (typeof Meiosis !== 'undefined' && Meiosis.destroy) Meiosis.destroy(); },
-                    () => { if (typeof GeneExpression !== 'undefined' && GeneExpression.destroy) GeneExpression.destroy(); },
-                    () => { if (typeof CellularResp !== 'undefined' && CellularResp.destroy) CellularResp.destroy(); },
-                    () => { if (typeof SubstanceTransport !== 'undefined' && SubstanceTransport.destroy) SubstanceTransport.destroy(); },
-                    () => { if (typeof GeneMutation !== 'undefined' && GeneMutation.destroy) GeneMutation.destroy(); },
-                ]
-            };
-
-            const fns = destroyMap[page];
-            if (fns) fns.forEach(fn => { try { fn(); } catch(e) { /* ignore */ } });
-
-            // Reset ModuleSelector state for this page
-            if (typeof ModuleSelector !== 'undefined' && ModuleSelector.resetPage) {
-                ModuleSelector.resetPage(page);
+            if (typeof ModuleSelector !== 'undefined' && typeof ModuleSelector.leavePage === 'function') {
+                try { ModuleSelector.leavePage(page, { preserveHash: true }); } catch (e) { /* ignore */ }
             }
         }
     },

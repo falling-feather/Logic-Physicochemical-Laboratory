@@ -9,105 +9,6 @@ const ModuleSelector = {
     _sidebarOpen: {},   // { pageName: bool }
     _swipeBackCtrls: {}, // { pageName: SwipeBack controller }
     _scriptPromises: {},
-    _moduleScripts: {
-        // Mathematics
-        'function-graph': 'pages/mathematics/mathematics.js',
-        'calculus': 'pages/mathematics/calculus.js',
-        'geometry': 'pages/mathematics/geometry.js',
-        'complex': 'pages/mathematics/complex-numbers.js',
-        'trigonometry': 'pages/mathematics/trigonometry.js',
-        'set-operations': 'pages/mathematics/set-operations.js',
-        'probability': 'pages/mathematics/probability.js',
-        'vector-ops': 'pages/mathematics/vector-ops.js',
-        'inequality': 'pages/mathematics/inequality.js',
-        'conic-sections': 'pages/mathematics/conic-sections.js',
-        'solid-geometry': 'pages/mathematics/solid-geometry.js',
-        'permutation-combination': 'pages/mathematics/permutation-combination.js',
-        'sequences': 'pages/mathematics/sequences.js',
-        'function-properties': 'pages/mathematics/function-properties.js',
-        'exp-log': 'pages/mathematics/exp-log.js',
-        'binomial-theorem': 'pages/mathematics/binomial-theorem.js',
-        'statistics-regression': 'pages/mathematics/statistics-regression.js',
-        'modeling-numerical': 'pages/mathematics/modeling-numerical.js?v=20260618mathModelP1',
-        'spatial-vector': 'pages/mathematics/spatial-vector.js',
-        'derivative-application': 'pages/mathematics/derivative-application.js?v=20260606fix1',
-
-        // Physics
-        'mechanics': 'pages/physics/physics.js',
-        'gas-laws': 'pages/physics/gas-laws.js?v=20260618publicClean1',
-        'thermodynamics': 'pages/physics/thermodynamics.js?v=20260618thermoP1',
-        'electromagnetism': 'pages/physics/electromagnetic.js',
-        'waves': 'pages/physics/waves.js',
-        'relativity': 'pages/physics/relativity.js',
-        'fluid-dynamics': 'pages/physics/fluid-dynamics.js?v=20260424v46e',
-        'optics': 'pages/physics/optics.js',
-        'kinematics': 'pages/physics/kinematics.js',
-        'projectile': 'pages/physics/projectile.js',
-        'circular-motion': 'pages/physics/circular-motion.js',
-        'energy-conservation': 'pages/physics/energy-conservation.js?v=20260424v46b',
-        'circuit-analysis': 'pages/physics/circuit-analysis.js',
-        'em-induction': 'pages/physics/electromagnetic-induction.js',
-        'alternating-current': 'pages/physics/alternating-current.js',
-        'gravitation': 'pages/physics/gravitation.js?v=20260424v46d',
-        'force-composition': 'pages/physics/force-composition.js?v=20260424v46a',
-        'momentum-conservation': 'pages/physics/momentum-conservation.js?v=20260424v46c',
-        'charged-particle': 'pages/physics/charged-particle.js',
-        'atomic-physics': 'pages/physics/atomic-physics.js?v=20260618publicClean1',
-
-        // Chemistry
-        'periodic-table': 'pages/chemistry/periodic-table.js?v=20260618ptNames1',
-        'molecular-structure': 'pages/chemistry/molecular-structure.js?v=20260424v45e',
-        'hybrid-orbitals': 'pages/chemistry/hybrid-orbitals.js?v=20260618hybFix1',
-        'crystal-structures': 'pages/chemistry/crystal-structures.js?v=20260617crystalP2',
-        'reactions': 'pages/chemistry/chemical-reactions.js?v=20260424v45g',
-        'chemical-equilibrium': 'pages/chemistry/chemical-equilibrium.js?v=20260606chem1',
-        'electrochemistry': 'pages/chemistry/electrochemistry.js?v=20260606chem1',
-        'chemical-bond': 'pages/chemistry/chemical-bond.js?v=20260424v45h',
-        'organic-chemistry': 'pages/chemistry/organic-chemistry.js?v=20260424v45i',
-        'reaction-rate': 'pages/chemistry/reaction-rate.js?v=20260618rateP1',
-        'solution-ionization': 'pages/chemistry/solution-ionization.js?v=20260618ionP1',
-        'ionic-reaction': 'pages/chemistry/ionic-reaction.js',
-        'redox': 'pages/chemistry/redox.js?v=20260618redoxP1',
-        'atomic-structure': 'pages/chemistry/atomic-structure.js',
-        'element-compounds': 'pages/chemistry/element-compounds.js?v=20260530v62a',
-        'intermolecular-forces': 'pages/chemistry/intermolecular-forces.js?v=20260617gasP1b',
-        'experiments': 'pages/chemistry/virtual-experiments.js?v=20260618refsP1',
-
-        // Algorithms
-        'sorting': 'pages/algorithms/algorithms.js',
-        'searching': 'pages/algorithms/search-algorithms.js',
-        'hash-tables': 'pages/algorithms/hash-tables.js?v=20260617bstP1b',
-        'bst-avl': 'pages/algorithms/bst-avl.js?v=20260617bstP1b',
-        'graph': 'pages/algorithms/graph-algo.js',
-        'mst-compare': 'pages/algorithms/mst-compare.js?v=20260618mstP1',
-        'greedy-scheduling': 'pages/algorithms/greedy-scheduling.js?v=20260618refsP1',
-        'data-structures': 'pages/algorithms/data-structures.js',
-        'sorting-compare': 'pages/algorithms/sorting-compare.js',
-        'recursion-vis': 'pages/algorithms/recursion-vis.js',
-        'dynamic-programming': 'pages/algorithms/dynamic-programming.js?v=20260618algoTextP1',
-        'string-matching': 'pages/algorithms/string-matching.js?v=20260618algoTextP1',
-
-        // Biology
-        'cell-structure': 'pages/biology/cell-structure.js?v=20260617gasP1b',
-        'dna': 'pages/biology/dna-helix.js?v=20260416b',
-        'photosynthesis': 'pages/biology/photosynthesis.js?v=20260618photoSourceP1d',
-        'enzyme-properties': 'pages/biology/enzyme-properties.js?v=20260618enzymeSourceP1b',
-        'homeostasis': 'pages/biology/homeostasis.js?v=20260618homeostasisP1',
-        'humoral-regulation': 'pages/biology/humoral-regulation.js?v=20260618humoralP2',
-        'genetics': 'pages/biology/genetics.js?v=20260416b',
-        'mitosis': 'pages/biology/mitosis.js?v=20260617gasP1b',
-        'meiosis': 'pages/biology/meiosis.js?v=20260617gasP1b',
-        'gene-expression': 'pages/biology/gene-expression.js?v=20260618genexpP1',
-        'gene-engineering': 'pages/biology/gene-engineering.js?v=20260618gengP1',
-        'cellular-respiration': 'pages/biology/cellular-respiration.js?v=20260618cellRespSourceP1',
-        'substance-transport': 'pages/biology/substance-transport.js?v=20260618transportSourceP1',
-        'gene-mutation': 'pages/biology/gene-mutation.js?v=20260618gmutP3',
-        'neural-regulation': 'pages/biology/neural-regulation.js?v=20260618neuralP1',
-        'immune-system': 'pages/biology/immune-system.js?v=20260618immuneP2',
-        'population-community': 'pages/biology/population-community.js?v=20260618popcommP1',
-        'material-cycles': 'pages/biology/material-cycles.js?v=20260618cyclesP1',
-        'ecosystem': 'pages/biology/ecosystem.js?v=20260423a'
-    },
     _pageEnhancementScripts: {
         physics: ['pages/physics/physics-zoom.js'],
         biology: ['pages/biology/biology.js?v=20260416b', 'pages/biology/biology-zoom.js?v=20260416b']
@@ -449,6 +350,22 @@ const ModuleSelector = {
         }
     },
 
+    _hideModuleTools() {
+        const actions = [
+            () => {
+                const guide = this._getExperimentGuide();
+                if (guide) guide.hideHelpButton();
+            },
+            () => { if (window.ExperimentExport) ExperimentExport.hide(); },
+            () => { if (window.ExperimentQuiz) ExperimentQuiz.hide(); },
+            () => { if (window.ExperimentFavorites) ExperimentFavorites.hide(); },
+            () => { if (window.ExperimentRating) ExperimentRating.hide(); }
+        ];
+        actions.forEach((action) => {
+            try { action(); } catch (error) { /* page leave must continue */ }
+        });
+    },
+
     closeModule(page, options = {}) {
         const pageEl = document.getElementById(`page-${page}`);
         if (!pageEl) return;
@@ -457,21 +374,7 @@ const ModuleSelector = {
             BackendContent.destroyExperimentSchema(page, activeModule);
         }
 
-        // Hide experiment guide help button
-        const guide = this._getExperimentGuide();
-        if (guide) guide.hideHelpButton();
-
-        // Hide export button (E-03)
-        if (window.ExperimentExport) ExperimentExport.hide();
-
-        // Hide quiz FAB (X-02)
-        if (window.ExperimentQuiz) ExperimentQuiz.hide();
-
-        // Hide favorites button
-        if (window.ExperimentFavorites) ExperimentFavorites.hide();
-
-        // Hide rating card
-        if (window.ExperimentRating) ExperimentRating.hide();
+        this._hideModuleTools();
 
         // Hide all module sections
         pageEl.querySelectorAll('[data-module].module-active').forEach(s => {
@@ -521,6 +424,23 @@ const ModuleSelector = {
             this._swipeBackCtrls[page].destroy();
             this._swipeBackCtrls[page] = null;
         }
+    },
+
+    leavePage(page, options = {}) {
+        try {
+            if (this.activeModule[page]) this.closeModule(page, options);
+        } catch (error) {
+            // Continue through the same best-effort phases that legacy Router used.
+        }
+        this._hideModuleTools();
+        let cleanupReport = Object.freeze({ attempted: 0, executed: 0, failed: 0 });
+        try {
+            cleanupReport = window.AstraExperimentRegistry?.cleanupPage(page) || cleanupReport;
+        } catch (error) {
+            cleanupReport = Object.freeze({ attempted: 0, executed: 0, failed: 1 });
+        }
+        try { this.resetPage(page); } catch (error) { /* keep navigation moving */ }
+        return cleanupReport;
     },
 
     toggleSidebar(page) {
@@ -610,7 +530,8 @@ const ModuleSelector = {
 
     _loadModuleAssets(page, moduleId) {
         const scripts = [];
-        if (this._moduleScripts[moduleId]) scripts.push(this._moduleScripts[moduleId]);
+        const experimentScript = window.AstraExperimentRegistry?.scriptFor(page, moduleId);
+        if (experimentScript) scripts.push(experimentScript);
         if (this._pageEnhancementScripts[page]) scripts.push(...this._pageEnhancementScripts[page]);
 
         return scripts.reduce(
@@ -626,141 +547,32 @@ const ModuleSelector = {
             return;
         }
 
-        // Map moduleId to init function
-        const retryInit = (fnName) => {
-            const fn = window[fnName];
-            if (typeof fn !== 'function') return false;
-            fn();
-            return true;
+        const initFn = () => window.AstraExperimentRegistry?.init(page, moduleId) || false;
+        const runInit = (attempt = 0) => {
+            if (this.activeModule[page] !== moduleId) return;
+            const initialized = initFn();
+            if (initialized === false && attempt < 20) {
+                setTimeout(() => runInit(attempt + 1), 100);
+                return;
+            }
+            if (initialized === false) {
+                console.warn('[ModuleSelector] init function unavailable after script load:', moduleId);
+                return;
+            }
+            this._initialized[key] = true;
+            if (page === 'physics' && window.PhysicsZoom && typeof window.PhysicsZoom.init === 'function') {
+                window.PhysicsZoom.init();
+            }
+            if (page === 'biology' && window.BiologyZoom && typeof window.BiologyZoom.init === 'function') {
+                window.BiologyZoom.init();
+            }
+            this._showModuleTools(page, moduleId);
         };
-        const initMap = {
-            // Mathematics
-            'function-graph': () => retryInit('initFunctionGraph'),
-            'calculus': () => retryInit('initCalculus'),
-            'geometry': () => retryInit('initGeoTransform'),
-            'complex': () => retryInit('initComplexVis'),
-            'trigonometry': () => retryInit('initTrigVis'),
-            'set-operations': () => retryInit('initSetOps'),
-            'probability': () => retryInit('initProbability'),
-            'vector-ops': () => retryInit('initVectorOps'),
-            'inequality': () => retryInit('initInequality'),
-            'conic-sections': () => retryInit('initConicSections'),
-            'solid-geometry': () => retryInit('initSolidGeom'),
-            'permutation-combination': () => retryInit('initPermComb'),
-            'sequences': () => retryInit('initSequences'),
-            'function-properties': () => retryInit('initFuncProps'),
-            'exp-log': () => retryInit('initExpLog'),
-            'binomial-theorem': () => retryInit('initBinomial'),
-            'statistics-regression': () => retryInit('initStatReg'),
-            'modeling-numerical': () => retryInit('initModelingNumerical'),
-            'spatial-vector': () => retryInit('initSpatialVec'),
-            'derivative-application': () => retryInit('initDerivApp'),
-
-            // Physics
-            'mechanics': () => retryInit('initPhysics'),
-            'gas-laws': () => retryInit('initGasLaws'),
-            'thermodynamics': () => retryInit('initThermodynamics'),
-            'electromagnetism': () => retryInit('initElectromagnetic'),
-            'waves': () => retryInit('initWaves'),
-            'relativity': () => retryInit('initRelativity'),
-            'fluid-dynamics': () => retryInit('initFluidDynamics'),
-            'optics': () => retryInit('initOptics'),
-            'kinematics': () => retryInit('initKinematics'),
-            'projectile': () => retryInit('initProjectile'),
-            'circular-motion': () => retryInit('initCircularMotion'),
-            'energy-conservation': () => retryInit('initEnergyConservation'),
-            'circuit-analysis': () => retryInit('initCircuitAnalysis'),
-            'em-induction': () => retryInit('initEMInduction'),
-            'alternating-current': () => retryInit('initACCircuit'),
-            'gravitation': () => retryInit('initGravitation'),
-            'force-composition': () => retryInit('initForceComposition'),
-            'momentum-conservation': () => retryInit('initMomentumConservation'),
-            'charged-particle': () => retryInit('initChargedParticle'),
-            'atomic-physics': () => retryInit('initAtomicPhysics'),
-
-            // Chemistry
-            'periodic-table': () => retryInit('initPeriodicTable'),
-            'molecular-structure': () => retryInit('initMoleculeVis'),
-            'hybrid-orbitals': () => retryInit('initHybridOrbitals'),
-            'crystal-structures': () => retryInit('initCrystalStructures'),
-            'reactions': () => retryInit('initChemReaction'),
-            'chemical-equilibrium': () => retryInit('initChemEquilibrium'),
-            'electrochemistry': () => retryInit('initElectrochemistry'),
-            'chemical-bond': () => retryInit('initChemBond'),
-            'organic-chemistry': () => retryInit('initOrganicChem'),
-            'reaction-rate': () => retryInit('initReactionRate'),
-            'solution-ionization': () => retryInit('initSolutionIon'),
-            'ionic-reaction': () => retryInit('initIonicReaction'),
-            'redox': () => retryInit('initRedox'),
-            'atomic-structure': () => retryInit('initAtomicStructure'),
-            'element-compounds': () => retryInit('initElementCompounds'),
-            'intermolecular-forces': () => retryInit('initIntermolecular'),
-            'experiments': () => retryInit('initChemVirtualExperiments'),
-
-            // Algorithms
-            'sorting': () => true, // algorithms.js self-inits
-            'searching': () => retryInit('initSearchAlgorithms'),
-            'hash-tables': () => retryInit('initHashTablesLab'),
-            'bst-avl': () => retryInit('initBSTAVL'),
-            'graph': () => retryInit('initGraphAlgo'),
-            'mst-compare': () => retryInit('initMSTCompare'),
-            'greedy-scheduling': () => retryInit('initGreedyScheduling'),
-            'data-structures': () => retryInit('initDataStructVis'),
-            'sorting-compare': () => retryInit('initSortCompare'),
-            'recursion-vis': () => retryInit('initRecursionVis'),
-            'dynamic-programming': () => retryInit('initDPVis'),
-            'string-matching': () => retryInit('initStringMatch'),
-
-            // Biology
-            'cell-structure': () => retryInit('initCellStructure'),
-            'dna': () => retryInit('initDNAHelix'),
-            'photosynthesis': () => retryInit('initPhotosynthesis'),
-            'enzyme-properties': () => retryInit('initEnzymeProperties'),
-            'homeostasis': () => retryInit('initHomeostasis'),
-            'humoral-regulation': () => retryInit('initHumoralRegulation'),
-            'genetics': () => retryInit('initGenetics'),
-            'mitosis': () => retryInit('initMitosis'),
-            'meiosis': () => retryInit('initMeiosis'),
-            'gene-expression': () => retryInit('initGeneExpression'),
-            'gene-engineering': () => retryInit('initGeneEngineering'),
-            'cellular-respiration': () => retryInit('initCellularResp'),
-            'substance-transport': () => retryInit('initSubstanceTransport'),
-            'gene-mutation': () => retryInit('initGeneMutation'),
-            'neural-regulation': () => retryInit('initNeuralReg'),
-            'immune-system': () => retryInit('initImmuneSystem'),
-            'population-community': () => retryInit('initPopulationCommunity'),
-            'material-cycles': () => retryInit('initMaterialCycles'),
-            'ecosystem': () => retryInit('initEcosystem'),
-        };
-
-        const initFn = initMap[moduleId];
-        if (initFn) {
-            const runInit = (attempt = 0) => {
-                if (this.activeModule[page] !== moduleId) return;
-                const initialized = initFn();
-                if (initialized === false && attempt < 20) {
-                    setTimeout(() => runInit(attempt + 1), 100);
-                    return;
-                }
-                if (initialized === false) {
-                    console.warn('[ModuleSelector] init function unavailable after script load:', moduleId);
-                    return;
-                }
-                this._initialized[key] = true;
-                if (page === 'physics' && window.PhysicsZoom && typeof window.PhysicsZoom.init === 'function') {
-                    window.PhysicsZoom.init();
-                }
-                if (page === 'biology' && window.BiologyZoom && typeof window.BiologyZoom.init === 'function') {
-                    window.BiologyZoom.init();
-                }
-                this._showModuleTools(page, moduleId);
-            };
-            this._loadModuleAssets(page, moduleId)
-                .then(() => setTimeout(() => runInit(), 50))
-                .catch(error => {
-                    console.warn('[ModuleSelector] failed to load module assets:', moduleId, error);
-                });
-        }
+        this._loadModuleAssets(page, moduleId)
+            .then(() => setTimeout(() => runInit(), 50))
+            .catch(error => {
+                console.warn('[ModuleSelector] failed to load module assets:', moduleId, error);
+            });
     },
 
     _showModuleTools(page, moduleId) {
@@ -805,7 +617,7 @@ const ModuleSelector = {
         const experiments = CONFIG.experiments[page];
         if (!experiments) return;
         if (window.BackendContent && typeof BackendContent.destroyPage === 'function') {
-            BackendContent.destroyPage(page);
+            try { BackendContent.destroyPage(page); } catch (error) { /* state reset must continue */ }
         }
         experiments.forEach(exp => {
             delete this._initialized[`${page}:${exp.id}`];
