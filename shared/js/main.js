@@ -224,7 +224,7 @@ function updateFooterVisibility() {
 
 window.updateFooterVisibility = updateFooterVisibility;
 
-const ENGLAB_ASSET_VERSION = '20260715v7423RoleResourcesP1';
+const ENGLAB_ASSET_VERSION = '20260716v7425OrganizationGovernanceP0';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',

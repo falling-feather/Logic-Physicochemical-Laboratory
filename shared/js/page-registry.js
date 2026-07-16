@@ -4,7 +4,7 @@
 
     if (global.AstraPageRegistry) return;
 
-    const ROLE_RESOURCE_VERSION = '20260715v7423RoleResourcesP1';
+    const ROLE_RESOURCE_VERSION = '20260716v7425OrganizationGovernanceP0';
 
     const definePage = (config) => Object.freeze({
         galaxy: config.galaxy || 'englab',

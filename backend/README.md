@@ -2,9 +2,9 @@
 
 > **文档定位**：后端本地开发、API/服务边界、配置、迁移、运维脚本和验证入口。V7.4.12 起完成事实见 [`../doc/03-开发历史.md`](../doc/03-开发历史.md)，更早实机证据见 [`../doc/03-发布历史.md`](../doc/03-发布历史.md)，未来任务见 [`../doc/02-项目规划.md`](../doc/02-项目规划.md)。
 >
-> **当前基线**：FastAPI + SQLAlchemy + Alembic 0047；SQLite 为安全本地默认，MySQL 为发布目标。V7.4.24 已完成学校/班级受约束治理、乐观并发、责任人保护、审计与活动组织边界；V7.4.22 已硬化浏览器 Cookie-only/非浏览器 Bearer 双通道契约；V7.4.9 已建立 Python 3.12 通用哈希锁和 CI 漂移门禁；V7.4.8 已完成管理 API 全部分域拆分，`admin.py` 为纯路由聚合器；V6.6.63 后端阶段、真实 MySQL、四服务拓扑、Release 构建/回滚和 15/15 stage gate 已完成。
+> **当前基线**：FastAPI + SQLAlchemy + Alembic 0047；SQLite 为安全本地默认，MySQL 为发布目标。V7.4.25 已将学校/班级受约束治理接入管理 UI，并补齐凭据型 PUT 预检；V7.4.24 已完成组织治理 API、乐观并发、责任人保护、审计与活动组织边界；V7.4.22 已硬化浏览器 Cookie-only/非浏览器 Bearer 双通道契约；V7.4.9 已建立 Python 3.12 通用哈希锁和 CI 漂移门禁；V7.4.8 已完成管理 API 全部分域拆分，`admin.py` 为纯路由聚合器；V6.6.63 后端阶段、真实 MySQL、四服务拓扑、Release 构建/回滚和 15/15 stage gate 已完成。
 >
-> **最后更新**：2026-07-15
+> **最后更新**：2026-07-16
 
 后端当前承担认证与会话、学校/班级/课程、作业/提交/批改、积分与知识状态、内容草稿/审核/发布/回滚、脚本隔离、管理治理、DB-backed 任务和审计链。`server/` 中的 Node/C++ 进程只承担显式白名单静态资源，不是业务 API。
 
@@ -345,7 +345,7 @@ node tools/browser/script-sandbox-isolation-proof.cjs --api http://127.0.0.1:800
 | `ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_SCAN_LIMIT` | `25` | 单轮调度最多扫描的 published 外部脚本引用数量，范围 1~200 |
 | `ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_SOURCE_HOST` | 空 | 可选调度筛选：仅扫描指定 source host |
 | `ASTRA_CONTENT_SCRIPT_REMOTE_DRIFT_SCHEDULER_SLUG` | 空 | 可选调度筛选：仅扫描指定内容页 slug |
-| `ASTRA_CORS_ORIGINS` | `http://127.0.0.1:8766,http://localhost:8766` | 凭据型 API 与 sandbox frame ancestor 的精确 origin；`*`、`null`、userinfo、路径、query、fragment 会使应用启动失败 |
+| `ASTRA_CORS_ORIGINS` | `http://127.0.0.1:8766,http://localhost:8766` | 凭据型 API 与 sandbox frame ancestor 的精确 origin；允许方法固定为 `GET/POST/PUT/PATCH/DELETE/OPTIONS`，`*`、`null`、userinfo、路径、query、fragment 会使应用启动失败 |
 | `ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_ENABLED` | `false` | 是否随 FastAPI lifespan 启动知识快照进程内调度器 |
 | `ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_RUN_ON_START` | `false` | 调度器启动后是否立即检查一次到期窗口 |
 | `ASTRA_KNOWLEDGE_SNAPSHOT_SCHEDULER_INTERVAL_SECONDS` | `300` | 调度器轮询间隔，最低 30 秒 |
@@ -449,6 +449,8 @@ V6.6.62 基线收集 373 项：默认套件 368 项通过、5 项真实 MySQL �
 V6.6.63 基线收集 380 项：默认套件 375 项通过、5 项真实 MySQL 专项按显式环境门禁跳过；RC 范围门禁定向、中文路径 ASCII-safe 初始化 CLI、真实 MySQL 0046 preflight/smoke、拓扑 render 和最终生产 stage gate 15/15 通过。
 
 V7.4.24 基线收集 435 项：默认套件 429 项通过、6 项真实 MySQL 发布证据按显式环境门禁跳过；新增组织治理、0047 SQLite 往返、条件式 MySQL schema、26 个活动组织写门禁、责任人并发保护以及归档后当前学情/进度与历史读取边界回归。真实 MySQL 未提供隔离库时只能声明门禁已落地，不得声明目标数据库已通过。
+
+V7.4.25 针对管理组织 UI 的后端定向门禁为 40 项通过：`test_admin_organization_governance.py` 覆盖受约束治理，`test_health.py` 覆盖凭据型 `PUT` CORS 预检。本次没有重跑完整后端套件，也没有提供新的真实 MySQL 或目标环境证据；完整 V7.4.24 数据库基线和 0047 MySQL 待补边界保持不变。
 
 ```bash
 python -m pytest backend/tests/test_school_classes.py backend/tests/test_access_control.py backend/tests/test_course_learning_loop.py -q

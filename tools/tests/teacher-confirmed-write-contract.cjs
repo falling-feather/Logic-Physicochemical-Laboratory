@@ -1,7 +1,14 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
 
 const teacherPath = path.resolve(__dirname, '../../pages/teacher/teacher.js');
+const teacherSource = fs.readFileSync(teacherPath, 'utf8');
+assert.match(
+    teacherSource,
+    /function canManageAssignmentClassPolicy\(\)\s*\{\s*return !isClassReadOnly\(\) && hasCourseCapability/,
+    'archived class must disable assignment-class-policy PUT and DELETE controls'
+);
 
 async function main() {
     global.window = global;

@@ -577,7 +577,7 @@
         const container = state.root.querySelector('[data-teacher-scope]');
         if (!container) return;
         container.innerHTML = `
-            ${renderScopeSelect('schoolId', '学校', state.data.schools, state.selected.schoolId, (item) => item.name, state.errors.schools)}
+            ${renderScopeSelect('schoolId', '学校', state.data.schools, state.selected.schoolId, (item) => `${item.name}${item.status !== 'active' ? ` · ${item.status}` : ''}`, state.errors.schools)}
             ${renderScopeSelect('classId', '班级', state.data.classes, state.selected.classId, (item) => `${item.name}${item.status !== 'active' ? ` · ${item.status}` : ''}`, state.errors.classes)}
             ${renderScopeSelect('courseId', '课程', state.data.courses, state.selected.courseId, (item) => `${item.title}${item.status !== 'published' ? ` · ${item.status}` : ''}`, state.errors.courses)}
             ${renderScopeSelect('unitId', '单元', state.data.units, state.selected.unitId, (item) => `${item.position}. ${item.title}`, state.errors.units)}
@@ -611,7 +611,7 @@
     }
 
     function renderSetupPanel() {
-        const schoolDisabled = !state.selected.schoolId;
+        const schoolDisabled = !state.selected.schoolId || isSchoolReadOnly();
         const courseDisabled = !state.selected.courseId || isCourseReadOnly();
         const classDisabled = !state.selected.classId || isClassReadOnly();
         const unitOptions = state.data.units.map((unit) => `<option value="${unit.id}"${String(unit.id) === state.selected.unitId ? ' selected' : ''}>${escapeHtml(unit.title)}</option>`).join('');
@@ -886,7 +886,7 @@
             const label = `${member ? (member.display_name || member.username) : `#${submission.student_id}`} · ${submission.status} · #${submission.id}`;
             return `<option value="${submission.id}">${escapeHtml(label)}</option>`;
         }).join('');
-        const disabled = !options;
+        const disabled = !options || isClassReadOnly() || isSchoolReadOnly();
         return `
             <form class="teacher-form teacher-form--grade" data-teacher-form="grade">
                 <h3>评分</h3>
@@ -1619,12 +1619,17 @@
 
     function isClassReadOnly() {
         const classGroup = selectedClass();
-        return !classGroup || classGroup.status !== 'active';
+        return isSchoolReadOnly() || !classGroup || classGroup.status !== 'active';
+    }
+
+    function isSchoolReadOnly() {
+        const school = selectedSchool();
+        return !school || school.status !== 'active';
     }
 
     function isCourseReadOnly() {
         const course = selectedCourse();
-        return !course || course.status === 'archived';
+        return isSchoolReadOnly() || !course || course.status === 'archived';
     }
 
     function activeCourseCollaboratorRole() {
@@ -1661,7 +1666,7 @@
     }
 
     function canManageAssignmentClassPolicy() {
-        return hasCourseCapability(['editor', 'assessment_editor']);
+        return !isClassReadOnly() && hasCourseCapability(['editor', 'assessment_editor']);
     }
 
     function assignmentOptions() {

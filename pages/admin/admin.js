@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    const ADMIN_ASSET_VERSION = '20260711v740RoleShellP0';
+    const ADMIN_ASSET_VERSION = '20260716v7425OrganizationGovernanceP0';
     const API_BASE_STORAGE_KEY = 'astra-admin-api-base';
 
     const state = {
@@ -19,6 +19,11 @@
         writeLock: null,
         pendingJoinReview: null,
         pendingUserUpdate: null,
+        pendingOrganizationUpdate: null,
+        organizationEditor: null,
+        organizationEditorTrigger: null,
+        organizationGeneration: 0,
+        organizationSummary: null,
         onOnline: null,
         onOffline: null,
         onAuthRequired: null,
@@ -90,6 +95,30 @@
         }
     ];
 
+    const ORGANIZATION_CONFIGS = Object.freeze({
+        school: Object.freeze({
+            label: '学校',
+            panelId: 'schools',
+            collection: 'schools',
+            fields: Object.freeze([
+                Object.freeze({ name: 'name', label: '学校名称', required: true, maxLength: 160 }),
+                Object.freeze({ name: 'region', label: '区域', maxLength: 160 }),
+                Object.freeze({ name: 'description', label: '说明', maxLength: 2000, multiline: true })
+            ])
+        }),
+        class: Object.freeze({
+            label: '班级',
+            panelId: 'classes',
+            collection: 'classes',
+            fields: Object.freeze([
+                Object.freeze({ name: 'name', label: '班级名称', required: true, maxLength: 160 }),
+                Object.freeze({ name: 'grade', label: '年级', maxLength: 64 }),
+                Object.freeze({ name: 'term', label: '学期', maxLength: 64 }),
+                Object.freeze({ name: 'description', label: '说明', maxLength: 2000, multiline: true })
+            ])
+        })
+    });
+
     const PANEL_CONFIGS = [
         {
             id: 'users',
@@ -117,23 +146,39 @@
             title: '学校与组织',
             icon: 'landmark',
             path: '/api/admin/schools',
-            filters: [textFilter('q', '学校或区域')],
-            columns: [
-                col('id', 'ID'), col('name', '学校'), col('region', '区域'), badgeCol('status', '状态')
+            filters: [
+                selectFilter('status', '状态', [
+                    ['', '全部'], ['active', '启用'], ['archived', '已归档']
+                ]),
+                textFilter('q', '学校或区域')
             ],
-            details: ['id', 'name', 'region', 'status']
+            columns: [
+                col('id', 'ID'), col('name', '学校'), col('region', '区域'),
+                badgeCol('status', '状态'), col('version', '版本')
+            ],
+            details: ['id', 'name', 'region', 'description', 'status', 'version', 'created_at', 'updated_at'],
+            actions: 'organization-governance',
+            organizationKind: 'school'
         },
         {
             id: 'classes',
             title: '全局班级',
             icon: 'school',
             path: '/api/admin/classes',
-            filters: [textFilter('q', '班级、年级或学期'), textFilter('school_id', '学校 ID')],
+            filters: [
+                selectFilter('status', '状态', [
+                    ['', '全部'], ['active', '启用'], ['archived', '已归档']
+                ]),
+                textFilter('q', '班级、年级或学期'),
+                textFilter('school_id', '学校 ID')
+            ],
             columns: [
                 col('id', 'ID'), col('school_id', '学校 ID'), col('name', '班级'),
-                col('grade', '年级'), col('term', '学期'), badgeCol('status', '状态')
+                col('grade', '年级'), col('term', '学期'), badgeCol('status', '状态'), col('version', '版本')
             ],
-            details: ['id', 'school_id', 'name', 'grade', 'term', 'status']
+            details: ['id', 'school_id', 'name', 'grade', 'term', 'description', 'status', 'version', 'created_at', 'updated_at'],
+            actions: 'organization-governance',
+            organizationKind: 'class'
         },
         {
             id: 'join-requests',
@@ -419,6 +464,8 @@
         state.busy = false;
         state.panelData = {};
         state.summaryData = {};
+        state.organizationSummary = null;
+        resetOrganizationEditor(false);
         const dashboard = getDashboard();
         if (dashboard) dashboard.hidden = true;
         if (state.root) {
@@ -446,6 +493,8 @@
             state.user = null;
             state.panelData = {};
             state.summaryData = {};
+            state.organizationSummary = null;
+            resetOrganizationEditor(false);
             clearDashboardDom();
             const dashboard = getDashboard();
             if (dashboard) dashboard.hidden = true;
@@ -460,6 +509,8 @@
             state.user = null;
             state.panelData = {};
             state.summaryData = {};
+            state.organizationSummary = null;
+            resetOrganizationEditor(false);
             clearDashboardDom();
             const dashboard = getDashboard();
             if (dashboard) dashboard.hidden = true;
@@ -513,7 +564,7 @@
                         <span>API</span>
                         <input type="url" data-admin-api-base value="${escapeAttr(state.apiBase)}" placeholder="同源" autocomplete="off">
                     </label>
-                    <button type="button" class="admin-icon-button" data-admin-action="refresh" aria-label="刷新治理总览">
+                    <button type="button" class="admin-icon-button" data-admin-action="refresh" data-admin-refresh-control aria-label="刷新治理总览">
                         <i data-lucide="refresh-cw"></i>
                         <span>刷新</span>
                     </button>
@@ -524,6 +575,9 @@
             <div class="admin-dashboard" data-admin-dashboard hidden>
                 <section class="admin-kpi-grid" data-admin-stats></section>
                 <section class="admin-database-map" data-admin-database-map></section>
+                <dialog class="admin-organization-dialog" data-admin-organization-dialog aria-labelledby="admin-organization-dialog-title" aria-describedby="admin-organization-dialog-description">
+                    <div data-admin-organization-editor></div>
+                </dialog>
                 <section class="admin-summary-grid" data-admin-summary></section>
                 <section class="admin-panel-grid" data-admin-panels>
                     ${PANEL_CONFIGS.map(renderPanelShell).join('')}
@@ -535,7 +589,7 @@
 
     function renderPanelShell(config) {
         return `
-            <article class="admin-panel" data-admin-panel="${config.id}">
+            <article class="admin-panel" data-admin-panel="${config.id}" tabindex="-1">
                 <header class="admin-panel__header">
                     <div>
                         <h2><i data-lucide="${config.icon}"></i>${escapeHtml(config.title)}</h2>
@@ -588,11 +642,55 @@
         state.root.addEventListener('click', (event) => {
             const refreshAllButton = event.target.closest('[data-admin-action="refresh"]');
             if (refreshAllButton) {
-                state.writeLock = null;
+                if (state.busy) return;
+                if (!state.writeLock) resetOrganizationEditor(false);
                 state.pendingJoinReview = null;
                 state.pendingUserUpdate = null;
+                state.pendingOrganizationUpdate = null;
                 setNotice('', '');
-                refreshAll();
+                refreshAll({ releaseWriteLock: true });
+                return;
+            }
+
+            const userUpdateButton = event.target.closest('[data-admin-user-update]');
+            if (userUpdateButton) {
+                updateUserGovernance(userUpdateButton);
+                return;
+            }
+
+            const openPanelButton = event.target.closest('[data-admin-open-panel]');
+            if (openPanelButton) {
+                focusOrganizationPanel(openPanelButton.dataset.adminOpenPanel);
+                return;
+            }
+
+            const organizationEditButton = event.target.closest('[data-admin-organization-edit]');
+            if (organizationEditButton) {
+                openOrganizationEditor(organizationEditButton);
+                return;
+            }
+
+            const organizationCloseButton = event.target.closest('[data-admin-organization-close]');
+            if (organizationCloseButton) {
+                closeOrganizationEditor();
+                return;
+            }
+
+            const organizationConfirmButton = event.target.closest('[data-admin-organization-confirm]');
+            if (organizationConfirmButton) {
+                prepareOrganizationUpdate(organizationConfirmButton.dataset.adminOrganizationConfirm);
+                return;
+            }
+
+            const organizationReconcileButton = event.target.closest('[data-admin-organization-reconcile]');
+            if (organizationReconcileButton) {
+                reconcileOrganizationWrite(true);
+                return;
+            }
+
+            const organizationUnlockButton = event.target.closest('[data-admin-organization-unlock]');
+            if (organizationUnlockButton) {
+                unlockOrganizationWrite();
                 return;
             }
 
@@ -634,6 +732,10 @@
         state.root.addEventListener('change', (event) => {
             const apiInput = event.target.closest('[data-admin-api-base]');
             if (apiInput) {
+                if (state.busy || state.writeLock) {
+                    apiInput.value = state.apiBase;
+                    return;
+                }
                 state.apiBase = normalizeApiBase(apiInput.value);
                 localStorage.setItem(API_BASE_STORAGE_KEY, state.apiBase);
                 apiInput.value = state.apiBase;
@@ -646,6 +748,37 @@
                 applyPanelForm(form.dataset.adminPanelForm, form);
             }
         });
+
+        state.root.addEventListener('input', (event) => {
+            const form = event.target.closest('[data-admin-organization-form]');
+            if (!form || !state.pendingOrganizationUpdate) return;
+            state.pendingOrganizationUpdate = null;
+            if (state.organizationEditor) {
+                state.organizationEditor.message = '输入已变化，上一次确认已失效；请重新预览。';
+                state.organizationEditor.messageType = 'warning';
+            }
+            form.querySelectorAll('[data-admin-organization-confirm]').forEach((button) => {
+                button.classList.remove('admin-icon-button--confirming');
+                button.setAttribute('aria-label', button.dataset.adminOrganizationConfirm === 'status'
+                    ? '预览组织状态变更'
+                    : '预览组织资料变更');
+            });
+            const preview = form.querySelector('[data-admin-organization-preview]');
+            if (preview) preview.remove();
+            const inlineNotice = form.querySelector('[data-admin-organization-form-notice]');
+            if (inlineNotice) {
+                inlineNotice.hidden = false;
+                inlineNotice.className = 'admin-organization-form__notice admin-organization-form__notice--warning';
+                inlineNotice.textContent = '输入已变化，上一次确认已失效；请重新预览。';
+            }
+        });
+
+        state.root.addEventListener('cancel', (event) => {
+            const dialog = event.target.closest('[data-admin-organization-dialog]');
+            if (!dialog) return;
+            event.preventDefault();
+            if (!state.busy) closeOrganizationEditor();
+        }, true);
     }
 
     function applyPanelForm(panelId, form) {
@@ -662,13 +795,15 @@
         refreshPanel(panelId);
     }
 
-    async function refreshAll() {
+    async function refreshAll(options) {
         if (!state.root || !state.active) return;
+        const releaseWriteLock = Boolean(options && options.releaseWriteLock);
         const generation = beginRequestGeneration();
         setBusy(true);
         state.user = null;
         state.panelData = {};
         state.summaryData = {};
+        state.organizationSummary = null;
         clearDashboardDom();
         renderAuthState('checking');
         const dashboard = getDashboard();
@@ -689,11 +824,23 @@
             }
             renderAuthState('ready', user);
             if (dashboard) dashboard.hidden = false;
-            await Promise.all([
+            const results = await Promise.all([
                 refreshStats(generation),
                 refreshSummaries(generation),
                 ...PANEL_CONFIGS.map((config) => refreshPanel(config.id, generation))
             ]);
+            const reconciled = results.every((result) => result === true);
+            if (releaseWriteLock && state.writeLock) {
+                if (state.writeLock.action === 'organization-governance') {
+                    await reconcileOrganizationWrite(false);
+                } else if (reconciled) {
+                    setWriteLock(null);
+                    setNotice('success', '权威列表、统计与审计已重新读取，治理写锁已解除。');
+                } else {
+                    setNotice('warning', '权威刷新未完整完成，治理写锁保持；系统不会重复发送写入。');
+                }
+            }
+            return reconciled;
         } catch (error) {
             if (AstraApiClient.isCancelled(error) || !isCurrentRequest(generation)) return;
             renderAuthError(error);
@@ -713,14 +860,22 @@
         if (!container) return;
         container.innerHTML = renderLoading('统计加载中');
         try {
-            const [stats, health] = await Promise.all([
+            const [stats, health, activeSchools, archivedSchools, activeClasses, archivedClasses] = await Promise.all([
                 fetchJson('/api/admin/stats'),
-                fetchJson('/api/health')
+                fetchJson('/api/health'),
+                fetchJson('/api/admin/schools', { status: 'active', limit: 1, offset: 0 }),
+                fetchJson('/api/admin/schools', { status: 'archived', limit: 1, offset: 0 }),
+                fetchJson('/api/admin/classes', { status: 'active', limit: 1, offset: 0 }),
+                fetchJson('/api/admin/classes', { status: 'archived', limit: 1, offset: 0 })
             ]);
             if (!isCurrentRequest(requestGeneration)) return;
+            state.organizationSummary = {
+                schools: { active: Number(activeSchools.total || 0), archived: Number(archivedSchools.total || 0) },
+                classes: { active: Number(activeClasses.total || 0), archived: Number(archivedClasses.total || 0) }
+            };
             container.innerHTML = renderStats(stats);
             const databaseMap = state.root.querySelector('[data-admin-database-map]');
-            if (databaseMap) databaseMap.innerHTML = renderDatabaseMap(stats, health);
+            if (databaseMap) databaseMap.innerHTML = renderDatabaseMap(stats, health, state.organizationSummary);
             return true;
         } catch (error) {
             if (AstraApiClient.isCancelled(error) || !isCurrentRequest(requestGeneration)) return;
@@ -748,6 +903,7 @@
             }
             return renderSummaryCard(config, result.value, false);
         }).join('');
+        return settled.every((result) => result.status === 'fulfilled');
     }
 
     async function refreshPanel(panelId, generation) {
@@ -780,6 +936,7 @@
             if (meta) meta.textContent = '读取失败';
             return false;
         } finally {
+            applyAdminWriteAvailability();
             refreshIcons();
         }
     }
@@ -806,17 +963,6 @@
                 return;
             }
 
-            const userUpdateButton = event.target.closest('[data-admin-user-update]');
-            if (userUpdateButton) {
-                updateUserGovernance(userUpdateButton);
-                return;
-            }
-
-            const teachingButton = event.target.closest('[data-admin-open-teaching]');
-            if (teachingButton && window.Router) {
-                Router.navigateTo('teacher', true);
-                return;
-            }
             container.innerHTML = `
                 <div class="admin-auth-card admin-auth-card--blocked">
                     <i data-lucide="shield-x"></i>
@@ -896,8 +1042,12 @@
         `).join('');
     }
 
-    function renderDatabaseMap(stats, health) {
+    function renderDatabaseMap(stats, health, organizationSummary) {
         const databaseOk = Boolean(health && health.database && health.database.ok);
+        const organizations = organizationSummary || {
+            schools: { active: 0, archived: 0 },
+            classes: { active: 0, archived: 0 }
+        };
         const entities = [
             ['users', '用户', stats.total_users, 'users'],
             ['schools', '学校', stats.total_schools, 'landmark'],
@@ -917,8 +1067,8 @@
                 </div>
                 <div class="admin-database-map__actions">
                     <span class="admin-status-pill admin-status-pill--${databaseOk ? 'good' : 'bad'}">数据库 ${databaseOk ? '已连接' : '异常'}</span>
-                    <button type="button" class="admin-icon-button" data-admin-open-teaching>
-                        <i data-lucide="workflow"></i><span>组织与班级编辑</span>
+                    <button type="button" class="admin-icon-button" data-admin-open-panel="schools">
+                        <i data-lucide="workflow"></i><span>进入受限组织治理</span>
                     </button>
                 </div>
             </header>
@@ -936,6 +1086,32 @@
                     const total = Number((stats.users_by_role || {})[role] || 0);
                     const width = Math.max(total ? 4 : 0, Math.round(total / roleTotal * 100));
                     return `<div><span>${escapeHtml(role)}</span><b><i style="width:${width}%"></i></b><strong>${formatNumber(total)}</strong></div>`;
+                }).join('')}
+            </div>
+            <div class="admin-database-map__organizations" data-admin-organization-summary aria-label="学校与班级状态分布">
+                ${[
+                    ['schools', '学校', organizations.schools, 'landmark'],
+                    ['classes', '班级', organizations.classes, 'school']
+                ].map(([panelId, label, counts, icon]) => {
+                    const active = Number(counts.active || 0);
+                    const archived = Number(counts.archived || 0);
+                    const total = Math.max(1, active + archived);
+                    const activeWidth = Math.round(active / total * 100);
+                    return `
+                        <article data-admin-organization-summary-kind="${panelId}">
+                            <header>
+                                <span><i data-lucide="${icon}"></i>${escapeHtml(label)}治理状态</span>
+                                <button type="button" class="admin-text-button" data-admin-open-panel="${panelId}">查看与治理</button>
+                            </header>
+                            <div class="admin-organization-distribution" aria-label="${escapeAttr(label)}启用 ${active}，已归档 ${archived}">
+                                <i style="width:${activeWidth}%"></i>
+                            </div>
+                            <dl>
+                                <div><dt>启用</dt><dd>${formatNumber(active)}</dd></div>
+                                <div><dt>已归档（历史只读）</dt><dd>${formatNumber(archived)}</dd></div>
+                            </dl>
+                        </article>
+                    `;
                 }).join('')}
             </div>
         `;
@@ -1026,19 +1202,53 @@
         });
         return `
             ${config.actions === 'user-governance' ? renderUserGovernance(item) : ''}
+            ${config.actions === 'organization-governance' ? renderOrganizationGovernanceAction(config, item) : ''}
             ${config.actions === 'join-request-review' && item.status === 'pending' ? `
                 <div class="admin-row-actions">
-                    <button type="button" class="admin-icon-button admin-icon-button--compact${approvePending ? ' admin-icon-button--confirming' : ''}" data-admin-join-review="approved" data-join-request-id="${item.id}" ${state.busy || state.writeLock || !state.online ? 'disabled' : ''} aria-label="${approvePending ? '再次点击确认批准加入请求' : '批准加入请求'}">
+                    <button type="button" class="admin-icon-button admin-icon-button--compact${approvePending ? ' admin-icon-button--confirming' : ''}" data-admin-write data-admin-join-review="approved" data-join-request-id="${item.id}" ${state.busy || state.writeLock || !state.online ? 'disabled' : ''} aria-label="${approvePending ? '再次点击确认批准加入请求' : '批准加入请求'}">
                         <i data-lucide="check"></i>
                     </button>
-                    <button type="button" class="admin-icon-button admin-icon-button--compact${rejectPending ? ' admin-icon-button--confirming' : ''}" data-admin-join-review="rejected" data-join-request-id="${item.id}" ${state.busy || state.writeLock || !state.online ? 'disabled' : ''} aria-label="${rejectPending ? '再次点击确认拒绝加入请求' : '拒绝加入请求'}">
+                    <button type="button" class="admin-icon-button admin-icon-button--compact${rejectPending ? ' admin-icon-button--confirming' : ''}" data-admin-write data-admin-join-review="rejected" data-join-request-id="${item.id}" ${state.busy || state.writeLock || !state.online ? 'disabled' : ''} aria-label="${rejectPending ? '再次点击确认拒绝加入请求' : '拒绝加入请求'}">
                         <i data-lucide="x"></i>
                     </button>
                 </div>
             ` : ''}
-            <details class="admin-row-detail">
-                <summary>查看</summary>
-                <pre>${escapeHtml(JSON.stringify(details, null, 2))}</pre>
+            ${config.actions === 'organization-governance'
+                ? renderOrganizationReadOnlyDetails(details)
+                : `
+                    <details class="admin-row-detail">
+                        <summary>查看</summary>
+                        <pre>${escapeHtml(JSON.stringify(details, null, 2))}</pre>
+                    </details>
+                `}
+        `;
+    }
+
+    function renderOrganizationGovernanceAction(config, item) {
+        const kindLabel = config.organizationKind === 'school' ? '学校' : '班级';
+        const lockBlocks = Boolean(state.writeLock) && !(
+            state.writeLock.action === 'organization-governance'
+            && state.writeLock.kind === config.organizationKind
+            && Number(state.writeLock.resourceId) === Number(item.id)
+        );
+        return `
+            <div class="admin-row-actions">
+                <button type="button" class="admin-icon-button admin-icon-button--compact" data-admin-organization-edit data-organization-kind="${config.organizationKind}" data-organization-id="${item.id}" ${state.busy || !state.online || lockBlocks ? 'disabled' : ''} aria-label="治理${escapeAttr(kindLabel)} ${escapeAttr(item.name || item.id)}">
+                    <i data-lucide="settings-2"></i><span>受限治理</span>
+                </button>
+            </div>
+        `;
+    }
+
+    function renderOrganizationReadOnlyDetails(details) {
+        return `
+            <details class="admin-row-detail admin-row-detail--organization">
+                <summary>历史与版本</summary>
+                <dl>
+                    ${Object.entries(details).map(([key, value]) => `
+                        <div><dt>${escapeHtml(organizationFieldLabel(key))}</dt><dd>${escapeHtml(formatValue(value, {}))}</dd></div>
+                    `).join('')}
+                </dl>
             </details>
         `;
     }
@@ -1058,10 +1268,701 @@
                 <select data-admin-user-status aria-label="用户状态">
                     ${['active', 'disabled'].map((status) => `<option value="${status}"${selectedStatus === status ? ' selected' : ''}>${status}</option>`).join('')}
                 </select>
-                <button type="button" class="admin-icon-button admin-icon-button--compact${confirming ? ' admin-icon-button--confirming' : ''}" data-admin-user-update data-user-id="${item.id}" ${state.busy || state.writeLock || !state.online ? 'disabled' : ''} aria-label="${confirming ? '再次点击确认用户权限变更' : '预览用户权限变更'}">
+                <button type="button" class="admin-icon-button admin-icon-button--compact${confirming ? ' admin-icon-button--confirming' : ''}" data-admin-write data-admin-user-update data-user-id="${item.id}" ${state.busy || state.writeLock || !state.online ? 'disabled' : ''} aria-label="${confirming ? '再次点击确认用户权限变更' : '预览用户权限变更'}">
                     <i data-lucide="${confirming ? 'shield-alert' : 'save'}"></i>
                 </button>
             </div>`;
+    }
+
+    function organizationConfig(kind) {
+        return ORGANIZATION_CONFIGS[String(kind || '')] || null;
+    }
+
+    function organizationEndpoint(kind, id) {
+        const config = organizationConfig(kind);
+        return config ? `/api/admin/${config.collection}/${Number(id)}` : '';
+    }
+
+    function organizationFieldLabel(key) {
+        const labels = {
+            id: 'ID', school_id: '学校 ID', name: '名称', region: '区域', grade: '年级',
+            term: '学期', description: '说明', status: '状态', version: '版本',
+            created_at: '创建时间', updated_at: '更新时间', reason: '治理原因'
+        };
+        return labels[key] || key;
+    }
+
+    function focusOrganizationPanel(panelId) {
+        if (!['schools', 'classes'].includes(panelId)) return;
+        const panel = state.root && state.root.querySelector(`[data-admin-panel="${panelId}"]`);
+        if (!panel) return;
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        try { panel.focus({ preventScroll: true }); } catch (error) { panel.focus(); }
+    }
+
+    async function openOrganizationEditor(button) {
+        if (state.busy || !state.online) return;
+        const operationOwner = captureLifecycleOwner();
+        if (!operationOwner) return;
+        const kind = String(button.dataset.organizationKind || '');
+        const id = Number(button.dataset.organizationId);
+        const config = organizationConfig(kind);
+        if (!config || !id) return;
+        const generation = state.organizationGeneration + 1;
+        state.organizationGeneration = generation;
+        state.organizationEditorTrigger = button;
+        state.pendingOrganizationUpdate = null;
+        state.organizationEditor = {
+            kind,
+            id,
+            loading: true,
+            resource: null,
+            draft: null,
+            message: '',
+            messageType: ''
+        };
+        setBusy(true);
+        renderOrganizationDialog(true, '[data-admin-organization-title]');
+        try {
+            const resource = await fetchJson(organizationEndpoint(kind, id), undefined, operationOwner.controller.signal);
+            if (!isLifecycleOwner(operationOwner)
+                || !state.organizationEditor
+                || state.organizationGeneration !== generation) return;
+            state.organizationEditor.loading = false;
+            state.organizationEditor.resource = resource;
+            state.organizationEditor.draft = organizationDraftFromResource(config, resource);
+            replacePanelResource(config.panelId, resource);
+            renderOrganizationDialog(true, '[data-admin-organization-title]');
+        } catch (error) {
+            if (!isLifecycleOwner(operationOwner)
+                || AstraApiClient.isCancelled(error)
+                || state.organizationGeneration !== generation) return;
+            if (!state.organizationEditor) return;
+            state.organizationEditor.loading = false;
+            state.organizationEditor.error = errorMessage(error);
+            renderOrganizationDialog(true, '[data-admin-organization-close]');
+        } finally {
+            if (isLifecycleOwner(operationOwner)) setBusy(false);
+            if (isLifecycleOwner(operationOwner)
+                && state.organizationEditor
+                && state.organizationGeneration === generation) {
+                renderOrganizationDialog(true, organizationOutcomeFocusSelector());
+            }
+        }
+    }
+
+    function closeOrganizationEditor() {
+        if (state.busy) return;
+        resetOrganizationEditor(true);
+    }
+
+    function resetOrganizationEditor(restoreFocus) {
+        state.organizationGeneration += 1;
+        const editor = state.organizationEditor;
+        const originalTrigger = state.organizationEditorTrigger;
+        const currentTrigger = editor && state.root && state.root.querySelector(
+            `[data-admin-organization-edit][data-organization-kind="${editor.kind}"][data-organization-id="${editor.id}"]`
+        );
+        const trigger = originalTrigger && originalTrigger.isConnected ? originalTrigger : currentTrigger;
+        const dialog = state.root && state.root.querySelector('[data-admin-organization-dialog]');
+        if (dialog && dialog.open) dialog.close();
+        state.organizationEditor = null;
+        state.organizationEditorTrigger = null;
+        state.pendingOrganizationUpdate = null;
+        if (restoreFocus && trigger && trigger.isConnected) {
+            try { trigger.focus({ preventScroll: true }); } catch (error) { trigger.focus(); }
+        }
+    }
+
+    function renderOrganizationDialog(openDialog, focusSelector) {
+        const dialog = state.root && state.root.querySelector('[data-admin-organization-dialog]');
+        const container = dialog && dialog.querySelector('[data-admin-organization-editor]');
+        if (!dialog || !container || !state.organizationEditor) return;
+        const nextFocusSelector = focusSelector || organizationDialogFocusSelector(dialog);
+        container.innerHTML = renderOrganizationEditorContent(state.organizationEditor);
+        if (openDialog && !dialog.open) {
+            if (typeof dialog.showModal === 'function') dialog.showModal();
+            else dialog.setAttribute('open', '');
+        }
+        applyAdminWriteAvailability();
+        refreshIcons();
+        if (openDialog || dialog.open) {
+            window.requestAnimationFrame(() => {
+                if (!dialog.open && !dialog.hasAttribute('open')) return;
+                let target = nextFocusSelector && dialog.querySelector(nextFocusSelector);
+                if (!target || target.disabled) {
+                    target = dialog.querySelector('[data-admin-organization-status], [data-admin-organization-lock], [data-admin-organization-title], [data-admin-organization-close]:not([disabled])');
+                }
+                if (!target) return;
+                try { target.focus({ preventScroll: true }); } catch (error) { target.focus(); }
+            });
+        }
+    }
+
+    function organizationDialogFocusSelector(dialog) {
+        const active = document.activeElement;
+        if (!active || !dialog.contains(active)) return '[data-admin-organization-title]';
+        const confirmation = active.getAttribute && active.getAttribute('data-admin-organization-confirm');
+        if (['metadata', 'status'].includes(confirmation)) {
+            return `[data-admin-organization-confirm="${confirmation}"]`;
+        }
+        const stableAttributes = [
+            'data-admin-organization-close',
+            'data-admin-organization-reconcile',
+            'data-admin-organization-unlock',
+            'data-admin-organization-status',
+            'data-admin-organization-lock',
+            'data-admin-organization-title'
+        ];
+        for (const attribute of stableAttributes) {
+            if (active.hasAttribute && active.hasAttribute(attribute)) return `[${attribute}]`;
+        }
+        const fieldName = String(active.getAttribute && active.getAttribute('name') || '');
+        if (/^[a-z_]+$/.test(fieldName)) return `[name="${fieldName}"]`;
+        return '[data-admin-organization-title]';
+    }
+
+    function organizationOutcomeFocusSelector() {
+        if (state.writeLock && state.writeLock.action === 'organization-governance') {
+            return state.writeLock.reconciled
+                ? '[data-admin-organization-unlock]'
+                : '[data-admin-organization-lock]';
+        }
+        if (state.organizationEditor && state.organizationEditor.message) {
+            return '[data-admin-organization-status]';
+        }
+        return '[data-admin-organization-title]';
+    }
+
+    function renderOrganizationEditorContent(editor) {
+        const config = organizationConfig(editor.kind);
+        if (!config) return '';
+        if (editor.loading) {
+            return `
+                <header class="admin-organization-dialog__header">
+                    <div><span>权威读取</span><h2 id="admin-organization-dialog-title" data-admin-organization-title tabindex="-1">${escapeHtml(config.label)}治理</h2></div>
+                    <button type="button" class="admin-icon-button" data-admin-organization-close disabled aria-label="读取完成后关闭治理对话框"><i data-lucide="x"></i></button>
+                </header>
+                <p id="admin-organization-dialog-description">正在通过精确接口读取当前资源和乐观并发版本。</p>
+                ${renderLoading('读取权威状态')}
+            `;
+        }
+        if (editor.error || !editor.resource) {
+            return `
+                <header class="admin-organization-dialog__header">
+                    <div><span>读取失败</span><h2 id="admin-organization-dialog-title" data-admin-organization-title tabindex="-1">${escapeHtml(config.label)}治理</h2></div>
+                    <button type="button" class="admin-icon-button" data-admin-organization-close aria-label="关闭治理对话框"><i data-lucide="x"></i></button>
+                </header>
+                <p id="admin-organization-dialog-description">未读取到权威资源，治理写入保持关闭。</p>
+                <div class="admin-organization-alert admin-organization-alert--error" role="alert">${escapeHtml(editor.error || '资源不可用')}</div>
+            `;
+        }
+
+        const resource = editor.resource;
+        const draft = editor.draft || organizationDraftFromResource(config, resource);
+        const pending = state.pendingOrganizationUpdate
+            && state.pendingOrganizationUpdate.kind === editor.kind
+            && state.pendingOrganizationUpdate.id === editor.id
+            ? state.pendingOrganizationUpdate
+            : null;
+        const lock = state.writeLock
+            && state.writeLock.action === 'organization-governance'
+            && state.writeLock.kind === editor.kind
+            && state.writeLock.resourceId === editor.id
+            ? state.writeLock
+            : null;
+        const archived = resource.status === 'archived';
+        const nextStatus = archived ? 'active' : 'archived';
+        const statusAction = archived ? '恢复' : '归档';
+        const disabled = state.busy || Boolean(state.writeLock) || !state.online;
+        return `
+            <header class="admin-organization-dialog__header">
+                <div>
+                    <span>受限领域治理</span>
+                    <h2 id="admin-organization-dialog-title" data-admin-organization-title tabindex="-1">${escapeHtml(config.label)} · ${escapeHtml(resource.name)}</h2>
+                </div>
+                <button type="button" class="admin-icon-button" data-admin-organization-close ${state.busy ? 'disabled' : ''} aria-label="关闭治理对话框"><i data-lucide="x"></i></button>
+            </header>
+            <p id="admin-organization-dialog-description">仅可修改明确列出的领域字段；版本号和归属关系由系统维护，每次写入都记录原因与审计。</p>
+            ${editor.message ? `<div class="admin-organization-alert admin-organization-alert--${escapeAttr(editor.messageType || 'warning')}" data-admin-organization-status tabindex="-1" role="${editor.messageType === 'success' ? 'status' : 'alert'}">${escapeHtml(editor.message)}</div>` : ''}
+            ${lock ? renderOrganizationWriteLock(lock) : ''}
+            <dl class="admin-organization-readonly" data-admin-organization-readonly="${escapeAttr(resource.status)}">
+                <div><dt>ID</dt><dd>${formatNumber(resource.id)}</dd></div>
+                ${editor.kind === 'class' ? `<div><dt>学校 ID</dt><dd>${formatNumber(resource.school_id)}</dd></div>` : ''}
+                <div><dt>当前状态</dt><dd><span class="admin-status-pill admin-status-pill--${statusClass(resource.status)}">${archived ? '已归档 · 教学只读' : '启用'}</span></dd></div>
+                <div><dt>权威版本</dt><dd data-admin-organization-version="${resource.version}">v${formatNumber(resource.version)}</dd></div>
+                <div><dt>更新时间</dt><dd>${escapeHtml(formatDate(resource.updated_at))}</dd></div>
+            </dl>
+            <form class="admin-organization-form" data-admin-organization-form data-organization-kind="${editor.kind}" data-organization-id="${editor.id}" aria-busy="${state.busy ? 'true' : 'false'}">
+                <div class="admin-organization-form__fields">
+                    ${config.fields.map((field) => renderOrganizationField(field, draft[field.name])).join('')}
+                </div>
+                <label class="admin-organization-form__reason">
+                    <span>治理原因 <b>必填</b></span>
+                    <textarea name="reason" data-admin-organization-reason required maxlength="500" rows="3" placeholder="说明本次调整的业务原因和影响">${escapeHtml(draft.reason || '')}</textarea>
+                </label>
+                <div class="admin-organization-form__notice" data-admin-organization-form-notice hidden></div>
+                ${pending ? renderOrganizationPreview(pending, resource) : ''}
+                <div class="admin-organization-form__actions">
+                    <button type="button" class="admin-icon-button${pending && pending.action === 'metadata' ? ' admin-icon-button--confirming' : ''}" data-admin-write data-admin-organization-confirm="metadata" ${disabled ? 'disabled' : ''} aria-label="${pending && pending.action === 'metadata' ? `再次确认写入${config.label}资料` : `预览${config.label}资料变更`}">
+                        <i data-lucide="${pending && pending.action === 'metadata' ? 'shield-alert' : 'save'}"></i>
+                        <span>${pending && pending.action === 'metadata' ? '再次确认写入资料' : '预览资料变更'}</span>
+                    </button>
+                    <button type="button" class="admin-icon-button ${archived ? 'admin-icon-button--restore' : 'admin-icon-button--danger'}${pending && pending.action === 'status' ? ' admin-icon-button--confirming' : ''}" data-admin-write data-admin-organization-confirm="status" data-next-status="${nextStatus}" ${disabled ? 'disabled' : ''} aria-label="${pending && pending.action === 'status' ? `再次确认${statusAction}${config.label}` : `预览${statusAction}${config.label}`}">
+                        <i data-lucide="${archived ? 'archive-restore' : 'archive'}"></i>
+                        <span>${pending && pending.action === 'status' ? `再次确认${statusAction}` : `预览${statusAction}`}</span>
+                    </button>
+                </div>
+                <p class="admin-organization-form__history-note"><i data-lucide="history"></i>归档不是删除：历史作业、提交、学习事件、统计与审计继续保留只读；恢复仍以后端责任人和父组织约束为准。</p>
+            </form>
+        `;
+    }
+
+    function renderOrganizationField(field, value) {
+        const attributes = `${field.required ? ' required' : ''} maxlength="${field.maxLength}"`;
+        const control = field.multiline
+            ? `<textarea name="${field.name}" rows="4"${attributes}>${escapeHtml(value || '')}</textarea>`
+            : `<input type="text" name="${field.name}" value="${escapeAttr(value || '')}"${attributes}>`;
+        return `<label class="${field.multiline ? 'admin-organization-field--multiline' : ''}"><span>${escapeHtml(field.label)}${field.required ? ' <b>必填</b>' : ''}</span>${control}</label>`;
+    }
+
+    function renderOrganizationPreview(pending, resource) {
+        const entries = Object.entries(pending.payload)
+            .filter(([key]) => !['expected_version', 'reason'].includes(key));
+        return `
+            <section class="admin-organization-preview" data-admin-organization-preview role="alert">
+                <h3><i data-lucide="shield-alert"></i>写入预览：尚未发送</h3>
+                <dl>
+                    ${entries.map(([key, value]) => `
+                        <div>
+                            <dt>${escapeHtml(organizationFieldLabel(key))}</dt>
+                            <dd><del>${escapeHtml(formatOrganizationComparison(resource[key]))}</del><i data-lucide="arrow-right"></i><ins>${escapeHtml(formatOrganizationComparison(value))}</ins></dd>
+                        </div>
+                    `).join('')}
+                    <div><dt>原因</dt><dd>${escapeHtml(pending.payload.reason)}</dd></div>
+                    <div><dt>并发版本</dt><dd>v${formatNumber(pending.payload.expected_version)}</dd></div>
+                </dl>
+                <p>再次点击同一操作按钮才会发送一次 PATCH；输入变化会立即废弃本次确认。</p>
+            </section>
+        `;
+    }
+
+    function renderOrganizationWriteLock(lock) {
+        const requestId = String(lock.requestId || '').trim();
+        return `
+            <section class="admin-organization-write-lock" data-admin-organization-lock tabindex="-1" role="alert">
+                <h3><i data-lucide="lock-keyhole"></i>${lock.reconciled ? '结果已回读，等待人工确认' : '治理写入已锁定'}</h3>
+                <p>${escapeHtml(lock.message || '系统不会自动重复发送写入；请先精确读取权威资源并核对审计。')}</p>
+                ${requestId ? `<code>Request ID: ${escapeHtml(requestId)}</code>` : ''}
+                <div>
+                    <button type="button" class="admin-icon-button" data-admin-organization-reconcile ${state.busy ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>重新权威对账</span></button>
+                    ${lock.reconciled ? `<button type="button" class="admin-icon-button admin-icon-button--confirming" data-admin-organization-unlock ${state.busy ? 'disabled' : ''}><i data-lucide="unlock-keyhole"></i><span>确认核对并解除锁定</span></button>` : ''}
+                </div>
+            </section>
+        `;
+    }
+
+    function organizationDraftFromResource(config, resource) {
+        const draft = { reason: '' };
+        config.fields.forEach((field) => {
+            draft[field.name] = resource[field.name] === null || resource[field.name] === undefined
+                ? ''
+                : String(resource[field.name]);
+        });
+        return draft;
+    }
+
+    function readOrganizationDraft(form, config) {
+        const draft = { reason: String(form.elements.reason?.value || '') };
+        config.fields.forEach((field) => {
+            draft[field.name] = String(form.elements[field.name]?.value || '');
+        });
+        return draft;
+    }
+
+    function normalizedOrganizationValue(field, value) {
+        const normalized = String(value === null || value === undefined ? '' : value).trim();
+        if (field.required) return normalized;
+        return normalized || null;
+    }
+
+    function prepareOrganizationUpdate(action) {
+        if (state.busy || !state.organizationEditor || !state.organizationEditor.resource) return;
+        const editor = state.organizationEditor;
+        const config = organizationConfig(editor.kind);
+        const dialog = state.root && state.root.querySelector('[data-admin-organization-dialog]');
+        const form = dialog && dialog.querySelector('[data-admin-organization-form]');
+        if (!config || !form) return;
+        if (!state.online) {
+            setOrganizationEditorMessage('warning', '当前离线，组织治理写入已停用。');
+            return;
+        }
+        if (state.writeLock) {
+            setOrganizationEditorMessage('warning', '已有治理写入等待权威对账，解除锁定前不能发送新写入。');
+            return;
+        }
+
+        const draft = readOrganizationDraft(form, config);
+        editor.draft = draft;
+        let payload;
+        try {
+            payload = buildOrganizationMutation(editor.kind, editor.resource, draft, action);
+        } catch (error) {
+            showOrganizationFormError(form, error.message, error.selector);
+            return;
+        }
+
+        const signature = organizationMutationSignature(editor.kind, editor.id, action, payload);
+        const pending = state.pendingOrganizationUpdate;
+        if (!pending || pending.signature !== signature) {
+            state.pendingOrganizationUpdate = {
+                signature,
+                kind: editor.kind,
+                id: editor.id,
+                action,
+                payload,
+                draft: { ...draft }
+            };
+            editor.message = '变更预览已生成，尚未发送；请核对后再次点击同一操作按钮。';
+            editor.messageType = 'warning';
+            renderOrganizationDialog(true, `[data-admin-organization-confirm="${action}"]`);
+            return;
+        }
+        commitOrganizationUpdate(pending);
+    }
+
+    function organizationMutationSignature(kind, id, action, payload) {
+        return JSON.stringify({ kind, id: Number(id), action, payload });
+    }
+
+    function buildOrganizationMutation(kind, resource, draft, action) {
+        const config = organizationConfig(kind);
+        if (!config || !resource || !draft) throw organizationValidationError('组织治理输入无效。');
+        const reason = String(draft.reason || '').trim();
+        if (!reason) throw organizationValidationError('治理原因不能为空。', '[data-admin-organization-reason]');
+        if (reason.length > 500) throw organizationValidationError('治理原因不能超过 500 个字符。', '[data-admin-organization-reason]');
+        const payload = {
+            expected_version: Number(resource.version),
+            reason
+        };
+        if (action === 'status') {
+            payload.status = resource.status === 'archived' ? 'active' : 'archived';
+            return payload;
+        }
+        if (action !== 'metadata') throw organizationValidationError('未知的组织治理动作。');
+        for (const field of config.fields) {
+            const nextValue = normalizedOrganizationValue(field, draft[field.name]);
+            if (field.required && !nextValue) {
+                throw organizationValidationError(`${field.label}不能为空。`, `[name="${field.name}"]`);
+            }
+            if (nextValue !== null && String(nextValue).length > field.maxLength) {
+                throw organizationValidationError(`${field.label}不能超过 ${field.maxLength} 个字符。`, `[name="${field.name}"]`);
+            }
+            const currentValue = normalizedOrganizationValue(field, resource[field.name]);
+            if (nextValue !== currentValue) payload[field.name] = nextValue;
+        }
+        if (Object.keys(payload).length === 2) {
+            throw organizationValidationError('资料字段没有变化，未发送写入。');
+        }
+        return payload;
+    }
+
+    function organizationValidationError(message, selector) {
+        const error = new Error(message);
+        error.selector = selector || '';
+        return error;
+    }
+
+    async function commitOrganizationUpdate(submission) {
+        if (state.busy || state.writeLock || !state.online) return;
+        const operationOwner = captureLifecycleOwner();
+        if (!operationOwner) return;
+        const config = organizationConfig(submission.kind);
+        if (!config) return;
+        state.pendingOrganizationUpdate = null;
+        setBusy(true);
+        setOrganizationEditorMessage('warning', '治理写入正在发送；刷新和其他写操作已锁定。', false);
+        renderOrganizationDialog(true, '[data-admin-organization-title]');
+        try {
+            await AstraApiClient.request(organizationEndpoint(submission.kind, submission.id), {
+                baseUrl: state.apiBase,
+                method: 'PATCH',
+                body: submission.payload,
+                signal: operationOwner.controller.signal
+            });
+            setWriteLock(organizationWriteLock(submission, {
+                outcome: 'confirmed',
+                message: '服务器已确认写入，正在执行精确资源、列表、统计和审计回读；生命周期切换时必须由新页面显式续接对账。'
+            }));
+            if (!isLifecycleOwner(operationOwner)) return;
+            const authority = await loadOrganizationAuthority(submission.kind, submission.id, submission.draft, operationOwner);
+            if (!isLifecycleOwner(operationOwner)) return;
+            if (!organizationMutationMatches(authority, submission.payload, submission.payload.expected_version)) {
+                setWriteLock(organizationWriteLock(submission, {
+                    outcome: 'confirmed-authority-mismatch',
+                    reconciled: true,
+                    authorityVersion: Number(authority.version),
+                    message: '服务器已返回成功，但精确权威资源不是预期的 version+1/目标字段；不得宣称成功或自动重发。'
+                }));
+                if (state.organizationEditor) {
+                    state.organizationEditor.draft = { ...submission.draft };
+                    state.organizationEditor.message = state.writeLock.message;
+                    state.organizationEditor.messageType = 'warning';
+                }
+                await refreshOrganizationEvidence(config.panelId);
+                if (!isLifecycleOwner(operationOwner)) return;
+                setNotice('warning', `${config.label} #${submission.id} 的成功响应与权威资源不一致，写锁保持并等待人工核对。`);
+                return;
+            }
+            const evidenceOk = await refreshOrganizationEvidence(config.panelId);
+            if (!isLifecycleOwner(operationOwner)) return;
+            if (evidenceOk) {
+                setWriteLock(null);
+                if (state.organizationEditor) {
+                    state.organizationEditor.draft = organizationDraftFromResource(config, authority);
+                    state.organizationEditor.message = `已写入并完成权威回读，当前版本为 v${authority.version}。`;
+                    state.organizationEditor.messageType = 'success';
+                }
+                setNotice('success', `${config.label} #${submission.id} 已更新，权威资源、统计和审计已同步。`);
+            } else {
+                setWriteLock(organizationWriteLock(submission, {
+                    outcome: 'confirmed-awaiting-evidence',
+                    message: '服务器已确认写入，但列表、统计或审计回读未完整完成。'
+                }));
+                setOrganizationEditorMessage('warning', '写入已确认，但完整对账尚未完成；系统不会重复发送，请重新权威对账。', false);
+            }
+        } catch (error) {
+            if (error && error.status === 409) {
+                if (isLifecycleOwner(operationOwner)) {
+                    await handleOrganizationConflict(submission, error, operationOwner);
+                }
+            } else if (error && (error.confirmed || AstraApiClient.isAmbiguousMutation(error))) {
+                setWriteLock(organizationWriteLock(submission, {
+                    outcome: error.confirmed ? 'confirmed-unknown-response' : 'unknown',
+                    requestId: String(error.requestId || ''),
+                    message: '写入响应无法确认，系统未自动重试；必须通过精确资源和审计回读判定结果。'
+                }));
+                if (isLifecycleOwner(operationOwner)) {
+                    await reconcileOrganizationWrite(false, operationOwner);
+                }
+            } else if (isLifecycleOwner(operationOwner) && !AstraApiClient.isCancelled(error)) {
+                setOrganizationEditorMessage('error', errorMessage(error), false);
+            }
+        } finally {
+            if (isLifecycleOwner(operationOwner)) {
+                setBusy(false);
+                if (state.organizationEditor) renderOrganizationDialog(true, organizationOutcomeFocusSelector());
+                applyAdminWriteAvailability();
+            }
+        }
+    }
+
+    function organizationWriteLock(submission, extra) {
+        return Object.assign({
+            action: 'organization-governance',
+            kind: submission.kind,
+            resourceId: submission.id,
+            payload: { ...submission.payload },
+            draft: { ...submission.draft },
+            expectedVersion: Number(submission.payload.expected_version),
+            reconciled: false,
+            requestId: ''
+        }, extra || {});
+    }
+
+    async function handleOrganizationConflict(submission, error, operationOwner) {
+        const config = organizationConfig(submission.kind);
+        try {
+            const authority = await loadOrganizationAuthority(submission.kind, submission.id, submission.draft, operationOwner);
+            if (!isLifecycleOwner(operationOwner)) return;
+            if (state.organizationEditor) {
+                state.organizationEditor.draft = { ...submission.draft };
+                state.organizationEditor.message = `检测到版本冲突：服务器当前为 v${authority.version}。旧确认已废弃，草稿已保留；请基于最新值重新预览。`;
+                state.organizationEditor.messageType = 'warning';
+            }
+            await Promise.all([refreshPanel(config.panelId), refreshPanel('audit-logs')]);
+            if (!isLifecycleOwner(operationOwner)) return;
+            setNotice('warning', `${config.label} #${submission.id} 发生并发冲突，已精确回读且未自动重发。`);
+        } catch (readError) {
+            if (!isLifecycleOwner(operationOwner) || AstraApiClient.isCancelled(readError)) return;
+            setWriteLock(organizationWriteLock(submission, {
+                outcome: 'conflict-unreconciled',
+                requestId: String(error.requestId || ''),
+                message: '服务器拒绝了陈旧版本，但最新资源读取失败；写入保持锁定。'
+            }));
+            setOrganizationEditorMessage('warning', '版本冲突后的权威读取失败；请重新对账，系统不会自动重发。', false);
+        }
+    }
+
+    async function reconcileOrganizationWrite(manual, existingOwner) {
+        const lock = state.writeLock;
+        if (!lock || lock.action !== 'organization-governance') return false;
+        if (manual && state.busy) return false;
+        const operationOwner = existingOwner || captureLifecycleOwner();
+        if (!operationOwner || !isLifecycleOwner(operationOwner)) return false;
+        const wasBusy = state.busy;
+        if (!wasBusy) {
+            setBusy(true);
+            if (state.organizationEditor) renderOrganizationDialog(true, '[data-admin-organization-title]');
+        }
+        try {
+            const config = organizationConfig(lock.kind);
+            const authority = await loadOrganizationAuthority(lock.kind, lock.resourceId, lock.draft, operationOwner);
+            if (!isLifecycleOwner(operationOwner)) return false;
+            if (organizationMutationMatches(authority, lock.payload, lock.expectedVersion)) {
+                const evidenceOk = await refreshOrganizationEvidence(config.panelId);
+                if (!isLifecycleOwner(operationOwner)) return false;
+                if (evidenceOk) {
+                    setWriteLock(null);
+                    state.pendingOrganizationUpdate = null;
+                    if (state.organizationEditor) {
+                        state.organizationEditor.draft = organizationDraftFromResource(config, authority);
+                        state.organizationEditor.message = `未知响应已由权威回读确认生效，当前版本为 v${authority.version}；未发生重复写入。`;
+                        state.organizationEditor.messageType = 'success';
+                    }
+                    setNotice('success', `${config.label} #${lock.resourceId} 已由权威回读确认生效，治理写锁已解除。`);
+                    return true;
+                }
+                setWriteLock(Object.assign({}, lock, {
+                    outcome: 'applied-awaiting-evidence',
+                    message: '精确资源已证明变更生效，但列表、统计或审计仍未完整回读。'
+                }));
+                return false;
+            }
+
+            const unchangedVersion = Number(authority.version) === Number(lock.expectedVersion);
+            setWriteLock(Object.assign({}, lock, {
+                reconciled: true,
+                authorityVersion: Number(authority.version),
+                outcome: unchangedVersion ? 'not-observed' : 'conflict-observed',
+                message: unchangedVersion
+                    ? '精确回读尚未观察到目标变更；请核对后人工解除锁定，任何重试都必须重新双确认。'
+                    : '权威版本已变化且内容与目标不一致；请核对冲突后人工解除锁定。'
+            }));
+            if (state.organizationEditor) {
+                state.organizationEditor.draft = { ...(lock.draft || {}) };
+                state.organizationEditor.message = state.writeLock.message;
+                state.organizationEditor.messageType = 'warning';
+            }
+            setNotice('warning', `${config.label} #${lock.resourceId} 的写入结果未获证明，系统未自动重试。`);
+            return false;
+        } catch (error) {
+            if (!isLifecycleOwner(operationOwner) || AstraApiClient.isCancelled(error)) return false;
+            setWriteLock(Object.assign({}, lock, {
+                reconciled: false,
+                message: '权威资源读取失败，治理写锁保持；系统不会自动重试。'
+            }));
+            setOrganizationEditorMessage('warning', `${state.writeLock.message}${state.writeLock.requestId ? ` Request ID: ${state.writeLock.requestId}` : ''}`, false);
+            return false;
+        } finally {
+            if (isLifecycleOwner(operationOwner)) {
+                if (!wasBusy) setBusy(false);
+                if (state.organizationEditor) renderOrganizationDialog(true, organizationOutcomeFocusSelector());
+            }
+        }
+    }
+
+    function unlockOrganizationWrite() {
+        const lock = state.writeLock;
+        if (state.busy || !lock || lock.action !== 'organization-governance' || !lock.reconciled) return;
+        const config = organizationConfig(lock.kind);
+        setWriteLock(null);
+        state.pendingOrganizationUpdate = null;
+        if (state.organizationEditor) {
+            state.organizationEditor.message = '已依据权威回读人工解除锁定。草稿仍保留，任何新写入都必须重新预览并再次确认。';
+            state.organizationEditor.messageType = 'warning';
+        }
+        setNotice('warning', `${config.label} #${lock.resourceId} 的写锁已人工解除；系统没有自动重发。`);
+        renderOrganizationDialog(true, '[data-admin-organization-status]');
+    }
+
+    async function loadOrganizationAuthority(kind, id, preservedDraft, operationOwner) {
+        const config = organizationConfig(kind);
+        if (operationOwner && !isLifecycleOwner(operationOwner)) {
+            throw Object.assign(new Error('组织治理生命周期已切换。'), {
+                code: 'cancelled',
+                cancelled: true,
+                ambiguous: false
+            });
+        }
+        const resource = await fetchJson(
+            organizationEndpoint(kind, id),
+            undefined,
+            operationOwner && operationOwner.controller.signal
+        );
+        if (operationOwner && !isLifecycleOwner(operationOwner)) {
+            throw Object.assign(new Error('组织治理生命周期已切换。'), {
+                code: 'cancelled',
+                cancelled: true,
+                ambiguous: false
+            });
+        }
+        replacePanelResource(config.panelId, resource);
+        if (state.organizationEditor
+            && state.organizationEditor.kind === kind
+            && state.organizationEditor.id === Number(id)) {
+            state.organizationEditor.resource = resource;
+            state.organizationEditor.loading = false;
+            state.organizationEditor.error = '';
+            state.organizationEditor.draft = preservedDraft
+                ? { ...preservedDraft }
+                : organizationDraftFromResource(config, resource);
+        }
+        return resource;
+    }
+
+    async function refreshOrganizationEvidence(panelId) {
+        const results = await Promise.all([
+            refreshPanel(panelId),
+            refreshPanel('audit-logs'),
+            refreshStats()
+        ]);
+        return results.every((result) => result === true);
+    }
+
+    function replacePanelResource(panelId, resource) {
+        const page = state.panelData[panelId];
+        if (!page || !Array.isArray(page.items)) return;
+        const index = page.items.findIndex((item) => Number(item.id) === Number(resource.id));
+        if (index >= 0) page.items[index] = resource;
+        rerenderPanel(panelId);
+    }
+
+    function organizationMutationMatches(resource, payload, expectedVersion) {
+        if (!resource || Number(resource.version) !== Number(expectedVersion) + 1) return false;
+        return Object.entries(payload || {})
+            .filter(([key]) => !['expected_version', 'reason'].includes(key))
+            .every(([key, value]) => normalizedComparable(resource[key]) === normalizedComparable(value));
+    }
+
+    function normalizedComparable(value) {
+        if (value === null || value === undefined || String(value).trim() === '') return null;
+        return String(value).trim();
+    }
+
+    function formatOrganizationComparison(value) {
+        const normalized = normalizedComparable(value);
+        return normalized === null ? '（空）' : normalized;
+    }
+
+    function showOrganizationFormError(form, message, selector) {
+        const notice = form.querySelector('[data-admin-organization-form-notice]');
+        if (notice) {
+            notice.hidden = false;
+            notice.className = 'admin-organization-form__notice admin-organization-form__notice--error';
+            notice.textContent = message;
+        }
+        if (selector) {
+            const target = form.querySelector(selector);
+            if (target) target.focus();
+        }
+    }
+
+    function setOrganizationEditorMessage(type, message, rerender) {
+        if (!state.organizationEditor) return;
+        state.organizationEditor.messageType = type;
+        state.organizationEditor.message = String(message || '');
+        if (rerender !== false) renderOrganizationDialog(true, '[data-admin-organization-status]');
     }
 
     function renderPager(panelId, data) {
@@ -1130,16 +2031,16 @@
                 refreshPanel('users'), refreshPanel('audit-logs'), refreshStats()
             ]);
             if (results.some((result) => !result)) {
-                state.writeLock = { action: 'user-governance', resourceId: userId };
+                setWriteLock({ action: 'user-governance', resourceId: userId });
                 setNotice('warning', '用户变更已由服务端确认，但列表核对未完整完成；写入已锁定，请刷新后核对。');
             } else {
                 setNotice('success', `用户 #${userId} 已更新为 ${role} / ${status}，审计日志和统计已同步。`);
             }
         } catch (error) {
             if (error && (error.confirmed || AstraApiClient.isAmbiguousMutation(error))) {
-                state.writeLock = {
+                setWriteLock({
                     action: 'user-governance', resourceId: userId, requestId: String(error.requestId || '')
-                };
+                });
                 await Promise.all([refreshPanel('users'), refreshPanel('audit-logs'), refreshStats()]);
                 setNotice('warning', '用户变更结果尚未确认，系统未自动重试；写入已锁定，请刷新并依据审计日志核对。');
             } else {
@@ -1184,18 +2085,18 @@
                 refreshStats()
             ]);
             if (!panelReconciled || !statsReconciled) {
-                state.writeLock = { action: 'join-request-review', resourceId: joinRequestId };
+                setWriteLock({ action: 'join-request-review', resourceId: joinRequestId });
                 setNotice('warning', '审批已由服务器确认，但列表或统计刷新失败；系统不会重复发送，请点击顶部刷新完成核对');
             } else {
                 setNotice('success', nextStatus === 'approved' ? '加入请求已批准并完成权威列表核对' : '加入请求已拒绝并完成权威列表核对');
             }
         } catch (error) {
             if (error && (error.confirmed || AstraApiClient.isAmbiguousMutation(error))) {
-                state.writeLock = {
+                setWriteLock({
                     action: 'join-request-review',
                     resourceId: joinRequestId,
                     requestId: String(error.requestId || '')
-                };
+                });
                 await Promise.all([refreshPanel('join-requests'), refreshStats()]);
                 setNotice('warning', '审批结果尚未确认，系统未自动重试；写入已锁定，请点击顶部刷新并核对请求状态');
             } else {
@@ -1231,12 +2132,30 @@
         notice.textContent = text;
     }
 
-    async function fetchJson(path, params) {
+    async function fetchJson(path, params, signal) {
         return AstraApiClient.request(path, {
             baseUrl: state.apiBase,
             params,
-            signal: state.lifecycleController && state.lifecycleController.signal
+            signal: signal || (state.lifecycleController && state.lifecycleController.signal)
         });
+    }
+
+    function captureLifecycleOwner() {
+        if (!state.active || !state.lifecycleController || state.lifecycleController.signal.aborted) return null;
+        return {
+            generation: state.requestGeneration,
+            controller: state.lifecycleController
+        };
+    }
+
+    function isLifecycleOwner(owner) {
+        return Boolean(
+            owner
+            && state.active
+            && owner.generation === state.requestGeneration
+            && owner.controller === state.lifecycleController
+            && !owner.controller.signal.aborted
+        );
     }
 
     function beginRequestGeneration() {
@@ -1362,7 +2281,7 @@
         if (['success', 'approved', 'active', 'trusted', 'ok', 'yes', 'true', 'queued'].includes(normalized)) return 'good';
         if (['pending', 'pending-review', 'watch', 'warning', 'triaged', 'in-progress', 'planned'].includes(normalized)) return 'warn';
         if (['failed', 'rejected', 'blocked', 'critical', 'cancelled', 'closed', 'no', 'false'].includes(normalized)) return 'bad';
-        if (normalized === 'readonly') return 'readonly';
+        if (['readonly', 'archived'].includes(normalized)) return 'readonly';
         return 'neutral';
     }
 
@@ -1389,6 +2308,35 @@
     function setBusy(value) {
         state.busy = value;
         if (state.root) state.root.classList.toggle('is-busy', value);
+        applyAdminWriteAvailability();
+    }
+
+    function setWriteLock(value) {
+        state.writeLock = value || null;
+        applyAdminWriteAvailability();
+    }
+
+    function applyAdminWriteAvailability() {
+        if (!state.root) return;
+        const writeDisabled = state.busy || Boolean(state.writeLock) || !state.online;
+        state.root.querySelectorAll('[data-admin-write], [data-admin-user-update], [data-admin-join-review]').forEach((control) => {
+            control.disabled = writeDisabled;
+        });
+        state.root.querySelectorAll('[data-admin-refresh-control]').forEach((control) => {
+            control.disabled = state.busy;
+        });
+        state.root.querySelectorAll('[data-admin-api-base]').forEach((control) => {
+            control.disabled = state.busy || Boolean(state.writeLock);
+        });
+        state.root.querySelectorAll('[data-admin-organization-edit]').forEach((control) => {
+            const lockTargetsControl = state.writeLock
+                && state.writeLock.action === 'organization-governance'
+                && state.writeLock.kind === control.dataset.organizationKind
+                && Number(state.writeLock.resourceId) === Number(control.dataset.organizationId);
+            control.disabled = state.busy || !state.online || (Boolean(state.writeLock) && !lockTargetsControl);
+        });
+        const form = state.root.querySelector('[data-admin-organization-form]');
+        if (form) form.setAttribute('aria-busy', state.busy ? 'true' : 'false');
     }
 
     function refreshIcons() {
@@ -1417,6 +2365,15 @@
     window.initAdminGovernance = initAdmin;
     window.AdminGovernance = {
         version: ADMIN_ASSET_VERSION,
-        refresh: refreshAll
+        refresh: refreshAll,
+        contract: Object.freeze({
+            buildOrganizationMutation,
+            organizationMutationSignature,
+            organizationMutationMatches,
+            organizationFields: (kind) => {
+                const config = organizationConfig(kind);
+                return config ? config.fields.map((field) => field.name) : [];
+            }
+        })
     };
 })();

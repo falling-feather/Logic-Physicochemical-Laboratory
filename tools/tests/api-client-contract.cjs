@@ -104,6 +104,34 @@ async function main() {
     );
     assert.equal(localFailureFetches, 0, 'local failures and pre-abort must not call fetch');
 
+    let postSendAbortCalls = 0;
+    let markPostSendStarted;
+    const postSendStarted = new Promise((resolve) => { markPostSendStarted = resolve; });
+    global.fetch = async (url, options) => {
+        postSendAbortCalls += 1;
+        markPostSendStarted();
+        return new Promise((resolve, reject) => {
+            options.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
+        });
+    };
+    const postSendController = new AbortController();
+    const postSendRequest = client.request('/api/demo', {
+        method: 'PATCH',
+        body: { value: 'lifecycle-switch' },
+        signal: postSendController.signal
+    });
+    await postSendStarted;
+    postSendController.abort();
+    await assert.rejects(
+        () => postSendRequest,
+        (error) => error.code === 'cancelled'
+            && error.cancelled === true
+            && error.ambiguous === true
+            && error.mutation === true
+            && Boolean(error.requestId)
+    );
+    assert.equal(postSendAbortCalls, 1, 'externally aborted in-flight mutations must not be replayed');
+
     let mutationCalls = 0;
     global.fetch = async () => {
         mutationCalls += 1;

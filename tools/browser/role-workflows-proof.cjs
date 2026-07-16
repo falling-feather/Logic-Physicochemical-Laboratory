@@ -111,6 +111,9 @@ function attachDiagnostics(page, bucket, label) {
   });
   page.on('requestfailed', (request) => {
     if (/\/favicon\.ico(?:$|\?)/.test(request.url())) return;
+    if ((page.__astraExpectedRequestFailurePaths || []).some((item) => (
+      request.method() === item.method && new URL(request.url()).pathname === item.path
+    ))) return;
     bucket.push({
       kind: 'requestfailed',
       label,
@@ -121,6 +124,11 @@ function attachDiagnostics(page, bucket, label) {
   page.on('response', (response) => {
     if (response.status() < 400) return;
     const resource = new URL(response.url());
+    if ((page.__astraExpectedHttpResponses || []).some((item) => (
+      response.request().method() === item.method
+      && response.status() === item.status
+      && resource.pathname === item.path
+    ))) return;
     const expectedAuthChallenge = response.status() === 401 && resource.pathname === '/api/users/me';
     const expectedPermissionDenial = response.status() === 403 && (
       resource.pathname === '/api/admin/stats'
@@ -226,6 +234,98 @@ async function responsiveEvidence(page, role, outDir) {
   return { ...layout, screenshot };
 }
 
+async function adminOrganizationResponsiveEvidence(page, outDir) {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const dialog = page.locator('[data-admin-organization-dialog]');
+  await dialog.waitFor({ state: 'visible' });
+  const layout = await page.evaluate(() => {
+    const activeDialog = document.querySelector('[data-admin-organization-dialog][open]');
+    const rect = activeDialog && activeDialog.getBoundingClientRect();
+    const form = activeDialog && activeDialog.querySelector('[data-admin-organization-form]');
+    const actionBoxes = Array.from(activeDialog.querySelectorAll([
+      '[data-admin-organization-close]',
+      '[data-admin-organization-confirm]',
+      '[data-admin-organization-reconcile]',
+      '[data-admin-organization-unlock]'
+    ].join(','))).filter((element) => {
+      const style = getComputedStyle(element);
+      const box = element.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && box.width > 0 && box.height > 0;
+    }).map((element) => {
+      const box = element.getBoundingClientRect();
+      return {
+        action: element.getAttribute('data-admin-organization-confirm')
+          || Array.from(element.attributes).find((attribute) => attribute.name.startsWith('data-admin-organization-'))?.name
+          || element.tagName,
+        width: box.width,
+        height: box.height,
+      };
+    });
+    return {
+      innerWidth: window.innerWidth,
+      bodyScrollWidth: document.body.scrollWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      dialogLeft: rect && rect.left,
+      dialogRight: rect && rect.right,
+      dialogScrollWidth: activeDialog && activeDialog.scrollWidth,
+      dialogClientWidth: activeDialog && activeDialog.clientWidth,
+      formScrollWidth: form && form.scrollWidth,
+      formClientWidth: form && form.clientWidth,
+      actionBoxes,
+    };
+  });
+  const screenshot = path.join(outDir, 'admin-organization-390x844.png');
+  await page.screenshot({ path: screenshot, fullPage: true });
+  assert(layout.bodyScrollWidth <= layout.innerWidth, 'admin organization body overflows 390px viewport');
+  assert(layout.documentScrollWidth <= layout.innerWidth, 'admin organization document overflows 390px viewport');
+  assert(layout.dialogLeft >= 0 && layout.dialogRight <= layout.innerWidth, 'admin organization dialog is outside viewport');
+  assert(layout.dialogScrollWidth <= layout.dialogClientWidth + 1, 'admin organization dialog has horizontal overflow');
+  assert(layout.formScrollWidth <= layout.formClientWidth + 1, 'admin organization form has horizontal overflow');
+  assert(layout.actionBoxes.length >= 3, 'admin organization dialog must expose visible governance actions');
+  assert(layout.actionBoxes.every((box) => box.width >= 44 && box.height >= 44), `admin organization touch targets are smaller than 44px: ${JSON.stringify(layout.actionBoxes)}`);
+  return { ...layout, screenshot };
+}
+
+async function organizationFocusEvidence(page, label, expectedSelector = '') {
+  await page.waitForFunction(({ selector }) => {
+    const dialog = document.querySelector('[data-admin-organization-dialog][open]');
+    const active = document.activeElement;
+    return Boolean(dialog && active && dialog.contains(active) && (!selector || active.matches(selector)));
+  }, { selector: expectedSelector });
+  const evidence = await page.evaluate(() => {
+    const dialog = document.querySelector('[data-admin-organization-dialog][open]');
+    const active = document.activeElement;
+    return {
+      insideDialog: Boolean(dialog && active && dialog.contains(active)),
+      tag: active && active.tagName,
+      name: active && active.getAttribute('name'),
+      action: active && (
+        active.getAttribute('data-admin-organization-confirm')
+        || Array.from(active.attributes).find((attribute) => attribute.name.startsWith('data-admin-organization-'))?.name
+      ),
+      text: String(active && active.textContent || '').trim().slice(0, 120),
+    };
+  });
+  assert(evidence.insideDialog, `${label}: focus escaped the open organization dialog`);
+  return evidence;
+}
+
+async function openOrganizationEditor(page, panelId, entityName) {
+  const row = page.locator(`[data-admin-panel="${panelId}"] tbody tr`).filter({ hasText: entityName }).first();
+  await row.waitFor({ state: 'visible' });
+  await row.locator('[data-admin-organization-edit]').click();
+  const dialog = page.locator('[data-admin-organization-dialog]');
+  await dialog.waitFor({ state: 'visible' });
+  await dialog.locator('[data-admin-organization-form]').waitFor({ state: 'visible' });
+  await organizationFocusEvidence(page, `open ${panelId} organization editor`);
+  return dialog;
+}
+
+async function closeOrganizationEditor(dialog) {
+  await dialog.locator('[data-admin-organization-close]').click();
+  await dialog.waitFor({ state: 'hidden' });
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const apiBase = stripTrailingSlash(args.api || '');
@@ -291,14 +391,16 @@ async function main() {
     await teacherRuntime.page.locator('[data-teacher-dashboard]:not([hidden])').waitFor({ state: 'visible' });
     record('teacher first-party registration and dashboard');
 
+    const schoolName = `E2E School ${runId}`;
+    const className = `E2E Class ${runId}`;
     await teacherForm(teacherRuntime.page, 'school', {
-      name: `E2E School ${runId}`,
+      name: schoolName,
       region: 'Shanghai',
     }, '学校已创建');
     const schoolId = await selectedValue(teacherRuntime.page, '[data-teacher-scope="schoolId"]');
 
     await teacherForm(teacherRuntime.page, 'class', {
-      name: `E2E Class ${runId}`,
+      name: className,
       grade: '10',
       term: '2026A',
     }, '班级已创建');
@@ -329,8 +431,12 @@ async function main() {
       description: '提交能量守恒推导过程。',
     }, '作业已创建');
     const assignmentId = await selectedValue(teacherRuntime.page, '[data-teacher-scope="assignmentId"]');
+    const initialPolicyForm = teacherRuntime.page.locator('[data-teacher-form="assignment-class-policy"]');
+    await initialPolicyForm.locator('button[type="submit"]').click();
+    await teacherRuntime.page.locator('[data-teacher-flash]').filter({ hasText: '当前班级作业与积分覆盖策略已保存' }).waitFor({ state: 'visible' });
+    await teacherRuntime.page.locator('[data-teacher-class-policy-reset]:not([disabled])').waitFor({ state: 'visible' });
     report.entities = { schoolId, classId, courseId, unitId, assignmentId };
-    record('teacher creates published course workflow', report.entities);
+    record('teacher creates published course workflow and persisted class policy', report.entities);
 
     const studentRuntime = await createRolePage(browser, report, webBase, apiBase, 'student');
     contexts.push(studentRuntime.context);
@@ -372,7 +478,34 @@ async function main() {
     assert(studentAdminDenied.status === 403, `Student admin access expected 403, got ${studentAdminDenied.status}`);
     const teacherAdminDenied = await pageApi(teacherRuntime.page, apiBase, '/api/admin/class-join-requests');
     assert(teacherAdminDenied.status === 403, `Teacher admin queue expected 403, got ${teacherAdminDenied.status}`);
-    record('role permission denials', { studentAdmin: 403, teacherAdminQueue: 403 });
+    studentRuntime.page.__astraExpectedHttpResponses = [
+      { method: 'GET', status: 403, path: `/api/admin/schools/${schoolId}` },
+      { method: 'PATCH', status: 403, path: `/api/admin/schools/${schoolId}` },
+    ];
+    teacherRuntime.page.__astraExpectedHttpResponses = [
+      { method: 'GET', status: 403, path: `/api/admin/classes/${classId}` },
+      { method: 'PATCH', status: 403, path: `/api/admin/classes/${classId}` },
+    ];
+    const studentSchoolReadDenied = await pageApi(studentRuntime.page, apiBase, `/api/admin/schools/${schoolId}`);
+    const studentSchoolPatchDenied = await pageApi(studentRuntime.page, apiBase, `/api/admin/schools/${schoolId}`, {
+      method: 'PATCH',
+      body: { expected_version: 1, reason: 'student denial proof', name: 'denied' },
+    });
+    const teacherClassReadDenied = await pageApi(teacherRuntime.page, apiBase, `/api/admin/classes/${classId}`);
+    const teacherClassPatchDenied = await pageApi(teacherRuntime.page, apiBase, `/api/admin/classes/${classId}`, {
+      method: 'PATCH',
+      body: { expected_version: 1, reason: 'teacher denial proof', name: 'denied' },
+    });
+    assert(studentSchoolReadDenied.status === 403 && studentSchoolPatchDenied.status === 403, 'student organization governance must be denied');
+    assert(teacherClassReadDenied.status === 403 && teacherClassPatchDenied.status === 403, 'teacher organization governance must be denied');
+    studentRuntime.page.__astraExpectedHttpResponses = [];
+    teacherRuntime.page.__astraExpectedHttpResponses = [];
+    record('role permission denials', {
+      studentAdmin: 403,
+      teacherAdminQueue: 403,
+      studentOrganization: [403, 403],
+      teacherOrganization: [403, 403],
+    });
 
     const applicantRuntime = await createRolePage(browser, report, webBase, apiBase, 'student');
     contexts.push(applicantRuntime.context);
@@ -399,6 +532,440 @@ async function main() {
     const audit = await pageApi(adminRuntime.page, apiBase, `/api/admin/audit-logs?action=class.join.request.approve&resource_id=${joinRequestId}`);
     assert(audit.status === 200 && audit.body && audit.body.total === 1, 'Admin approval audit reconciliation failed');
     record('admin approves join request and reconciles audit', { joinRequestId, auditTotal: audit.body.total });
+
+    const organizationPatches = [];
+    adminRuntime.page.on('request', (request) => {
+      const resource = new URL(request.url());
+      if (request.method() !== 'PATCH' || !/^\/api\/admin\/(schools|classes)\/\d+$/.test(resource.pathname)) return;
+      let body = null;
+      try { body = request.postDataJSON(); } catch {}
+      organizationPatches.push({ path: resource.pathname, body });
+    });
+    const schoolPath = `/api/admin/schools/${schoolId}`;
+    const classPath = `/api/admin/classes/${classId}`;
+
+    const activeSchoolPage = await pageApi(adminRuntime.page, apiBase, '/api/admin/schools?status=active&limit=1&offset=0');
+    const archivedSchoolPage = await pageApi(adminRuntime.page, apiBase, '/api/admin/schools?status=archived&limit=1&offset=0');
+    const activeClassPage = await pageApi(adminRuntime.page, apiBase, '/api/admin/classes?status=active&limit=1&offset=0');
+    const archivedClassPage = await pageApi(adminRuntime.page, apiBase, '/api/admin/classes?status=archived&limit=1&offset=0');
+    const visualCounts = await adminRuntime.page.evaluate(() => {
+      const read = (kind) => Array.from(document.querySelectorAll(`[data-admin-organization-summary-kind="${kind}"] dd`))
+        .map((item) => Number(String(item.textContent || '').replace(/[^0-9]/g, '')) || 0);
+      return { schools: read('schools'), classes: read('classes') };
+    });
+    assert(visualCounts.schools[0] === activeSchoolPage.body.total, 'active school visual total must match API');
+    assert(visualCounts.schools[1] === archivedSchoolPage.body.total, 'archived school visual total must match API');
+    assert(visualCounts.classes[0] === activeClassPage.body.total, 'active class visual total must match API');
+    assert(visualCounts.classes[1] === archivedClassPage.body.total, 'archived class visual total must match API');
+    record('admin organization status visualization matches authoritative totals', visualCounts);
+
+    const schoolRow = adminRuntime.page.locator('[data-admin-panel="schools"] tbody tr').filter({ hasText: schoolName }).first();
+    const schoolEditorTrigger = schoolRow.locator('[data-admin-organization-edit]');
+    let releaseSchoolRead;
+    const schoolReadGate = new Promise((resolve) => { releaseSchoolRead = resolve; });
+    await adminRuntime.page.route(`**${schoolPath}`, async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+      await schoolReadGate;
+      await route.continue();
+    });
+    await schoolEditorTrigger.click();
+    let organizationDialog = adminRuntime.page.locator('[data-admin-organization-dialog]');
+    await organizationDialog.waitFor({ state: 'visible' });
+    const loadingFocus = await organizationFocusEvidence(adminRuntime.page, 'busy exact GET', '[data-admin-organization-title]');
+    await adminRuntime.page.keyboard.press('Escape');
+    assert(await organizationDialog.isVisible(), 'Escape must not close organization dialog during exact GET');
+    releaseSchoolRead();
+    await organizationDialog.locator('[data-admin-organization-form]').waitFor({ state: 'visible' });
+    await adminRuntime.page.unroute(`**${schoolPath}`);
+    const loadedFocus = await organizationFocusEvidence(adminRuntime.page, 'completed exact GET', '[data-admin-organization-title]');
+    await adminRuntime.page.keyboard.press('Escape');
+    await organizationDialog.waitFor({ state: 'hidden' });
+    await adminRuntime.page.waitForFunction(() => document.activeElement?.hasAttribute('data-admin-organization-edit'));
+    assert(await schoolEditorTrigger.evaluate((element) => document.activeElement === element), 'idle Escape must restore focus to the organization editor trigger');
+    record('organization dialog Escape and focus lifecycle', { loadingFocus, loadedFocus, triggerRestored: true });
+
+    organizationDialog = await openOrganizationEditor(adminRuntime.page, 'schools', schoolName);
+    const initialSchoolVersion = Number(await organizationDialog.locator('[data-admin-organization-version]').getAttribute('data-admin-organization-version'));
+    const schoolForm = organizationDialog.locator('[data-admin-organization-form]');
+    const schoolPatchStart = organizationPatches.filter((item) => item.path === schoolPath).length;
+    await schoolForm.locator('[name="description"]').fill(`治理说明 ${runId}`);
+    await schoolForm.locator('[data-admin-organization-reason]').fill(`E2E 学校治理 ${runId}`);
+    await schoolForm.locator('[data-admin-organization-confirm="metadata"]').click();
+    await schoolForm.locator('[data-admin-organization-preview]').waitFor({ state: 'visible' });
+    assert(organizationPatches.filter((item) => item.path === schoolPath).length === schoolPatchStart, 'first organization confirmation must send zero PATCH requests');
+    await schoolForm.locator('[name="region"]').fill('Shanghai Governance');
+    await schoolForm.locator('[data-admin-organization-preview]').waitFor({ state: 'detached' });
+    await schoolForm.locator('[data-admin-organization-confirm="metadata"]').click();
+    await schoolForm.locator('[data-admin-organization-preview]').waitFor({ state: 'visible' });
+    assert(organizationPatches.filter((item) => item.path === schoolPath).length === schoolPatchStart, 'changed input must require a fresh zero-write preview');
+    const previewFocus = await organizationFocusEvidence(adminRuntime.page, 'school metadata preview', '[data-admin-organization-confirm="metadata"]');
+    let releaseSchoolPatch;
+    const schoolPatchGate = new Promise((resolve) => { releaseSchoolPatch = resolve; });
+    await adminRuntime.page.route(`**${schoolPath}`, async (route) => {
+      if (route.request().method() !== 'PATCH') {
+        await route.continue();
+        return;
+      }
+      await schoolPatchGate;
+      await route.continue();
+    });
+    await schoolForm.locator('[data-admin-organization-confirm="metadata"]').click();
+    await schoolForm.waitFor({ state: 'visible' });
+    await adminRuntime.page.waitForFunction(() => document.querySelector('[data-admin-organization-form]')?.getAttribute('aria-busy') === 'true');
+    const busyPatchFocus = await organizationFocusEvidence(adminRuntime.page, 'busy school PATCH', '[data-admin-organization-title]');
+    await adminRuntime.page.keyboard.press('Escape');
+    assert(await organizationDialog.isVisible(), 'Escape must not close organization dialog during PATCH reconciliation');
+    assert(organizationPatches.filter((item) => item.path === schoolPath).length === schoolPatchStart + 1, 'busy PATCH Escape path must still send exactly one request');
+    releaseSchoolPatch();
+    await adminRuntime.page.locator('[data-admin-notice]').filter({ hasText: `学校 #${schoolId} 已更新` }).waitFor({ state: 'visible' });
+    await adminRuntime.page.unroute(`**${schoolPath}`);
+    await organizationDialog.locator(`[data-admin-organization-version="${initialSchoolVersion + 1}"]`).waitFor({ state: 'visible' });
+    const successFocus = await organizationFocusEvidence(adminRuntime.page, 'school metadata success', '[data-admin-organization-status]');
+    const schoolUiPatches = organizationPatches.filter((item) => item.path === schoolPath).slice(schoolPatchStart);
+    assert(schoolUiPatches.length === 1, `school metadata expected exactly one PATCH, got ${schoolUiPatches.length}`);
+    assert(
+      JSON.stringify(Object.keys(schoolUiPatches[0].body).sort()) === JSON.stringify(['description', 'expected_version', 'reason', 'region']),
+      `school PATCH contains unexpected fields: ${JSON.stringify(schoolUiPatches[0].body)}`
+    );
+    assert(schoolUiPatches[0].body.expected_version === initialSchoolVersion, 'school PATCH must use exact GET version');
+    const schoolAudit = await pageApi(adminRuntime.page, apiBase, `/api/admin/audit-logs?action=admin.school.update&resource_id=${schoolId}`);
+    assert(schoolAudit.status === 200 && schoolAudit.body.total >= 1, 'school governance audit reconciliation failed');
+    record('admin school metadata double-confirm and authoritative reread', {
+      versionBefore: initialSchoolVersion,
+      versionAfter: initialSchoolVersion + 1,
+      patchCount: schoolUiPatches.length,
+      auditTotal: schoolAudit.body.total,
+      focus: { previewFocus, busyPatchFocus, successFocus },
+    });
+
+    const lifecycleVersion = initialSchoolVersion + 1;
+    const lifecycleForm = organizationDialog.locator('[data-admin-organization-form]');
+    await lifecycleForm.locator('[name="description"]').fill(`生命周期切换不落库 ${runId}`);
+    await lifecycleForm.locator('[data-admin-organization-reason]').fill(`E2E 路由生命周期竞态 ${runId}`);
+    await lifecycleForm.locator('[data-admin-organization-confirm="metadata"]').click();
+    await lifecycleForm.locator('[data-admin-organization-preview]').waitFor({ state: 'visible' });
+    const lifecyclePatchStart = organizationPatches.filter((item) => item.path === schoolPath).length;
+    let releaseLifecyclePatch;
+    let lifecycleRouteOutcome = 'pending';
+    const lifecyclePatchGate = new Promise((resolve) => { releaseLifecyclePatch = resolve; });
+    adminRuntime.page.__astraExpectedRequestFailurePaths = [{ method: 'PATCH', path: schoolPath }];
+    const lifecyclePatchFailure = adminRuntime.page.waitForEvent('requestfailed', {
+      predicate: (request) => request.method() === 'PATCH' && new URL(request.url()).pathname === schoolPath,
+      timeout: 10000,
+    });
+    await adminRuntime.page.route(`**${schoolPath}`, async (route) => {
+      if (route.request().method() !== 'PATCH') {
+        await route.continue();
+        return;
+      }
+      await lifecyclePatchGate;
+      try {
+        await route.abort('connectionreset');
+        lifecycleRouteOutcome = 'aborted';
+      } catch {
+        lifecycleRouteOutcome = 'already-cancelled';
+      }
+    });
+    await lifecycleForm.locator('[data-admin-organization-confirm="metadata"]').click();
+    await adminRuntime.page.waitForFunction(() => document.querySelector('[data-admin-organization-form]')?.getAttribute('aria-busy') === 'true');
+    assert(
+      organizationPatches.filter((item) => item.path === schoolPath).length === lifecyclePatchStart + 1,
+      'lifecycle race must send exactly one PATCH before route destroy'
+    );
+
+    await adminRuntime.page.evaluate(() => { window.location.hash = 'teacher'; });
+    await adminRuntime.page.waitForURL(/#teacher$/);
+    await adminRuntime.page.locator('[data-teacher-dashboard]:not([hidden])').waitFor({ state: 'visible' });
+
+    let releaseReentryStats;
+    let markReentryStatsStarted;
+    const reentryStatsGate = new Promise((resolve) => { releaseReentryStats = resolve; });
+    const reentryStatsStarted = new Promise((resolve) => { markReentryStatsStarted = resolve; });
+    await adminRuntime.page.route('**/api/admin/stats', async (route) => {
+      markReentryStatsStarted();
+      await reentryStatsGate;
+      await route.continue();
+    });
+    await adminRuntime.page.evaluate(() => { window.location.hash = 'admin'; });
+    await adminRuntime.page.waitForURL(/#admin$/);
+    await reentryStatsStarted;
+    await adminRuntime.page.locator('[data-admin-governance].is-busy').waitFor({ state: 'visible' });
+
+    releaseLifecyclePatch();
+    await lifecyclePatchFailure;
+    await adminRuntime.page.waitForTimeout(150);
+    const reentryBusyEvidence = await adminRuntime.page.evaluate(() => ({
+      rootBusy: document.querySelector('[data-admin-governance]')?.classList.contains('is-busy') === true,
+      refreshDisabled: document.querySelector('[data-admin-refresh-control]')?.disabled === true,
+    }));
+    assert(reentryBusyEvidence.rootBusy, 'old PATCH completion must not clear the re-entered admin lifecycle busy state');
+    assert(reentryBusyEvidence.refreshDisabled, 'old PATCH completion must not re-enable controls owned by the new lifecycle');
+
+    releaseReentryStats();
+    await adminRuntime.page.unroute('**/api/admin/stats');
+    await adminRuntime.page.unroute(`**${schoolPath}`);
+    adminRuntime.page.__astraExpectedRequestFailurePaths = [];
+    await adminRuntime.page.waitForFunction(() => !document.querySelector('[data-admin-governance]')?.classList.contains('is-busy'));
+    await adminRuntime.page.waitForFunction(({ targetId }) => {
+      const target = document.querySelector(`[data-admin-organization-edit][data-organization-kind="school"][data-organization-id="${targetId}"]`);
+      const other = document.querySelector('[data-admin-organization-edit][data-organization-kind="class"]');
+      return Boolean(target && !target.disabled && other && other.disabled);
+    }, { targetId: String(schoolId) });
+
+    organizationDialog = await openOrganizationEditor(adminRuntime.page, 'schools', schoolName);
+    await organizationDialog.locator('[data-admin-organization-lock]').waitFor({ state: 'visible' });
+    await organizationDialog.locator('[data-admin-organization-reconcile]').waitFor({ state: 'visible' });
+    assert(
+      Number(await organizationDialog.locator('[data-admin-organization-version]').getAttribute('data-admin-organization-version')) === lifecycleVersion,
+      'destroyed lifecycle PATCH must not silently change the authoritative resource'
+    );
+    const lifecyclePatchBeforeReconcile = organizationPatches.filter((item) => item.path === schoolPath).length;
+    await organizationDialog.locator('[data-admin-organization-reconcile]').click();
+    await organizationDialog.locator('[data-admin-organization-unlock]').waitFor({ state: 'visible' });
+    assert(
+      organizationPatches.filter((item) => item.path === schoolPath).length === lifecyclePatchBeforeReconcile,
+      'new lifecycle reconciliation must not resend the destroyed PATCH'
+    );
+    await organizationDialog.locator('[data-admin-organization-unlock]').click();
+    await organizationDialog.locator('[data-admin-organization-status]').filter({ hasText: '人工解除锁定' }).waitFor({ state: 'visible' });
+    record('in-flight PATCH route destroy preserves lock across admin re-entry', {
+      version: lifecycleVersion,
+      patchCount: organizationPatches.filter((item) => item.path === schoolPath).length - lifecyclePatchStart,
+      routeOutcome: lifecycleRouteOutcome,
+      reentryBusyEvidence,
+      reconciledWithoutReplay: true,
+    });
+    await closeOrganizationEditor(organizationDialog);
+
+    organizationDialog = await openOrganizationEditor(adminRuntime.page, 'schools', schoolName);
+    const mismatchVersion = initialSchoolVersion + 1;
+    const mismatchForm = organizationDialog.locator('[data-admin-organization-form]');
+    await mismatchForm.locator('[name="description"]').fill(`伪成功未落库 ${runId}`);
+    await mismatchForm.locator('[data-admin-organization-reason]').fill(`E2E 2xx 权威不一致 ${runId}`);
+    await mismatchForm.locator('[data-admin-organization-confirm="metadata"]').click();
+    await mismatchForm.locator('[data-admin-organization-preview]').waitFor({ state: 'visible' });
+    let mismatchPatchCount = 0;
+    await adminRuntime.page.route(`**${schoolPath}`, async (route) => {
+      if (route.request().method() !== 'PATCH') {
+        await route.continue();
+        return;
+      }
+      mismatchPatchCount += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: Number(schoolId), version: mismatchVersion, status: 'active' }),
+      });
+    });
+    await mismatchForm.locator('[data-admin-organization-confirm="metadata"]').click();
+    await organizationDialog.locator('[data-admin-organization-unlock]').waitFor({ state: 'visible' });
+    await organizationDialog.locator('[data-admin-organization-status]').filter({ hasText: '精确权威资源不是预期的 version+1' }).waitFor({ state: 'visible' });
+    const mismatchFocus = await organizationFocusEvidence(adminRuntime.page, '2xx authority mismatch', '[data-admin-organization-unlock]');
+    assert(Number(await organizationDialog.locator('[data-admin-organization-version]').getAttribute('data-admin-organization-version')) === mismatchVersion, '2xx mismatch must retain the unchanged authority version');
+    assert(mismatchPatchCount === 1, `2xx mismatch expected exactly one PATCH, got ${mismatchPatchCount}`);
+    await adminRuntime.page.waitForTimeout(300);
+    assert(mismatchPatchCount === 1, '2xx mismatch must not retry PATCH');
+    assert(!String(await adminRuntime.page.locator('[data-admin-notice]').textContent()).includes('已更新，权威资源'), '2xx mismatch must not claim governance success');
+    await adminRuntime.page.unroute(`**${schoolPath}`);
+    await organizationDialog.locator('[data-admin-organization-unlock]').click();
+    await organizationDialog.locator('[data-admin-organization-status]').filter({ hasText: '人工解除锁定' }).waitFor({ state: 'visible' });
+    record('2xx response with unchanged authority remains locked without retry', {
+      authorityVersion: mismatchVersion,
+      patchCount: mismatchPatchCount,
+      focus: mismatchFocus,
+    });
+    await closeOrganizationEditor(organizationDialog);
+
+    organizationDialog = await openOrganizationEditor(adminRuntime.page, 'classes', className);
+    const classForm = organizationDialog.locator('[data-admin-organization-form]');
+    const classVersion = Number(await organizationDialog.locator('[data-admin-organization-version]').getAttribute('data-admin-organization-version'));
+    await classForm.locator('[name="grade"]').fill('11');
+    await classForm.locator('[data-admin-organization-reason]').fill(`E2E 冲突草稿 ${runId}`);
+    await classForm.locator('[data-admin-organization-confirm="metadata"]').click();
+    await classForm.locator('[data-admin-organization-preview]').waitFor({ state: 'visible' });
+    const concurrentClass = await pageApi(adminRuntime.page, apiBase, classPath, {
+      method: 'PATCH',
+      body: { expected_version: classVersion, reason: `E2E 并发推进 ${runId}`, term: `2026B-${runId}` },
+    });
+    assert(concurrentClass.status === 200, `concurrent class update expected 200, got ${concurrentClass.status}`);
+    adminRuntime.page.__astraExpectedHttpResponses = [{ method: 'PATCH', status: 409, path: classPath }];
+    const classPatchBeforeConflict = organizationPatches.filter((item) => item.path === classPath).length;
+    await classForm.locator('[data-admin-organization-confirm="metadata"]').click();
+    await organizationDialog.locator('.admin-organization-alert').filter({ hasText: '检测到版本冲突' }).waitFor({ state: 'visible' });
+    await organizationDialog.locator(`[data-admin-organization-version="${classVersion + 1}"]`).waitFor({ state: 'visible' });
+    assert(await organizationDialog.locator('[name="grade"]').inputValue() === '11', '409 reconciliation must preserve user draft');
+    assert(organizationPatches.filter((item) => item.path === classPath).length === classPatchBeforeConflict + 1, '409 flow must send one UI PATCH');
+    await adminRuntime.page.waitForTimeout(300);
+    assert(organizationPatches.filter((item) => item.path === classPath).length === classPatchBeforeConflict + 1, '409 flow must not retry PATCH');
+    adminRuntime.page.__astraExpectedHttpResponses = [];
+    record('admin organization 409 conflict rereads authority without retry', {
+      staleVersion: classVersion,
+      authorityVersion: classVersion + 1,
+      uiPatchCount: 1,
+    });
+    await closeOrganizationEditor(organizationDialog);
+
+    organizationDialog = await openOrganizationEditor(adminRuntime.page, 'classes', className);
+    let governedClassVersion = Number(await organizationDialog.locator('[data-admin-organization-version]').getAttribute('data-admin-organization-version'));
+    let governedClassForm = organizationDialog.locator('[data-admin-organization-form]');
+    await governedClassForm.locator('[data-admin-organization-reason]').fill(`E2E 归档班级 ${runId}`);
+    const classPatchBeforeArchive = organizationPatches.filter((item) => item.path === classPath).length;
+    await governedClassForm.locator('[data-admin-organization-confirm="status"]').click();
+    await governedClassForm.locator('[data-admin-organization-preview]').waitFor({ state: 'visible' });
+    assert(organizationPatches.filter((item) => item.path === classPath).length === classPatchBeforeArchive, 'class archive preview must send zero PATCH requests');
+    await governedClassForm.locator('[data-admin-organization-confirm="status"]').click();
+    await adminRuntime.page.locator('[data-admin-notice]').filter({ hasText: `班级 #${classId} 已更新` }).waitFor({ state: 'visible' });
+    await organizationDialog.locator(`[data-admin-organization-version="${governedClassVersion + 1}"]`).waitFor({ state: 'visible' });
+    await organizationDialog.locator('[data-admin-organization-readonly="archived"]').waitFor({ state: 'visible' });
+    const archivedFocus = await organizationFocusEvidence(adminRuntime.page, 'class archive success', '[data-admin-organization-status]');
+    const archiveVisual = await organizationDialog.evaluate((dialog) => {
+      const badge = dialog.querySelector('[data-admin-organization-readonly="archived"] .admin-status-pill');
+      const restore = dialog.querySelector('[data-admin-organization-confirm="status"]');
+      const style = restore && getComputedStyle(restore);
+      const box = restore && restore.getBoundingClientRect();
+      return {
+        badgeText: String(badge && badge.textContent || '').trim(),
+        restoreText: String(restore && restore.textContent || '').trim(),
+        restoreClass: String(restore && restore.className || ''),
+        restoreColor: style && style.color,
+        restoreWidth: box && box.width,
+        restoreHeight: box && box.height,
+      };
+    });
+    assert(archiveVisual.badgeText.includes('已归档 · 教学只读'), `archived organization wording missing: ${JSON.stringify(archiveVisual)}`);
+    assert(archiveVisual.restoreText.includes('恢复') && archiveVisual.restoreClass.includes('admin-icon-button--restore'), 'archived organization must expose the green restore action');
+    assert(archiveVisual.restoreColor === 'rgb(191, 245, 213)', `restore action must use the green semantic color, got ${archiveVisual.restoreColor}`);
+    assert(archiveVisual.restoreWidth >= 44 && archiveVisual.restoreHeight >= 44, 'restore action must be at least 44x44');
+    const archivePatches = organizationPatches.filter((item) => item.path === classPath).slice(classPatchBeforeArchive);
+    assert(archivePatches.length === 1 && archivePatches[0].body.status === 'archived', 'class archive must send one constrained status PATCH');
+    const archivedClassStats = await pageApi(adminRuntime.page, apiBase, `/api/admin/classes/${classId}/stats`);
+    assert(archivedClassStats.status === 200, 'archived class history statistics must remain readable');
+    const classArchiveAudit = await pageApi(adminRuntime.page, apiBase, `/api/admin/audit-logs?action=admin.class.archive&resource_id=${classId}`);
+    assert(classArchiveAudit.status === 200 && classArchiveAudit.body.total >= 1, 'class archive audit must exist');
+    await teacherRuntime.page.locator('[data-teacher-action="refresh"]').click();
+    await teacherRuntime.page.locator('[data-teacher-scope="classId"] option:checked').filter({ hasText: 'archived' }).waitFor({ state: 'attached' });
+    assert(await teacherRuntime.page.locator('[data-teacher-form="student-batch-import"] button[type="submit"]').isDisabled(), 'archived class must disable teacher membership writes');
+    assert(await teacherRuntime.page.locator('[data-teacher-form="grade"] button[type="submit"]').isDisabled(), 'archived class must disable teacher grading writes');
+    assert(await teacherRuntime.page.locator('[data-teacher-form="assignment-class-policy"] button[type="submit"]').isDisabled(), 'archived class must disable teacher assignment-class-policy PUT');
+    assert(await teacherRuntime.page.locator('[data-teacher-class-policy-reset]').isDisabled(), 'archived class must disable teacher assignment-class-policy DELETE');
+
+    governedClassVersion += 1;
+    governedClassForm = organizationDialog.locator('[data-admin-organization-form]');
+    await governedClassForm.locator('[data-admin-organization-reason]').fill(`E2E 恢复班级 ${runId}`);
+    const classPatchBeforeRestore = organizationPatches.filter((item) => item.path === classPath).length;
+    await governedClassForm.locator('[data-admin-organization-confirm="status"]').click();
+    await governedClassForm.locator('[data-admin-organization-preview]').waitFor({ state: 'visible' });
+    assert(organizationPatches.filter((item) => item.path === classPath).length === classPatchBeforeRestore, 'class restore preview must send zero PATCH requests');
+    await governedClassForm.locator('[data-admin-organization-confirm="status"]').click();
+    await organizationDialog.locator(`[data-admin-organization-version="${governedClassVersion + 1}"]`).waitFor({ state: 'visible' });
+    await organizationDialog.locator('[data-admin-organization-readonly="active"]').waitFor({ state: 'visible' });
+    const restoredFocus = await organizationFocusEvidence(adminRuntime.page, 'class restore success', '[data-admin-organization-status]');
+    const restorePatches = organizationPatches.filter((item) => item.path === classPath).slice(classPatchBeforeRestore);
+    assert(restorePatches.length === 1 && restorePatches[0].body.status === 'active', 'class restore must send one constrained status PATCH');
+    const classRestoreAudit = await pageApi(adminRuntime.page, apiBase, `/api/admin/audit-logs?action=admin.class.restore&resource_id=${classId}`);
+    assert(classRestoreAudit.status === 200 && classRestoreAudit.body.total >= 1, 'class restore audit must exist');
+    await teacherRuntime.page.locator('[data-teacher-action="refresh"]').click();
+    await teacherRuntime.page.waitForFunction(({ expectedClassName }) => {
+      const selected = document.querySelector('[data-teacher-scope="classId"] option:checked');
+      const membershipWrite = document.querySelector('[data-teacher-form="student-batch-import"] button[type="submit"]');
+      const policyWrite = document.querySelector('[data-teacher-form="assignment-class-policy"] button[type="submit"]');
+      const policyReset = document.querySelector('[data-teacher-class-policy-reset]');
+      return selected
+        && String(selected.textContent || '').includes(expectedClassName)
+        && !String(selected.textContent || '').includes('archived')
+        && membershipWrite
+        && !membershipWrite.disabled
+        && policyWrite
+        && !policyWrite.disabled
+        && policyReset
+        && !policyReset.disabled;
+    }, { expectedClassName: className });
+    assert(!(await teacherRuntime.page.locator('[data-teacher-form="student-batch-import"] button[type="submit"]').isDisabled()), 'restored class must re-enable eligible teacher membership writes');
+    record('admin archives and restores class with historical read and teacher readonly boundary', {
+      archivePatchCount: archivePatches.length,
+      restorePatchCount: restorePatches.length,
+      archivedStatsStatus: archivedClassStats.status,
+      archiveAuditTotal: classArchiveAudit.body.total,
+      restoreAuditTotal: classRestoreAudit.body.total,
+      archiveVisual,
+      focus: { archivedFocus, restoredFocus },
+    });
+    await closeOrganizationEditor(organizationDialog);
+
+    organizationDialog = await openOrganizationEditor(adminRuntime.page, 'schools', schoolName);
+    let currentSchoolVersion = Number(await organizationDialog.locator('[data-admin-organization-version]').getAttribute('data-admin-organization-version'));
+    let currentSchoolForm = organizationDialog.locator('[data-admin-organization-form]');
+    await currentSchoolForm.locator('[name="description"]').fill(`响应丢失但已落库 ${runId}`);
+    await currentSchoolForm.locator('[data-admin-organization-reason]').fill(`E2E 未知结果已生效 ${runId}`);
+    await currentSchoolForm.locator('[data-admin-organization-confirm="metadata"]').click();
+    let appliedUnknownCount = 0;
+    adminRuntime.page.__astraExpectedRequestFailurePaths = [{ method: 'PATCH', path: schoolPath }];
+    await adminRuntime.page.route(`**${schoolPath}`, async (route) => {
+      if (route.request().method() !== 'PATCH') {
+        await route.continue();
+        return;
+      }
+      appliedUnknownCount += 1;
+      await route.fetch();
+      await route.abort('connectionreset');
+    });
+    await currentSchoolForm.locator('[data-admin-organization-confirm="metadata"]').click();
+    await adminRuntime.page.locator('[data-admin-notice]').filter({ hasText: '已由权威回读确认生效' }).waitFor({ state: 'visible' });
+    await organizationDialog.locator(`[data-admin-organization-version="${currentSchoolVersion + 1}"]`).waitFor({ state: 'visible' });
+    const appliedUnknownFocus = await organizationFocusEvidence(adminRuntime.page, 'applied unknown reconciliation', '[data-admin-organization-status]');
+    assert(appliedUnknownCount === 1, `applied unknown result expected one PATCH, got ${appliedUnknownCount}`);
+    await adminRuntime.page.unroute(`**${schoolPath}`);
+    adminRuntime.page.__astraExpectedRequestFailurePaths = [];
+    record('unknown response with committed mutation resolves by exact GET without retry', {
+      patchCount: appliedUnknownCount,
+      versionBefore: currentSchoolVersion,
+      versionAfter: currentSchoolVersion + 1,
+      focus: appliedUnknownFocus,
+    });
+
+    currentSchoolVersion += 1;
+    currentSchoolForm = organizationDialog.locator('[data-admin-organization-form]');
+    await currentSchoolForm.locator('[name="description"]').fill(`响应丢失且未落库 ${runId}`);
+    await currentSchoolForm.locator('[data-admin-organization-reason]').fill(`E2E 未知结果未生效 ${runId}`);
+    await currentSchoolForm.locator('[data-admin-organization-confirm="metadata"]').click();
+    let unappliedUnknownCount = 0;
+    adminRuntime.page.__astraExpectedRequestFailurePaths = [{ method: 'PATCH', path: schoolPath }];
+    await adminRuntime.page.route(`**${schoolPath}`, async (route) => {
+      if (route.request().method() !== 'PATCH') {
+        await route.continue();
+        return;
+      }
+      unappliedUnknownCount += 1;
+      await route.abort('connectionreset');
+    });
+    await currentSchoolForm.locator('[data-admin-organization-confirm="metadata"]').click();
+    await organizationDialog.locator('[data-admin-organization-unlock]').waitFor({ state: 'visible' });
+    assert(unappliedUnknownCount === 1, `unapplied unknown result expected one PATCH, got ${unappliedUnknownCount}`);
+    await adminRuntime.page.unroute(`**${schoolPath}`);
+    adminRuntime.page.__astraExpectedRequestFailurePaths = [];
+    const lockedFocus = await organizationFocusEvidence(adminRuntime.page, 'unapplied unknown reconciliation', '[data-admin-organization-unlock]');
+    const patchCountBeforeManualReconcile = organizationPatches.filter((item) => item.path === schoolPath).length;
+    await organizationDialog.locator('[data-admin-organization-reconcile]').click();
+    await organizationDialog.locator('[data-admin-organization-unlock]').waitFor({ state: 'visible' });
+    const manualReconcileFocus = await organizationFocusEvidence(adminRuntime.page, 'manual authoritative reconciliation', '[data-admin-organization-unlock]');
+    assert(organizationPatches.filter((item) => item.path === schoolPath).length === patchCountBeforeManualReconcile, 'manual reconciliation must not resend PATCH');
+    await organizationDialog.locator('[data-admin-organization-unlock]').click();
+    await organizationDialog.locator('.admin-organization-alert').filter({ hasText: '人工解除锁定' }).waitFor({ state: 'visible' });
+    const patchCountBeforeFreshPreview = organizationPatches.filter((item) => item.path === schoolPath).length;
+    await organizationDialog.locator('[data-admin-organization-confirm="metadata"]').click();
+    await organizationDialog.locator('[data-admin-organization-preview]').waitFor({ state: 'visible' });
+    assert(organizationPatches.filter((item) => item.path === schoolPath).length === patchCountBeforeFreshPreview, 'manual unlock must require a fresh zero-write preview');
+    report.responsive.adminOrganization = await adminOrganizationResponsiveEvidence(adminRuntime.page, outDir);
+    record('unapplied unknown result remains locked until explicit reconciliation', {
+      patchCount: unappliedUnknownCount,
+      version: currentSchoolVersion,
+      focus: { lockedFocus, manualReconcileFocus },
+    });
+    await closeOrganizationEditor(organizationDialog);
+    await adminRuntime.page.setViewportSize({ width: 1440, height: 1000 });
 
     const outsiderRuntime = await createRolePage(browser, report, webBase, apiBase, 'student');
     contexts.push(outsiderRuntime.context);

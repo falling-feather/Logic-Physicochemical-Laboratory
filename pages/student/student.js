@@ -1557,6 +1557,7 @@
             already_submitted: '该作业已有提交记录',
             assignment_closed: '作业已关闭，只能查看历史记录',
             assignment_archived: '作业已归档，只能查看历史记录',
+            class_archived: '班级已归档，只能查看历史作业与提交记录',
             assignment_not_active: '作业当前未开放提交'
         }[value] || (value ? statusLabel(value) : '当前状态不允许提交');
     }

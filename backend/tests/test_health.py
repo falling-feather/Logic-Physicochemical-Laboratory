@@ -50,5 +50,6 @@ def test_cors_allows_local_preview_origin(client):
 
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://localhost:8766"
+    assert "PUT" in response.headers["access-control-allow-methods"]
     assert "DELETE" in response.headers["access-control-allow-methods"]
     assert "X-Device-Name" in response.headers["access-control-allow-headers"]
