@@ -19,7 +19,8 @@
         busy: false,
         status: null,
         appStarted: false,
-        explicitSignedOut: false
+        explicitSignedOut: false,
+        reloadPending: false
     };
 
     function escapeHtml(value) {
@@ -54,6 +55,99 @@
             baseUrl: state.apiBase,
             dispatchAuthRequired: false
         }, options || {}));
+    }
+
+    function roleResourceRegistry() {
+        const registry = global.AstraPageRegistry;
+        if (
+            !registry
+            || typeof registry.stylesForRole !== 'function'
+            || typeof registry.resourcesForRole !== 'function'
+            || typeof registry.allRoleResources !== 'function'
+        ) {
+            throw new Error('角色资源注册表尚未就绪');
+        }
+        return registry;
+    }
+
+    function absoluteResourceUrl(resource) {
+        return new URL(String(resource || ''), document.baseURI || global.location.href).href;
+    }
+
+    async function pruneRoleResourceCaches(role) {
+        const registry = roleResourceRegistry();
+        const allowedUrls = new Set(registry.resourcesForRole(role).map(absoluteResourceUrl));
+        const rolePaths = new Set(registry.allRoleResources().map(function (resource) {
+            return new URL(absoluteResourceUrl(resource)).pathname;
+        }));
+
+        document.querySelectorAll('link[rel="stylesheet"]').forEach(function (link) {
+            const linkUrl = new URL(link.href);
+            if (rolePaths.has(linkUrl.pathname) && !allowedUrls.has(link.href)) link.remove();
+        });
+
+        if (!global.caches || typeof global.caches.keys !== 'function') return;
+        const cacheNames = await global.caches.keys();
+        await Promise.all(cacheNames.map(async function (name) {
+            const cache = await global.caches.open(name);
+            const requests = await cache.keys();
+            await Promise.all(requests.map(function (cachedRequest) {
+                const cachedUrl = new URL(cachedRequest.url);
+                if (!rolePaths.has(cachedUrl.pathname) || allowedUrls.has(cachedRequest.url)) return false;
+                return cache.delete(cachedRequest);
+            }));
+        }));
+    }
+
+    function loadRoleStyles(role) {
+        const styles = roleResourceRegistry().stylesForRole(role);
+        return Promise.all(styles.map(function (resource) {
+            const href = absoluteResourceUrl(resource);
+            const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).find(function (link) {
+                return link.href === href;
+            });
+            if (existing && existing.sheet) {
+                existing.dataset.astraRoleResource = resource;
+                return Promise.resolve();
+            }
+            return new Promise(function (resolve, reject) {
+                const link = existing || document.createElement('link');
+                const timeout = global.setTimeout(function () {
+                    link.remove();
+                    reject(new Error('角色样式加载超时'));
+                }, 8000);
+                const finish = function (callback) {
+                    global.clearTimeout(timeout);
+                    callback();
+                };
+                link.rel = 'stylesheet';
+                link.href = href;
+                link.dataset.astraRoleResource = resource;
+                link.addEventListener('load', function () {
+                    finish(resolve);
+                }, { once: true });
+                link.addEventListener('error', function () {
+                    link.remove();
+                    finish(function () { reject(new Error('角色样式加载失败')); });
+                }, { once: true });
+                if (!existing) document.head.appendChild(link);
+            });
+        }));
+    }
+
+    async function prepareRoleResources(role) {
+        await pruneRoleResourceCaches(role);
+        await loadRoleStyles(role);
+    }
+
+    async function reloadAfterRoleResourceCleanup() {
+        if (state.reloadPending) return;
+        state.reloadPending = true;
+        try {
+            await pruneRoleResourceCaches(null);
+        } catch (error) {}
+        state.user = null;
+        global.location.reload();
     }
 
     function roleLanding(role) {
@@ -345,21 +439,22 @@
 
     async function reconcileSession() {
         const user = await request('/api/users/me', { method: 'GET' });
-        completeAuthentication(user);
+        await completeAuthentication(user);
     }
 
-    function completeAuthentication(user) {
+    async function completeAuthentication(user) {
         if (!user || !ROLE_PAGE_ACCESS[user.role]) throw new Error('账号角色无效');
+        if (state.appStarted) {
+            await reloadAfterRoleResourceCleanup();
+            return;
+        }
+        await prepareRoleResources(user.role);
         state.user = Object.freeze(Object.assign({}, user));
         state.explicitSignedOut = false;
         applyRoleUI();
         renderSessionControl();
         hidePortal();
         global.dispatchEvent(new CustomEvent('astra:session-ready', { detail: { user: state.user } }));
-        if (state.appStarted) {
-            global.location.reload();
-            return;
-        }
         if (state.resolveBoot) {
             state.resolveBoot(true);
             state.resolveBoot = null;
@@ -367,8 +462,13 @@
     }
 
     function requireAuthentication() {
-        state.user = null;
         state.appStarted = Boolean(global.Router && global.Router._initialEnterFired);
+        state.user = null;
+        if (state.appStarted) {
+            reloadAfterRoleResourceCleanup();
+            return;
+        }
+        pruneRoleResourceCaches(null).catch(function () {});
         state.view = 'login';
         state.status = state.explicitSignedOut
             ? null
@@ -386,13 +486,12 @@
                 return;
             }
         }
-        state.user = null;
-        global.location.reload();
+        await reloadAfterRoleResourceCleanup();
     }
 
     function handleSignedOut() {
         state.explicitSignedOut = true;
-        requireAuthentication();
+        reloadAfterRoleResourceCleanup();
     }
 
     function bootstrap() {
@@ -405,11 +504,14 @@
             state.resolveBoot = resolve;
             request('/api/users/me', { method: 'GET' })
                 .then(completeAuthentication)
-                .catch(function (error) {
+                .catch(async function (error) {
+                    state.user = null;
+                    await pruneRoleResourceCaches(null).catch(function () {});
                     state.view = 'login';
                     state.status = error && error.status === 401
                         ? null
                         : { type: 'error', message: api().message(error) };
+                    applyRoleUI();
                     ensurePortal();
                 });
         });

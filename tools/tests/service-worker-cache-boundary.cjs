@@ -57,6 +57,16 @@ async function main() {
     assert.equal(fetchCalls, 0);
     assert.deepEqual(cachedPuts, []);
 
+    let roleResourcePromise = null;
+    handlers.fetch({
+        request: { method: 'GET', mode: 'cors', url: 'https://astra.test/pages/admin/admin.js?v=current' },
+        respondWith(value) { roleResourcePromise = value; }
+    });
+    assert.ok(roleResourcePromise, 'role resources must use an explicit network-only response');
+    await roleResourcePromise;
+    assert.equal(fetchCalls, 1);
+    assert.deepEqual(cachedPuts, [], 'role resources must never enter shared CacheStorage');
+
     let staticPromise = null;
     handlers.fetch({
         request: { method: 'GET', mode: 'cors', url: 'https://astra.test/pages/apiary/app.js' },
@@ -64,7 +74,7 @@ async function main() {
     });
     assert.ok(staticPromise, '/pages/apiary must not be mistaken for /api');
     await staticPromise;
-    assert.equal(fetchCalls, 1);
+    assert.equal(fetchCalls, 2);
     assert.deepEqual(cachedPuts, ['https://astra.test/pages/apiary/app.js']);
 
     let navigationPromise = null;
@@ -74,7 +84,7 @@ async function main() {
     });
     assert.ok(navigationPromise, 'normal SPA navigation should keep network-first shell behavior');
     await navigationPromise;
-    assert.equal(fetchCalls, 2);
+    assert.equal(fetchCalls, 3);
     assert.deepEqual(cachedPuts, [
         'https://astra.test/pages/apiary/app.js',
         'https://astra.test/'

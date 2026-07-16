@@ -44,7 +44,7 @@ assert.deepEqual(
 assert.equal(registry.galaxyFor('planets'), 'astra');
 assert.equal(registry.galaxyFor('cosmos'), 'frontier');
 assert.equal(registry.galaxyFor('unknown-page'), 'englab');
-assert.equal(registry.scriptFor('teacher'), 'pages/teacher/teacher.js?v=20260711v740RoleShellP0');
+assert.equal(registry.scriptFor('teacher'), 'pages/teacher/teacher.js?v=20260715v7423RoleResourcesP1');
 assert.equal(registry.isReady('teacher'), false);
 
 let entered = 0;
@@ -60,7 +60,7 @@ assert.equal(registry.enter('mathematics'), false);
 assert.equal(registry.leave('mathematics'), false);
 
 assert.match(html, /app-session\.js[\s\S]*experiment-registry\.js[\s\S]*page-registry\.js[\s\S]*router\.js[\s\S]*main\.js/);
-assert.match(serviceWorker, /page-registry\.js\?v=20260715v7420HomeViewportClipP1/);
+assert.match(serviceWorker, /page-registry\.js\?v=20260715v7423RoleResourcesP1/);
 assert.match(router, /AstraPageRegistry\.pagesByTag\('course'\)/);
 assert.match(router, /AstraPageRegistry\.galaxyFor\(page\)/);
 assert.match(router, /AstraPageRegistry\.scriptFor\(page\)/);
@@ -73,9 +73,9 @@ assert.match(moduleSelector, /closeModule\(page, options = \{\}\)/);
 assert.match(moduleSelector, /if \(!options\.preserveHash\)/);
 assert.match(router, /module-selector\.js\?v=20260715v7420HomeViewportClipP1/);
 assert.match(main, /module-selector\.js\?v=20260715v7420HomeViewportClipP1/);
-assert.match(main, /page-registry\.js\?v=20260715v7420HomeViewportClipP1/);
+assert.match(main, /page-registry\.js\?v=' \+ ENGLAB_ASSET_VERSION/);
 assert.match(main, /AstraPageRegistry\.galaxyFor\(hash\)/);
-assert.match(main, /const ENGLAB_ASSET_VERSION = '20260715v7420HomeViewportClipP1'/);
+assert.match(main, /const ENGLAB_ASSET_VERSION = '20260715v7423RoleResourcesP1'/);
 assert.doesNotMatch(main, /const frontierPages = \[|const englabPages = \[/);
 
 console.log('page-registry-contract: ok');

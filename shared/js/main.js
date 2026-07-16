@@ -224,7 +224,7 @@ function updateFooterVisibility() {
 
 window.updateFooterVisibility = updateFooterVisibility;
 
-const ENGLAB_ASSET_VERSION = '20260715v7420HomeViewportClipP1';
+const ENGLAB_ASSET_VERSION = '20260715v7423RoleResourcesP1';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',
@@ -239,16 +239,13 @@ const CORE_HTTP_FALLBACK_ASSETS = [
     './shared/js/api-client.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/app-session.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/experiment-registry.js?v=20260715v7420HomeViewportClipP1',
-    './shared/js/page-registry.js?v=20260715v7420HomeViewportClipP1',
+    './shared/js/page-registry.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/router.js?v=20260715v7420HomeViewportClipP1',
-    './shared/js/main.js?v=20260715v7420HomeViewportClipP1',
+    './shared/js/main.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/backend-content.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/css/backend-content.css?v=' + ENGLAB_ASSET_VERSION,
     './shared/css/auth-ui.css?v=' + ENGLAB_ASSET_VERSION,
-    './shared/css/app-session.css?v=20260715v7413PageRegistryP1',
-    './pages/admin/admin.css?v=' + ENGLAB_ASSET_VERSION,
-    './pages/teacher/teacher.css?v=' + ENGLAB_ASSET_VERSION,
-    './pages/student/student.css?v=' + ENGLAB_ASSET_VERSION
+    './shared/css/app-session.css?v=20260715v7413PageRegistryP1'
 ];
 
 const GALAXY_HTTP_FALLBACK_ASSETS = {
@@ -271,9 +268,6 @@ const GALAXY_HTTP_FALLBACK_ASSETS = {
         './pages/chemistry/chemistry.css?v=20260618ionP1',
         './pages/algorithms/algorithms.css?v=20260618algoTextP1',
         './pages/biology/biology.css?v=20260618neuralP1',
-        './pages/admin/admin.css?v=' + ENGLAB_ASSET_VERSION,
-        './pages/teacher/teacher.css?v=' + ENGLAB_ASSET_VERSION,
-        './pages/student/student.css?v=' + ENGLAB_ASSET_VERSION,
         './shared/js/module-selector.js?v=20260715v7420HomeViewportClipP1',
         './shared/js/experiment-guide.js?v=20260630mainV64',
         './shared/js/experiment-export.js?v=20260528v61f',
@@ -284,10 +278,7 @@ const GALAXY_HTTP_FALLBACK_ASSETS = {
         './shared/js/global-search.js?v=20260424v45a',
         './shared/js/keyboard-shortcuts.js?v=20260424v45b',
         './shared/js/related-experiments.js?v=20260424v45c',
-        './pages/home/home.js?v=20260704qianduanV70',
-        './pages/admin/admin.js?v=' + ENGLAB_ASSET_VERSION,
-        './pages/teacher/teacher.js?v=' + ENGLAB_ASSET_VERSION,
-        './pages/student/student.js?v=' + ENGLAB_ASSET_VERSION
+        './pages/home/home.js?v=20260704qianduanV70'
     ],
     frontier: [
         './shared/js/frontier-learning.js?v=20260630mainV64',

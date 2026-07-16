@@ -1,0 +1,74 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const root = path.resolve(__dirname, '../..');
+const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+
+const html = read('index.html');
+const registrySource = read('shared/js/page-registry.js');
+const session = read('shared/js/app-session.js');
+const router = read('shared/js/router.js');
+const main = read('shared/js/main.js');
+const serviceWorker = read('sw.js');
+const context = { window: {} };
+
+vm.runInNewContext(registrySource, context, { filename: 'shared/js/page-registry.js' });
+const registry = context.window.AstraPageRegistry;
+const normalize = (items) => Array.from(items);
+const version = '20260715v7423RoleResourcesP1';
+const student = [
+    `pages/student/student.css?v=${version}`,
+    `pages/student/student.js?v=${version}`
+];
+const teacher = [
+    `pages/teacher/teacher.css?v=${version}`,
+    `pages/teacher/teacher.js?v=${version}`
+];
+const admin = [
+    ...teacher,
+    `pages/admin/admin.css?v=${version}`,
+    `pages/admin/admin.js?v=${version}`
+];
+
+assert.deepEqual(normalize(registry.resourcesForRole('student')), student);
+assert.deepEqual(normalize(registry.resourcesForRole('teacher')), teacher);
+assert.deepEqual(normalize(registry.resourcesForRole('admin')), admin);
+assert.deepEqual(normalize(registry.resourcesForRole('anonymous')), []);
+assert.deepEqual(normalize(registry.stylesForRole('student')), student.slice(0, 1));
+assert.deepEqual(normalize(registry.rolesFor('teacher')), ['teacher', 'admin']);
+assert.equal(new Set(normalize(registry.allRoleResources())).size, 6);
+
+const roleAssetPattern = /pages\/(?:student|teacher|admin)\/(?:student|teacher|admin)\.(?:css|js)/;
+assert.doesNotMatch(html, /<link[^>]+href="pages\/(?:student|teacher|admin)\//);
+
+const appShell = serviceWorker.match(/const APP_SHELL = \[([\s\S]*?)\n\];/);
+assert.ok(appShell, 'service-worker APP_SHELL must remain inspectable');
+assert.doesNotMatch(appShell[1], roleAssetPattern, 'APP_SHELL must not pre-cache any role resource');
+assert.match(serviceWorker, /astra-static-v20260715v7423RoleResourcesP1/);
+
+const coreFallback = main.match(/const CORE_HTTP_FALLBACK_ASSETS = \[([\s\S]*?)\n\];/);
+const galaxyFallback = main.match(/const GALAXY_HTTP_FALLBACK_ASSETS = \{([\s\S]*?)\n\};/);
+assert.ok(coreFallback && galaxyFallback, 'HTTP fallback manifests must remain inspectable');
+assert.doesNotMatch(coreFallback[1], roleAssetPattern);
+assert.doesNotMatch(galaxyFallback[1], roleAssetPattern);
+assert.doesNotMatch(main, /AstraPageRegistry\.resourcesForRole\(/, 'network-only role resources must not be prewarmed');
+
+assert.match(session, /await prepareRoleResources\(user\.role\)[\s\S]*state\.user =/);
+assert.match(session, /document\.querySelectorAll\('link\[rel="stylesheet"\]'\)/);
+assert.match(session, /rolePaths\.has\(linkUrl\.pathname\)/);
+assert.match(session, /角色样式加载超时/);
+assert.match(session, /const cacheNames = await global\.caches\.keys\(\);[\s\S]*Promise\.all\(cacheNames\.map\(async function \(name\)/);
+assert.doesNotMatch(session, /cacheNames\.filter\(/, 'legacy/custom same-origin caches must also be scanned for exact role paths');
+assert.match(session, /rolePaths\.has\(cachedUrl\.pathname\)/);
+assert.match(session, /async function reloadAfterRoleResourceCleanup\(\)[\s\S]*state\.reloadPending = true;[\s\S]*await pruneRoleResourceCaches\(null\)[\s\S]*state\.user = null;[\s\S]*global\.location\.reload\(\)/);
+assert.match(session, /if \(state\.appStarted\) \{[\s\S]*await reloadAfterRoleResourceCleanup\(\);[\s\S]*return;[\s\S]*\}[\s\S]*await prepareRoleResources\(user\.role\)/);
+assert.match(session, /function requireAuthentication\(\)[\s\S]*state\.appStarted = Boolean[\s\S]*if \(state\.appStarted\) \{[\s\S]*reloadAfterRoleResourceCleanup\(\);[\s\S]*return;[\s\S]*\}[\s\S]*ensurePortal\(\)/);
+assert.match(session, /function handleSignedOut\(\)[\s\S]*state\.explicitSignedOut = true;[\s\S]*reloadAfterRoleResourceCleanup\(\)/);
+assert.doesNotMatch(session, /function handleSignedOut\(\)[\s\S]*requireAuthentication\(\)/);
+assert.match(session, /request\('\/api\/users\/me'[\s\S]*\.catch\(async function \(error\)[\s\S]*await pruneRoleResourceCaches\(null\)[\s\S]*applyRoleUI\(\)[\s\S]*ensurePortal\(\)/);
+assert.match(router, /if \(window\.AstraApplicationSession && !window\.AstraApplicationSession\.canAccessPage\(page\)\)[\s\S]*AstraPageRegistry\.scriptFor\(page\)/);
+assert.match(serviceWorker, /isRoleResource[\s\S]*fetch\(request, \{ cache: 'no-store' \}\)/);
+
+console.log('role-resource-pruning-contract: ok');

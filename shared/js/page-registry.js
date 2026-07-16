@@ -4,9 +4,13 @@
 
     if (global.AstraPageRegistry) return;
 
+    const ROLE_RESOURCE_VERSION = '20260715v7423RoleResourcesP1';
+
     const definePage = (config) => Object.freeze({
         galaxy: config.galaxy || 'englab',
         tags: Object.freeze([...(config.tags || [])]),
+        roles: Object.freeze([...(config.roles || [])]),
+        styles: Object.freeze([...(config.styles || [])]),
         script: config.script || null,
         ready: config.ready || null,
         enter: config.enter || null,
@@ -34,21 +38,27 @@
         biology: definePage({ galaxy: 'englab', tags: ['course'] }),
         student: definePage({
             galaxy: 'englab',
-            script: 'pages/student/student.js?v=20260711v740RoleShellP0',
+            roles: ['student'],
+            styles: [`pages/student/student.css?v=${ROLE_RESOURCE_VERSION}`],
+            script: `pages/student/student.js?v=${ROLE_RESOURCE_VERSION}`,
             ready: 'initStudent',
             enter: 'initStudent',
             leave: 'destroyStudent'
         }),
         teacher: definePage({
             galaxy: 'englab',
-            script: 'pages/teacher/teacher.js?v=20260711v740RoleShellP0',
+            roles: ['teacher', 'admin'],
+            styles: [`pages/teacher/teacher.css?v=${ROLE_RESOURCE_VERSION}`],
+            script: `pages/teacher/teacher.js?v=${ROLE_RESOURCE_VERSION}`,
             ready: 'initTeacher',
             enter: 'initTeacher',
             leave: 'destroyTeacher'
         }),
         admin: definePage({
             galaxy: 'englab',
-            script: 'pages/admin/admin.js?v=20260711v740RoleShellP0',
+            roles: ['admin'],
+            styles: [`pages/admin/admin.css?v=${ROLE_RESOURCE_VERSION}`],
+            script: `pages/admin/admin.js?v=${ROLE_RESOURCE_VERSION}`,
             ready: 'initAdmin',
             enter: 'initAdmin',
             leave: 'destroyAdmin'
@@ -122,6 +132,11 @@
         const definition = get(page);
         return !!definition && definition.tags.includes(tag);
     };
+    const resourcesForRole = (role) => pageNames.flatMap((page) => {
+        const definition = get(page);
+        if (!definition || !definition.roles.includes(role)) return [];
+        return definition.styles.concat(definition.script ? [definition.script] : []);
+    });
     const invokeHook = (page, hook) => {
         const definition = get(page);
         const hookName = definition && definition[hook];
@@ -145,6 +160,26 @@
             const definition = get(page);
             return definition ? definition.script : null;
         },
+        stylesFor: (page) => {
+            const definition = get(page);
+            return definition ? definition.styles.slice() : [];
+        },
+        rolesFor: (page) => {
+            const definition = get(page);
+            return definition ? definition.roles.slice() : [];
+        },
+        stylesForRole: (role) => pageNames.flatMap((page) => {
+            const definition = get(page);
+            return definition && definition.roles.includes(role) ? definition.styles : [];
+        }),
+        resourcesForRole: (role) => resourcesForRole(String(role || '')).slice(),
+        allRoleResources: () => Array.from(new Set(
+            pageNames.flatMap((page) => {
+                const definition = get(page);
+                if (!definition || !definition.roles.length) return [];
+                return definition.styles.concat(definition.script ? [definition.script] : []);
+            })
+        )),
         isReady: (page) => {
             const definition = get(page);
             const hookName = definition && definition.ready;

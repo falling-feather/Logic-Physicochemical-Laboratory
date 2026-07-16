@@ -352,6 +352,6 @@ assert.match(html, /config\.js[\s\S]*experiment-registry\.js[\s\S]*page-registry
 assert.match(main, /experiment-registry\.js\?v=20260715v7420HomeViewportClipP1/);
 assert.match(main, /module-selector\.js\?v=20260715v7420HomeViewportClipP1/);
 assert.match(serviceWorker, /experiment-registry\.js\?v=20260715v7420HomeViewportClipP1/);
-assert.match(serviceWorker, /astra-static-v20260715v7420HomeViewportClipP1/);
+assert.match(serviceWorker, /astra-static-v20260715v7423RoleResourcesP1/);
 
 console.log('experiment-registry-contract: ok');
