@@ -1,5 +1,6 @@
 import json
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 from scripts import backend_stage_gate
 
@@ -125,6 +126,27 @@ def test_backend_stage_gate_cli_returns_json_for_invalid_now(capsys):
     assert exit_code == 1
     assert output["ok"] is False
     assert output["status"] == "invalid_argument"
+
+
+def test_backend_stage_gate_forwards_strict_public_port_isolation_to_topology():
+    args = SimpleNamespace(
+        static_url="https://learn.astra.school/",
+        proxied_api_url="https://learn.astra.school/api/health",
+        direct_api_url="http://127.0.0.1:8000/api/health",
+        public_direct_api_url="http://203.0.113.10:8000/api/health",
+        external_probe_ref="probe/external-20260716",
+        origin="https://learn.astra.school",
+        api_bind_host="127.0.0.1",
+        api_bind_port=8000,
+        verify_windows_services=True,
+        require_public_port_isolation=True,
+    )
+
+    options = backend_stage_gate._topology_options(args)
+
+    assert options["verify_windows_services"] is True
+    assert options["require_public_port_isolation"] is True
+    assert options["external_probe_ref"] == "probe/external-20260716"
 
 
 def _patch_stage_gate_reports(monkeypatch):

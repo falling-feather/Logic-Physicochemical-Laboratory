@@ -41,6 +41,12 @@ def test_deploy_smoke_reports_ready_database_and_api(monkeypatch):
         assert report["schema"]["status"] == "ready"
         assert report["schema"]["dialect"] == "sqlite"
         assert report["schema"]["missing_tables"] == []
+        assert report["schema"]["organization_governance_mismatches"] == {}
+        assert report["schema"]["organization_version_invalid_rows"] == {
+            "class_groups": 0,
+            "schools": 0,
+        }
+        assert report["schema"]["expected_organization_governance_revision"] == "20260716_0047"
         assert "users" in report["schema"]["actual_tables"]
         assert "content_pages" in report["schema"]["actual_tables"]
         assert "content_drafts" in report["schema"]["actual_tables"]
@@ -137,6 +143,64 @@ def test_deploy_smoke_rejects_mysql_knowledge_window_without_microseconds(monkey
     }
 
 
+def test_deploy_smoke_rejects_0047_organization_column_contract_mismatch(monkeypatch):
+    metadata = MetaData()
+    Table(
+        "schools",
+        metadata,
+        Column("description", String, nullable=False),
+        Column("version", String, nullable=True),
+    )
+    Table(
+        "class_groups",
+        metadata,
+        Column("description", String, nullable=False),
+        Column("version", String, nullable=True),
+    )
+    fake_base = type("FakeBase", (), {"metadata": metadata})
+    monkeypatch.setattr(deploy_smoke, "Base", fake_base)
+    monkeypatch.setattr(deploy_smoke, "make_engine", lambda database_url: _FakeMysqlSchemaEngine())
+    monkeypatch.setattr(deploy_smoke, "inspect", lambda engine: _FakeOrganizationMismatchInspector())
+
+    report = deploy_smoke._schema_report("mysql+pymysql://example.invalid/astra", require_mysql=True)
+
+    assert report["ok"] is False
+    assert report["status"] == "organization_governance_schema_mismatch"
+    assert set(report["organization_governance_mismatches"]) == {"schools", "class_groups"}
+    assert report["organization_governance_mismatches"]["schools"] == {
+        "description_type": "String",
+        "description_nullable": False,
+        "version_type": "String",
+        "version_nullable": True,
+        "version_default": None,
+    }
+
+
+def test_deploy_smoke_rejects_nonpositive_0047_historical_versions(monkeypatch):
+    backend_root = Path(__file__).resolve().parents[1]
+    database_path = _migrated_sqlite_database(monkeypatch, backend_root)
+    database_url = f"sqlite+pysqlite:///{database_path.as_posix()}"
+    engine = make_engine(database_url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO schools (name, status, version, created_at, updated_at) "
+                    "VALUES ('Invalid historical version', 'active', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+                )
+            )
+
+        report = deploy_smoke._schema_report(database_url, require_mysql=False)
+
+        assert report["ok"] is False
+        assert report["status"] == "organization_version_history_invalid"
+        assert report["organization_governance_mismatches"] == {}
+        assert report["organization_version_invalid_rows"] == {"class_groups": 0, "schools": 1}
+    finally:
+        engine.dispose()
+        _dispose_and_remove(database_url, database_path)
+
+
 def _migrated_sqlite_database(monkeypatch, backend_root: Path) -> Path:
     runtime_dir = backend_root / "pytest-cache-files-smoke"
     runtime_dir.mkdir(exist_ok=True)
@@ -213,5 +277,18 @@ class _FakeMysqlPrecisionInspector:
             return [
                 {"name": "period_start", "type": mysql.DATETIME(fsp=0)},
                 {"name": "period_end", "type": mysql.DATETIME(fsp=0)},
+            ]
+        return [{"name": "version_num", "type": String()}]
+
+
+class _FakeOrganizationMismatchInspector:
+    def get_table_names(self) -> list[str]:
+        return ["alembic_version", "schools", "class_groups"]
+
+    def get_columns(self, table_name: str) -> list[dict[str, object]]:
+        if table_name in {"schools", "class_groups"}:
+            return [
+                {"name": "description", "type": String(), "nullable": False},
+                {"name": "version", "type": String(), "nullable": True, "default": None},
             ]
         return [{"name": "version_num", "type": String()}]

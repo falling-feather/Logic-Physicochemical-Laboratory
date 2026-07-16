@@ -1,0 +1,12 @@
+{
+  "schema_version": "release-artifact-manifest-v1",
+  "release_version": "REPLACE_WITH_RELEASE_VERSION",
+  "release_revision": "REPLACE_WITH_40_HEX_GIT_REVISION",
+  "artifacts": [
+    {"component": "static", "artifact_ref": "REPLACE_WITH_IMMUTABLE_STATIC_ARTIFACT_REFERENCE", "sha256": "REPLACE_WITH_64_HEX_SHA256", "size_bytes": 0},
+    {"component": "api", "artifact_ref": "REPLACE_WITH_IMMUTABLE_API_ARTIFACT_REFERENCE", "sha256": "REPLACE_WITH_64_HEX_SHA256", "size_bytes": 0},
+    {"component": "worker", "artifact_ref": "REPLACE_WITH_IMMUTABLE_WORKER_ARTIFACT_REFERENCE", "sha256": "REPLACE_WITH_64_HEX_SHA256", "size_bytes": 0},
+    {"component": "proxy", "artifact_ref": "REPLACE_WITH_IMMUTABLE_PROXY_ARTIFACT_REFERENCE", "sha256": "REPLACE_WITH_64_HEX_SHA256", "size_bytes": 0},
+    {"component": "migrations", "artifact_ref": "REPLACE_WITH_IMMUTABLE_MIGRATION_ARTIFACT_REFERENCE", "sha256": "REPLACE_WITH_64_HEX_SHA256", "size_bytes": 0}
+  ]
+}

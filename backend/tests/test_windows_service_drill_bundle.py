@@ -9,6 +9,30 @@ import pytest
 from scripts.windows_service_drill_bundle import build_windows_service_drill_bundle
 
 
+def test_root_deploy_wrapper_forwards_reviewed_generator_contract_and_exit_code():
+    root = Path(__file__).resolve().parents[2]
+    source = (root / "deploy.ps1").read_text(encoding="utf-8")
+
+    assert '"backend\\scripts\\windows_service_drill_bundle.py"' in source
+    for parameter, option in (
+        ("$OutputDir", '"--output-dir"'),
+        ("$WinSwPath", '"--winsw-path"'),
+        ("$StaticExecutable", '"--static-executable"'),
+        ("$CaddyExecutable", '"--caddy-executable"'),
+        ("$InstallRoot", '"--install-root"'),
+        ("$DatabaseUrlValue", '"--database-url-value"'),
+        ("$ServiceAccount", '"--service-account"'),
+        ("$StaticPort", '"--static-port"'),
+        ("$ApiPort", '"--api-port"'),
+        ("$ProxyPort", '"--proxy-port"'),
+    ):
+        assert option in source
+        assert parameter in source
+    assert "if ($LASTEXITCODE -ne 0)" in source
+    assert "New-NetFirewallRule" not in source
+    assert "Invoke-WebRequest" not in source
+
+
 def test_windows_service_bundle_is_loopback_minimal_and_reversible():
     with _runtime_dir() as runtime:
         install_root = runtime / "install"

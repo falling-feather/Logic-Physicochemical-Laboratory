@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import argparse
+from datetime import UTC, datetime
 import json
 from ipaddress import ip_address
 from pathlib import PureWindowsPath
 import re
+import socket
 import subprocess
 import sys
 from typing import Any, Callable
@@ -16,6 +18,7 @@ from urllib.request import Request, urlopen
 FetchResult = dict[str, Any]
 Fetcher = Callable[[str, dict[str, str], float], FetchResult]
 ServiceQuery = Callable[[tuple[str, ...]], dict[str, Any]]
+Resolver = Callable[[str], list[str]]
 
 
 DEFAULT_REQUEST_ID = "astra-topology-drill"
@@ -27,6 +30,7 @@ def run_topology_drill(
     proxied_api_url: str = "http://127.0.0.1/api/health",
     direct_api_url: str = "http://127.0.0.1:8000/api/health",
     public_direct_api_url: str | None = None,
+    external_probe_ref: str | None = None,
     origin: str | None = None,
     request_id: str = DEFAULT_REQUEST_ID,
     api_bind_host: str = "127.0.0.1",
@@ -41,10 +45,14 @@ def run_topology_drill(
     worker_log_path: str = r"C:\englab\logs\astra-worker.log",
     proxy_log_path: str = r"C:\englab\logs\astra-proxy.log",
     verify_windows_services: bool = False,
+    require_public_port_isolation: bool = False,
+    generated_at: datetime | None = None,
     timeout_seconds: float = 5.0,
     fetcher: Fetcher | None = None,
     service_query: ServiceQuery | None = None,
+    resolver: Resolver | None = None,
 ) -> dict[str, Any]:
+    generated = generated_at or datetime.now(UTC)
     fetch = fetcher or _fetch_url
     topology = _topology_report(
         static_url=static_url,
@@ -77,6 +85,9 @@ def run_topology_drill(
         fetch=fetch,
         timeout_seconds=timeout_seconds,
         request_id=request_id,
+        required=require_public_port_isolation,
+        external_probe_ref=external_probe_ref,
+        resolver=resolver or _resolve_host,
     )
     service_plan = _service_plan_report(
         static_service_name=static_service_name,
@@ -107,6 +118,11 @@ def run_topology_drill(
     }
     return {
         "ok": all(bool(section["ok"]) for section in sections.values()),
+        "generated_at": generated.isoformat(),
+        "target_requirements": {
+            "public_port_isolation_required": require_public_port_isolation,
+            "windows_services_requested": verify_windows_services,
+        },
         **sections,
     }
 
@@ -269,13 +285,42 @@ def _public_exposure_report(
     fetch: Fetcher,
     timeout_seconds: float,
     request_id: str,
+    required: bool,
+    external_probe_ref: str | None,
+    resolver: Resolver,
 ) -> dict[str, Any]:
     if not url:
         return {
-            "ok": True,
-            "status": "skipped_no_public_direct_api_url",
+            "ok": not required,
+            "status": "missing_public_direct_api_url" if required else "skipped_no_public_direct_api_url",
             "url": None,
+            "required": required,
             "policy": "provide_public_direct_api_url_to_verify_public_port_is_not_reachable",
+        }
+    if required and not _present_reference(external_probe_ref):
+        return {
+            "ok": False,
+            "status": "missing_external_probe_reference",
+            "url": url,
+            "required": required,
+            "external_probe_ref": None,
+            "policy": "target_release_requires_an_external_probe_evidence_reference",
+        }
+    parsed = urlparse(url)
+    target_host = str(parsed.hostname or "").strip().lower()
+    resolved_addresses, resolved_public_address = _resolve_public_probe_host(target_host, resolver)
+    if not target_host or not resolved_addresses or not resolved_public_address:
+        return {
+            "ok": False,
+            "status": "public_probe_target_unresolved",
+            "url": url,
+            "required": required,
+            "external_probe_ref": external_probe_ref,
+            "target_host": target_host or None,
+            "target_resolved": bool(resolved_addresses),
+            "resolved_public_address": resolved_public_address,
+            "resolved_addresses": resolved_addresses,
+            "policy": "public_direct_probe_target_must_resolve_to_a_public_address",
         }
     response = fetch(url, {"Accept": "application/json", "X-Request-ID": request_id}, timeout_seconds)
     if not response["ok"]:
@@ -283,6 +328,12 @@ def _public_exposure_report(
             "ok": True,
             "status": "not_reachable",
             "url": url,
+            "required": required,
+            "external_probe_ref": external_probe_ref,
+            "target_host": target_host,
+            "target_resolved": True,
+            "resolved_public_address": True,
+            "resolved_addresses": resolved_addresses,
             "error": response.get("error"),
             "policy": "public_direct_fastapi_port_must_not_be_reachable",
         }
@@ -290,6 +341,12 @@ def _public_exposure_report(
         "ok": False,
         "status": "reachable_public_direct_api_port",
         "url": url,
+        "required": required,
+        "external_probe_ref": external_probe_ref,
+        "target_host": target_host,
+        "target_resolved": True,
+        "resolved_public_address": True,
+        "resolved_addresses": resolved_addresses,
         "status_code": response["status_code"],
         "policy": "public_direct_fastapi_port_must_not_be_reachable",
     }
@@ -496,6 +553,39 @@ def _fetch_url(url: str, headers: dict[str, str], timeout_seconds: float) -> Fet
         }
 
 
+def _resolve_host(host: str) -> list[str]:
+    try:
+        results = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    except OSError:
+        return []
+    return sorted({str(item[4][0]).strip() for item in results if item[4] and item[4][0]})
+
+
+def _resolve_public_probe_host(host: str, resolver: Resolver) -> tuple[list[str], bool]:
+    if not host:
+        return [], False
+    try:
+        address = ip_address(host)
+        addresses = [str(address)]
+    except ValueError:
+        try:
+            addresses = resolver(host)
+        except Exception:
+            addresses = []
+    normalized: list[str] = []
+    public = False
+    for value in addresses:
+        try:
+            address = ip_address(str(value).strip().strip("[]"))
+        except ValueError:
+            continue
+        rendered = str(address)
+        if rendered not in normalized:
+            normalized.append(rendered)
+        public = public or address.is_global
+    return normalized, public
+
+
 def _header(response: FetchResult, name: str) -> str:
     headers = response.get("headers", {})
     return str(headers.get(name.lower(), ""))
@@ -534,12 +624,22 @@ def _valid_service_name(value: str) -> bool:
     return bool(re.fullmatch(r"[A-Za-z][A-Za-z0-9._-]{1,63}", value.strip()))
 
 
+def _present_reference(value: Any) -> bool:
+    reference = str(value or "").strip()
+    return bool(reference) and not reference.upper().startswith(("REPLACE_", "TODO", "CHANGEME"))
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run reverse-proxy and service topology drill checks.")
     parser.add_argument("--static-url", default="http://127.0.0.1:910/", help="Public or local static site URL.")
     parser.add_argument("--proxied-api-url", default="http://127.0.0.1/api/health", help="API health URL through reverse proxy.")
     parser.add_argument("--direct-api-url", default="http://127.0.0.1:8000/api/health", help="Direct local FastAPI health URL.")
-    parser.add_argument("--public-direct-api-url", default=None, help="Optional public direct FastAPI URL that should be unreachable.")
+    parser.add_argument("--public-direct-api-url", default=None, help="Public direct FastAPI URL that should be unreachable.")
+    parser.add_argument(
+        "--external-probe-ref",
+        default=None,
+        help="Immutable reference produced by the external probe executor; required in target strict mode.",
+    )
     parser.add_argument("--origin", default=None, help="Optional Origin header used to verify CORS through the proxy.")
     parser.add_argument("--request-id", default=DEFAULT_REQUEST_ID, help="Request ID expected to round-trip through FastAPI.")
     parser.add_argument("--api-bind-host", default="127.0.0.1", help="Configured FastAPI bind host.")
@@ -558,6 +658,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Require all four Windows services to be installed, automatic, running, and minimally privileged.",
     )
+    parser.add_argument(
+        "--require-public-port-isolation",
+        action="store_true",
+        help="Fail when --public-direct-api-url is omitted; required for target-release evidence.",
+    )
     parser.add_argument("--timeout-seconds", type=float, default=5.0, help="HTTP timeout for each check.")
     args = parser.parse_args(argv)
     report = run_topology_drill(
@@ -565,6 +670,7 @@ def main(argv: list[str] | None = None) -> int:
         proxied_api_url=args.proxied_api_url,
         direct_api_url=args.direct_api_url,
         public_direct_api_url=args.public_direct_api_url,
+        external_probe_ref=args.external_probe_ref,
         origin=args.origin,
         request_id=args.request_id,
         api_bind_host=args.api_bind_host,
@@ -579,6 +685,7 @@ def main(argv: list[str] | None = None) -> int:
         worker_log_path=args.worker_log_path,
         proxy_log_path=args.proxy_log_path,
         verify_windows_services=args.verify_windows_services,
+        require_public_port_isolation=args.require_public_port_isolation,
         timeout_seconds=args.timeout_seconds,
     )
     print(json.dumps(report, ensure_ascii=True, indent=2, sort_keys=True))

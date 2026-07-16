@@ -47,10 +47,20 @@ def run_backend_stage_gate_report(
     root = backend_root or BACKEND_ROOT
     subreports: dict[str, dict[str, Any] | None] = {
         "deploy_preflight": _safe_report(
-            lambda: run_preflight(database_url=database_url, backend_root=root, require_mysql=require_mysql)
+            lambda: run_preflight(
+                database_url=database_url,
+                backend_root=root,
+                require_mysql=require_mysql,
+                generated_at=generated_at,
+            )
         ),
         "deploy_smoke": _safe_report(
-            lambda: run_smoke(database_url=database_url, backend_root=root, require_mysql=require_mysql)
+            lambda: run_smoke(
+                database_url=database_url,
+                backend_root=root,
+                require_mysql=require_mysql,
+                generated_at=generated_at,
+            )
         ),
         "auth_security": _safe_report(
             lambda: run_auth_security_drill(
@@ -93,7 +103,9 @@ def run_backend_stage_gate_report(
         "rc_external_scope": None,
     }
     if run_topology_live:
-        subreports["deploy_topology"] = _safe_report(lambda: run_topology_drill(**(topology_options or {})))
+        subreports["deploy_topology"] = _safe_report(
+            lambda: run_topology_drill(generated_at=generated_at, **(topology_options or {}))
+        )
     if run_rc_external_scope:
         subreports["rc_external_scope"] = _safe_report(
             lambda: run_rc_external_scope_gate(
@@ -104,7 +116,7 @@ def run_backend_stage_gate_report(
                 generated_at=generated_at,
             )
         )
-    return build_backend_stage_gate_report(
+    report = build_backend_stage_gate_report(
         subreports=subreports,
         confirmations={
             "backend_tests": confirm_backend_tests_passed,
@@ -118,6 +130,8 @@ def run_backend_stage_gate_report(
         topology_live_requested=run_topology_live,
         rc_external_scope_requested=run_rc_external_scope,
     )
+    report["time_override_used"] = generated_at is not None
+    return report
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -157,6 +171,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--proxied-api-url", default=None, help="Proxied /api/health URL for topology probes.")
     parser.add_argument("--direct-api-url", default=None, help="Direct FastAPI /api/health URL for topology probes.")
     parser.add_argument("--public-direct-api-url", default=None, help="Optional public direct FastAPI URL expected to fail.")
+    parser.add_argument(
+        "--external-probe-ref",
+        default=None,
+        help="Immutable external probe evidence reference for target topology verification.",
+    )
+    parser.add_argument(
+        "--require-public-port-isolation",
+        action="store_true",
+        help="Fail the live topology gate if the public direct API probe URL is omitted.",
+    )
     parser.add_argument("--origin", default=None, help="Optional Origin header for CORS topology probe.")
     parser.add_argument("--api-bind-host", default=None, help="Expected FastAPI bind host for topology policy.")
     parser.add_argument("--api-bind-port", type=int, default=None, help="Expected FastAPI bind port for topology policy.")
@@ -237,6 +261,8 @@ def _topology_options(args: argparse.Namespace) -> dict[str, Any]:
         "api_bind_host": "api_bind_host",
         "api_bind_port": "api_bind_port",
         "verify_windows_services": "verify_windows_services",
+        "require_public_port_isolation": "require_public_port_isolation",
+        "external_probe_ref": "external_probe_ref",
     }.items():
         value = getattr(args, arg_name)
         if value is not None:

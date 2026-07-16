@@ -1,22 +1,31 @@
 {
-  "schema_version": "target-release-v1",
+  "schema_version": "target-release-v2",
   "target": {
     "environment": "staging",
-    "public_origin": "https://learn.example.edu",
+    "public_origin": "REPLACE_WITH_TARGET_HTTPS_ORIGIN",
+    "instance_id": "REPLACE_WITH_TARGET_INSTANCE_ID",
     "operations_owner": "REPLACE_WITH_OWNER",
     "change_record": "REPLACE_WITH_CHANGE_RECORD",
-    "approved_at": "2026-07-11T00:00:00Z"
+    "approved_at": "REPLACE_WITH_ISO8601_APPROVAL_TIME"
+  },
+  "release": {
+    "version": "REPLACE_WITH_RELEASE_VERSION",
+    "revision": "REPLACE_WITH_40_HEX_GIT_REVISION",
+    "artifact_manifest_path": "REPLACE_WITH_RELEASE_ARTIFACT_MANIFEST_PATH",
+    "artifact_manifest_sha256": "REPLACE_WITH_RELEASE_ARTIFACT_MANIFEST_SHA256",
+    "evidence_bundle_id": "REPLACE_WITH_EVIDENCE_BUNDLE_ID"
   },
   "controls": {
     "tls": {
       "certificate_ref": "REPLACE_WITH_CERTIFICATE_INVENTORY_REFERENCE",
       "minimum_protocol": "TLSv1.2",
       "hsts_enabled": true,
-      "not_after": "2026-10-11T00:00:00Z"
+      "not_after": "REPLACE_WITH_ISO8601_CERTIFICATE_EXPIRY"
     },
     "network": {
       "public_ports": [80, 443],
       "blocked_inner_ports": [9010, 9011, 9012],
+      "public_probe_host": "REPLACE_WITH_TARGET_PUBLIC_IP_OR_HOST",
       "external_probe_ref": "REPLACE_WITH_EXTERNAL_PORT_PROBE_REFERENCE"
     },
     "secrets": {
@@ -40,7 +49,7 @@
       "source_database": "astra",
       "restore_database": "astra_restore_verification",
       "restore_report_ref": "REPLACE_WITH_RESTORE_REPORT_REFERENCE",
-      "restore_completed_at": "2026-07-11T00:00:00Z"
+      "restore_completed_at": "REPLACE_WITH_ISO8601_RESTORE_COMPLETION_TIME"
     },
     "logging": {
       "rotation_enabled": true,
@@ -49,7 +58,7 @@
       "rotation_test_ref": "REPLACE_WITH_LOG_ROTATION_TEST_REFERENCE"
     },
     "monitoring": {
-      "health_url": "https://learn.example.edu/api/health",
+      "health_url": "REPLACE_WITH_TARGET_HTTPS_ORIGIN/api/health",
       "service_monitors": ["static", "api", "worker", "proxy"],
       "alert_channel_ref": "REPLACE_WITH_ALERT_CHANNEL_REFERENCE",
       "alert_test_ref": "REPLACE_WITH_ALERT_TEST_REFERENCE"
@@ -58,16 +67,16 @@
       "config_ref": "REPLACE_WITH_CONFIG_ROLLBACK_REFERENCE",
       "binary_ref": "REPLACE_WITH_BINARY_ROLLBACK_REFERENCE",
       "database_ref": "REPLACE_WITH_DATABASE_ROLLBACK_REFERENCE",
-      "drill_completed_at": "2026-07-11T00:00:00Z"
+      "drill_completed_at": "REPLACE_WITH_ISO8601_ROLLBACK_COMPLETION_TIME"
     }
   },
   "evidence": [
-    {"id": "deploy_preflight", "path": "evidence/deploy-preflight.json", "sha256": "REPLACE_WITH_64_HEX_SHA256", "status_path": "ok", "expected": true},
-    {"id": "deploy_smoke", "path": "evidence/deploy-smoke.json", "sha256": "REPLACE_WITH_64_HEX_SHA256", "status_path": "ok", "expected": true},
-    {"id": "deploy_topology", "path": "evidence/deploy-topology.json", "sha256": "REPLACE_WITH_64_HEX_SHA256", "status_path": "ok", "expected": true},
-    {"id": "backend_stage_gate", "path": "evidence/backend-stage-gate.json", "sha256": "REPLACE_WITH_64_HEX_SHA256", "status_path": "ok", "expected": true},
-    {"id": "database_restore", "path": "evidence/database-restore.json", "sha256": "REPLACE_WITH_64_HEX_SHA256", "status_path": "ok", "expected": true},
-    {"id": "runtime_rollback", "path": "evidence/runtime-rollback.json", "sha256": "REPLACE_WITH_64_HEX_SHA256", "status_path": "ok", "expected": true},
-    {"id": "target_browser_smoke", "path": "evidence/target-browser-smoke.json", "sha256": "REPLACE_WITH_64_HEX_SHA256", "status_path": "ok", "expected": true}
+    {"id": "deploy_preflight", "run_id": "REPLACE_WITH_PREFLIGHT_RUN_ID", "path": "evidence/deploy-preflight.json", "sha256": "REPLACE_WITH_64_HEX_SHA256"},
+    {"id": "deploy_smoke", "run_id": "REPLACE_WITH_SMOKE_RUN_ID", "path": "evidence/deploy-smoke.json", "sha256": "REPLACE_WITH_64_HEX_SHA256"},
+    {"id": "deploy_topology", "run_id": "REPLACE_WITH_TOPOLOGY_RUN_ID", "path": "evidence/deploy-topology.json", "sha256": "REPLACE_WITH_64_HEX_SHA256"},
+    {"id": "backend_stage_gate", "run_id": "REPLACE_WITH_STAGE_GATE_RUN_ID", "path": "evidence/backend-stage-gate.json", "sha256": "REPLACE_WITH_64_HEX_SHA256"},
+    {"id": "database_restore", "run_id": "REPLACE_WITH_RESTORE_RUN_ID", "path": "evidence/database-restore.json", "sha256": "REPLACE_WITH_64_HEX_SHA256"},
+    {"id": "runtime_rollback", "run_id": "REPLACE_WITH_ROLLBACK_RUN_ID", "path": "evidence/runtime-rollback.json", "sha256": "REPLACE_WITH_64_HEX_SHA256"},
+    {"id": "target_browser_smoke", "run_id": "REPLACE_WITH_BROWSER_RUN_ID", "path": "evidence/target-browser-smoke.json", "sha256": "REPLACE_WITH_64_HEX_SHA256"}
   ]
 }

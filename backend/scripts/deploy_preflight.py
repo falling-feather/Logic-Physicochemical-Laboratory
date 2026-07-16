@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import UTC, datetime
 import json
 from pathlib import Path
 import sys
@@ -28,7 +29,9 @@ def run_preflight(
     backend_root: Path | None = None,
     *,
     require_mysql: bool = False,
+    generated_at: datetime | None = None,
 ) -> dict[str, Any]:
+    generated = generated_at or datetime.now(UTC)
     root = backend_root or BACKEND_ROOT
     settings = get_settings()
     url = database_url or settings.database_url
@@ -42,6 +45,7 @@ def run_preflight(
     )
     return {
         "ok": bool(configuration["ok"] and database["ok"] and migrations["ok"] and compatibility["ok"]),
+        "generated_at": generated.isoformat(),
         "configuration": configuration,
         "database": database,
         "migrations": migrations,

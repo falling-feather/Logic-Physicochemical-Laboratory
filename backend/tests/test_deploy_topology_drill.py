@@ -41,6 +41,10 @@ def test_deploy_topology_drill_reports_ready_topology_without_real_network():
     )
 
     assert report["ok"] is True
+    assert report["target_requirements"] == {
+        "public_port_isolation_required": False,
+        "windows_services_requested": False,
+    }
     assert report["topology"]["proxied_api_path_ok"] is True
     assert report["static_site"]["html_detected"] is True
     assert report["proxied_api"]["cache_no_store_ok"] is True
@@ -55,6 +59,49 @@ def test_deploy_topology_drill_reports_ready_topology_without_real_network():
     assert report["service_plan"]["proxy_service_name"] == "AstraProxy"
     assert report["service_plan"]["logs_configured"] is True
     assert report["windows_services"]["status"] == "skipped_not_requested"
+
+
+def test_deploy_topology_drill_target_mode_rejects_missing_public_port_probe():
+    report = run_topology_drill(
+        static_url="https://astra.example/",
+        proxied_api_url="https://astra.example/api/health",
+        direct_api_url="http://127.0.0.1:8000/api/health",
+        request_id="drill-1",
+        require_public_port_isolation=True,
+        fetcher=_ready_fetcher(),
+    )
+
+    assert report["ok"] is False
+    assert report["target_requirements"]["public_port_isolation_required"] is True
+    assert report["public_exposure"] == {
+        "ok": False,
+        "status": "missing_public_direct_api_url",
+        "url": None,
+        "required": True,
+        "policy": "provide_public_direct_api_url_to_verify_public_port_is_not_reachable",
+    }
+
+
+def test_deploy_topology_drill_target_mode_rejects_missing_external_probe_reference():
+    report = run_topology_drill(
+        static_url="https://astra.example/",
+        proxied_api_url="https://astra.example/api/health",
+        direct_api_url="http://127.0.0.1:8000/api/health",
+        public_direct_api_url="http://8.8.8.8:8000/api/health",
+        request_id="drill-1",
+        require_public_port_isolation=True,
+        fetcher=_ready_fetcher(),
+    )
+
+    assert report["ok"] is False
+    assert report["public_exposure"] == {
+        "ok": False,
+        "status": "missing_external_probe_reference",
+        "url": "http://8.8.8.8:8000/api/health",
+        "required": True,
+        "external_probe_ref": None,
+        "policy": "target_release_requires_an_external_probe_evidence_reference",
+    }
 
 
 def test_deploy_topology_drill_verifies_running_minimal_windows_services():
@@ -357,6 +404,34 @@ def test_deploy_topology_drill_handles_http_failures_as_report_items():
     assert report["direct_api"]["status"] == "unavailable"
     assert report["public_exposure"]["ok"] is True
     assert report["public_exposure"]["status"] == "not_reachable"
+
+
+def test_deploy_topology_drill_rejects_unresolved_public_probe_target():
+    report = run_topology_drill(
+        static_url="https://astra.example/",
+        proxied_api_url="https://astra.example/api/health",
+        direct_api_url="http://127.0.0.1:8000/api/health",
+        public_direct_api_url="http://unresolved.astra.school:8000/api/health",
+        external_probe_ref="probe/external-20260716",
+        require_public_port_isolation=True,
+        request_id="drill-1",
+        fetcher=_ready_fetcher(),
+        resolver=lambda _host: [],
+    )
+
+    assert report["ok"] is False
+    assert report["public_exposure"] == {
+        "ok": False,
+        "status": "public_probe_target_unresolved",
+        "url": "http://unresolved.astra.school:8000/api/health",
+        "required": True,
+        "external_probe_ref": "probe/external-20260716",
+        "target_host": "unresolved.astra.school",
+        "target_resolved": False,
+        "resolved_public_address": False,
+        "resolved_addresses": [],
+        "policy": "public_direct_probe_target_must_resolve_to_a_public_address",
+    }
 
 
 def _ready_fetcher() -> "_FakeFetcher":

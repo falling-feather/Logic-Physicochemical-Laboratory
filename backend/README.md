@@ -100,7 +100,9 @@ python -m scripts.backend_stage_gate --require-mysql \
   --proxied-api-url https://your-domain.example/api/health \
   --direct-api-url http://127.0.0.1:8000/api/health \
   --public-direct-api-url http://your-public-ip:8000/api/health \
+  --external-probe-ref probe/external-change-001 \
   --verify-windows-services \
+  --require-public-port-isolation \
   --run-rc-external-scope \
   --confirm-database-restore-evidence \
   --confirm-runtime-rollback-evidence \
@@ -575,7 +577,7 @@ cd backend
 python -m scripts.deploy_smoke --require-mysql
 ```
 
-smoke 会复用部署预检，再检查当前模型期望表是否全部存在、关键模型列是否缺失，并用同一配置启动 FastAPI TestClient 访问 `/api/health`。脚本运行时会临时关闭自动建表、知识快照调度器和内容脚本远端漂移调度器，只验证迁移后的现有状态。`--require-mysql` 用作生产门禁：会把 MySQL 方言、`utf8mb4` 字符集/排序规则检查传递给预检层，并继续在 schema 层阻断非 MySQL 方言；本地或 CI 需要覆盖临时库时可追加 `--database-url` 且不传 `--require-mysql`。
+smoke 会复用部署预检，再检查当前模型期望表是否全部存在、关键模型列是否缺失，并用同一配置启动 FastAPI TestClient 访问 `/api/health`。0047 起还固定检查 `schools/class_groups.description` 的 Text/nullable、`version` 的 Integer/non-null/server default 1，以及所有现存行 `version >= 1`；结果位于 `organization_governance_mismatches` 与 `organization_version_invalid_rows`。脚本运行时会临时关闭自动建表、知识快照调度器和内容脚本远端漂移调度器，只验证迁移后的现有状态。`--require-mysql` 用作生产门禁：会把 MySQL 方言、`utf8mb4` 字符集/排序规则检查传递给预检层，并继续在 schema 层阻断非 MySQL 方言；本地或 CI 需要覆盖临时库时可追加 `--database-url` 且不传 `--require-mysql`。
 
 反向代理/服务注册拓扑演练报告：
 
@@ -584,14 +586,17 @@ cd backend
 python -m scripts.deploy_topology_drill \
   --static-url https://your-domain.example/ \
   --proxied-api-url https://your-domain.example/api/health \
-  --direct-api-url http://127.0.0.1:8000/api/health \
-  --public-direct-api-url http://your-public-ip:8000/api/health \
+  --direct-api-url http://127.0.0.1:9011/api/health \
+  --public-direct-api-url http://your-public-ip:9011/api/health \
+  --external-probe-ref probe/external-change-001 \
   --origin https://your-domain.example \
   --api-bind-host 127.0.0.1 \
-  --verify-windows-services
+  --api-bind-port 9011 \
+  --verify-windows-services \
+  --require-public-port-isolation
 ```
 
-该脚本输出 JSON 报告，检查静态主站 HTML、经反向代理的 FastAPI `/api/health`、`Cache-Control: no-store`、`X-Request-ID`、CORS Origin、公开 health 不回传数据库 URL、直连 FastAPI 主机是否为本机/内网、可选公网直连端口是否不可达，以及四个服务的日志和重启计划。`--verify-windows-services` 还会从 Windows SCM 回读 `EngLab/AstraApi/AstraWorker/AstraProxy` 是否已安装、自动启动、正在运行、使用最小权限内置账号且具有有效 PID。
+该脚本输出 JSON 报告，检查静态主站 HTML、经反向代理的 FastAPI `/api/health`、`Cache-Control: no-store`、`X-Request-ID`、CORS Origin、公开 health 不回传数据库 URL、直连 FastAPI 主机是否为本机/内网、公网直连端口是否不可达，以及四个服务的日志和重启计划。目标发布必须同时使用 `--require-public-port-isolation`、`--external-probe-ref` 与 `--verify-windows-services`：公网探测 host 必须由 manifest 冻结并成功解析到公网地址，缺 URL/外部执行引用或解析失败均阻断；SCM 回读还要逐服务确认存在、自动启动、正在运行、最小权限内置账号和有效 PID。本地非发布演练可不启用严格参数。
 
 Windows 演练包应使用已单独下载并复核 hash 的 WinSW/Caddy 与合格 Release 构建产物生成；脚本不会联网下载、不会打开防火墙、不会安装或启动服务，也不会把 MySQL DSN 写进报告：
 
@@ -604,6 +609,17 @@ Windows 演练包应使用已单独下载并复核 hash 的 WinSW/Caddy 与合�
 ```
 
 生成后先复核 JSON 中的 `artifact_hashes`、四份 XML 和 `config/Caddyfile`，再按 `commands.install/start/stop/uninstall` 操作。生产数据库连接只允许由服务账号环境或 secret store 提供；根脚本不再下载未校验 NSSM、不开放端口，也不再用 `sc.exe` 直接包装控制台程序。
+
+目标发布证据使用 `target-release-v2`。先基于 `backend/release-artifact-manifest.example.json` 建立同包 `release-artifact-manifest-v1`，固定 version/revision 以及 static/API/worker/proxy/migrations 五类不可变制品引用、SHA 和大小；再完成 `backend/target-release-manifest.example.json` 中的目标实例、HTTPS origin、版本、冻结 revision、制品清单路径/SHA 和 bundle ID。四份自动报告必须保留执行时生成的 `generated_at` raw JSON，恢复/回滚/浏览器三类报告从 fail-closed 模板开始。所有 raw 报告必须由统一封装器校验并绑定唯一 run ID：
+
+```bash
+cd backend
+python -m scripts.target_release_evidence template --evidence-id database_restore --output ../evidence/raw/database-restore.json
+python -m scripts.target_release_evidence seal --manifest ../evidence/target-release.json --evidence-id deploy_preflight --run-id preflight-change-001 --input ../evidence/raw/deploy-preflight.json --output ../evidence/evidence/deploy-preflight.json
+python -m scripts.target_release_gate --manifest ../evidence/target-release.json
+```
+
+总闸固定为 51/51：拒绝示例 origin、制品清单缺失/篡改/版本不一致、manifest 自选 `status_path/expected`、匿名或自定义第八 evidence、空壳 `ok=true`、跨目标/跨 revision/跨 bundle、重复 run、过期 envelope 或超出总闸当前窗口的旧 raw、路径逃逸/hash 篡改、非单一 0047 MySQL、未绑定/未解析公网探针、仅服务名 SCM、缺少三角色/409/组织归档恢复浏览器语义和敏感正文。正式 CLI 完全拒绝时间覆盖；测试只能直接调用内部函数注入时钟。真实证据包、DSN、secret 和备份内容不得进入仓库；完整执行顺序见 `doc/04-部署指南.md`。
 
 正式内容初始化：
 

@@ -10,20 +10,33 @@ import re
 from typing import Any
 from urllib.parse import urlsplit
 
-
-SCHEMA_VERSION = "target-release-v1"
-MAX_EVIDENCE_BYTES = 10 * 1024 * 1024
-REQUIRED_EVIDENCE = (
-    "deploy_preflight",
-    "deploy_smoke",
-    "deploy_topology",
-    "backend_stage_gate",
-    "database_restore",
-    "runtime_rollback",
-    "target_browser_smoke",
+from scripts.target_release_evidence import (
+    ARTIFACT_MANIFEST_SCHEMA_VERSION,
+    REQUIRED_EVIDENCE,
+    TARGET_RELEASE_SCHEMA_VERSION,
+    validate_release_artifact_manifest,
+    validate_evidence_envelope,
 )
+
+SCHEMA_VERSION = TARGET_RELEASE_SCHEMA_VERSION
+MAX_EVIDENCE_BYTES = 10 * 1024 * 1024
 REQUIRED_SERVICES = {"static", "api", "worker", "proxy"}
-SENSITIVE_KEY_PARTS = ("password", "token", "credential", "private_key", "database_url", "dsn")
+SENSITIVE_KEY_PARTS = (
+    "password",
+    "secret",
+    "token",
+    "credential",
+    "private_key",
+    "api_key",
+    "access_key",
+    "database_url",
+    "dsn",
+)
+_RELEASE_VERSION_RE = re.compile(r"V\d+\.\d+\.\d+")
+_GIT_REVISION_RE = re.compile(r"[0-9a-fA-F]{40}")
+_SHA256_RE = re.compile(r"[0-9a-fA-F]{64}")
+_IDENTIFIER_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{5,127}")
+_EXAMPLE_DOMAIN_ROOTS = ("example.com", "example.net", "example.org", "example.edu")
 
 
 def build_target_release_report(
@@ -33,6 +46,7 @@ def build_target_release_report(
 ) -> dict[str, Any]:
     generated_at = _utc(now or datetime.now(UTC))
     source = Path(manifest_path).resolve()
+    bundle_root = source.parent
     checks: list[dict[str, Any]] = []
 
     def check(control: str, ok: bool, reason: str = "ready") -> bool:
@@ -66,6 +80,12 @@ def build_target_release_report(
     approved_at = _parse_datetime(target.get("approved_at"))
     check("target_environment", environment in {"staging", "production"}, "target_must_be_staging_or_production")
     check("target_public_origin", origin_ok, origin_reason)
+    target_instance_id = str(target.get("instance_id") or "").strip()
+    check(
+        "target_instance_id",
+        _present(target_instance_id) and bool(_IDENTIFIER_RE.fullmatch(target_instance_id)),
+        "target_instance_id_missing_or_invalid",
+    )
     check("operations_owner", _present(target.get("operations_owner")), "operations_owner_missing")
     check("change_record", _present(target.get("change_record")), "change_record_missing")
     check(
@@ -73,6 +93,45 @@ def build_target_release_report(
         _recent(approved_at, generated_at, days=30),
         "approval_missing_future_or_older_than_30_days",
     )
+
+    release_source = _mapping(manifest.get("release"))
+    release_version = str(release_source.get("version") or "").strip()
+    release_revision = str(release_source.get("revision") or "").strip().lower()
+    artifact_manifest_sha256 = str(release_source.get("artifact_manifest_sha256") or "").strip().lower()
+    artifact_manifest_path = str(release_source.get("artifact_manifest_path") or "").strip()
+    evidence_bundle_id = str(release_source.get("evidence_bundle_id") or "").strip()
+    check(
+        "release_version",
+        bool(_RELEASE_VERSION_RE.fullmatch(release_version)),
+        "release_version_must_use_Vx_y_z",
+    )
+    check(
+        "release_revision",
+        bool(_GIT_REVISION_RE.fullmatch(release_revision)),
+        "release_revision_must_be_40_hex_git_commit",
+    )
+    artifact_manifest_ok, artifact_manifest_reason = validate_release_artifact_manifest(
+        bundle_root,
+        {
+            "version": release_version,
+            "revision": release_revision,
+            "artifact_manifest_path": artifact_manifest_path,
+            "artifact_manifest_sha256": artifact_manifest_sha256,
+        },
+    )
+    check("release_artifact_manifest", artifact_manifest_ok, artifact_manifest_reason)
+    check(
+        "release_evidence_bundle",
+        _present(evidence_bundle_id) and bool(_IDENTIFIER_RE.fullmatch(evidence_bundle_id)),
+        "evidence_bundle_id_missing_or_invalid",
+    )
+    release = {
+        "version": release_version,
+        "revision": release_revision,
+        "artifact_manifest_path": artifact_manifest_path,
+        "artifact_manifest_sha256": artifact_manifest_sha256,
+        "evidence_bundle_id": evidence_bundle_id,
+    }
 
     controls = _mapping(manifest.get("controls"))
     _validate_tls(_mapping(controls.get("tls")), generated_at, check)
@@ -84,7 +143,7 @@ def build_target_release_report(
     _validate_monitoring(_mapping(controls.get("monitoring")), public_origin, check)
     _validate_rollback(_mapping(controls.get("rollback")), generated_at, check)
 
-    evidence_root = source.parent
+    evidence_root = bundle_root
     evidence_items = manifest.get("evidence") if isinstance(manifest.get("evidence"), list) else []
     evidence_by_id = {
         str(item.get("id")): item
@@ -93,32 +152,65 @@ def build_target_release_report(
     }
     for evidence_id in REQUIRED_EVIDENCE:
         item = evidence_by_id.get(evidence_id)
-        ok, reason = _validate_evidence_item(evidence_root, item)
+        ok, reason = _validate_evidence_item(
+            evidence_root,
+            item,
+            evidence_id=evidence_id,
+            target={
+                "environment": environment,
+                "public_origin": public_origin,
+                "instance_id": target_instance_id,
+            },
+            release=release,
+            controls=controls,
+            now=generated_at,
+        )
         check(f"evidence.{evidence_id}", ok, reason)
 
-    duplicate_ids = len(evidence_by_id) != len(
-        [item for item in evidence_items if isinstance(item, dict) and _present(item.get("id"))]
+    identified_items = [item for item in evidence_items if isinstance(item, dict) and _present(item.get("id"))]
+    run_ids = [str(item.get("run_id") or "").strip() for item in identified_items]
+    duplicate_ids = len(evidence_by_id) != len(identified_items)
+    invalid_or_duplicate_run_ids = (
+        len(run_ids) != len(set(run_ids))
+        or any(not _present(run_id) or not _IDENTIFIER_RE.fullmatch(run_id) for run_id in run_ids)
     )
-    check("evidence_unique_ids", not duplicate_ids, "duplicate_evidence_id")
+    check(
+        "evidence_unique_ids",
+        len(evidence_items) == len(REQUIRED_EVIDENCE)
+        and set(evidence_by_id) == set(REQUIRED_EVIDENCE)
+        and len(identified_items) == len(REQUIRED_EVIDENCE)
+        and not duplicate_ids
+        and not invalid_or_duplicate_run_ids,
+        "duplicate_or_invalid_evidence_id_or_run_id",
+    )
 
     return _report(
         generated_at=generated_at,
         manifest_path=source,
         checks=checks,
-        target={"environment": environment, "public_origin": public_origin if origin_ok else None},
+        target={
+            "environment": environment,
+            "public_origin": public_origin if origin_ok else None,
+            "instance_id": target_instance_id or None,
+        },
+        release=release,
     )
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate a target-environment release evidence bundle.")
-    parser.add_argument("--manifest", required=True, help="Path to target-release-v1 JSON manifest.")
-    parser.add_argument("--now", default=None, help="Override current UTC time for deterministic verification.")
+    parser.add_argument("--manifest", required=True, help="Path to target-release-v2 JSON manifest.")
+    parser.add_argument("--now", default=None, help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--allow-test-time-override",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
     args = parser.parse_args(argv)
     try:
-        now = _parse_datetime(args.now) if args.now else None
-        if args.now and now is None:
-            raise ValueError("--now must be an ISO-8601 timestamp")
-        report = build_target_release_report(args.manifest, now=now)
+        if args.now is not None or args.allow_test_time_override:
+            raise ValueError("cli_time_override_not_supported")
+        report = build_target_release_report(args.manifest)
     except Exception as exc:
         report = {
             "ok": False,
@@ -151,19 +243,31 @@ def _validate_tls(tls: dict[str, Any], now: datetime, check: Any) -> None:
 def _validate_network(network: dict[str, Any], check: Any) -> None:
     public_ports = sorted(_integer_list(network.get("public_ports")))
     inner_ports = _integer_list(network.get("blocked_inner_ports"))
+    external_probe_ref = network.get("external_probe_ref")
+    public_probe_host = network.get("public_probe_host")
     check("network_public_ports", public_ports == [80, 443], "public_ports_must_be_exactly_80_443")
     check(
         "network_inner_ports",
         bool(inner_ports) and not ({80, 443} & set(inner_ports)),
         "blocked_inner_ports_missing_or_include_public_ports",
     )
-    check("network_external_probe", _present(network.get("external_probe_ref")), "external_probe_reference_missing")
+    check(
+        "network_external_probe",
+        _present(external_probe_ref) and _public_probe_host(public_probe_host),
+        "external_probe_reference_or_public_probe_host_missing_or_invalid",
+    )
 
 
 def _validate_secrets(secrets: dict[str, Any], check: Any) -> None:
     refs = secrets.get("references") if isinstance(secrets.get("references"), list) else []
     check("secret_store_provider", _present(secrets.get("provider")), "secret_store_provider_missing")
-    check("secret_references", len(refs) >= 3 and all(_present(value) for value in refs), "at_least_three_secret_references_required")
+    check(
+        "secret_references",
+        len(refs) >= 3 and len(set(str(value) for value in refs)) == len(refs) and all(
+            _opaque_secret_reference(value) for value in refs
+        ),
+        "at_least_three_distinct_opaque_secret_references_required",
+    )
     check("secret_rotation_owner", _present(secrets.get("rotation_owner")), "secret_rotation_owner_missing")
 
 
@@ -226,33 +330,48 @@ def _validate_rollback(rollback: dict[str, Any], now: datetime, check: Any) -> N
     )
 
 
-def _validate_evidence_item(root: Path, item: Any) -> tuple[bool, str]:
+def _validate_evidence_item(
+    root: Path,
+    item: Any,
+    *,
+    evidence_id: str,
+    target: dict[str, Any],
+    release: dict[str, Any],
+    controls: dict[str, Any],
+    now: datetime,
+) -> tuple[bool, str]:
     if not isinstance(item, dict):
         return False, "evidence_entry_missing"
+    if "status_path" in item or "expected" in item:
+        return False, "evidence_status_override_not_allowed"
+    run_id = str(item.get("run_id") or "").strip()
     relative = item.get("path")
     expected_sha = str(item.get("sha256") or "").strip().lower()
     if not _present(relative) or not _sha256_text(expected_sha):
         return False, "evidence_path_or_sha256_invalid"
-    target = (root / str(relative)).resolve()
+    evidence_path = (root / str(relative)).resolve()
     try:
-        target.relative_to(root)
+        evidence_path.relative_to(root)
     except ValueError:
         return False, "evidence_path_escapes_bundle"
     try:
-        if not target.is_file() or target.stat().st_size > MAX_EVIDENCE_BYTES:
+        if not evidence_path.is_file() or evidence_path.stat().st_size > MAX_EVIDENCE_BYTES:
             return False, "evidence_file_missing_or_too_large"
-        raw = target.read_bytes()
+        raw = evidence_path.read_bytes()
         if hashlib.sha256(raw).hexdigest() != expected_sha:
             return False, "evidence_sha256_mismatch"
         payload = json.loads(raw.decode("utf-8"))
     except Exception as exc:
         return False, exc.__class__.__name__
-    status_path = str(item.get("status_path") or "ok").strip()
-    expected = item.get("expected", True)
-    actual = _value_at(payload, status_path)
-    if actual != expected:
-        return False, "evidence_status_mismatch"
-    return True, "ready"
+    return validate_evidence_envelope(
+        payload,
+        evidence_id=evidence_id,
+        run_id=run_id,
+        target=target,
+        release=release,
+        controls=controls,
+        now=now,
+    )
 
 
 def _report(
@@ -261,6 +380,7 @@ def _report(
     manifest_path: Path,
     checks: list[dict[str, Any]],
     target: dict[str, Any] | None = None,
+    release: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     blockers = [item for item in checks if not item["ok"]]
     return {
@@ -269,7 +389,14 @@ def _report(
         "schema_version": SCHEMA_VERSION,
         "generated_at": generated_at.isoformat(),
         "manifest_name": manifest_path.name,
-        "target": target or {"environment": None, "public_origin": None},
+        "target": target or {"environment": None, "public_origin": None, "instance_id": None},
+        "release": release or {
+            "version": None,
+            "revision": None,
+            "artifact_manifest_path": None,
+            "artifact_manifest_sha256": None,
+            "evidence_bundle_id": None,
+        },
         "counts": {"total": len(checks), "passed": len(checks) - len(blockers), "blocked": len(blockers)},
         "checks": checks,
         "blockers": blockers,
@@ -286,7 +413,15 @@ def _sensitive_manifest_paths(value: Any, prefix: str = "$") -> list[str]:
             normalized = str(key).strip().lower()
             child_path = f"{prefix}.{key}"
             is_reference = normalized.endswith("_ref") or normalized in {"references", "provider"}
-            if not is_reference and any(part in normalized for part in SENSITIVE_KEY_PARTS):
+            has_sensitive_name = any(part in normalized for part in SENSITIVE_KEY_PARTS)
+            if (
+                is_reference
+                and has_sensitive_name
+                and isinstance(child, str)
+                and not _opaque_secret_reference(child)
+            ):
+                found.append(child_path)
+            elif not is_reference and normalized != "secrets" and has_sensitive_name:
                 found.append(child_path)
             found.extend(_sensitive_manifest_paths(child, child_path))
     elif isinstance(value, list):
@@ -299,12 +434,18 @@ def _sensitive_manifest_paths(value: Any, prefix: str = "$") -> list[str]:
 
 def _public_https_origin(value: str) -> tuple[bool, str]:
     try:
+        if not _present(value):
+            return False, "public_origin_placeholder_not_replaced"
         parsed = urlsplit(value)
         if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
             return False, "public_origin_must_be_https_origin"
         if parsed.path or parsed.query or parsed.fragment or parsed.port not in {None, 443}:
             return False, "public_origin_must_not_include_path_query_fragment_or_nonstandard_port"
         hostname = parsed.hostname.lower()
+        if hostname.endswith((".example", ".invalid", ".test", ".localhost")) or any(
+            hostname == root or hostname.endswith(f".{root}") for root in _EXAMPLE_DOMAIN_ROOTS
+        ):
+            return False, "public_origin_placeholder_domain_not_allowed"
         if hostname in {"localhost", "127.0.0.1", "::1"}:
             return False, "public_origin_must_not_be_local"
         try:
@@ -319,14 +460,20 @@ def _public_https_origin(value: str) -> tuple[bool, str]:
         return False, "public_origin_invalid"
 
 
-def _value_at(payload: Any, dotted_path: str) -> Any:
-    current = payload
-    for part in dotted_path.split("."):
-        if isinstance(current, dict) and part in current:
-            current = current[part]
-        else:
-            return None
-    return current
+def _public_probe_host(value: Any) -> bool:
+    host = str(value or "").strip().lower().strip("[]")
+    if not _present(host) or re.search(r"\s|/|@", host):
+        return False
+    if host in {"localhost", "0.0.0.0", "::", "::1"}:
+        return False
+    try:
+        address = ipaddress.ip_address(host)
+        return bool(address.is_global)
+    except ValueError:
+        pass
+    if "." not in host or host.endswith((".example", ".invalid", ".test", ".localhost", ".local", ".internal")):
+        return False
+    return not any(host == root or host.endswith(f".{root}") for root in _EXAMPLE_DOMAIN_ROOTS)
 
 
 def _parse_datetime(value: Any) -> datetime | None:
@@ -372,6 +519,34 @@ def _integer_list(value: Any) -> list[int]:
 
 def _sha256_text(value: Any) -> bool:
     return bool(re.fullmatch(r"[0-9a-fA-F]{64}", str(value or "").strip()))
+
+
+def _opaque_secret_reference(value: Any) -> bool:
+    reference = str(value or "").strip()
+    lowered = reference.lower()
+    if not _present(reference) or not 4 <= len(reference) <= 256:
+        return False
+    if re.search(r"\s|=|://", reference):
+        return False
+    if lowered.startswith(
+        (
+            "sk-",
+            "ghp_",
+            "github_pat_",
+            "bearer-",
+            "bearer:",
+            "basic:",
+            "password:",
+            "passwd:",
+            "pwd:",
+            "token:",
+            "secret:",
+            "apikey:",
+            "api_key:",
+        )
+    ):
+        return False
+    return any(separator in reference for separator in ("/", ":", "#"))
 
 
 if __name__ == "__main__":
