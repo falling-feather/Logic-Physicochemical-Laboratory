@@ -219,6 +219,65 @@ const expectedValidated = {
         owner: 'GeneEngineering'
     }
 };
+
+const exactContext = { window: {}, console };
+vm.createContext(exactContext);
+vm.runInContext(registrySource, exactContext, { filename: 'shared/js/experiment-registry.js' });
+const exactRegistry = exactContext.window.AstraExperimentRegistry;
+const unknownExact = exactRegistry.cleanupModule('physics', 'not-found');
+assert.equal(unknownExact.outcome, 'unknown');
+assert.equal(unknownExact.eligible, 0);
+assert.equal(unknownExact.skipped, 1);
+assert.equal(unknownExact.attempted, 0);
+assert.equal(unknownExact.executed, 0);
+assert.equal(unknownExact.failed, 0);
+assert.ok(Object.isFrozen(unknownExact));
+
+vm.runInContext(`
+    globalThis.legacyExactCalls = 0;
+    function destroyFunctionGraph() { globalThis.legacyExactCalls += 1; }
+`, exactContext);
+const unverifiedExact = exactRegistry.cleanupModule('mathematics', 'function-graph');
+assert.equal(unverifiedExact.outcome, 'unverified');
+assert.equal(unverifiedExact.eligible, 0);
+assert.equal(unverifiedExact.skipped, 1);
+assert.equal(unverifiedExact.attempted, 0);
+assert.equal(unverifiedExact.executed, 0);
+assert.equal(unverifiedExact.failed, 0);
+assert.equal(exactContext.legacyExactCalls, 0, 'module cleanup must never execute a legacy callback');
+
+const unavailableExact = exactRegistry.cleanupModule('physics', 'mechanics');
+assert.equal(unavailableExact.outcome, 'owner-unavailable');
+assert.equal(unavailableExact.eligible, 1);
+assert.equal(unavailableExact.attempted, 1);
+assert.equal(unavailableExact.executed, 0);
+assert.equal(unavailableExact.failed, 0);
+
+vm.runInContext(`
+    globalThis.modelExactCalls = 0;
+    globalThis.otherExactCalls = 0;
+    const ModelingNumerical = { destroy() { globalThis.modelExactCalls += 1; } };
+    const Thermodynamics = { destroy() { globalThis.otherExactCalls += 1; } };
+    const GasLaws = { destroy() { throw new Error('destroy probe'); } };
+`, exactContext);
+const failedExact = exactRegistry.cleanupModule('physics', 'gas-laws');
+assert.equal(failedExact.outcome, 'failed');
+assert.equal(failedExact.eligible, 1);
+assert.equal(failedExact.attempted, 1);
+assert.equal(failedExact.executed, 0);
+assert.equal(failedExact.failed, 1);
+
+const cleanedExact = exactRegistry.cleanupModule('mathematics', 'modeling-numerical');
+assert.equal(cleanedExact.outcome, 'cleaned');
+assert.equal(cleanedExact.eligible, 1);
+assert.equal(cleanedExact.skipped, 0);
+assert.equal(cleanedExact.attempted, 1);
+assert.equal(cleanedExact.executed, 1);
+assert.equal(cleanedExact.failed, 0);
+assert.equal(exactContext.modelExactCalls, 1);
+assert.equal(exactContext.otherExactCalls, 0, 'exact cleanup must not execute another verified owner');
+assert.ok(Object.isFrozen(cleanedExact));
+
 assert.deepEqual(
     definitions
         .filter(entry => entry.cleanup.state === 'validated-callback')
@@ -284,6 +343,7 @@ assert.doesNotMatch(registrySource, /destroyPhysics|Biology\.destroy/);
 assert.doesNotMatch(moduleSelector, /\b_moduleScripts\s*:|\bconst initMap\s*=/);
 assert.match(moduleSelector, /AstraExperimentRegistry\?\.scriptFor\(page, moduleId\)/);
 assert.match(moduleSelector, /AstraExperimentRegistry\?\.init\(page, moduleId\)/);
+assert.match(moduleSelector, /registry\.cleanupModule\(page, moduleId\)/);
 assert.match(moduleSelector, /leavePage\(page, options = \{\}\)/);
 assert.match(moduleSelector, /AstraExperimentRegistry\?\.cleanupPage\(page\)/);
 const leavePageStart = moduleSelector.indexOf('leavePage(page, options = {})');
@@ -291,7 +351,8 @@ const leavePageSource = moduleSelector.slice(
     leavePageStart,
     moduleSelector.indexOf('toggleSidebar(page)', leavePageStart)
 );
-assert.match(leavePageSource, /try \{[\s\S]*this\.closeModule\(page, options\)/);
+assert.match(leavePageSource, /try \{[\s\S]*this\.closeModule\(page, \{/);
+assert.match(leavePageSource, /skipExperimentCleanup: true/);
 assert.match(leavePageSource, /try \{[\s\S]*AstraExperimentRegistry\?\.cleanupPage\(page\)/);
 assert.match(leavePageSource, /try \{ this\.resetPage\(page\); \} catch/);
 const openModuleSource = moduleSelector.slice(
@@ -302,9 +363,12 @@ const closeModuleSource = moduleSelector.slice(
     moduleSelector.indexOf('closeModule(page, options = {})'),
     moduleSelector.indexOf('leavePage(page, options = {})')
 );
+assert.match(openModuleSource, /_releaseModuleRuntime\(page, prevModule\)/);
+assert.match(closeModuleSource, /_releaseModuleRuntime\(page, activeModule, options\)/);
 assert.doesNotMatch(openModuleSource, /cleanupPage|\.cleanup\.run/);
 assert.doesNotMatch(closeModuleSource, /cleanupPage|\.cleanup\.run/);
-assert.doesNotMatch(closeModuleSource, /_preparePageCleanup/);
+assert.match(moduleSelector, /skipExperimentCleanup: true/);
+assert.match(router, /skipExperimentCleanup: true/);
 
 const isolationContext = {
     window: {
@@ -349,9 +413,9 @@ assert.ok(
 assert.doesNotMatch(router, /\bconst destroyMap\s*=/);
 assert.match(router, /ModuleSelector\.leavePage\(page, \{ preserveHash: true \}\)/);
 assert.match(html, /config\.js[\s\S]*experiment-registry\.js[\s\S]*page-registry\.js[\s\S]*router\.js[\s\S]*main\.js/);
-assert.match(main, /experiment-registry\.js\?v=20260715v7420HomeViewportClipP1/);
-assert.match(main, /module-selector\.js\?v=20260715v7420HomeViewportClipP1/);
-assert.match(serviceWorker, /experiment-registry\.js\?v=20260715v7420HomeViewportClipP1/);
-assert.match(serviceWorker, /astra-static-v20260716v7425OrganizationGovernanceP0/);
+assert.match(main, /experiment-registry\.js\?v=20260716v7426ModuleSwitchLifecycleP4/);
+assert.match(main, /module-selector\.js\?v=20260716v7426ModuleSwitchLifecycleP4/);
+assert.match(serviceWorker, /experiment-registry\.js\?v=20260716v7426ModuleSwitchLifecycleP4/);
+assert.match(serviceWorker, /astra-static-v20260716v7426ModuleSwitchLifecycleP4/);
 
 console.log('experiment-registry-contract: ok');

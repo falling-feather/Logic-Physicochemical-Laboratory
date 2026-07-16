@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    const ADMIN_ASSET_VERSION = '20260716v7425OrganizationGovernanceP0';
+    const ADMIN_ASSET_VERSION = '20260716v7426ModuleSwitchLifecycleP4';
     const API_BASE_STORAGE_KEY = 'astra-admin-api-base';
 
     const state = {

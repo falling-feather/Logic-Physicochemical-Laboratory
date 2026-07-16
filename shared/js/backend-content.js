@@ -49,20 +49,20 @@ const BackendContent = {
     },
 
     applyExperimentSchema(page, moduleId) {
-        if (!page || !moduleId) return;
+        if (!page || !moduleId) return Promise.resolve(false);
         const slug = `${page}/${moduleId}`;
         const target = document.querySelector(`#page-${page} [data-module="${moduleId}"]`);
-        if (!target) return;
+        if (!target) return Promise.resolve(false);
         if (!this.isEnabled()) {
             this._removeRenderIntent(target);
             this._clearBackendViews(target);
-            return;
+            return Promise.resolve(true);
         }
         this._setRenderIntent(target, page, moduleId);
         this._clearBackendViews(target);
         const generation = (this._renderGenerations.get(target) || 0) + 1;
         this._renderGenerations.set(target, generation);
-        this.fetchPageSchema(slug).then((schema) => {
+        return this.fetchPageSchema(slug).then((schema) => {
             if (this._renderGenerations.get(target) !== generation) return;
             if (!schema || schema.layout !== 'experiment-page') {
                 throw new AstraApiClient.Error('后端内容结构无效', {

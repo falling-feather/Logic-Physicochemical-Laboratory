@@ -6,6 +6,7 @@ var ExperimentGuide = {
     _storageKey: 'englab-guide-seen',
     _overlay: null,
     _helpBtn: null,
+    _focusTimer: null,
     _currentModule: null,
     _seen: new Set(),
     _moduleAliases: {
@@ -819,11 +820,31 @@ var ExperimentGuide = {
 
         // Focus dismiss button for keyboard accessibility
         const btn = card.querySelector('.guide-dismiss-btn');
-        if (btn) setTimeout(() => btn.focus(), 100);
+        if (this._focusTimer) clearTimeout(this._focusTimer);
+        this._focusTimer = btn ? setTimeout(() => {
+            this._focusTimer = null;
+            if (this._overlay?.classList.contains('active') && btn.isConnected) btn.focus();
+        }, 100) : null;
     },
 
-    _dismiss() {
+    _dismiss(options = {}) {
+        if (this._focusTimer) clearTimeout(this._focusTimer);
+        this._focusTimer = null;
+        const wasActive = !!(this._overlay && this._overlay.classList.contains('active'));
         if (this._overlay) this._overlay.classList.remove('active');
+        if (!wasActive || options.restoreFocus !== true) return;
+        const current = this._currentModule;
+        setTimeout(() => {
+            if (!current) return;
+            const section = document.querySelector(
+                `#page-${current.page} [data-module="${current.moduleId}"].module-active`
+            );
+            if (!section) return;
+            const focusable = section.querySelector(
+                'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            );
+            if (focusable) focusable.focus();
+        }, 0);
     },
 
     _inferCurrentModule() {
@@ -932,17 +953,20 @@ var ExperimentGuide = {
 
         // Click outside card to dismiss
         overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) this._dismiss();
+            if (e.target === overlay) this._dismiss({ restoreFocus: true });
         });
 
         // Click dismiss button
         overlay.addEventListener('click', (e) => {
-            if (e.target.closest('.guide-dismiss-btn')) this._dismiss();
+            if (e.target.closest('.guide-dismiss-btn')) this._dismiss({ restoreFocus: true });
         });
 
         // Esc to dismiss
         overlay.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') this._dismiss();
+            if (e.key !== 'Escape') return;
+            e.preventDefault();
+            e.stopPropagation();
+            this._dismiss({ restoreFocus: true });
         });
 
         document.body.appendChild(overlay);

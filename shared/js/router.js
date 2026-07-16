@@ -9,6 +9,7 @@ const Router = {
     _runningTimeId: null,
     _hashReconcileId: null,
     _pendingModule: null,
+    _pendingModuleGeneration: 0,
     _pendingAnchor: null,
     _lastAppliedAnchor: null,
     _anchorScrollGeneration: 0,
@@ -22,7 +23,7 @@ const Router = {
     _galaxyCacheVersion: '20260704qianduanV70',
     courseSupportScripts: [
         'shared/js/lucide.min.js?v=20260417d',
-        'shared/js/module-selector.js?v=20260715v7420HomeViewportClipP1'
+        'shared/js/module-selector.js?v=20260716v7426ModuleSwitchLifecycleP4'
     ],
     galaxySupportScripts: {
         astra: [
@@ -34,7 +35,7 @@ const Router = {
             'shared/js/back-to-top.js?v=20260424rr',
             'shared/js/fab-trigger.js?v=20260528v61g',
             'shared/js/touch-gestures.js?v=20260418a',
-            'shared/js/experiment-guide.js?v=20260630mainV64',
+            'shared/js/experiment-guide.js?v=20260716v7426ModuleSwitchLifecycleP4',
             'shared/js/experiment-export.js?v=20260528v61f',
             'shared/js/quiz-data.js?v=20260618refsP1',
             'shared/js/experiment-quiz.js?v=20260606fix1',
@@ -71,7 +72,12 @@ const Router = {
                         this._pendingAnchor = null;
                         this._lastAppliedAnchor = null;
                         if (page !== 'home' && typeof ModuleSelector !== 'undefined' && ModuleSelector.activeModule[page]) {
-                            ModuleSelector.closeModule(page);
+                            let closed = false;
+                            try { closed = ModuleSelector.closeModule(page) === true; } catch (error) {}
+                            if (!closed) {
+                                this._restoreModuleRoute(page);
+                                return;
+                            }
                         }
                         if (window.location.hash.slice(1) !== page) {
                             history.pushState(null, '', `#${page}`);
@@ -162,6 +168,20 @@ const Router = {
             history.replaceState(null, '', `#${allowedPage}`);
         }
         return guarded;
+    },
+
+    _restoreModuleRoute(page) {
+        let activeModule = null;
+        try {
+            if (typeof ModuleSelector !== 'undefined' && ModuleSelector.activeModule) {
+                activeModule = ModuleSelector.activeModule[page] || null;
+            }
+        } catch (error) {}
+        const stableRoute = activeModule ? `${page}/${activeModule}` : page;
+        if (window.location.hash.slice(1) !== stableRoute) {
+            history.replaceState(null, '', `#${stableRoute}`);
+        }
+        return stableRoute;
     },
 
     _pageForFrontierAnchor(anchorId) {
@@ -388,7 +408,12 @@ const Router = {
         if (previousGalaxy === 'englab' && typeof ModuleSelector !== 'undefined' && ModuleSelector.activeModule) {
             this.coursePages.forEach((subject) => {
                 if (ModuleSelector.activeModule[subject] && typeof ModuleSelector.closeModule === 'function') {
-                    try { ModuleSelector.closeModule(subject, { preserveHash: true }); } catch (e) {}
+                    try {
+                        ModuleSelector.closeModule(subject, {
+                            preserveHash: true,
+                            skipExperimentCleanup: true
+                        });
+                    } catch (e) {}
                 }
             });
             try {
@@ -917,10 +942,19 @@ const Router = {
         if (!moduleId) return;
         const isCoursePage = this.coursePages.includes(page);
         if (!isCoursePage) { this._pendingModule = null; return; }
+        const generation = ++this._pendingModuleGeneration;
         const tryOpen = (retries) => {
+            if (generation !== this._pendingModuleGeneration
+                || this.currentPage !== page
+                || !this._isActivePage(page)
+                || this._pendingModule !== moduleId) {
+                return;
+            }
             if (typeof ModuleSelector !== 'undefined' && typeof ModuleSelector.openModule === 'function') {
-                try { ModuleSelector.openModule(page, moduleId); } catch (e) {}
+                let opened = false;
+                try { opened = ModuleSelector.openModule(page, moduleId) === true; } catch (e) {}
                 this._pendingModule = null;
+                if (!opened) this._restoreModuleRoute(page);
                 return;
             }
             if (retries > 0) setTimeout(() => tryOpen(retries - 1), 60);

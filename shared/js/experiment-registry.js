@@ -197,6 +197,16 @@
 
     const get = (subject, id) => byKey.get(`${subject}:${id}`) || null;
 
+    const moduleCleanupReport = (outcome, overrides = {}) => Object.freeze({
+        outcome,
+        eligible: 0,
+        skipped: 0,
+        attempted: 0,
+        executed: 0,
+        failed: 0,
+        ...overrides
+    });
+
     const api = Object.freeze({
         entries: (subject = null) => subject
             ? (bySubject.get(subject) || Object.freeze([]))
@@ -211,6 +221,38 @@
             if (typeof fn !== 'function') return false;
             fn();
             return true;
+        },
+        cleanupModule: (subject, id) => {
+            const definition = get(subject, id);
+            if (!definition) {
+                return moduleCleanupReport('unknown', { skipped: 1 });
+            }
+            if (definition.cleanup.verified !== true) {
+                return moduleCleanupReport('unverified', { skipped: 1 });
+            }
+            const run = definition.cleanup.run;
+            if (typeof run !== 'function') {
+                return moduleCleanupReport('owner-unavailable', { eligible: 1 });
+            }
+            try {
+                if (!run()) {
+                    return moduleCleanupReport('owner-unavailable', {
+                        eligible: 1,
+                        attempted: 1
+                    });
+                }
+                return moduleCleanupReport('cleaned', {
+                    eligible: 1,
+                    attempted: 1,
+                    executed: 1
+                });
+            } catch (error) {
+                return moduleCleanupReport('failed', {
+                    eligible: 1,
+                    attempted: 1,
+                    failed: 1
+                });
+            }
         },
         cleanupPage: (subject) => {
             const report = { attempted: 0, executed: 0, failed: 0 };

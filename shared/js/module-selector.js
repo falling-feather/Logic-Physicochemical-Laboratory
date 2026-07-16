@@ -5,10 +5,13 @@
 const ModuleSelector = {
     activeModule: {},   // { pageName: 'module-id' | null }
     _initialized: {},   // { 'module-id': true } — tracks which modules have been initialized
+    _runtimeDirty: {},  // init threw after it may have started runtime resources
     _sidebars: {},      // { pageName: sidebar DOM element }
     _sidebarOpen: {},   // { pageName: bool }
     _swipeBackCtrls: {}, // { pageName: SwipeBack controller }
     _scriptPromises: {},
+    _transitionGeneration: {},
+    _transitionTimers: {},
     _pageEnhancementScripts: {
         physics: ['pages/physics/physics-zoom.js'],
         biology: ['pages/biology/biology.js?v=20260416b', 'pages/biology/biology-zoom.js?v=20260416b']
@@ -29,6 +32,8 @@ const ModuleSelector = {
             pageEl.classList.add(`page-${page}`);
             this.activeModule[page] = null;
             this._sidebarOpen[page] = false;
+            this._transitionGeneration[page] = 0;
+            this._transitionTimers[page] = [];
 
             this.createSidebar(page, pageEl);
             this.createLearningOverview(page, pageEl);
@@ -261,33 +266,76 @@ const ModuleSelector = {
             .replace(/'/g, '&#39;');
     },
 
+    _beginModuleTransition(page) {
+        const nextGeneration = (this._transitionGeneration[page] || 0) + 1;
+        this._transitionGeneration[page] = nextGeneration;
+        const timers = this._transitionTimers[page] || [];
+        timers.forEach((id) => {
+            try { clearTimeout(id); } catch (error) {}
+        });
+        this._transitionTimers[page] = [];
+        return nextGeneration;
+    },
+
+    _isCurrentModuleTransition(page, moduleId, generation) {
+        return this._transitionGeneration[page] === generation
+            && this.activeModule[page] === moduleId;
+    },
+
+    _scheduleModuleTask(page, moduleId, generation, delay, callback) {
+        if (!this._transitionTimers[page]) this._transitionTimers[page] = [];
+        const id = setTimeout(() => {
+            this._transitionTimers[page] = (this._transitionTimers[page] || [])
+                .filter((timerId) => timerId !== id);
+            if (!this._isCurrentModuleTransition(page, moduleId, generation)) return;
+            callback();
+        }, delay);
+        this._transitionTimers[page].push(id);
+        return id;
+    },
+
     openModule(page, moduleId) {
         const pageEl = document.getElementById(`page-${page}`);
-        if (!pageEl) return;
+        if (!pageEl) return false;
+
+        const registry = window.AstraExperimentRegistry;
+        const targetDefinition = registry && typeof registry.get === 'function'
+            ? registry.get(page, moduleId)
+            : null;
+        if (!targetDefinition) {
+            console.warn('[ModuleSelector] refusing transition to unknown module:', `${page}:${moduleId}`);
+            return false;
+        }
+        const sections = pageEl.querySelectorAll(`[data-module="${moduleId}"]`);
+        if (sections.length === 0) {
+            console.warn('[ModuleSelector] refusing transition because module DOM is unavailable:', `${page}:${moduleId}`);
+            return false;
+        }
 
         // If same module, just close sidebar
         if (this.activeModule[page] === moduleId) {
             if (window.innerWidth <= 768) this._closeSidebar(page);
-            return;
+            return true;
         }
 
         // Deactivate previous module
         const prevModule = this.activeModule[page];
         if (prevModule) {
+            if (!this._releaseModuleRuntime(page, prevModule)) return false;
             if (window.BackendContent && typeof BackendContent.destroyExperimentSchema === 'function') {
-                BackendContent.destroyExperimentSchema(page, prevModule);
+                try { BackendContent.destroyExperimentSchema(page, prevModule); } catch (error) {}
             }
             pageEl.querySelectorAll(`[data-module="${prevModule}"].module-active`).forEach(s => {
                 s.classList.remove('module-active');
             });
         }
+        const generation = this._beginModuleTransition(page);
 
         // Hide gallery
         const gallery = document.getElementById(`gallery-${page}`);
         if (gallery) gallery.style.display = 'none';
 
         // Show target module sections
-        const sections = pageEl.querySelectorAll(`[data-module="${moduleId}"]`);
         sections.forEach(s => s.classList.add('module-active'));
 
         // Update sidebar active state
@@ -321,8 +369,8 @@ const ModuleSelector = {
         }
 
         // Lazy-initialize this specific module
-        this._initModule(page, moduleId);
-        this._applyBackendSchema(page, moduleId);
+        this._initModule(page, moduleId, generation);
+        const backendSchemaReady = this._applyBackendSchema(page, moduleId);
 
         // Scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -331,16 +379,15 @@ const ModuleSelector = {
         this._closeSidebar(page);
 
         // Trigger resize for canvas elements
-        setTimeout(() => window.dispatchEvent(new Event('resize')), 150);
+        this._scheduleModuleTask(page, moduleId, generation, 150, () => {
+            window.dispatchEvent(new Event('resize'));
+        });
 
         // E-04: Focus first interactive control for keyboard users
-        this._focusExperiment(page, moduleId);
+        this._focusExperiment(page, moduleId, generation, backendSchemaReady);
 
-        // v4.5-α3: Render related experiments panel at the bottom
-        if (typeof RelatedExperiments !== 'undefined') {
-            // 等模块 DOM 渲染完毕（_initModule 是同步的，但部分模块在 microtask 内才挂 DOM）
-            setTimeout(() => RelatedExperiments.show(page, moduleId), 80);
-        }
+        // Render related experiments after deferred galaxy support becomes ready.
+        this._showRelatedExperiments(page, moduleId, generation);
 
         // Enable swipe-back from left edge (touch devices)
         if (typeof TouchGestures !== 'undefined' && !this._swipeBackCtrls[page]) {
@@ -348,6 +395,7 @@ const ModuleSelector = {
                 pageEl, () => this.closeModule(page)
             );
         }
+        return true;
     },
 
     _hideModuleTools() {
@@ -372,17 +420,52 @@ const ModuleSelector = {
             : (page === 'biology' ? window.BiologyZoom : null);
         try {
             if (subjectZoom && typeof subjectZoom.close === 'function') subjectZoom.close();
+            return true;
         } catch (error) {
             // Canvas cleanup must continue even if the shared zoom overlay cannot close.
+            return false;
         }
+    },
+
+    _releaseModuleRuntime(page, moduleId, options = {}) {
+        if (!moduleId || options.skipExperimentCleanup === true) return true;
+        const registry = window.AstraExperimentRegistry;
+        const definition = registry && typeof registry.get === 'function'
+            ? registry.get(page, moduleId)
+            : null;
+        if (!definition) {
+            console.warn('[ModuleSelector] refusing transition for unknown module:', `${page}:${moduleId}`);
+            return false;
+        }
+        if (!this._preparePageCleanup(page)) {
+            console.warn('[ModuleSelector] refusing transition because the subject zoom could not close:', `${page}:${moduleId}`);
+            return false;
+        }
+        if (definition.cleanup?.verified !== true) return true;
+
+        const key = `${page}:${moduleId}`;
+        if (!this._initialized[key] && !this._runtimeDirty[key]) return true;
+        let cleanupReport = null;
+        try {
+            cleanupReport = registry.cleanupModule(page, moduleId);
+        } catch (error) {}
+        if (!cleanupReport || cleanupReport.outcome !== 'cleaned' || cleanupReport.executed !== 1) {
+            console.warn('[ModuleSelector] refusing transition because exact cleanup did not complete:', `${page}:${moduleId}`);
+            return false;
+        }
+        delete this._initialized[key];
+        delete this._runtimeDirty[key];
+        return true;
     },
 
     closeModule(page, options = {}) {
         const pageEl = document.getElementById(`page-${page}`);
-        if (!pageEl) return;
+        if (!pageEl) return false;
         const activeModule = this.activeModule[page];
+        if (activeModule && !this._releaseModuleRuntime(page, activeModule, options)) return false;
+        const generation = options.transitionGeneration || this._beginModuleTransition(page);
         if (activeModule && window.BackendContent && typeof BackendContent.destroyExperimentSchema === 'function') {
-            BackendContent.destroyExperimentSchema(page, activeModule);
+            try { BackendContent.destroyExperimentSchema(page, activeModule); } catch (error) {}
         }
 
         this._hideModuleTools();
@@ -435,11 +518,19 @@ const ModuleSelector = {
             this._swipeBackCtrls[page].destroy();
             this._swipeBackCtrls[page] = null;
         }
+        return generation > 0;
     },
 
     leavePage(page, options = {}) {
+        const generation = this._beginModuleTransition(page);
         try {
-            if (this.activeModule[page]) this.closeModule(page, options);
+            if (this.activeModule[page]) {
+                this.closeModule(page, {
+                    ...options,
+                    skipExperimentCleanup: true,
+                    transitionGeneration: generation
+                });
+            }
         } catch (error) {
             // Continue through the same best-effort phases that legacy Router used.
         }
@@ -552,38 +643,56 @@ const ModuleSelector = {
         );
     },
 
-    _initModule(page, moduleId) {
+    _initModule(page, moduleId, generation = this._transitionGeneration[page]) {
         const key = `${page}:${moduleId}`;
-        if (this._initialized[key]) {
-            this._showModuleTools(page, moduleId);
+        if (this._initialized[key] || this._runtimeDirty[key]) {
+            if (this._isCurrentModuleTransition(page, moduleId, generation)) {
+                this._showModuleTools(page, moduleId);
+            }
             return;
         }
 
         const initFn = () => window.AstraExperimentRegistry?.init(page, moduleId) || false;
         const runInit = (attempt = 0) => {
-            if (this.activeModule[page] !== moduleId) return;
-            const initialized = initFn();
+            if (!this._isCurrentModuleTransition(page, moduleId, generation)) return;
+            let initialized = false;
+            try {
+                initialized = initFn();
+            } catch (error) {
+                if (this._isCurrentModuleTransition(page, moduleId, generation)) {
+                    this._runtimeDirty[key] = true;
+                    console.warn('[ModuleSelector] init function failed:', moduleId, error);
+                }
+                return;
+            }
             if (initialized === false && attempt < 20) {
-                setTimeout(() => runInit(attempt + 1), 100);
+                this._scheduleModuleTask(page, moduleId, generation, 100, () => runInit(attempt + 1));
                 return;
             }
             if (initialized === false) {
                 console.warn('[ModuleSelector] init function unavailable after script load:', moduleId);
                 return;
             }
+            if (!this._isCurrentModuleTransition(page, moduleId, generation)) return;
             this._initialized[key] = true;
+            delete this._runtimeDirty[key];
             if (page === 'physics' && window.PhysicsZoom && typeof window.PhysicsZoom.init === 'function') {
-                window.PhysicsZoom.init();
+                try { window.PhysicsZoom.init(); } catch (error) {}
             }
             if (page === 'biology' && window.BiologyZoom && typeof window.BiologyZoom.init === 'function') {
-                window.BiologyZoom.init();
+                try { window.BiologyZoom.init(); } catch (error) {}
             }
             this._showModuleTools(page, moduleId);
         };
         this._loadModuleAssets(page, moduleId)
-            .then(() => setTimeout(() => runInit(), 50))
+            .then(() => {
+                if (!this._isCurrentModuleTransition(page, moduleId, generation)) return;
+                this._scheduleModuleTask(page, moduleId, generation, 50, () => runInit());
+            })
             .catch(error => {
-                console.warn('[ModuleSelector] failed to load module assets:', moduleId, error);
+                if (this._isCurrentModuleTransition(page, moduleId, generation)) {
+                    console.warn('[ModuleSelector] failed to load module assets:', moduleId, error);
+                }
             });
     },
 
@@ -610,17 +719,27 @@ const ModuleSelector = {
         if (window.ExperimentRating) {
             ExperimentRating.show(moduleId);
         }
-        if (window.BackendContent && typeof BackendContent.applyExperimentSchema === 'function') {
-            this._applyBackendSchema(page, moduleId);
-        }
+    },
+
+    _showRelatedExperiments(page, moduleId, generation, attempt = 0) {
+        this._scheduleModuleTask(page, moduleId, generation, attempt === 0 ? 80 : 100, () => {
+            if (typeof RelatedExperiments !== 'undefined' && typeof RelatedExperiments.show === 'function') {
+                RelatedExperiments.show(page, moduleId);
+                return;
+            }
+            if (attempt < 20) this._showRelatedExperiments(page, moduleId, generation, attempt + 1);
+        });
     },
 
     _applyBackendSchema(page, moduleId) {
-        if (!window.BackendContent || typeof BackendContent.applyExperimentSchema !== 'function') return;
+        if (!window.BackendContent || typeof BackendContent.applyExperimentSchema !== 'function') {
+            return Promise.resolve(false);
+        }
         try {
-            BackendContent.applyExperimentSchema(page, moduleId);
+            return Promise.resolve(BackendContent.applyExperimentSchema(page, moduleId));
         } catch (e) {
             console.warn('[ModuleSelector] backend schema apply failed:', moduleId, e);
+            return Promise.resolve(false);
         }
     },
 
@@ -633,6 +752,7 @@ const ModuleSelector = {
         }
         experiments.forEach(exp => {
             delete this._initialized[`${page}:${exp.id}`];
+            delete this._runtimeDirty[`${page}:${exp.id}`];
         });
         this.activeModule[page] = null;
 
@@ -728,18 +848,32 @@ const ModuleSelector = {
     },
 
     // Focus the first interactive control inside the experiment when it opens
-    _focusExperiment(page, moduleId) {
+    _focusExperiment(page, moduleId, generation = this._transitionGeneration[page], backendSchemaReady = null) {
         const pageEl = document.getElementById(`page-${page}`);
         if (!pageEl) return;
-        const section = pageEl.querySelector(`[data-module="${moduleId}"].module-active`);
-        if (!section) return;
+        if (!pageEl.querySelector(`[data-module="${moduleId}"].module-active`)) return;
 
-        // Find first focusable element (button, input, select, [tabindex])
-        const focusable = section.querySelector(
-            'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        );
-        if (focusable) {
-            setTimeout(() => focusable.focus(), 200);
+        // Backend schema may replace the module's leading card after openModule().
+        // Resolve the active section and focus target at execution time so a detached
+        // pre-schema node cannot silently return focus to <body>.
+        const focusCurrentTarget = (onlyIfLost = false) => {
+            const currentSection = pageEl.querySelector(`[data-module="${moduleId}"].module-active`);
+            if (!currentSection) return;
+            if (onlyIfLost) {
+                const active = document.activeElement;
+                if (active && active !== document.body && active.isConnected !== false) return;
+            }
+            const focusable = currentSection.querySelector(
+                'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            );
+            if (focusable) focusable.focus();
+        };
+        this._scheduleModuleTask(page, moduleId, generation, 200, () => focusCurrentTarget(false));
+        if (backendSchemaReady && typeof backendSchemaReady.then === 'function') {
+            backendSchemaReady.then(() => {
+                if (!this._isCurrentModuleTransition(page, moduleId, generation)) return;
+                this._scheduleModuleTask(page, moduleId, generation, 0, () => focusCurrentTarget(true));
+            }).catch(() => {});
         }
     }
 };
