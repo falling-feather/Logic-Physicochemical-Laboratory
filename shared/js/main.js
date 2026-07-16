@@ -113,9 +113,6 @@ function initApp() {
     // 11. Footer visibility based on current page
     updateFooterVisibility();
 
-    // 11b. Register service worker in the background for repeat-visit acceleration
-    registerServiceWorker();
-
     // 12. Dismiss loading screen
     //     FIXED: _coreReady() no longer requires lucide (it's now local/sync).
     //     We only require GSAP and Router to be initialized before dismissing.
@@ -224,7 +221,7 @@ function updateFooterVisibility() {
 
 window.updateFooterVisibility = updateFooterVisibility;
 
-const ENGLAB_ASSET_VERSION = '20260716v7426ModuleSwitchLifecycleP4';
+const ENGLAB_ASSET_VERSION = '20260716v7427RoleWorkflowGateP0';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',
@@ -238,9 +235,9 @@ const CORE_HTTP_FALLBACK_ASSETS = [
     './shared/js/config.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/api-client.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/app-session.js?v=' + ENGLAB_ASSET_VERSION,
-    './shared/js/experiment-registry.js?v=20260716v7426ModuleSwitchLifecycleP4',
+    './shared/js/experiment-registry.js?v=20260716v7427RoleWorkflowGateP0',
     './shared/js/page-registry.js?v=' + ENGLAB_ASSET_VERSION,
-    './shared/js/router.js?v=20260716v7426ModuleSwitchLifecycleP4',
+    './shared/js/router.js?v=20260716v7427RoleWorkflowGateP0',
     './shared/js/main.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/backend-content.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/css/backend-content.css?v=' + ENGLAB_ASSET_VERSION,
@@ -268,8 +265,8 @@ const GALAXY_HTTP_FALLBACK_ASSETS = {
         './pages/chemistry/chemistry.css?v=20260618ionP1',
         './pages/algorithms/algorithms.css?v=20260618algoTextP1',
         './pages/biology/biology.css?v=20260618neuralP1',
-        './shared/js/module-selector.js?v=20260716v7426ModuleSwitchLifecycleP4',
-        './shared/js/experiment-guide.js?v=20260716v7426ModuleSwitchLifecycleP4',
+        './shared/js/module-selector.js?v=20260716v7427RoleWorkflowGateP0',
+        './shared/js/experiment-guide.js?v=20260716v7427RoleWorkflowGateP0',
         './shared/js/experiment-export.js?v=20260528v61f',
         './shared/js/quiz-data.js?v=20260618refsP1',
         './shared/js/experiment-quiz.js?v=20260606fix1',
@@ -369,6 +366,8 @@ function warmHttpCacheFallback(galaxy) {
 
 window.warmGalaxyCache = function (galaxy) {
     if (!galaxy) return;
+    const cacheMode = window.__englabCache && window.__englabCache.cacheMode;
+    if (cacheMode === 'service-worker' || cacheMode === 'service-worker-pending') return;
     if (!window.__warmedGalaxies) window.__warmedGalaxies = {};
     if (window.__warmedGalaxies[galaxy]) return;
     window.__warmedGalaxies[galaxy] = true;
@@ -466,7 +465,9 @@ function registerServiceWorker() {
             });
     };
 
-    if (window.requestIdleCallback) {
+    if (forcedServiceWorker) {
+        doRegister();
+    } else if (window.requestIdleCallback) {
         window.requestIdleCallback(doRegister, { timeout: 1200 });
     } else {
         setTimeout(doRegister, 400);
@@ -481,6 +482,9 @@ function registerServiceWorker() {
         return;
     }
     try {
+        // Register only the public shell while the authentication gate is active.
+        // Router and all role resources still wait for the server session below.
+        registerServiceWorker();
         await window.AstraApplicationSession.bootstrap();
         initApp();
     } catch (error) {

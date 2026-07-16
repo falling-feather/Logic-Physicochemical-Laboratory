@@ -2,6 +2,35 @@
 
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+const { createHash } = require('node:crypto');
+
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
+const REQUIRED_BROWSER_CHANNEL = 'msedge';
+const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
+const DEFAULT_WORKFLOW_TIMEOUT_MS = 15 * 60_000;
+const ROLE_RESOURCE_PATHS = Object.freeze([
+  '/pages/student/student.css',
+  '/pages/student/student.js',
+  '/pages/teacher/teacher.css',
+  '/pages/teacher/teacher.js',
+  '/pages/admin/admin.css',
+  '/pages/admin/admin.js',
+]);
+const ROLE_RESOURCE_EXPECTATIONS = Object.freeze({
+  student: Object.freeze({
+    styles: Object.freeze(['/pages/student/student.css']),
+    scripts: Object.freeze(['/pages/student/student.js']),
+  }),
+  teacher: Object.freeze({
+    styles: Object.freeze(['/pages/teacher/teacher.css']),
+    scripts: Object.freeze(['/pages/teacher/teacher.js']),
+  }),
+  admin: Object.freeze({
+    styles: Object.freeze(['/pages/admin/admin.css', '/pages/teacher/teacher.css']),
+    scripts: Object.freeze(['/pages/admin/admin.js']),
+  }),
+});
 
 let playwright;
 try {
@@ -57,22 +86,82 @@ function safeName(value) {
   return String(value || '').replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 80);
 }
 
-async function launchBrowser(args) {
-  const requested = args.channel || process.env.ASTRA_BROWSER_CHANNEL || '';
-  const channels = requested ? [requested] : ['', 'msedge', 'chrome'];
-  const errors = [];
-  for (const channel of channels) {
-    try {
-      const browser = await chromium.launch({
-        headless: !args.headed,
-        ...(channel ? { channel } : {}),
-      });
-      return { browser, channel: channel || 'playwright-chromium' };
-    } catch (error) {
-      errors.push(`${channel || 'playwright-chromium'}: ${String(error && error.message || error).split('\n')[0]}`);
-    }
+function currentGitHead() {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return null;
   }
-  throw new Error(`Unable to launch Chromium-compatible browser. ${errors.join(' | ')}`);
+}
+
+function currentGitStatusShort() {
+  try {
+    return execFileSync('git', ['status', '--short'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim().split(/\r?\n/).filter(Boolean);
+  } catch {
+    return null;
+  }
+}
+
+async function fileSha256(relativePath) {
+  const bytes = await fs.readFile(path.join(REPO_ROOT, relativePath));
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+async function criticalArtifactHashes() {
+  const files = [
+    'tools/browser/role-workflows-proof.cjs',
+    'tools/tests/role-workflows-proof-contract.cjs',
+    'index.html',
+    'shared/js/app-session.js',
+    'shared/js/main.js',
+    'shared/js/page-registry.js',
+    'shared/js/router.js',
+    'pages/student/student.js',
+    'pages/teacher/teacher.js',
+    'pages/admin/admin.js',
+    'sw.js',
+  ];
+  return Object.fromEntries(await Promise.all(files.map(async (file) => [file, await fileSha256(file)])));
+}
+
+function sortedUnique(values) {
+  return Array.from(new Set(values || [])).sort();
+}
+
+function assertSamePaths(actual, expected, label) {
+  const actualPaths = sortedUnique(actual);
+  const expectedPaths = sortedUnique(expected);
+  assert(
+    JSON.stringify(actualPaths) === JSON.stringify(expectedPaths),
+    `${label}: expected ${JSON.stringify(expectedPaths)}, got ${JSON.stringify(actualPaths)}`
+  );
+}
+
+function isRoleResourcePath(pathname) {
+  return ROLE_RESOURCE_PATHS.includes(String(pathname || ''));
+}
+
+async function launchBrowser(args) {
+  const requested = String(args.channel || process.env.ASTRA_BROWSER_CHANNEL || REQUIRED_BROWSER_CHANNEL).toLowerCase();
+  assert(
+    requested === REQUIRED_BROWSER_CHANNEL,
+    `QA-007 requires the real Microsoft Edge channel (${REQUIRED_BROWSER_CHANNEL}), got ${requested || 'empty'}`
+  );
+  const browser = await chromium.launch({
+    headless: !args.headed,
+    channel: REQUIRED_BROWSER_CHANNEL,
+  });
+  return { browser, channel: REQUIRED_BROWSER_CHANNEL };
 }
 
 async function fetchJson(url, options = {}) {
@@ -84,6 +173,7 @@ async function fetchJson(url, options = {}) {
       ...(options.headers || {}),
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
+    signal: AbortSignal.timeout(Number(options.timeoutMs || DEFAULT_REQUEST_TIMEOUT_MS)),
   });
   const text = await response.text();
   let body = null;
@@ -91,25 +181,56 @@ async function fetchJson(url, options = {}) {
   return { status: response.status, body, text };
 }
 
+async function serviceWorkerSourceEvidence(webBase) {
+  const url = `${webBase}/sw.js`;
+  const response = await fetch(url, {
+    headers: { Accept: 'application/javascript,text/javascript;q=0.9,*/*;q=0.1' },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(DEFAULT_REQUEST_TIMEOUT_MS),
+  });
+  const source = await response.text();
+  assert(response.status === 200, `Service Worker source failed with ${response.status}`);
+  const cacheName = source.match(/const\s+CACHE_NAME\s*=\s*['"]([^'"]+)['"]/u)?.[1] || '';
+  assert(cacheName.startsWith('astra-static-'), 'Service Worker source must expose the expected astra-static cache version');
+  return {
+    url,
+    status: response.status,
+    cacheName,
+    sha256: createHash('sha256').update(source, 'utf8').digest('hex'),
+  };
+}
+
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
 function roleUrl(webBase, apiBase, role) {
-  return `${webBase}/?apiBase=${encodeURIComponent(apiBase)}#${role}`;
+  return `${webBase}/?cacheMode=service-worker&apiBase=${encodeURIComponent(apiBase)}#${role}`;
 }
 
 function attachDiagnostics(page, bucket, label) {
+  page.__astraInflightRequests = new Set();
+  page.__astraDiagnosticsFrozen = false;
+  page.on('request', (request) => {
+    page.__astraInflightRequests.add(request);
+  });
+  page.on('requestfinished', (request) => {
+    page.__astraInflightRequests.delete(request);
+  });
   page.on('console', (message) => {
+    if (page.__astraDiagnosticsFrozen) return;
     if (/^Failed to load resource:/.test(message.text())) return;
     if (['warning', 'error'].includes(message.type())) {
       bucket.push({ kind: 'console', label, level: message.type(), message: message.text() });
     }
   });
   page.on('pageerror', (error) => {
+    if (page.__astraDiagnosticsFrozen) return;
     bucket.push({ kind: 'pageerror', label, message: String(error && error.message || error) });
   });
   page.on('requestfailed', (request) => {
+    page.__astraInflightRequests.delete(request);
+    if (page.__astraDiagnosticsFrozen) return;
     if (/\/favicon\.ico(?:$|\?)/.test(request.url())) return;
     if ((page.__astraExpectedRequestFailurePaths || []).some((item) => (
       request.method() === item.method && new URL(request.url()).pathname === item.path
@@ -122,6 +243,7 @@ function attachDiagnostics(page, bucket, label) {
     });
   });
   page.on('response', (response) => {
+    if (page.__astraDiagnosticsFrozen) return;
     if (response.status() < 400) return;
     const resource = new URL(response.url());
     if ((page.__astraExpectedHttpResponses || []).some((item) => (
@@ -140,14 +262,86 @@ function attachDiagnostics(page, bucket, label) {
   });
 }
 
+async function waitForNetworkQuiet(page, quietMs = 500, timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS) {
+  const startedAt = Date.now();
+  let quietSince = null;
+  while (Date.now() - startedAt < timeoutMs) {
+    const pending = page.__astraInflightRequests ? page.__astraInflightRequests.size : 0;
+    if (pending === 0) {
+      if (quietSince === null) quietSince = Date.now();
+      if (Date.now() - quietSince >= quietMs) return;
+    } else {
+      quietSince = null;
+    }
+    await page.waitForTimeout(50);
+  }
+  throw new Error(`Network did not remain quiet for ${quietMs}ms; pending requests: ${page.__astraInflightRequests?.size || 0}`);
+}
+
+async function freezeDiagnostics(contexts) {
+  const pages = contexts.flatMap((context) => context.pages());
+  for (const page of pages) {
+    await waitForNetworkQuiet(page);
+    page.__astraDiagnosticsFrozen = true;
+  }
+}
+
 async function createRolePage(browser, report, webBase, apiBase, role, viewport = { width: 1440, height: 1000 }) {
   const context = await browser.newContext({ viewport });
   const page = await context.newPage();
+  page.__astraRoleResponses = [];
+  page.on('response', (response) => {
+    const resource = new URL(response.url());
+    if (!isRoleResourcePath(resource.pathname)) return;
+    page.__astraRoleResponses.push({
+      path: resource.pathname,
+      status: response.status(),
+      fromServiceWorker: response.fromServiceWorker(),
+    });
+  });
   attachDiagnostics(page, report.browserIssues, role);
   await page.goto(roleUrl(webBase, apiBase, role), { waitUntil: 'domcontentloaded' });
   await page.locator('[data-app-auth-overlay]:not([hidden])').waitFor({ state: 'visible' });
   await page.locator('[data-app-auth-form="login"]').waitFor({ state: 'visible' });
-  return { context, page };
+  try {
+    await page.waitForFunction(() => {
+      const state = window.__englabCache;
+      return Boolean(state && (
+        (state.cacheMode === 'service-worker' && state.swRegistered && state.swReady)
+        || state.swError
+        || state.cacheMode === 'http-fallback'
+      ));
+    }, null, { timeout: 20_000 });
+  } catch (error) {
+    const diagnostics = await page.evaluate(() => ({
+      cache: window.__englabCache || null,
+      controller: navigator.serviceWorker && navigator.serviceWorker.controller
+        ? navigator.serviceWorker.controller.scriptURL
+        : null,
+    }));
+    throw new Error(`${role} Service Worker readiness timed out: ${JSON.stringify(diagnostics)}`, { cause: error });
+  }
+  const readiness = await page.evaluate(() => ({
+    cache: window.__englabCache || null,
+    controller: navigator.serviceWorker && navigator.serviceWorker.controller
+      ? navigator.serviceWorker.controller.scriptURL
+      : null,
+  }));
+  assert(
+    readiness.cache
+      && readiness.cache.cacheMode === 'service-worker'
+      && readiness.cache.swRegistered
+      && readiness.cache.swReady,
+    `${role} Service Worker readiness failed: ${JSON.stringify(readiness)}`
+  );
+  const controlled = await page.evaluate(() => Boolean(navigator.serviceWorker && navigator.serviceWorker.controller));
+  if (!controlled) {
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.locator('[data-app-auth-overlay]:not([hidden])').waitFor({ state: 'visible' });
+    await page.locator('[data-app-auth-form="login"]').waitFor({ state: 'visible' });
+  }
+  await page.waitForFunction(() => Boolean(navigator.serviceWorker && navigator.serviceWorker.controller), null, { timeout: 20_000 });
+  return { context, page, serviceWorkerReadiness: readiness };
 }
 
 async function registerFromUi(page, role, account) {
@@ -172,23 +366,232 @@ async function loginFromUi(page, role, account) {
   await page.locator(`[data-auth-ui="account"][data-auth-role="${role}"]`).waitFor({ state: 'visible' });
 }
 
+async function registerThenLogout(browser, report, webBase, apiBase, role, account) {
+  const runtime = await createRolePage(browser, report, webBase, apiBase, role);
+  try {
+    await registerFromUi(runtime.page, role, account);
+    const logout = await pageApi(runtime.page, apiBase, '/api/auth/logout', { method: 'POST' });
+    assert(
+      logout.status === 200 && logout.body && logout.body.status === 'ok',
+      `${role} registration logout expected 200 status=ok, got ${logout.status}: ${JSON.stringify(logout.body)}`
+    );
+  } finally {
+    await runtime.context.close();
+  }
+}
+
 async function pageApi(page, apiBase, apiPath, options = {}) {
-  return page.evaluate(async ({ base, resource, request }) => {
-    const response = await fetch(base + resource, {
-      method: request.method || 'GET',
-      credentials: 'include',
-      cache: 'no-store',
-      headers: {
-        Accept: 'application/json',
-        ...(request.body ? { 'Content-Type': 'application/json' } : {}),
-      },
-      body: request.body ? JSON.stringify(request.body) : undefined,
-    });
-    const text = await response.text();
-    let body = null;
-    try { body = text ? JSON.parse(text) : null; } catch { body = null; }
-    return { status: response.status, body };
-  }, { base: apiBase, resource: apiPath, request: options });
+  return page.evaluate(async ({ base, resource, request, timeoutMs }) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs);
+    try {
+      const response = await fetch(base + resource, {
+        method: request.method || 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+        signal: controller.signal,
+        headers: {
+          Accept: 'application/json',
+          ...(request.body ? { 'Content-Type': 'application/json' } : {}),
+        },
+        body: request.body ? JSON.stringify(request.body) : undefined,
+      });
+      const text = await response.text();
+      let body = null;
+      try { body = text ? JSON.parse(text) : null; } catch { body = null; }
+      return { status: response.status, body };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }, {
+    base: apiBase,
+    resource: apiPath,
+    request: options,
+    timeoutMs: Number(options.timeoutMs || DEFAULT_REQUEST_TIMEOUT_MS),
+  });
+}
+
+async function serviceWorkerRoleEvidence(page, role, options = {}) {
+  const expectation = ROLE_RESOURCE_EXPECTATIONS[role];
+  assert(expectation, `Unknown role resource expectation: ${role}`);
+  const expectedScripts = role === 'admin' && options.teacherWorkspaceVisited
+    ? expectation.scripts.concat('/pages/teacher/teacher.js')
+    : expectation.scripts.slice();
+  const expectedResources = expectation.styles.concat(expectedScripts);
+  await page.waitForFunction(({ styles, scripts }) => {
+    const loadedStyles = Array.from(document.querySelectorAll('link[data-astra-role-resource]'))
+      .map((node) => new URL(node.href).pathname);
+    const loadedScripts = Array.from(document.querySelectorAll('script[data-router-page-script]'))
+      .map((node) => new URL(node.src).pathname);
+    return styles.every((value) => loadedStyles.includes(value))
+      && scripts.every((value) => loadedScripts.includes(value));
+  }, { styles: expectation.styles, scripts: expectedScripts });
+  await page.waitForTimeout(150);
+  const browserEvidence = await page.evaluate(async ({ rolePaths }) => {
+    const cacheNames = await caches.keys();
+    const entries = [];
+    for (const cacheName of cacheNames) {
+      const cache = await caches.open(cacheName);
+      const requests = await cache.keys();
+      requests.forEach((request) => entries.push({
+        cacheName,
+        url: request.url,
+        path: new URL(request.url).pathname,
+        method: request.method,
+      }));
+    }
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    const controllerUrl = navigator.serviceWorker.controller && new URL(navigator.serviceWorker.controller.scriptURL);
+    return {
+      pageOrigin: location.origin,
+      cacheMode: window.__englabCache && window.__englabCache.cacheMode,
+      swReady: Boolean(window.__englabCache && window.__englabCache.swReady),
+      controller: Boolean(navigator.serviceWorker.controller),
+      controllerScript: navigator.serviceWorker.controller && navigator.serviceWorker.controller.scriptURL,
+      controllerOrigin: controllerUrl && controllerUrl.origin,
+      controllerPath: controllerUrl && controllerUrl.pathname,
+      registrations: registrations.map((registration) => ({
+        scope: registration.scope,
+        activeScript: registration.active && registration.active.scriptURL,
+      })),
+      cacheNames,
+      totalCacheEntries: entries.length,
+      apiEntries: entries.filter((item) => item.path === '/api' || item.path.startsWith('/api/')),
+      roleEntries: entries.filter((item) => rolePaths.includes(item.path)),
+      loadedStyles: Array.from(document.querySelectorAll('link[data-astra-role-resource]'))
+        .map((node) => new URL(node.href).pathname),
+      loadedScripts: Array.from(document.querySelectorAll('script[data-router-page-script]'))
+        .map((node) => new URL(node.src).pathname),
+    };
+  }, { rolePaths: ROLE_RESOURCE_PATHS });
+  const responses = (page.__astraRoleResponses || []).map((item) => ({ ...item }));
+  const responsePaths = responses.map((item) => item.path);
+  assert(browserEvidence.cacheMode === 'service-worker', `${role} must force service-worker cache mode`);
+  assert(browserEvidence.swReady && browserEvidence.controller, `${role} must have a ready controlling Service Worker`);
+  assert(browserEvidence.controllerOrigin === browserEvidence.pageOrigin, `${role} Service Worker controller origin mismatch`);
+  assert(browserEvidence.controllerPath === '/sw.js', `${role} Service Worker controller must be /sw.js`);
+  assert(browserEvidence.registrations.length === 1, `${role} must retain exactly one Service Worker registration`);
+  assert(
+    browserEvidence.registrations[0].scope === `${browserEvidence.pageOrigin}/`
+      && browserEvidence.registrations[0].activeScript
+      && new URL(browserEvidence.registrations[0].activeScript).pathname === '/sw.js',
+    `${role} Service Worker scope or active script mismatch`
+  );
+  assert(
+    browserEvidence.cacheNames.filter((name) => name.startsWith('astra-static-')).length === 1
+      && browserEvidence.cacheNames.includes(options.expectedCacheName),
+    `${role} Service Worker cache version mismatch: ${JSON.stringify(browserEvidence.cacheNames)}`
+  );
+  assert(browserEvidence.apiEntries.length === 0, `${role} CacheStorage must not contain API entries`);
+  assert(browserEvidence.roleEntries.length === 0, `${role} CacheStorage must not contain role resources`);
+  assertSamePaths(browserEvidence.loadedStyles, expectation.styles, `${role} loaded role styles`);
+  assertSamePaths(browserEvidence.loadedScripts, expectedScripts, `${role} loaded role scripts`);
+  assertSamePaths(responsePaths, expectedResources, `${role} role resource responses`);
+  assert(responsePaths.length === expectedResources.length, `${role} role resources must load exactly once`);
+  assert(responses.every((item) => item.status === 200), `${role} role resource responses must be 200`);
+  assert(responses.every((item) => item.fromServiceWorker), `${role} role resources must traverse the controlling Service Worker network-only branch`);
+  return { ...browserEvidence, responses };
+}
+
+async function stableUiEvidence(page, role) {
+  await waitForNetworkQuiet(page, 500);
+  await page.waitForTimeout(300);
+  const evidence = await page.evaluate(({ currentRole }) => {
+    const visible = (element) => {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return !element.hidden && style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+    };
+    const errorSelectors = [
+      '.teacher-error',
+      '.admin-error',
+      '.admin-summary--error',
+      '.admin-organization-alert--error',
+      '.admin-organization-form__notice--error',
+      '.student-panel-state--error',
+      '.student-flash--error',
+      '.teacher-flash--error',
+      '.admin-notice--error',
+      '[data-student-network]:not([hidden])',
+      '[data-teacher-write-lock]:not([hidden])',
+      '[data-admin-organization-lock]',
+    ];
+    const loadingSelectors = [
+      '.student-loading',
+      '.teacher-loading',
+      '.admin-loading',
+      '[aria-busy="true"]',
+    ];
+    const readVisible = (selectors, requireText = true) => Array.from(document.querySelectorAll(selectors.join(',')))
+      .filter((element) => visible(element) && (!requireText || String(element.textContent || '').trim()))
+      .map((element) => ({
+        selector: element.className || element.tagName,
+        text: String(element.textContent || '').trim().slice(0, 160),
+      }));
+    const dashboardSelector = {
+      student: '[data-student-dashboard]:not([hidden])',
+      teacher: '[data-teacher-dashboard]:not([hidden])',
+      admin: '[data-admin-dashboard]:not([hidden])',
+    }[currentRole];
+    return {
+      activePages: document.querySelectorAll('.page.active').length,
+      dashboardCount: dashboardSelector ? document.querySelectorAll(dashboardSelector).length : 0,
+      authOverlayVisible: Array.from(document.querySelectorAll('[data-app-auth-overlay]')).some(visible),
+      visibleErrors: readVisible(errorSelectors),
+      visibleLoading: readVisible(loadingSelectors, false),
+    };
+  }, { currentRole: role });
+  assert(evidence.activePages === 1, `${role} must have one active page`);
+  assert(evidence.dashboardCount === 1, `${role} must have one visible dashboard`);
+  assert(!evidence.authOverlayVisible, `${role} auth overlay must be hidden after login`);
+  assert(evidence.visibleErrors.length === 0, `${role} has visible error UI: ${JSON.stringify(evidence.visibleErrors)}`);
+  assert(evidence.visibleLoading.length === 0, `${role} has a stuck loading UI: ${JSON.stringify(evidence.visibleLoading)}`);
+  return evidence;
+}
+
+async function mobileRoleInteraction(page, role, options = {}) {
+  if (role === 'student') {
+    const assignmentId = String(options.assignmentId || '');
+    assert(assignmentId, 'student mobile interaction requires the graded assignment id');
+    for (const filter of ['feedback', 'all']) {
+      const responsePromise = page.waitForResponse((response) => {
+        const resource = new URL(response.url());
+        return response.request().method() === 'GET'
+          && resource.pathname === '/api/assignments/me'
+          && resource.searchParams.get('filter') === filter
+          && response.status() === 200;
+      }, { timeout: DEFAULT_REQUEST_TIMEOUT_MS });
+      await Promise.all([
+        responsePromise,
+        page.locator(`[data-student-assignment-filter="${filter}"]`).click(),
+      ]);
+      await page.locator(`[data-student-assignment-filter="${filter}"][aria-selected="true"]`).waitFor({ state: 'visible' });
+      await page.locator(
+        `[data-student-panel="assignments"] [data-student-assignment-id="${assignmentId}"]`
+      ).waitFor({ state: 'visible' });
+      await waitForNetworkQuiet(page, 300);
+    }
+  }
+  if (role === 'teacher') {
+    await page.locator('[data-teacher-action="refresh"]:not([disabled])').click();
+    await page.locator('[data-teacher-action="refresh"]:not([disabled])').waitFor({ state: 'visible' });
+  }
+  if (role === 'admin') {
+    await page.locator('[data-admin-action="refresh"]:not([disabled])').click();
+    await page.locator('[data-admin-action="refresh"]:not([disabled])').waitFor({ state: 'visible' });
+    await page.locator('[data-admin-open-panel="schools"]:visible').first().click();
+    await page.waitForFunction(() => document.activeElement?.matches('[data-admin-panel="schools"]'));
+  }
+  return page.evaluate(({ currentRole }) => ({
+    role: currentRole,
+    hash: location.hash,
+    activeElement: document.activeElement && (
+      document.activeElement.getAttribute('data-admin-panel')
+      || document.activeElement.getAttribute('data-student-assignment-filter')
+      || document.activeElement.getAttribute('data-teacher-action')
+      || document.activeElement.tagName
+    ),
+  }), { currentRole: role });
 }
 
 async function teacherForm(page, type, fields, successText) {
@@ -210,9 +613,11 @@ async function selectedValue(page, selector) {
   return page.locator(selector).inputValue();
 }
 
-async function responsiveEvidence(page, role, outDir) {
+async function responsiveEvidence(page, role, outDir, options = {}) {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator(`[data-auth-ui="account"][data-auth-role="${role}"]`).waitFor({ state: 'visible' });
+  const interaction = await mobileRoleInteraction(page, role, options);
+  const stableUi = await stableUiEvidence(page, role);
   const layout = await page.evaluate(() => ({
     innerWidth: window.innerWidth,
     bodyScrollWidth: document.body.scrollWidth,
@@ -231,7 +636,7 @@ async function responsiveEvidence(page, role, outDir) {
   assert(layout.bodyScrollWidth <= layout.innerWidth, `${role} body overflows 390px viewport`);
   assert(layout.documentScrollWidth <= layout.innerWidth, `${role} document overflows 390px viewport`);
   assert(layout.clippedAuthNodes.length === 0, `${role} auth UI contains clipped nodes at 390px`);
-  return { ...layout, screenshot };
+  return { ...layout, interaction, stableUi, screenshot };
 }
 
 async function adminOrganizationResponsiveEvidence(page, outDir) {
@@ -334,24 +739,59 @@ async function main() {
   const report = {
     ok: false,
     generatedAt: new Date().toISOString(),
-    environment: { apiBase, webBase, browserChannel: null, isolatedConfirmation: false },
+    environment: {
+      apiBase,
+      webBase,
+      browserChannel: null,
+      isolatedConfirmation: false,
+      gitHead: currentGitHead(),
+      gitStatusShort: currentGitStatusShort(),
+      artifactSha256: null,
+      serviceWorkerSource: null,
+    },
     checks: [],
     entities: {},
+    accounts: {},
+    serviceWorker: {},
+    timeline: {
+      swReadyAt: null,
+      firstMutationAt: null,
+    },
+    stableUi: {},
     responsive: {},
+    externalGates: {
+      sqliteDirectReconciliation: 'required-after-browser-proof',
+      targetEnvironmentRelease: 'not-in-scope',
+    },
     browserIssues: [],
     failure: null,
   };
   const contexts = [];
   let browser = null;
+  let workflowCompleted = false;
+  let watchdogExpired = false;
+  let watchdogTimer = null;
+  const workflowTimeoutMs = Number(args['workflow-timeout-ms'] || DEFAULT_WORKFLOW_TIMEOUT_MS);
 
   function record(name, evidence = {}) {
     report.checks.push({ name, ok: true, evidence });
   }
 
   try {
+    assert(Number.isFinite(workflowTimeoutMs) && workflowTimeoutMs >= 60_000 && workflowTimeoutMs <= 30 * 60_000, 'Workflow timeout must be between 60000 and 1800000 ms');
     assert(args['confirm-isolated-environment'] === true, 'Pass --confirm-isolated-environment for a disposable local database');
     assert(isLocalUrl(apiBase) && isLocalUrl(webBase), 'Role workflow proof only accepts local API and web URLs');
+    assert(report.environment.gitHead, 'QA-007 requires an exact Git HEAD');
+    assert(Array.isArray(report.environment.gitStatusShort), 'QA-007 requires readable Git working-tree provenance');
     report.environment.isolatedConfirmation = true;
+    report.environment.artifactSha256 = await criticalArtifactHashes();
+    report.environment.serviceWorkerSource = await serviceWorkerSourceEvidence(webBase);
+    record('exact Git and critical artifact provenance', {
+      gitHead: report.environment.gitHead,
+      dirtyPaths: report.environment.gitStatusShort,
+      serviceWorkerSha256: report.environment.serviceWorkerSource.sha256,
+      serviceWorkerCacheName: report.environment.serviceWorkerSource.cacheName,
+    });
 
     const health = await fetchJson(`${apiBase}/api/health`);
     assert(health.status === 200, `API health failed with ${health.status}`);
@@ -362,17 +802,51 @@ async function main() {
     const launched = await launchBrowser(args);
     browser = launched.browser;
     report.environment.browserChannel = launched.channel;
+    watchdogTimer = setTimeout(() => {
+      watchdogExpired = true;
+      if (browser) browser.close().catch(() => {});
+    }, workflowTimeoutMs);
+
+    const anonymousPreflight = await createRolePage(browser, report, webBase, apiBase, 'student');
+    try {
+      const anonymousEvidence = await anonymousPreflight.page.evaluate(() => ({
+        authOverlayVisible: Boolean(document.querySelector('[data-app-auth-overlay]:not([hidden])')),
+        loginFormVisible: Boolean(document.querySelector('[data-app-auth-form="login"]')),
+        controller: navigator.serviceWorker && navigator.serviceWorker.controller
+          ? navigator.serviceWorker.controller.scriptURL
+          : null,
+      }));
+      const anonymousRoleResponses = (anonymousPreflight.page.__astraRoleResponses || []).map((item) => ({ ...item }));
+      assert(anonymousEvidence.authOverlayVisible && anonymousEvidence.loginFormVisible, 'anonymous preflight must remain inside the login gate');
+      assert(anonymousRoleResponses.length === 0, `anonymous preflight loaded role resources: ${JSON.stringify(anonymousRoleResponses)}`);
+      report.serviceWorker.anonymous = {
+        ...anonymousEvidence,
+        cache: anonymousPreflight.serviceWorkerReadiness.cache,
+        roleResponses: anonymousRoleResponses,
+      };
+      report.timeline.swReadyAt = new Date().toISOString();
+      record('anonymous authentication gate and Service Worker preflight before any business mutation', report.serviceWorker.anonymous);
+    } finally {
+      await anonymousPreflight.context.close();
+    }
 
     const runId = Date.now().toString(36);
     const password = `Astra!${runId}Aa9`;
     const accounts = {
       teacher: { username: `e2e_teacher_${runId}`, displayName: '端到端教师', password },
       student: { username: `e2e_student_${runId}`, displayName: '端到端学生', password },
+      batchStudent: { username: `e2e_batch_${runId}`, displayName: '批量导入学生', password },
+      governed: { username: `e2e_governed_${runId}`, displayName: '用户治理对象', password },
       applicant: { username: `e2e_applicant_${runId}`, displayName: '审批申请学生', password },
       outsider: { username: `e2e_outsider_${runId}`, displayName: '越权验证学生', password },
       admin: { username: `e2e_admin_${runId}`, displayName: '端到端管理员', password },
     };
 
+    report.timeline.firstMutationAt = new Date().toISOString();
+    assert(
+      Date.parse(report.timeline.swReadyAt) <= Date.parse(report.timeline.firstMutationAt),
+      `Service Worker preflight must precede the first mutation: ${JSON.stringify(report.timeline)}`
+    );
     const bootstrap = await fetchJson(`${apiBase}/api/admin/bootstrap`, {
       method: 'POST',
       body: {
@@ -383,13 +857,38 @@ async function main() {
       },
     });
     assert(bootstrap.status === 201, `Admin bootstrap failed with ${bootstrap.status}: ${bootstrap.text}`);
+    report.accounts.admin = { username: accounts.admin.username, id: String(bootstrap.body && bootstrap.body.id) };
     record('controlled admin bootstrap', { role: bootstrap.body && bootstrap.body.role });
 
+    const auxiliaryRegistrations = {};
+    for (const key of ['batchStudent', 'governed']) {
+      const account = accounts[key];
+      const registration = await fetchJson(`${apiBase}/api/auth/register`, {
+        method: 'POST',
+        body: {
+          username: account.username,
+          display_name: account.displayName,
+          password: account.password,
+          role: 'student',
+        },
+      });
+      assert(registration.status === 201, `${key} registration failed with ${registration.status}: ${registration.text}`);
+      auxiliaryRegistrations[key] = registration.body;
+      report.accounts[key] = { username: account.username, id: String(registration.body && registration.body.id) };
+    }
+
+    await registerThenLogout(browser, report, webBase, apiBase, 'teacher', accounts.teacher);
     const teacherRuntime = await createRolePage(browser, report, webBase, apiBase, 'teacher');
     contexts.push(teacherRuntime.context);
-    await registerFromUi(teacherRuntime.page, 'teacher', accounts.teacher);
+    await loginFromUi(teacherRuntime.page, 'teacher', accounts.teacher);
     await teacherRuntime.page.locator('[data-teacher-dashboard]:not([hidden])').waitFor({ state: 'visible' });
-    record('teacher first-party registration and dashboard');
+    const teacherIdentity = await pageApi(teacherRuntime.page, apiBase, '/api/users/me');
+    assert(teacherIdentity.status === 200 && teacherIdentity.body.role === 'teacher', 'teacher explicit login identity mismatch');
+    report.accounts.teacher = { username: accounts.teacher.username, id: String(teacherIdentity.body.id) };
+    report.serviceWorker.teacher = await serviceWorkerRoleEvidence(teacherRuntime.page, 'teacher', {
+      expectedCacheName: report.environment.serviceWorkerSource.cacheName,
+    });
+    record('teacher first-party registration, logout, explicit login and dashboard');
 
     const schoolName = `E2E School ${runId}`;
     const className = `E2E Class ${runId}`;
@@ -436,11 +935,95 @@ async function main() {
     await teacherRuntime.page.locator('[data-teacher-flash]').filter({ hasText: '当前班级作业与积分覆盖策略已保存' }).waitFor({ state: 'visible' });
     await teacherRuntime.page.locator('[data-teacher-class-policy-reset]:not([disabled])').waitFor({ state: 'visible' });
     report.entities = { schoolId, classId, courseId, unitId, assignmentId };
-    record('teacher creates published course workflow and persisted class policy', report.entities);
+    record('teacher creates published course workflow and persisted class policy', { ...report.entities });
 
+    const eligibilityClass = await pageApi(teacherRuntime.page, apiBase, '/api/classes', {
+      method: 'POST',
+      body: {
+        school_id: Number(schoolId),
+        name: `E2E Eligibility ${runId}`,
+        grade: '10',
+        term: '2026A',
+      },
+    });
+    assert(
+      eligibilityClass.status === 201 && eligibilityClass.body && eligibilityClass.body.id,
+      `batch import eligibility class creation failed with ${eligibilityClass.status}: ${JSON.stringify(eligibilityClass.body)}`
+    );
+    const eligibilityClassId = String(eligibilityClass.body.id);
+    const batchStudentLogin = await fetchJson(`${apiBase}/api/auth/login`, {
+      method: 'POST',
+      body: {
+        username: accounts.batchStudent.username,
+        password: accounts.batchStudent.password,
+      },
+    });
+    assert(
+      batchStudentLogin.status === 200 && batchStudentLogin.body && batchStudentLogin.body.access_token,
+      `batch student eligibility login failed with ${batchStudentLogin.status}: ${batchStudentLogin.text}`
+    );
+    const batchStudentAuthorization = {
+      Authorization: `Bearer ${batchStudentLogin.body.access_token}`,
+    };
+    const eligibilityJoin = await fetchJson(`${apiBase}/api/classes/${eligibilityClassId}/join`, {
+      method: 'POST',
+      headers: batchStudentAuthorization,
+      body: { role: 'student' },
+    });
+    assert(
+      eligibilityJoin.status === 201 && eligibilityJoin.body && eligibilityJoin.body.role === 'student',
+      `batch student school eligibility setup failed with ${eligibilityJoin.status}: ${eligibilityJoin.text}`
+    );
+    const eligibilityLogout = await fetchJson(`${apiBase}/api/auth/logout`, {
+      method: 'POST',
+      headers: batchStudentAuthorization,
+    });
+    assert(
+      eligibilityLogout.status === 200 && eligibilityLogout.body && eligibilityLogout.body.status === 'ok',
+      `batch student eligibility logout failed with ${eligibilityLogout.status}: ${eligibilityLogout.text}`
+    );
+    report.entities.eligibilityClassId = eligibilityClassId;
+    record('batch import prerequisite uses public class join to establish same-school eligibility', {
+      eligibilityClassId,
+      username: accounts.batchStudent.username,
+      eligibilityMembershipId: String(eligibilityJoin.body.id),
+    });
+
+    let batchImportRequests = 0;
+    teacherRuntime.page.on('request', (request) => {
+      const resource = new URL(request.url());
+      if (request.method() === 'POST' && resource.pathname === `/api/classes/${classId}/students/batch-import`) {
+        batchImportRequests += 1;
+      }
+    });
+    await teacherForm(teacherRuntime.page, 'student-batch-import', {
+      usernames: accounts.batchStudent.username,
+    }, '批量导入已处理');
+    assert(batchImportRequests === 1, `teacher batch import expected one POST, got ${batchImportRequests}`);
+    const batchResult = teacherRuntime.page.locator('.teacher-member-import-result');
+    await batchResult.filter({ hasText: accounts.batchStudent.username }).waitFor({ state: 'visible' });
+    assert(await batchResult.filter({ hasText: '新增 1' }).count() === 1, 'teacher batch import must create one membership');
+    assert(await batchResult.filter({ hasText: '失败 0' }).count() === 1, 'teacher batch import must have zero failed rows');
+    await teacherRuntime.page.locator('.teacher-table tbody tr').filter({ hasText: accounts.batchStudent.username }).waitFor({ state: 'visible' });
+    report.entities.batchStudentId = String(auxiliaryRegistrations.batchStudent.id);
+    record('teacher performs one real batch student import and reconciles the member table', {
+      requestCount: batchImportRequests,
+      username: accounts.batchStudent.username,
+      userId: report.entities.batchStudentId,
+    });
+
+    await registerThenLogout(browser, report, webBase, apiBase, 'student', accounts.student);
     const studentRuntime = await createRolePage(browser, report, webBase, apiBase, 'student');
     contexts.push(studentRuntime.context);
-    await registerFromUi(studentRuntime.page, 'student', accounts.student);
+    await loginFromUi(studentRuntime.page, 'student', accounts.student);
+    await studentRuntime.page.locator('[data-student-dashboard]:not([hidden])').waitFor({ state: 'visible' });
+    const studentIdentity = await pageApi(studentRuntime.page, apiBase, '/api/users/me');
+    assert(studentIdentity.status === 200 && studentIdentity.body.role === 'student', 'student explicit login identity mismatch');
+    report.accounts.student = { username: accounts.student.username, id: String(studentIdentity.body.id) };
+    report.serviceWorker.student = await serviceWorkerRoleEvidence(studentRuntime.page, 'student', {
+      expectedCacheName: report.environment.serviceWorkerSource.cacheName,
+    });
+    record('student first-party registration, logout and explicit login');
     const joinForm = studentRuntime.page.locator('[data-student-join-form]');
     await joinForm.locator('[name="class_id"]').fill(classId);
     await joinForm.locator('button[type="submit"]').click();
@@ -454,21 +1037,31 @@ async function main() {
     const submissionForm = studentRuntime.page.locator(`[data-student-submission-form][data-assignment-id="${assignmentId}"]`);
     await submissionForm.waitFor({ state: 'visible' });
     const answer = `E2E answer ${runId}: energy before equals energy after.`;
+    let submissionWriteCount = 0;
+    studentRuntime.page.on('request', (request) => {
+      const resource = new URL(request.url());
+      if (request.method() === 'POST' && resource.pathname === `/api/assignments/${assignmentId}/submissions`) {
+        submissionWriteCount += 1;
+      }
+    });
     await submissionForm.locator('textarea').fill(answer);
     await submissionForm.locator('button[type="submit"]').click();
     await studentRuntime.page.locator('[data-student-panel="submission"] .student-review-block').filter({ hasText: answer }).waitFor({ state: 'visible' });
-    record('student submits assignment without retry', { assignmentId });
+    assert(submissionWriteCount === 1, `student submission expected one POST, got ${submissionWriteCount}`);
+    record('student submits assignment without retry', { assignmentId, requestCount: submissionWriteCount });
 
     const teacherRefresh = teacherRuntime.page.locator('[data-teacher-action="refresh"]');
     await teacherRefresh.click();
     const gradeForm = teacherRuntime.page.locator('[data-teacher-form="grade"]');
     await gradeForm.locator('[name="submission_id"]:not([disabled])').waitFor({ state: 'visible' });
+    const submissionId = await gradeForm.locator('[name="submission_id"]').inputValue();
     await gradeForm.locator('[name="score"]').fill('18');
     await gradeForm.locator('[name="status"]').selectOption('graded');
     await gradeForm.locator('[name="feedback"]').fill(`E2E feedback ${runId}`);
     await gradeForm.locator('button[type="submit"]').click();
     await teacherRuntime.page.locator('[data-teacher-flash]').filter({ hasText: '评分已提交' }).waitFor({ state: 'visible' });
-    record('teacher grades submission', { score: 18 });
+    report.entities.submissionId = String(submissionId);
+    record('teacher grades submission', { submissionId, score: 18 });
 
     await studentRuntime.page.locator('[data-student-action="refresh"]').click();
     await studentRuntime.page.locator('[data-student-panel="submission"] .student-review-block').filter({ hasText: `E2E feedback ${runId}` }).waitFor({ state: 'visible' });
@@ -506,10 +1099,26 @@ async function main() {
       studentOrganization: [403, 403],
       teacherOrganization: [403, 403],
     });
+    await teacherRuntime.page.goto(roleUrl(webBase, apiBase, 'admin'), { waitUntil: 'domcontentloaded' });
+    await teacherRuntime.page.waitForURL(/#teacher$/);
+    await teacherRuntime.page.locator('[data-teacher-dashboard]:not([hidden])').waitFor({ state: 'visible' });
+    const forbiddenAdminResources = await teacherRuntime.page.evaluate(() => ({
+      scripts: document.querySelectorAll('script[data-router-page-script="admin"]').length,
+      styles: Array.from(document.querySelectorAll('link[data-astra-role-resource]'))
+        .filter((node) => new URL(node.href).pathname.startsWith('/pages/admin/')).length,
+    }));
+    assert(
+      forbiddenAdminResources.scripts === 0 && forbiddenAdminResources.styles === 0,
+      `teacher must not load admin resources: ${JSON.stringify(forbiddenAdminResources)}`
+    );
+    record('teacher forbidden admin hash redirects before admin CSS or script load', forbiddenAdminResources);
 
     const applicantRuntime = await createRolePage(browser, report, webBase, apiBase, 'student');
     contexts.push(applicantRuntime.context);
     await registerFromUi(applicantRuntime.page, 'student', accounts.applicant);
+    const applicantIdentity = await pageApi(applicantRuntime.page, apiBase, '/api/users/me');
+    assert(applicantIdentity.status === 200, 'applicant identity reread failed');
+    report.accounts.applicant = { username: accounts.applicant.username, id: String(applicantIdentity.body.id) };
     const joinRequest = await pageApi(applicantRuntime.page, apiBase, `/api/classes/${classId}/join-requests`, {
       method: 'POST',
       body: { role: 'student', message: `E2E approval ${runId}` },
@@ -518,10 +1127,41 @@ async function main() {
     const joinRequestId = String(joinRequest.body.id);
     report.entities.joinRequestId = joinRequestId;
 
+    const governedRuntime = await createRolePage(browser, report, webBase, apiBase, 'student');
+    contexts.push(governedRuntime.context);
+    await loginFromUi(governedRuntime.page, 'student', accounts.governed);
+    await governedRuntime.page.locator('[data-student-dashboard]:not([hidden])').waitFor({ state: 'visible' });
+    const governedIdentity = await pageApi(governedRuntime.page, apiBase, '/api/users/me');
+    assert(
+      governedIdentity.status === 200
+      && Number(governedIdentity.body && governedIdentity.body.id) === Number(auxiliaryRegistrations.governed.id),
+      'governed user session identity mismatch'
+    );
+    report.entities.governedUserId = String(auxiliaryRegistrations.governed.id);
+    record('dedicated governed user has an active pre-governance session', {
+      userId: report.entities.governedUserId,
+      role: governedIdentity.body.role,
+      status: governedIdentity.body.status,
+    });
+
     const adminRuntime = await createRolePage(browser, report, webBase, apiBase, 'admin');
     contexts.push(adminRuntime.context);
     await loginFromUi(adminRuntime.page, 'admin', accounts.admin);
     await adminRuntime.page.locator('[data-admin-dashboard]:not([hidden])').waitFor({ state: 'visible' });
+    const adminIdentity = await pageApi(adminRuntime.page, apiBase, '/api/users/me');
+    assert(adminIdentity.status === 200 && adminIdentity.body.role === 'admin', 'admin login identity mismatch');
+    report.accounts.admin.id = String(adminIdentity.body.id);
+    await adminRuntime.page.locator('a[href="#teacher"]:visible').first().click();
+    await adminRuntime.page.locator('[data-teacher-dashboard]:not([hidden])').waitFor({ state: 'visible' });
+    await adminRuntime.page.locator('a[href="#admin"]:visible').first().click();
+    await adminRuntime.page.locator('[data-admin-dashboard]:not([hidden])').waitFor({ state: 'visible' });
+    report.serviceWorker.admin = await serviceWorkerRoleEvidence(adminRuntime.page, 'admin', {
+      teacherWorkspaceVisited: true,
+      expectedCacheName: report.environment.serviceWorkerSource.cacheName,
+    });
+    record('admin reaches teacher workspace and returns to global governance', {
+      loadedScripts: report.serviceWorker.admin.loadedScripts,
+    });
     const approve = adminRuntime.page.locator(`[data-admin-join-review="approved"][data-join-request-id="${joinRequestId}"]`);
     await approve.waitFor({ state: 'visible' });
     await approve.click();
@@ -532,6 +1172,69 @@ async function main() {
     const audit = await pageApi(adminRuntime.page, apiBase, `/api/admin/audit-logs?action=class.join.request.approve&resource_id=${joinRequestId}`);
     assert(audit.status === 200 && audit.body && audit.body.total === 1, 'Admin approval audit reconciliation failed');
     record('admin approves join request and reconciles audit', { joinRequestId, auditTotal: audit.body.total });
+
+    const batchAudit = await pageApi(adminRuntime.page, apiBase, `/api/admin/audit-logs?action=class.student.batch_import&resource_id=${classId}`);
+    assert(batchAudit.status === 200 && batchAudit.body && batchAudit.body.total === 1, 'Teacher batch import audit reconciliation failed');
+    record('teacher batch import audit is visible to admin', { total: batchAudit.body.total });
+
+    const governedUserId = String(auxiliaryRegistrations.governed.id);
+    const governedControls = adminRuntime.page.locator(`[data-admin-user-governance="${governedUserId}"]`);
+    await governedControls.waitFor({ state: 'visible' });
+    let governedPatchCount = 0;
+    const governedPatchBodies = [];
+    adminRuntime.page.on('request', (request) => {
+      const resource = new URL(request.url());
+      if (request.method() !== 'PATCH' || resource.pathname !== `/api/admin/users/${governedUserId}`) return;
+      governedPatchCount += 1;
+      try { governedPatchBodies.push(request.postDataJSON()); } catch { governedPatchBodies.push(null); }
+    });
+    await governedControls.locator('[data-admin-user-role]').selectOption('teacher');
+    await governedControls.locator('[data-admin-user-status]').selectOption('disabled');
+    await governedControls.locator('[data-admin-user-update]').click();
+    const governedConfirm = adminRuntime.page.locator(
+      `[data-admin-user-governance="${governedUserId}"] [data-admin-user-update][aria-label="再次点击确认用户权限变更"]`
+    );
+    await governedConfirm.waitFor({ state: 'visible' });
+    await governedConfirm.click();
+    await adminRuntime.page.locator('[data-admin-notice]').filter({
+      hasText: `用户 #${governedUserId} 已更新为 teacher / disabled`,
+    }).waitFor({ state: 'visible' });
+    assert(governedPatchCount === 1, `admin user governance expected one PATCH, got ${governedPatchCount}`);
+    assert(
+      JSON.stringify(governedPatchBodies[0]) === JSON.stringify({ role: 'teacher', status: 'disabled' }),
+      `admin user governance PATCH body mismatch: ${JSON.stringify(governedPatchBodies[0])}`
+    );
+    const governedUserPage = await pageApi(
+      adminRuntime.page,
+      apiBase,
+      `/api/admin/users?q=${encodeURIComponent(accounts.governed.username)}&limit=10&offset=0`
+    );
+    assert(governedUserPage.status === 200 && governedUserPage.body.total === 1, 'governed user authoritative list reread failed');
+    assert(
+      governedUserPage.body.items[0].role === 'teacher' && governedUserPage.body.items[0].status === 'disabled',
+      'governed user authoritative role/status mismatch'
+    );
+    const governedSessionAfter = await pageApi(governedRuntime.page, apiBase, '/api/users/me');
+    assert(governedSessionAfter.status === 401, `governed user session must be revoked, got ${governedSessionAfter.status}`);
+    const governedAudit = await pageApi(
+      adminRuntime.page,
+      apiBase,
+      `/api/admin/audit-logs?action=admin.user.update&resource_id=${governedUserId}`
+    );
+    assert(governedAudit.status === 200 && governedAudit.body.total === 1, 'admin user governance audit reconciliation failed');
+    await adminRuntime.page.locator('[data-admin-panel="audit-logs"] tbody tr')
+      .filter({ hasText: 'admin.user.update' })
+      .filter({ hasText: governedUserId })
+      .first()
+      .waitFor({ state: 'visible' });
+    record('admin double-confirms user role and status governance with session revocation and audit reread', {
+      userId: governedUserId,
+      requestCount: governedPatchCount,
+      role: 'teacher',
+      status: 'disabled',
+      revokedSessionStatus: governedSessionAfter.status,
+      auditTotal: governedAudit.body.total,
+    });
 
     const organizationPatches = [];
     adminRuntime.page.on('request', (request) => {
@@ -548,6 +1251,31 @@ async function main() {
     const archivedSchoolPage = await pageApi(adminRuntime.page, apiBase, '/api/admin/schools?status=archived&limit=1&offset=0');
     const activeClassPage = await pageApi(adminRuntime.page, apiBase, '/api/admin/classes?status=active&limit=1&offset=0');
     const archivedClassPage = await pageApi(adminRuntime.page, apiBase, '/api/admin/classes?status=archived&limit=1&offset=0');
+    const authoritativeStats = await pageApi(adminRuntime.page, apiBase, '/api/admin/stats');
+    assert(authoritativeStats.status === 200, `admin stats reread failed with ${authoritativeStats.status}`);
+    const entityCounts = await adminRuntime.page.evaluate(() => Object.fromEntries(
+      Array.from(document.querySelectorAll('[data-admin-database-map] [data-entity]')).map((item) => [
+        item.getAttribute('data-entity'),
+        Number(String(item.querySelector('strong')?.textContent || '').replace(/[^0-9]/g, '')) || 0,
+      ])
+    ));
+    const entityStatKeys = {
+      users: 'total_users',
+      schools: 'total_schools',
+      classes: 'total_classes',
+      courses: 'total_courses',
+      assignments: 'total_assignments',
+      submissions: 'total_submissions',
+      events: 'total_learning_events',
+      audits: 'total_audit_logs',
+    };
+    for (const [entity, statKey] of Object.entries(entityStatKeys)) {
+      assert(
+        entityCounts[entity] === Number(authoritativeStats.body[statKey] || 0),
+        `admin data map ${entity} expected ${authoritativeStats.body[statKey]}, got ${entityCounts[entity]}`
+      );
+    }
+    record('admin full domain data map matches authoritative stats', entityCounts);
     const visualCounts = await adminRuntime.page.evaluate(() => {
       const read = (kind) => Array.from(document.querySelectorAll(`[data-admin-organization-summary-kind="${kind}"] dd`))
         .map((item) => Number(String(item.textContent || '').replace(/[^0-9]/g, '')) || 0);
@@ -970,6 +1698,9 @@ async function main() {
     const outsiderRuntime = await createRolePage(browser, report, webBase, apiBase, 'student');
     contexts.push(outsiderRuntime.context);
     await registerFromUi(outsiderRuntime.page, 'student', accounts.outsider);
+    const outsiderIdentity = await pageApi(outsiderRuntime.page, apiBase, '/api/users/me');
+    assert(outsiderIdentity.status === 200, 'outsider identity reread failed');
+    report.accounts.outsider = { username: accounts.outsider.username, id: String(outsiderIdentity.body.id) };
     const outsiderReview = await pageApi(outsiderRuntime.page, apiBase, `/api/assignments/${assignmentId}/review`);
     assert(outsiderReview.status === 403, `Outsider assignment review expected 403, got ${outsiderReview.status}`);
     record('outsider assignment denial', { status: outsiderReview.status });
@@ -977,13 +1708,26 @@ async function main() {
     await studentRuntime.page.goto(roleUrl(webBase, apiBase, 'teacher'), { waitUntil: 'domcontentloaded' });
     await studentRuntime.page.waitForURL(/#student$/);
     const deniedRoleScripts = await studentRuntime.page.locator('script[data-router-page-script="teacher"], script[data-router-page-script="admin"]').count();
-    assert(deniedRoleScripts === 0, 'Student must not load teacher or admin page scripts');
+    const deniedRoleStyles = await studentRuntime.page.evaluate(() => Array.from(
+      document.querySelectorAll('link[data-astra-role-resource]')
+    ).filter((node) => /\/pages\/(teacher|admin)\//.test(new URL(node.href).pathname)).length);
+    assert(deniedRoleScripts === 0 && deniedRoleStyles === 0, 'Student must not load teacher or admin page resources');
     await studentRuntime.page.locator('[data-student-dashboard]:not([hidden])').waitFor({ state: 'visible' });
-    record('role shell redirects forbidden hash before protected script load');
+    record('role shell redirects forbidden hash before protected CSS or script load', {
+      forbiddenScripts: deniedRoleScripts,
+      forbiddenStyles: deniedRoleStyles,
+    });
     await studentRuntime.page.goto(roleUrl(webBase, apiBase, 'student'), { waitUntil: 'domcontentloaded' });
     await studentRuntime.page.locator('[data-auth-ui="account"][data-auth-role="student"]').waitFor({ state: 'visible' });
 
-    report.responsive.student = await responsiveEvidence(studentRuntime.page, 'student', outDir);
+    report.stableUi.desktop = {
+      student: await stableUiEvidence(studentRuntime.page, 'student'),
+      teacher: await stableUiEvidence(teacherRuntime.page, 'teacher'),
+      admin: await stableUiEvidence(adminRuntime.page, 'admin'),
+    };
+    record('three-role desktop stable UI has no visible error or stuck loading state', report.stableUi.desktop);
+
+    report.responsive.student = await responsiveEvidence(studentRuntime.page, 'student', outDir, { assignmentId });
     report.responsive.teacher = await responsiveEvidence(teacherRuntime.page, 'teacher', outDir);
     report.responsive.admin = await responsiveEvidence(adminRuntime.page, 'admin', outDir);
     record('three-role 390x844 responsive evidence');
@@ -993,21 +1737,27 @@ async function main() {
     await studentRuntime.page.screenshot({ path: desktopScreenshot, fullPage: true });
     report.responsive.desktopScreenshot = desktopScreenshot;
 
+    await freezeDiagnostics(contexts);
     assert(report.browserIssues.length === 0, `Browser issues detected: ${JSON.stringify(report.browserIssues)}`);
     record('browser console and request diagnostics clean');
-    report.ok = true;
+    workflowCompleted = true;
   } catch (error) {
     report.failure = {
-      message: String(error && error.message || error),
+      message: watchdogExpired
+        ? `QA-007 workflow watchdog exceeded ${workflowTimeoutMs}ms`
+        : String(error && error.message || error),
       stack: String(error && error.stack || '').split('\n').slice(0, 12),
     };
   } finally {
+    if (watchdogTimer) clearTimeout(watchdogTimer);
     for (const context of contexts.reverse()) {
       try { await context.close(); } catch {}
     }
     if (browser) {
       try { await browser.close(); } catch {}
     }
+    report.ok = Boolean(workflowCompleted && !watchdogExpired && !report.failure && report.browserIssues.length === 0);
+    report.completedAt = new Date().toISOString();
     await fs.mkdir(outDir, { recursive: true });
     await fs.writeFile(path.join(outDir, 'role-workflows-report.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   }

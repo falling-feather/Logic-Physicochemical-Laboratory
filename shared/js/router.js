@@ -23,7 +23,7 @@ const Router = {
     _galaxyCacheVersion: '20260704qianduanV70',
     courseSupportScripts: [
         'shared/js/lucide.min.js?v=20260417d',
-        'shared/js/module-selector.js?v=20260716v7426ModuleSwitchLifecycleP4'
+        'shared/js/module-selector.js?v=20260716v7427RoleWorkflowGateP0'
     ],
     galaxySupportScripts: {
         astra: [
@@ -35,7 +35,7 @@ const Router = {
             'shared/js/back-to-top.js?v=20260424rr',
             'shared/js/fab-trigger.js?v=20260528v61g',
             'shared/js/touch-gestures.js?v=20260418a',
-            'shared/js/experiment-guide.js?v=20260716v7426ModuleSwitchLifecycleP4',
+            'shared/js/experiment-guide.js?v=20260716v7427RoleWorkflowGateP0',
             'shared/js/experiment-export.js?v=20260528v61f',
             'shared/js/quiz-data.js?v=20260618refsP1',
             'shared/js/experiment-quiz.js?v=20260606fix1',

@@ -17,7 +17,7 @@ const context = { window: {} };
 vm.runInNewContext(registrySource, context, { filename: 'shared/js/page-registry.js' });
 const registry = context.window.AstraPageRegistry;
 const normalize = (items) => Array.from(items);
-const version = '20260716v7426ModuleSwitchLifecycleP4';
+const version = '20260716v7427RoleWorkflowGateP0';
 const student = [
     `pages/student/student.css?v=${version}`,
     `pages/student/student.js?v=${version}`
@@ -46,7 +46,7 @@ assert.doesNotMatch(html, /<link[^>]+href="pages\/(?:student|teacher|admin)\//);
 const appShell = serviceWorker.match(/const APP_SHELL = \[([\s\S]*?)\n\];/);
 assert.ok(appShell, 'service-worker APP_SHELL must remain inspectable');
 assert.doesNotMatch(appShell[1], roleAssetPattern, 'APP_SHELL must not pre-cache any role resource');
-assert.match(serviceWorker, /astra-static-v20260716v7426ModuleSwitchLifecycleP4/);
+assert.match(serviceWorker, /astra-static-v20260716v7427RoleWorkflowGateP0/);
 
 const coreFallback = main.match(/const CORE_HTTP_FALLBACK_ASSETS = \[([\s\S]*?)\n\];/);
 const galaxyFallback = main.match(/const GALAXY_HTTP_FALLBACK_ASSETS = \{([\s\S]*?)\n\};/);
@@ -54,6 +54,26 @@ assert.ok(coreFallback && galaxyFallback, 'HTTP fallback manifests must remain i
 assert.doesNotMatch(coreFallback[1], roleAssetPattern);
 assert.doesNotMatch(galaxyFallback[1], roleAssetPattern);
 assert.doesNotMatch(main, /AstraPageRegistry\.resourcesForRole\(/, 'network-only role resources must not be prewarmed');
+assert.match(
+    main,
+    /window\.warmGalaxyCache = function \(galaxy\)[\s\S]*cacheMode === 'service-worker'[\s\S]*cacheMode === 'service-worker-pending'[\s\S]*return;/,
+    'HTTP fallback warming must not overwrite diagnostics or duplicate warming while Service Worker owns caching'
+);
+assert.match(
+    html,
+    /forcedServiceWorker[\s\S]*if \(!isLocalhost \|\| !\('serviceWorker' in navigator\) \|\| forcedServiceWorker\) return;[\s\S]*navigator\.serviceWorker\.getRegistrations\(\)/,
+    'forced Service Worker mode must not be unregistered by the localhost fallback owner'
+);
+assert.match(
+    main,
+    /registerServiceWorker\(\);[\s\S]*await window\.AstraApplicationSession\.bootstrap\(\);[\s\S]*initApp\(\);/,
+    'the public Service Worker shell must become ready while the authentication gate owns the page'
+);
+assert.match(
+    main,
+    /if \(forcedServiceWorker\) \{[\s\S]*doRegister\(\);[\s\S]*\} else if \(window\.requestIdleCallback\)/,
+    'forced QA mode must register the Service Worker immediately instead of waiting for an idle callback'
+);
 
 assert.match(session, /await prepareRoleResources\(user\.role\)[\s\S]*state\.user =/);
 assert.match(session, /document\.querySelectorAll\('link\[rel="stylesheet"\]'\)/);
