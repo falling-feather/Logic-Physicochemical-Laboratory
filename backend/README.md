@@ -2,7 +2,7 @@
 
 > **文档定位**：后端本地开发、API/服务边界、配置、迁移、运维脚本和验证入口。V7.4.12 起完成事实见 [`../doc/03-开发历史.md`](../doc/03-开发历史.md)，更早实机证据见 [`../doc/03-发布历史.md`](../doc/03-发布历史.md)，未来任务见 [`../doc/02-项目规划.md`](../doc/02-项目规划.md)。
 >
-> **当前基线**：FastAPI + SQLAlchemy + Alembic 0046；SQLite 为安全本地默认，MySQL 为发布目标。V7.4.22 已硬化浏览器 Cookie-only/非浏览器 Bearer 双通道契约；V7.4.9 已建立 Python 3.12 通用哈希锁和 CI 漂移门禁；V7.4.8 已完成管理 API 全部分域拆分，`admin.py` 为纯路由聚合器；V6.6.63 后端阶段、真实 MySQL、四服务拓扑、Release 构建/回滚和 15/15 stage gate 已完成。
+> **当前基线**：FastAPI + SQLAlchemy + Alembic 0047；SQLite 为安全本地默认，MySQL 为发布目标。V7.4.24 已完成学校/班级受约束治理、乐观并发、责任人保护、审计与活动组织边界；V7.4.22 已硬化浏览器 Cookie-only/非浏览器 Bearer 双通道契约；V7.4.9 已建立 Python 3.12 通用哈希锁和 CI 漂移门禁；V7.4.8 已完成管理 API 全部分域拆分，`admin.py` 为纯路由聚合器；V6.6.63 后端阶段、真实 MySQL、四服务拓扑、Release 构建/回滚和 15/15 stage gate 已完成。
 >
 > **最后更新**：2026-07-15
 
@@ -448,6 +448,8 @@ V6.6.62 基线收集 373 项：默认套件 368 项通过、5 项真实 MySQL �
 
 V6.6.63 基线收集 380 项：默认套件 375 项通过、5 项真实 MySQL 专项按显式环境门禁跳过；RC 范围门禁定向、中文路径 ASCII-safe 初始化 CLI、真实 MySQL 0046 preflight/smoke、拓扑 render 和最终生产 stage gate 15/15 通过。
 
+V7.4.24 基线收集 435 项：默认套件 429 项通过、6 项真实 MySQL 发布证据按显式环境门禁跳过；新增组织治理、0047 SQLite 往返、条件式 MySQL schema、26 个活动组织写门禁、责任人并发保护以及归档后当前学情/进度与历史读取边界回归。真实 MySQL 未提供隔离库时只能声明门禁已落地，不得声明目标数据库已通过。
+
 ```bash
 python -m pytest backend/tests/test_school_classes.py backend/tests/test_access_control.py backend/tests/test_course_learning_loop.py -q
 python -m pytest backend/tests/test_alert_delivery.py -q
@@ -458,7 +460,7 @@ python -m pytest backend/tests/test_backend_performance.py backend/tests/test_ap
 node tools/tests/v6653-permission-analytics-contract.cjs
 ```
 
-迁移最低门禁需验证 `upgrade 20260710_0043 -> upgrade head -> downgrade 20260710_0043 -> upgrade head`，最终 `alembic current` 必须为 `20260710_0046`；0044 绑定最后编辑者/审核 schema hash，0045 串行化 admin 安全控制面，0046 将知识快照窗口字段提升为 MySQL DATETIME(6) 并修复既有日/周窗口 run key。V6.6.61 已在真实 MySQL 完成 0043 建撤和 0045↔0046 往返。
+迁移最低门禁需验证 `upgrade 20260710_0043 -> upgrade head -> downgrade 20260710_0043 -> upgrade head`，最终 `alembic current` 必须为 `20260716_0047`；0044 绑定最后编辑者/审核 schema hash，0045 串行化 admin 安全控制面，0046 将知识快照窗口字段提升为 MySQL DATETIME(6) 并修复既有日/周窗口 run key，0047 增加学校/班级说明与乐观并发版本。V6.6.61 的真实 MySQL 证据只覆盖至 0046；0047 必须在新的隔离 MySQL 或目标环境补证。
 
 权限范围回归可单独运行：
 
@@ -474,7 +476,7 @@ $env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
 python -m alembic upgrade head
 ```
 
-当前 Alembic head：`20260710_0046`。`0043` 为审计时间线/资源线、Bug/同步账本、知识 run、脚本扫描 run 和待批改队列新增 10 个复合索引；`0044/0045` 分别增加内容审核绑定和安全控制锁；`0046` 将个人/班级快照及 run 的 period_start/period_end 统一为 MySQL DATETIME(6)。V6.6.61 已在代表性真实 MySQL 数据上完成 0043 建撤、0045↔0046 往返和独立恢复库 smoke。
+当前 Alembic head：`20260716_0047`。`0043` 为审计时间线/资源线、Bug/同步账本、知识 run、脚本扫描 run 和待批改队列新增 10 个复合索引；`0044/0045` 分别增加内容审核绑定和安全控制锁；`0046` 将个人/班级快照及 run 的 period_start/period_end 统一为 MySQL DATETIME(6)；`0047` 为学校/班级增加 nullable description 与非空默认 version=1。0047 已完成 SQLite 历史行往返和条件式 MySQL schema 门禁，真实 MySQL 仍待新环境补证。
 
 内容脚本远端漂移 CLI：
 

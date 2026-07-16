@@ -872,3 +872,112 @@ def test_performance_index_migration_round_trip_preserves_existing_claim_index(m
         assert new_indexes.issubset(restored)
     finally:
         _dispose_and_remove(database_url, database_path)
+
+
+def test_admin_organization_governance_migration_round_trip_preserves_rows(monkeypatch):
+    backend_root = Path(__file__).resolve().parents[1]
+    database_path, database_url = _empty_sqlite_database(monkeypatch, backend_root)
+    config = _alembic_config(backend_root)
+
+    def columns(table_name: str) -> dict[str, dict[str, object]]:
+        with make_engine(database_url).connect() as connection:
+            return {
+                str(row[1]): {
+                    "type": str(row[2]).upper(),
+                    "not_null": bool(row[3]),
+                    "default": row[4],
+                }
+                for row in connection.execute(text(f"PRAGMA table_info('{table_name}')")).all()
+            }
+
+    try:
+        command.upgrade(config, "20260710_0046")
+        assert {"description", "version"}.isdisjoint(columns("schools"))
+        assert {"description", "version"}.isdisjoint(columns("class_groups"))
+        now = _sqlite_datetime(datetime.now(UTC))
+        with make_engine(database_url).begin() as connection:
+            school_id = int(
+                connection.execute(
+                    text(
+                        "INSERT INTO schools "
+                        "(name, region, status, created_at, updated_at) "
+                        "VALUES (:name, :region, 'active', :now, :now)"
+                    ),
+                    {"name": "Migration Organization School", "region": "Shanghai", "now": now},
+                ).lastrowid
+            )
+            class_id = int(
+                connection.execute(
+                    text(
+                        "INSERT INTO class_groups "
+                        "(school_id, name, grade, term, status, created_at, updated_at) "
+                        "VALUES (:school_id, :name, '10', '2026A', 'active', :now, :now)"
+                    ),
+                    {
+                        "school_id": school_id,
+                        "name": "Migration Organization Class",
+                        "now": now,
+                    },
+                ).lastrowid
+            )
+
+        command.upgrade(config, "head")
+        assert {"description", "version"}.issubset(columns("schools"))
+        assert {"description", "version"}.issubset(columns("class_groups"))
+        for table_name in ("schools", "class_groups"):
+            metadata = columns(table_name)
+            assert metadata["description"] == {
+                "type": "TEXT",
+                "not_null": False,
+                "default": None,
+            }
+            assert metadata["version"] == {
+                "type": "INTEGER",
+                "not_null": True,
+                "default": "1",
+            }
+        with make_engine(database_url).connect() as connection:
+            school_row = connection.execute(
+                text("SELECT name, description, version FROM schools WHERE id = :id"),
+                {"id": school_id},
+            ).mappings().one()
+            class_row = connection.execute(
+                text("SELECT name, description, version FROM class_groups WHERE id = :id"),
+                {"id": class_id},
+            ).mappings().one()
+        assert school_row == {
+            "name": "Migration Organization School",
+            "description": None,
+            "version": 1,
+        }
+        assert class_row == {
+            "name": "Migration Organization Class",
+            "description": None,
+            "version": 1,
+        }
+
+        command.downgrade(config, "20260710_0046")
+        assert {"description", "version"}.isdisjoint(columns("schools"))
+        assert {"description", "version"}.isdisjoint(columns("class_groups"))
+        with make_engine(database_url).connect() as connection:
+            assert connection.execute(
+                text("SELECT name FROM schools WHERE id = :id"),
+                {"id": school_id},
+            ).scalar_one() == "Migration Organization School"
+            assert connection.execute(
+                text("SELECT name FROM class_groups WHERE id = :id"),
+                {"id": class_id},
+            ).scalar_one() == "Migration Organization Class"
+
+        command.upgrade(config, "head")
+        with make_engine(database_url).connect() as connection:
+            assert connection.execute(
+                text("SELECT version FROM schools WHERE id = :id"),
+                {"id": school_id},
+            ).scalar_one() == 1
+            assert connection.execute(
+                text("SELECT version FROM class_groups WHERE id = :id"),
+                {"id": class_id},
+            ).scalar_one() == 1
+    finally:
+        _dispose_and_remove(database_url, database_path)

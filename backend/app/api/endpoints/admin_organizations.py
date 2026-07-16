@@ -13,11 +13,15 @@ from app.schemas.admin import (
     AdminClassJoinRequestReview,
     AdminClassPage,
     AdminClassStats,
+    AdminClassUpdate,
     AdminSchoolPage,
     AdminSchoolStats,
+    AdminSchoolUpdate,
 )
+from app.schemas.school import ClassRead, SchoolRead
 from app.services.access_control import require_class_teacher_or_admin_by_id, require_school_teacher_or_admin
 from app.services.admin_common import next_offset, require_admin, statement_count
+from app.services.admin_organization_governance import update_admin_class, update_admin_school
 from app.services.admin_organization_stats import build_class_stats, build_school_stats
 from app.services.class_join_requests import (
     apply_class_join_request_review,
@@ -53,6 +57,37 @@ def list_admin_schools(
         limit=limit,
         offset=offset,
         next_offset=next_offset(total, offset, len(items)),
+    )
+
+
+@router.get("/schools/{school_id}", response_model=SchoolRead)
+def read_admin_school(
+    school_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> School:
+    require_admin(current_user)
+    school = db.get(School, school_id)
+    if school is None:
+        raise HTTPException(status_code=404, detail="School not found")
+    return school
+
+
+@router.patch("/schools/{school_id}", response_model=SchoolRead)
+def patch_admin_school(
+    school_id: int,
+    payload: AdminSchoolUpdate,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> School:
+    require_admin(current_user)
+    return update_admin_school(
+        db,
+        school_id=school_id,
+        payload=payload,
+        actor=current_user,
+        request=request,
     )
 
 
@@ -99,6 +134,37 @@ def list_admin_classes(
         limit=limit,
         offset=offset,
         next_offset=next_offset(total, offset, len(items)),
+    )
+
+
+@router.get("/classes/{class_id}", response_model=ClassRead)
+def read_admin_class(
+    class_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClassGroup:
+    require_admin(current_user)
+    class_group = db.get(ClassGroup, class_id)
+    if class_group is None:
+        raise HTTPException(status_code=404, detail="Class not found")
+    return class_group
+
+
+@router.patch("/classes/{class_id}", response_model=ClassRead)
+def patch_admin_class(
+    class_id: int,
+    payload: AdminClassUpdate,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClassGroup:
+    require_admin(current_user)
+    return update_admin_class(
+        db,
+        class_id=class_id,
+        payload=payload,
+        actor=current_user,
+        request=request,
     )
 
 

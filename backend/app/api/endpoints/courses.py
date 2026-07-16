@@ -37,6 +37,8 @@ from app.services.assignment_policies import build_effective_assignment_policy, 
 from app.services.access_control import (
     course_attached_to_class,
     get_course,
+    lock_active_class_for_write,
+    lock_active_school_for_write,
     lock_scope_eligible_user,
     require_class_member,
     require_class_teacher_or_admin,
@@ -105,6 +107,8 @@ def create_course(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Course:
+    require_school_role(db, current_user, payload.school_id, {"admin", "teacher"})
+    lock_active_school_for_write(db, payload.school_id)
     current_user = lock_scope_eligible_user(
         db,
         current_user.id,
@@ -172,6 +176,7 @@ def attach_course_class(
         class_group,
         detail="Course class attachment requires class teacher role",
     )
+    class_group = lock_active_class_for_write(db, class_group.id)
 
     existing = db.scalar(
         select(CourseClass).where(CourseClass.course_id == course.id, CourseClass.class_id == class_group.id)
@@ -220,6 +225,7 @@ def transfer_course_owner(
         course,
         detail="Course owner transfer requires course owner role",
     )
+    lock_active_school_for_write(db, course.school_id)
     _require_active_school_teacher(
         db,
         course.school_id,
@@ -319,6 +325,7 @@ def create_course_collaborator(
         course,
         detail="Course collaborator management requires course owner role",
     )
+    lock_active_school_for_write(db, course.school_id)
     _require_active_school_teacher(db, course.school_id, payload.user_id)
     if payload.user_id == course.creator_user_id:
         raise HTTPException(status_code=409, detail="Course creator is already an owner")
@@ -373,6 +380,7 @@ def batch_update_course_collaborators(
         course,
         detail="Course collaborator management requires course owner role",
     )
+    lock_active_school_for_write(db, course.school_id)
 
     user_ids = {item.user_id for item in payload.items}
     users = list(
@@ -556,6 +564,7 @@ def update_course_collaborator(
         raise HTTPException(status_code=404, detail="Course collaborator not found")
     if payload.role is None and payload.status is None:
         raise HTTPException(status_code=422, detail="Collaborator update requires role or status")
+    lock_active_school_for_write(db, course.school_id)
     next_role = payload.role or collaborator.role
     next_status = payload.status or collaborator.status
     if next_status == "active":
@@ -613,6 +622,7 @@ def create_course_unit(
         {"editor", "content_editor"},
         detail="Course unit creation requires editor or content_editor role",
     )
+    lock_active_school_for_write(db, course.school_id)
     content_slug = (payload.content_slug or "").strip() or None
     title = require_trimmed_text(payload.title, "Course unit title is required")
     existing_position = db.scalar(
@@ -775,6 +785,7 @@ def create_assignment(
         {"editor", "content_editor", "assessment_editor"},
         detail="Assignment creation requires active editing collaborator role",
     )
+    lock_active_school_for_write(db, course.school_id)
     unit = db.get(CourseUnit, unit_id)
     if unit is None or unit.course_id != course_id:
         raise HTTPException(status_code=404, detail="Course unit not found")

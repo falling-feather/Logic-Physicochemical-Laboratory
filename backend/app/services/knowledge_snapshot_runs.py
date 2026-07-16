@@ -3,12 +3,14 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta
 from typing import Callable, Literal
 
+from fastapi import HTTPException
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.api.endpoints import knowledge as knowledge_endpoint
-from app.models import ClassGroup, ClassMembership, Course, CourseClass, KnowledgeSnapshotRun, User
+from app.models import ClassGroup, ClassMembership, Course, CourseClass, KnowledgeSnapshotRun, School, User
 from app.models.base import utc_now
+from app.services.access_control import lock_active_class_for_write
 from app.services.knowledge_snapshot_leases import (
     knowledge_snapshot_lease_has_any_field,
     knowledge_snapshot_lease_is_expired,
@@ -223,6 +225,12 @@ def _rebuild_window(
     if heartbeat is not None:
         heartbeat.maybe()
     for class_group, course in _active_class_courses(db):
+        try:
+            class_group = lock_active_class_for_write(db, class_group.id)
+        except HTTPException as exc:
+            if exc.status_code in {404, 409}:
+                continue
+            raise
         class_course_pairs += 1
         created_by_user_id = _class_snapshot_actor_id(db, class_group, course)
         class_aggregate = knowledge_endpoint._build_class_knowledge(  # noqa: SLF001
@@ -281,10 +289,15 @@ def _active_class_courses(db: Session) -> list[tuple[ClassGroup, Course]]:
     return list(
         db.execute(
             select(ClassGroup, Course)
+            .join(School, School.id == ClassGroup.school_id)
             .join(CourseClass, CourseClass.class_id == ClassGroup.id)
             .join(Course, Course.id == CourseClass.course_id)
-            .where(ClassGroup.status == "active", CourseClass.status == "active")
-            .order_by(ClassGroup.id, Course.id)
+            .where(
+                School.status == "active",
+                ClassGroup.status == "active",
+                CourseClass.status == "active",
+            )
+            .order_by(School.id, ClassGroup.id, Course.id)
         ).all()
     )
 

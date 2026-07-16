@@ -37,12 +37,15 @@ from app.services.assignment_policies import (
     assignment_class_is_assigned_expression,
 )
 from app.services.access_control import (
+    active_assignment_class_ids,
     active_class_student_ids,
     get_class,
+    lock_active_class_for_write,
+    lock_active_classes_for_write,
+    lock_active_school_for_write,
     require_class_member,
     require_class_teacher_or_admin,
     require_course_scope,
-    user_assignment_class_ids,
 )
 
 
@@ -67,9 +70,9 @@ def get_my_knowledge(
     if course_id is not None:
         require_course_scope(db, current_user, class_group, course_id)
     assignment_class_ids = (
-        None
-        if current_user.role == "admin" and class_id is None
-        else user_assignment_class_ids(db, current_user.id, class_id)
+        [class_group.id]
+        if class_group is not None
+        else active_assignment_class_ids(db, current_user, course_id)
     )
     return _build_user_knowledge(
         db,
@@ -105,11 +108,18 @@ def rebuild_my_knowledge_snapshot(
         class_group = require_class_member(db, current_user, class_id)
     if course_id is not None:
         course = require_course_scope(db, current_user, class_group, course_id)
-    assignment_class_ids = (
-        None
-        if current_user.role == "admin" and class_id is None
-        else user_assignment_class_ids(db, current_user.id, class_id)
-    )
+    if class_group is not None:
+        class_group = lock_active_class_for_write(db, class_group.id)
+        assignment_class_ids = [class_group.id]
+    elif course is not None:
+        lock_active_school_for_write(db, course.school_id)
+        assignment_class_ids = active_assignment_class_ids(db, current_user, course.id)
+        if current_user.role == "student" and not assignment_class_ids:
+            raise HTTPException(status_code=409, detail="Course has no active class scope")
+        lock_active_classes_for_write(db, assignment_class_ids)
+    else:
+        assignment_class_ids = active_assignment_class_ids(db, current_user)
+        lock_active_classes_for_write(db, assignment_class_ids)
     aggregate = _build_user_knowledge(
         db,
         current_user.id,
@@ -241,6 +251,7 @@ def rebuild_class_knowledge_snapshot(
     require_class_teacher_or_admin(db, current_user, class_group)
     if course_id is not None:
         require_course_scope(db, current_user, class_group, course_id)
+    class_group = lock_active_class_for_write(db, class_group.id)
 
     aggregate = _build_class_knowledge(db, class_group, course_id, from_at, to_at)
     snapshot = _upsert_class_knowledge_snapshot(
@@ -344,6 +355,7 @@ def _build_user_knowledge(
         course_id,
         from_at,
         to_at,
+        class_ids=assignment_class_ids,
         graded=False,
         student_visible_resources=student_visible_resources,
     )
@@ -354,6 +366,7 @@ def _build_user_knowledge(
         course_id,
         from_at,
         to_at,
+        class_ids=assignment_class_ids,
         graded=True,
         student_visible_resources=student_visible_resources,
     )
@@ -364,12 +377,14 @@ def _build_user_knowledge(
         course_id,
         from_at,
         to_at,
+        class_ids=assignment_class_ids,
         student_visible_resources=student_visible_resources,
     )
     event_counts = _event_counts(
         db,
         user_id=user_id,
         class_id=class_id,
+        class_ids=assignment_class_ids,
         course_id=course_id,
         from_at=from_at,
         to_at=to_at,
@@ -379,6 +394,7 @@ def _build_user_knowledge(
         db,
         user_id=user_id,
         class_id=class_id,
+        class_ids=assignment_class_ids,
         course_id=course_id,
         from_at=from_at,
         to_at=to_at,
@@ -1185,6 +1201,7 @@ def _submission_count(
     from_at: datetime | None,
     to_at: datetime | None,
     *,
+    class_ids: list[int] | None = None,
     graded: bool,
     student_visible_resources: bool = False,
 ) -> int:
@@ -1197,6 +1214,7 @@ def _submission_count(
         from_at,
         to_at,
         graded,
+        class_ids=class_ids,
         student_visible_resources=student_visible_resources,
     )
     return int(db.scalar(statement) or 0)
@@ -1233,6 +1251,7 @@ def _score_totals(
     from_at: datetime | None,
     to_at: datetime | None,
     *,
+    class_ids: list[int] | None = None,
     student_visible_resources: bool = False,
 ) -> tuple[int, int]:
     statement = (
@@ -1248,6 +1267,7 @@ def _score_totals(
         from_at,
         to_at,
         graded=True,
+        class_ids=class_ids,
         assignment_joined=True,
         student_visible_resources=student_visible_resources,
     )
@@ -1291,11 +1311,14 @@ def _apply_submission_filters(
     to_at: datetime | None,
     graded: bool,
     *,
+    class_ids: list[int] | None = None,
     assignment_joined: bool = False,
     student_visible_resources: bool = False,
 ):
     if class_id is not None:
         statement = statement.where(Submission.class_id == class_id)
+    elif class_ids is not None:
+        statement = statement.where(Submission.class_id.in_(class_ids))
     if course_id is not None or student_visible_resources:
         if not assignment_joined:
             statement = statement.join(Assignment, Assignment.id == Submission.assignment_id)
@@ -1335,6 +1358,7 @@ def _event_counts(
     *,
     user_id: int | None,
     class_id: int | None,
+    class_ids: list[int] | None = None,
     course_id: int | None,
     from_at: datetime | None,
     to_at: datetime | None,
@@ -1345,6 +1369,8 @@ def _event_counts(
         statement = statement.where(LearningEvent.user_id == user_id)
     if class_id is not None:
         statement = statement.where(LearningEvent.class_id == class_id)
+    elif class_ids is not None:
+        statement = statement.where(LearningEvent.class_id.in_(class_ids))
     if course_id is not None:
         statement = statement.where(LearningEvent.course_id == course_id)
     if from_at is not None:
@@ -1389,6 +1415,7 @@ def _point_total(
     *,
     user_id: int | None,
     class_id: int | None,
+    class_ids: list[int] | None = None,
     course_id: int | None,
     from_at: datetime | None,
     to_at: datetime | None,
@@ -1399,6 +1426,8 @@ def _point_total(
         statement = statement.where(PointLedger.user_id == user_id)
     if class_id is not None:
         statement = statement.where(PointLedger.class_id == class_id)
+    elif class_ids is not None:
+        statement = statement.where(PointLedger.class_id.in_(class_ids))
     if course_id is not None or student_visible_resources:
         statement = statement.outerjoin(Assignment, Assignment.id == PointLedger.assignment_id).outerjoin(
             CourseUnit,

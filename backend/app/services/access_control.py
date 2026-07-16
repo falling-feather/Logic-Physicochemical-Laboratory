@@ -30,6 +30,72 @@ def get_course(db: Session, course_id: int) -> Course:
     return course
 
 
+def lock_active_school_for_write(db: Session, school_id: int) -> School:
+    school = db.scalar(
+        select(School)
+        .where(School.id == school_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if school is None:
+        raise HTTPException(status_code=404, detail="School not found")
+    if school.status != "active":
+        raise HTTPException(status_code=409, detail="School is not active")
+    return school
+
+
+def lock_active_class_for_write(db: Session, class_id: int) -> ClassGroup:
+    school_id = db.scalar(select(ClassGroup.school_id).where(ClassGroup.id == class_id))
+    if school_id is None:
+        raise HTTPException(status_code=404, detail="Class not found")
+    lock_active_school_for_write(db, school_id)
+    class_group = db.scalar(
+        select(ClassGroup)
+        .where(ClassGroup.id == class_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if class_group is None:
+        raise HTTPException(status_code=404, detail="Class not found")
+    if class_group.school_id != school_id:
+        raise HTTPException(status_code=409, detail="Class organization changed during write")
+    if class_group.status != "active":
+        raise HTTPException(status_code=409, detail="Class is not active")
+    return class_group
+
+
+def lock_active_classes_for_write(db: Session, class_ids: list[int]) -> list[ClassGroup]:
+    ordered_ids = sorted(set(class_ids))
+    if not ordered_ids:
+        return []
+    scope_rows = db.execute(
+        select(ClassGroup.id, ClassGroup.school_id).where(ClassGroup.id.in_(ordered_ids))
+    ).all()
+    school_by_class = {int(row.id): int(row.school_id) for row in scope_rows}
+    if len(school_by_class) != len(ordered_ids):
+        raise HTTPException(status_code=404, detail="Class not found")
+    for school_id in sorted(set(school_by_class.values())):
+        lock_active_school_for_write(db, school_id)
+    locked = list(
+        db.scalars(
+            select(ClassGroup)
+            .where(ClassGroup.id.in_(ordered_ids))
+            .order_by(ClassGroup.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).all()
+    )
+    if len(locked) != len(ordered_ids):
+        raise HTTPException(status_code=404, detail="Class not found")
+    for class_group in locked:
+        if class_group.school_id != school_by_class[class_group.id]:
+            raise HTTPException(status_code=409, detail="Class organization changed during write")
+        if class_group.status != "active":
+            raise HTTPException(status_code=409, detail="Class is not active")
+    by_id = {class_group.id: class_group for class_group in locked}
+    return [by_id[class_id] for class_id in class_ids]
+
+
 def visible_school_ids(db: Session, user_id: int) -> list[int]:
     return list(
         db.scalars(
@@ -112,6 +178,38 @@ def user_assignment_class_ids(db: Session, user_id: int, class_id: int | None) -
     if class_id is not None:
         return [class_id]
     return visible_class_ids(db, user_id)
+
+
+def active_assignment_class_ids(
+    db: Session,
+    user: User,
+    course_id: int | None = None,
+) -> list[int]:
+    statement = (
+        select(ClassGroup.id)
+        .join(School, School.id == ClassGroup.school_id)
+        .where(
+            School.status == "active",
+            ClassGroup.status == "active",
+        )
+    )
+    if course_id is not None:
+        statement = statement.join(CourseClass, CourseClass.class_id == ClassGroup.id).where(
+            CourseClass.course_id == course_id,
+            CourseClass.status == "active",
+        )
+    if user.role != "admin":
+        statement = (
+            statement.join(ClassMembership, ClassMembership.class_id == ClassGroup.id)
+            .join(User, User.id == ClassMembership.user_id)
+            .where(
+                ClassMembership.user_id == user.id,
+                ClassMembership.status == "active",
+                User.status == "active",
+                _membership_role_matches_global_role(ClassMembership.role),
+            )
+        )
+    return list(db.scalars(statement.distinct().order_by(ClassGroup.id)).all())
 
 
 def require_school_member(db: Session, user: User, school_id: int) -> None:

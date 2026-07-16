@@ -18,6 +18,8 @@ from app.schemas.course import LearningEventCreate, LearningEventRead
 from app.services.access_control import (
     course_attached_to_class,
     get_class,
+    lock_active_class_for_write,
+    lock_active_school_for_write,
     require_class_member,
     require_class_teacher_or_admin,
     require_course_visible,
@@ -38,6 +40,8 @@ def create_learning_event(
 ) -> LearningEvent:
     if payload.assignment_id is not None and payload.class_id is None:
         raise HTTPException(status_code=422, detail="Assignment learning events require class_id")
+    if current_user.role == "student" and payload.class_id is None:
+        raise HTTPException(status_code=422, detail="Student learning events require class_id")
     course, unit, assignment = _resolve_learning_scope(db, payload)
     if course is None:
         raise HTTPException(status_code=422, detail="Learning event must target a course, unit, or assignment")
@@ -58,6 +62,10 @@ def create_learning_event(
             raise HTTPException(status_code=403, detail="Assignment is not assigned to this class")
         if current_user.role == "student" and effective.status != "active":
             raise HTTPException(status_code=409, detail="Assignment is not active")
+    if class_group is not None:
+        class_group = lock_active_class_for_write(db, class_group.id)
+    else:
+        lock_active_school_for_write(db, course.school_id)
 
     event = LearningEvent(
         user_id=current_user.id,

@@ -12,7 +12,9 @@ class School(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(160), unique=True, nullable=False)
     region: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
 
 class SchoolMembership(TimestampMixin, Base):
@@ -39,7 +41,9 @@ class ClassGroup(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     grade: Mapped[str | None] = mapped_column(String(64), nullable=True)
     term: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
 
 class ClassMembership(TimestampMixin, Base):

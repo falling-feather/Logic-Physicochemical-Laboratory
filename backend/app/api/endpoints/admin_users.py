@@ -9,7 +9,16 @@ from app.api.deps.auth import get_current_user
 from app.core.config import get_settings
 from app.core.security import hash_password, password_strength_errors
 from app.db.session import get_db
-from app.models import AuthSession, Course, LoginAttempt, User
+from app.models import (
+    AuthSession,
+    ClassGroup,
+    ClassMembership,
+    Course,
+    LoginAttempt,
+    School,
+    SchoolMembership,
+    User,
+)
 from app.schemas.admin import (
     AdminBootstrapRequest,
     AdminUserPage,
@@ -22,6 +31,7 @@ from app.services.access_control import deactivate_incompatible_authority_rows
 from app.services.admin_common import (
     change_snapshot,
     count_rows,
+    lock_active_admin,
     next_offset,
     require_admin,
     statement_count,
@@ -130,9 +140,24 @@ def update_user(
 ) -> User:
     require_admin(current_user)
     acquire_security_control_lock(db, ADMIN_AUTHORITY_LOCK)
-    user = db.scalar(select(User).where(User.id == user_id).with_for_update())
+    responsible_school_ids, responsible_class_ids, lock_school_ids = _organization_responsibility_scope(
+        db,
+        user_id,
+    )
+    _lock_organization_responsibility_scope(
+        db,
+        school_ids=lock_school_ids,
+        class_ids=responsible_class_ids,
+    )
+    user = db.scalar(
+        select(User)
+        .where(User.id == user_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
+    current_user = lock_active_admin(db, current_user.id)
 
     before = _user_snapshot(user)
     next_role = payload.role or user.role
@@ -144,6 +169,17 @@ def update_user(
         owned_course_count = count_rows(db, Course, Course.creator_user_id == user.id)
         if owned_course_count:
             raise HTTPException(status_code=409, detail="Transfer owned courses before changing user to student")
+    if (
+        user.role in {"admin", "teacher"}
+        and user.status == "active"
+        and (next_role not in {"admin", "teacher"} or next_status != "active")
+    ):
+        _protect_organization_responsibilities(
+            db,
+            user.id,
+            school_ids=responsible_school_ids,
+            class_ids=responsible_class_ids,
+        )
 
     if payload.display_name is not None:
         user.display_name = require_trimmed_text(payload.display_name, "Display name is required")
@@ -222,6 +258,116 @@ def _enforce_password_strength(password: str, username: str) -> None:
 
 def _active_admin_count(db: Session) -> int:
     return count_rows(db, User, User.role == "admin", User.status == "active")
+
+
+def _organization_responsibility_scope(
+    db: Session,
+    user_id: int,
+) -> tuple[list[int], list[int], list[int]]:
+    # Authentication may have opened an older MySQL REPEATABLE READ snapshot
+    # before this request acquired ADMIN_AUTHORITY_LOCK. Locking reads force the
+    # current committed responsibility set; all authority writers take the same
+    # global lock before changing these rows.
+    responsible_school_ids = sorted(
+        set(
+            db.scalars(
+                select(SchoolMembership.school_id).where(
+                    SchoolMembership.user_id == user_id,
+                    SchoolMembership.role.in_(["admin", "teacher"]),
+                    SchoolMembership.status == "active",
+                ).with_for_update()
+            ).all()
+        )
+    )
+    class_rows = db.execute(
+        select(ClassMembership.class_id, ClassGroup.school_id)
+        .join(ClassGroup, ClassGroup.id == ClassMembership.class_id)
+        .where(
+            ClassMembership.user_id == user_id,
+            ClassMembership.role == "teacher",
+            ClassMembership.status == "active",
+        )
+        .with_for_update()
+    ).all()
+    responsible_class_ids = sorted({int(row.class_id) for row in class_rows})
+    lock_school_ids = sorted(
+        set(responsible_school_ids).union(int(row.school_id) for row in class_rows)
+    )
+    return responsible_school_ids, responsible_class_ids, lock_school_ids
+
+
+def _lock_organization_responsibility_scope(
+    db: Session,
+    *,
+    school_ids: list[int],
+    class_ids: list[int],
+) -> None:
+    if school_ids:
+        db.scalars(
+            select(School.id)
+            .where(School.id.in_(school_ids))
+            .order_by(School.id)
+            .with_for_update()
+        ).all()
+    if class_ids:
+        db.scalars(
+            select(ClassGroup.id)
+            .where(ClassGroup.id.in_(class_ids))
+            .order_by(ClassGroup.id)
+            .with_for_update()
+        ).all()
+
+
+def _protect_organization_responsibilities(
+    db: Session,
+    user_id: int,
+    *,
+    school_ids: list[int],
+    class_ids: list[int],
+) -> None:
+    for school_id in school_ids:
+        remaining = len(
+            db.execute(
+                select(SchoolMembership.id, User.id)
+                .join(User, User.id == SchoolMembership.user_id)
+                .where(
+                    SchoolMembership.school_id == school_id,
+                    SchoolMembership.user_id != user_id,
+                    SchoolMembership.role.in_(["admin", "teacher"]),
+                    SchoolMembership.status == "active",
+                    User.role.in_(["admin", "teacher"]),
+                    User.status == "active",
+                )
+                .with_for_update()
+            ).all()
+        )
+        if remaining < 1:
+            raise HTTPException(
+                status_code=409,
+                detail="Assign another active school responsible member before changing user authority",
+            )
+
+    for class_id in class_ids:
+        remaining = len(
+            db.execute(
+                select(ClassMembership.id, User.id)
+                .join(User, User.id == ClassMembership.user_id)
+                .where(
+                    ClassMembership.class_id == class_id,
+                    ClassMembership.user_id != user_id,
+                    ClassMembership.role == "teacher",
+                    ClassMembership.status == "active",
+                    User.role.in_(["admin", "teacher"]),
+                    User.status == "active",
+                )
+                .with_for_update()
+            ).all()
+        )
+        if remaining < 1:
+            raise HTTPException(
+                status_code=409,
+                detail="Assign another active class teacher before changing user authority",
+            )
 
 
 def _user_snapshot(user: User) -> dict[str, str]:

@@ -13,6 +13,8 @@ from app.schemas.course import (
 )
 from app.services.access_control import (
     course_attached_to_class,
+    lock_active_class_for_write,
+    lock_active_school_for_write,
     require_class_teacher_or_admin,
     require_course_author_or_admin,
     require_course_collaborator_or_admin,
@@ -44,6 +46,7 @@ def update_assignment_audience(
         course,
         detail="Assignment audience management requires course owner role",
     )
+    lock_active_school_for_write(db, course.school_id)
     if assignment.audience_mode == payload.audience_mode:
         return AssignmentRead.model_validate(assignment)
 
@@ -116,6 +119,7 @@ def put_assignment_class_policy(
         class_group,
         detail="Assignment class policy requires class teacher scope",
     )
+    class_group = lock_active_class_for_write(db, class_group.id)
 
     policy = get_assignment_class_policy(db, assignment.id, class_id)
     before = _policy_snapshot(policy)
@@ -183,6 +187,7 @@ def delete_assignment_class_policy(
         class_group,
         detail="Assignment class policy requires class teacher scope",
     )
+    class_group = lock_active_class_for_write(db, class_group.id)
     policy = get_assignment_class_policy(db, assignment.id, class_id)
     if policy is None:
         return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select, update
+from sqlalchemy import create_engine, inspect as sa_inspect, select, update
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 
 from app.core.config import Settings, get_settings
@@ -103,6 +103,21 @@ def mysql_client(mysql_url: str, monkeypatch):
         yield client, bootstrap_token
     get_settings.cache_clear()
     reset_database_state()
+
+
+def test_mysql_admin_organization_governance_schema(mysql_url: str):
+    engine = make_engine(mysql_url)
+    try:
+        inspector = sa_inspect(engine)
+        for table_name in ("schools", "class_groups"):
+            columns = {column["name"]: column for column in inspector.get_columns(table_name)}
+            assert columns["description"]["nullable"] is True
+            version = columns["version"]
+            assert version["nullable"] is False
+            assert version["type"].python_type is int
+            assert str(version["default"]).strip("()'\"") == "1"
+    finally:
+        engine.dispose()
 
 
 def test_mysql_content_publish_and_rollback_conflicts(mysql_client):

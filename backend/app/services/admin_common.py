@@ -16,6 +16,18 @@ def require_admin(user: User) -> None:
         raise HTTPException(status_code=403, detail="Admin role required")
 
 
+def lock_active_admin(db: Session, user_id: int) -> User:
+    user = db.scalar(
+        select(User)
+        .where(User.id == user_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if user is None or user.role != "admin" or user.status != "active":
+        raise HTTPException(status_code=403, detail="Active admin role required")
+    return user
+
+
 def count_rows(db: Session, model: Any, *criteria: Any) -> int:
     statement = select(func.count()).select_from(model)
     for criterion in criteria:

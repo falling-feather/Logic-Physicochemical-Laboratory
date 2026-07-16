@@ -9,6 +9,7 @@ from app.schemas.school import ClassRead, SchoolRead
 
 AdminUserRole = Literal["admin", "teacher", "student"]
 AdminUserStatus = Literal["active", "disabled"]
+AdminOrganizationStatus = Literal["active", "archived"]
 BugSeverity = Literal["P0", "P1", "P2", "P3"]
 BugStatus = Literal["open", "triaged", "in_progress", "closed"]
 
@@ -547,12 +548,35 @@ class AdminSchoolPage(BaseModel):
     next_offset: int | None = None
 
 
+class AdminSchoolUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_version: int = Field(ge=1)
+    reason: str = Field(min_length=1, max_length=500)
+    name: str | None = Field(default=None, max_length=160)
+    region: str | None = Field(default=None, max_length=160)
+    description: str | None = Field(default=None, max_length=2000)
+    status: AdminOrganizationStatus | None = None
+
+
 class AdminClassPage(BaseModel):
     items: list[ClassRead]
     total: int
     limit: int
     offset: int
     next_offset: int | None = None
+
+
+class AdminClassUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_version: int = Field(ge=1)
+    reason: str = Field(min_length=1, max_length=500)
+    name: str | None = Field(default=None, max_length=160)
+    grade: str | None = Field(default=None, max_length=64)
+    term: str | None = Field(default=None, max_length=64)
+    description: str | None = Field(default=None, max_length=2000)
+    status: AdminOrganizationStatus | None = None
 
 
 class AdminClassJoinRequestRead(BaseModel):

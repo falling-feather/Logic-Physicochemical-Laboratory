@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
@@ -36,11 +36,17 @@ from app.services.class_join_requests import (
     trim_optional,
 )
 from app.services.access_control import (
+    lock_active_class_for_write,
+    lock_active_classes_for_write,
+    lock_active_school_for_write,
+    lock_scope_eligible_user,
     require_class_teacher_or_admin,
     require_school_member,
     require_school_role,
     visible_school_ids,
 )
+from app.services.security_control_locks import ADMIN_AUTHORITY_LOCK, acquire_security_control_lock
+from app.services.admin_common import lock_active_admin
 from app.services.text import require_trimmed_text
 from app.services.users import normalize_username
 
@@ -64,21 +70,7 @@ def _class_member_read(membership: ClassMembership, user: User) -> ClassMemberRe
 
 
 def _active_teacher_count(db: Session, class_id: int) -> int:
-    return int(
-        db.scalar(
-            select(func.count())
-            .select_from(ClassMembership)
-            .join(User, User.id == ClassMembership.user_id)
-            .where(
-                ClassMembership.class_id == class_id,
-                ClassMembership.role == "teacher",
-                ClassMembership.status == "active",
-                User.role.in_(["admin", "teacher"]),
-                User.status == "active",
-            )
-        )
-        or 0
-    )
+    return len(_active_teacher_ids(db, class_id))
 
 
 def _active_teacher_ids(db: Session, class_id: int) -> set[int]:
@@ -93,6 +85,7 @@ def _active_teacher_ids(db: Session, class_id: int) -> set[int]:
                 User.role.in_(["admin", "teacher"]),
                 User.status == "active",
             )
+            .with_for_update()
         ).all()
     )
 
@@ -134,6 +127,15 @@ def create_class(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ClassGroup:
+    acquire_security_control_lock(db, ADMIN_AUTHORITY_LOCK)
+    lock_active_school_for_write(db, payload.school_id)
+    current_user = lock_scope_eligible_user(
+        db,
+        current_user.id,
+        "teacher",
+        detail="Only active admins or teachers can create classes",
+        status_code=403,
+    )
     require_school_role(db, current_user, payload.school_id, {"admin", "teacher"})
     name = require_trimmed_text(payload.name, "Class name is required")
     existing = db.scalar(
@@ -189,11 +191,18 @@ def join_class(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ClassMembership:
-    class_group = db.get(ClassGroup, class_id)
-    if class_group is None:
-        raise HTTPException(status_code=404, detail="Class not found")
-
     role = normalize_class_role(payload.role)
+    if role == "teacher":
+        acquire_security_control_lock(db, ADMIN_AUTHORITY_LOCK)
+    class_group = lock_active_class_for_write(db, class_id)
+    if role == "teacher":
+        current_user = lock_scope_eligible_user(
+            db,
+            current_user.id,
+            "teacher",
+            detail="Only active admins or teachers can join with teacher role",
+            status_code=403,
+        )
     if role == "teacher" and current_user.role not in {"admin", "teacher"}:
         raise HTTPException(status_code=403, detail="Only teachers can join with teacher role")
     if role == "teacher" and current_user.role != "admin":
@@ -201,7 +210,8 @@ def join_class(
         raise HTTPException(status_code=403, detail="Teacher class join requires approval")
 
     ensure_school_membership(db, class_group.school_id, current_user.id, role)
-    membership, membership_created = ensure_class_membership(db, class_group.id, current_user.id, role)
+    membership, membership_outcome = ensure_class_membership(db, class_group.id, current_user.id, role)
+    membership_changed = membership_outcome != "unchanged"
     join_request = db.scalar(
         select(ClassJoinRequest).where(
             ClassJoinRequest.class_id == class_group.id,
@@ -237,12 +247,14 @@ def join_class(
                     "reviewed_by_user_id": join_request.reviewed_by_user_id,
                     "reviewer_role": current_user.role,
                     "approval_source": "legacy_direct_join",
-                    "membership_created": membership_created,
+                    "membership_created": membership_outcome == "created",
+                    "membership_restored": membership_outcome == "restored",
+                    "membership_outcome": membership_outcome,
                     "membership_id": membership.id,
                 },
             },
         )
-    if membership_created:
+    if membership_changed:
         record_audit_log(
             db,
             actor=current_user,
@@ -259,6 +271,7 @@ def join_class(
                     "user_id": membership.user_id,
                     "role": membership.role,
                     "status": membership.status,
+                    "outcome": membership_outcome,
                 }
             },
         )
@@ -275,11 +288,11 @@ def transfer_class_teacher(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ClassTeacherTransferRead:
-    class_group = db.scalar(select(ClassGroup).where(ClassGroup.id == class_id).with_for_update())
-    if class_group is None:
-        raise HTTPException(status_code=404, detail="Class not found")
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admins can transfer class teacher membership")
+    acquire_security_control_lock(db, ADMIN_AUTHORITY_LOCK)
+    class_group = lock_active_class_for_write(db, class_id)
+    current_user = lock_active_admin(db, current_user.id)
 
     source_row = db.execute(
         select(ClassMembership, User)
@@ -432,6 +445,10 @@ def transfer_class_student(
         target_class,
         detail="Student transfer requires target class teacher scope",
     )
+    source_class, target_class = lock_active_classes_for_write(
+        db,
+        [source_class.id, target_class.id],
+    )
 
     source_row = db.execute(
         select(ClassMembership, User)
@@ -562,6 +579,7 @@ def batch_import_class_students(
         class_group,
         detail="Student batch import requires class teacher scope",
     )
+    class_group = lock_active_class_for_write(db, class_group.id)
 
     normalized_names = [normalize_username(item.username) for item in payload.items]
     lookup_names = {name for name in normalized_names if name}
@@ -772,9 +790,24 @@ def batch_update_class_member_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[ClassMemberRead]:
-    class_group = db.scalar(select(ClassGroup).where(ClassGroup.id == class_id).with_for_update())
+    class_group = db.get(ClassGroup, class_id)
     if class_group is None:
         raise HTTPException(status_code=404, detail="Class not found")
+    require_class_teacher_or_admin(
+        db,
+        current_user,
+        class_group,
+        detail="Class member updates require class teacher scope",
+    )
+    acquire_security_control_lock(db, ADMIN_AUTHORITY_LOCK)
+    class_group = lock_active_class_for_write(db, class_id)
+    current_user = lock_scope_eligible_user(
+        db,
+        current_user.id,
+        "teacher",
+        detail="Class member updates require an active teacher/admin",
+        status_code=403,
+    )
     require_class_teacher_or_admin(
         db,
         current_user,
@@ -813,10 +846,12 @@ def batch_update_class_member_status(
 
     next_active_teacher_ids = _active_teacher_ids(db, class_group.id)
     for membership_id in membership_ids:
-        membership, _ = row_by_id[membership_id]
+        membership, user = row_by_id[membership_id]
         next_status = item_by_id[membership_id].status
         if membership.role == "teacher":
             if next_status == "active":
+                if user.status != "active" or user.role not in {"admin", "teacher"}:
+                    raise HTTPException(status_code=409, detail="Teacher membership user is not eligible")
                 next_active_teacher_ids.add(membership.id)
             else:
                 next_active_teacher_ids.discard(membership.id)
@@ -889,9 +924,24 @@ def update_class_member_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ClassMemberRead:
-    class_group = db.scalar(select(ClassGroup).where(ClassGroup.id == class_id).with_for_update())
+    class_group = db.get(ClassGroup, class_id)
     if class_group is None:
         raise HTTPException(status_code=404, detail="Class not found")
+    require_class_teacher_or_admin(
+        db,
+        current_user,
+        class_group,
+        detail="Class member updates require class teacher scope",
+    )
+    acquire_security_control_lock(db, ADMIN_AUTHORITY_LOCK)
+    class_group = lock_active_class_for_write(db, class_id)
+    current_user = lock_scope_eligible_user(
+        db,
+        current_user.id,
+        "teacher",
+        detail="Class member updates require an active teacher/admin",
+        status_code=403,
+    )
     require_class_teacher_or_admin(
         db,
         current_user,
@@ -919,6 +969,12 @@ def update_class_member_status(
     previous_status = membership.status
     note = trim_optional(payload.note)
     if previous_status != payload.status:
+        if (
+            membership.role == "teacher"
+            and payload.status == "active"
+            and (user.status != "active" or user.role not in {"admin", "teacher"})
+        ):
+            raise HTTPException(status_code=409, detail="Teacher membership user is not eligible")
         if membership.role == "teacher" and previous_status == "active" and payload.status == "inactive":
             if _active_teacher_count(db, class_group.id) <= 1:
                 raise HTTPException(status_code=409, detail="Cannot deactivate the last active class teacher")
@@ -966,9 +1022,7 @@ def create_class_join_request(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ClassJoinRequest:
-    class_group = db.get(ClassGroup, class_id)
-    if class_group is None:
-        raise HTTPException(status_code=404, detail="Class not found")
+    class_group = lock_active_class_for_write(db, class_id)
 
     role = normalize_class_role(payload.role)
     if role == "teacher" and current_user.role not in {"admin", "teacher"}:

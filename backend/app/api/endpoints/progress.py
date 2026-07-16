@@ -16,7 +16,12 @@ from app.models import (
     User,
 )
 from app.schemas.course import ProgressSummary
-from app.services.access_control import get_class, require_class_member, require_class_teacher_or_admin
+from app.services.access_control import (
+    active_assignment_class_ids,
+    get_class,
+    require_class_member,
+    require_class_teacher_or_admin,
+)
 from app.services.assignment_policies import (
     assignment_class_effective_status_expression,
     assignment_class_is_assigned_expression,
@@ -34,10 +39,12 @@ def get_my_progress(
 ) -> ProgressSummary:
     if class_id is not None:
         require_class_member(db, current_user, class_id)
+    class_ids = [class_id] if class_id is not None else active_assignment_class_ids(db, current_user)
     return _build_progress_summary(
         db,
         current_user.id,
         class_id,
+        class_ids=class_ids,
         student_visible_resources=current_user.role == "student",
     )
 
@@ -78,6 +85,7 @@ def _build_progress_summary(
     user_id: int,
     class_id: int | None,
     *,
+    class_ids: list[int] | None = None,
     student_visible_resources: bool = False,
 ) -> ProgressSummary:
     submissions = select(Submission).where(Submission.student_id == user_id)
@@ -98,6 +106,12 @@ def _build_progress_summary(
         events = events.where(LearningEvent.class_id == class_id)
         completed_events = completed_events.where(LearningEvent.class_id == class_id)
         points = points.where(PointLedger.class_id == class_id)
+    elif class_ids is not None:
+        submissions = submissions.where(Submission.class_id.in_(class_ids))
+        graded_submissions = graded_submissions.where(Submission.class_id.in_(class_ids))
+        events = events.where(LearningEvent.class_id.in_(class_ids))
+        completed_events = completed_events.where(LearningEvent.class_id.in_(class_ids))
+        points = points.where(PointLedger.class_id.in_(class_ids))
 
     if student_visible_resources:
         submissions = _apply_student_visible_submission_filters(submissions)

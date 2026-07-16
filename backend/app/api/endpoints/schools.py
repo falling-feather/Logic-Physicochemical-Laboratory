@@ -8,6 +8,7 @@ from app.models import ClassGroup, School, SchoolMembership, User
 from app.schemas.school import ClassRead, SchoolCreate, SchoolRead
 from app.services.audit import record_audit_log
 from app.services.access_control import compatible_scope_roles, lock_scope_eligible_user, require_school_member
+from app.services.security_control_locks import ADMIN_AUTHORITY_LOCK, acquire_security_control_lock
 from app.services.text import require_trimmed_text
 
 
@@ -38,6 +39,7 @@ def create_school(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> School:
+    acquire_security_control_lock(db, ADMIN_AUTHORITY_LOCK)
     current_user = lock_scope_eligible_user(
         db,
         current_user.id,

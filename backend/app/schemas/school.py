@@ -15,7 +15,11 @@ class SchoolRead(BaseModel):
     id: int
     name: str
     region: str | None = None
+    description: str | None = None
     status: str
+    version: int
+    created_at: datetime
+    updated_at: datetime
 
 
 class ClassCreate(BaseModel):
@@ -33,7 +37,11 @@ class ClassRead(BaseModel):
     name: str
     grade: str | None = None
     term: str | None = None
+    description: str | None = None
     status: str
+    version: int
+    created_at: datetime
+    updated_at: datetime
 
 
 class ClassJoinPayload(BaseModel):

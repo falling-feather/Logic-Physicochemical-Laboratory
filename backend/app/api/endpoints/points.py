@@ -9,6 +9,7 @@ from app.schemas.course import AssignmentPointRuleRead, AssignmentPointRuleUpdat
 from app.services.audit import record_audit_log
 from app.services.access_control import (
     get_class,
+    lock_active_school_for_write,
     require_course_collaborator_or_admin,
     require_school_role,
     require_class_teacher_or_admin,
@@ -65,6 +66,7 @@ def update_assignment_point_rule(
         {"editor", "assessment_editor"},
         detail="Assignment point rule requires editor or assessment_editor role",
     )
+    lock_active_school_for_write(db, course.school_id)
     previous = _assignment_point_rule_read(assignment)
     next_rule = payload.model_dump()
     if next_rule == DEFAULT_ASSIGNMENT_POINT_RULE:

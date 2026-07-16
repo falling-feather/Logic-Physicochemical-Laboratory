@@ -41,6 +41,7 @@ from app.services.assignment_policies import (
 from app.services.access_control import (
     course_attached_to_class,
     get_class,
+    lock_active_class_for_write,
     require_class_teacher_or_admin,
     require_course_scope,
     require_course_visible,
@@ -133,11 +134,19 @@ def list_my_assignments(
     if course_id is not None:
         statement = statement.where(Course.id == course_id)
     if filter_by == "active":
-        statement = statement.where(effective_status == "active")
+        statement = statement.where(
+            effective_status == "active",
+            ClassGroup.status == "active",
+        )
     elif filter_by == "feedback":
         statement = statement.where(Submission.status.in_(["graded", "returned"]))
     elif filter_by == "history":
-        statement = statement.where(effective_status.in_(["closed", "archived"]))
+        statement = statement.where(
+            or_(
+                effective_status.in_(["closed", "archived"]),
+                ClassGroup.status != "active",
+            )
+        )
 
     statement = statement.order_by(ClassGroup.id, Course.id, CourseUnit.position, Assignment.id)
     total = int(db.scalar(select(func.count()).select_from(statement.order_by(None).subquery())) or 0)
@@ -145,7 +154,11 @@ def list_my_assignments(
     items: list[StudentAssignmentCenterItem] = []
     for row_class, course, unit, assignment, submission, policy in rows:
         effective = build_effective_assignment_policy(assignment, row_class.id, policy)
-        submit_block_reason = _assignment_submit_block_reason(effective.status, submission)
+        submit_block_reason = _assignment_submit_block_reason(
+            effective.status,
+            submission,
+            row_class.status,
+        )
         items.append(
             StudentAssignmentCenterItem(
                 class_=ClassRead.model_validate(row_class),
@@ -195,6 +208,7 @@ def create_submission(
         raise HTTPException(status_code=403, detail="Assignment is not assigned to this class")
     if effective.status != "active":
         raise HTTPException(status_code=409, detail="Assignment is not active")
+    class_group = lock_active_class_for_write(db, class_group.id)
 
     existing = db.scalar(
         select(Submission).where(
@@ -317,8 +331,13 @@ def read_assignment_review(
             raise HTTPException(status_code=403, detail="Assignment is outside current student class scope")
         effective = resolve_assignment_class_policy(db, assignment, eligible_class_ids[0])
         statement = statement.where(Submission.class_id == effective.class_id)
+        class_group = get_class(db, effective.class_id)
     submission = db.scalars(statement.limit(1)).first()
-    submit_block_reason = _assignment_submit_block_reason(effective.status, submission)
+    submit_block_reason = _assignment_submit_block_reason(
+        effective.status,
+        submission,
+        class_group.status,
+    )
     can_submit = submit_block_reason is None
     return AssignmentReviewRead(
         course_id=course.id,
@@ -393,18 +412,31 @@ def grade_submission(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Submission:
-    submission = db.scalar(select(Submission).where(Submission.id == submission_id).with_for_update())
-    if submission is None:
+    submission_scope = db.get(Submission, submission_id)
+    if submission_scope is None:
         raise HTTPException(status_code=404, detail="Submission not found")
-    assignment, _, course = _resolve_assignment(db, submission.assignment_id)
+    assignment_id = submission_scope.assignment_id
+    class_id = submission_scope.class_id
+    assignment, _, course = _resolve_assignment(db, assignment_id)
     require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
-    class_group = get_class(db, submission.class_id)
+    class_group = get_class(db, class_id)
     require_class_teacher_or_admin(
         db,
         current_user,
         class_group,
         detail="Submission grading requires class teacher scope",
     )
+    class_group = lock_active_class_for_write(db, class_group.id)
+    submission = db.scalar(
+        select(Submission)
+        .where(Submission.id == submission_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if submission is None:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    if submission.assignment_id != assignment_id or submission.class_id != class_group.id:
+        raise HTTPException(status_code=409, detail="Submission scope changed during grading")
     if payload.score > assignment.max_score:
         raise HTTPException(status_code=422, detail="Score cannot exceed assignment max_score")
 
@@ -503,7 +535,13 @@ def _active_user_course_class_ids(db: Session, user_id: int, course_id: int) -> 
     )
 
 
-def _assignment_submit_block_reason(assignment_status: str, submission: Submission | None) -> str | None:
+def _assignment_submit_block_reason(
+    assignment_status: str,
+    submission: Submission | None,
+    class_status: str,
+) -> str | None:
+    if class_status != "active":
+        return "class_archived"
     if assignment_status == "closed":
         return "assignment_closed"
     if assignment_status == "archived":
