@@ -25,6 +25,7 @@ def test_root_deploy_wrapper_forwards_reviewed_generator_contract_and_exit_code(
         ("$DatabaseUrlValue", '"--database-url-value"'),
         ("$SecretStorePath", '"--secret-store-path"'),
         ("$PublicOrigin", '"--public-origin"'),
+        ("$Environment", '"--environment"'),
         ("$EnableAdminBootstrap", '"--enable-admin-bootstrap"'),
         ("$ServiceAccount", '"--service-account"'),
         ("$StaticPort", '"--static-port"'),
@@ -62,6 +63,7 @@ def test_windows_service_bundle_is_loopback_minimal_and_reversible():
         assert report["services"] == ["EngLab", "AstraApi", "AstraWorker", "AstraProxy"]
         assert report["service_account"] == "NT AUTHORITY\\LocalService"
         assert report["service_account_is_minimal"] is True
+        assert report["environment"] == "production"
         assert report["database_url_returned"] is False
         assert report["sensitive_values_returned"] is False
         assert "config/Caddyfile" in report["artifact_hashes"]
@@ -79,6 +81,7 @@ def test_windows_service_bundle_is_loopback_minimal_and_reversible():
 
         api_root = ET.parse(output / "AstraApi.xml").getroot()
         api_environment = {element.attrib["name"]: element.attrib["value"] for element in api_root.findall("env")}
+        assert api_environment["ASTRA_ENVIRONMENT"] == "production"
         assert api_environment["ASTRA_DATABASE_URL"].startswith("sqlite+pysqlite:///")
         assert api_environment["ASTRA_ADMIN_BOOTSTRAP_ENABLED"] == "false"
         assert api_environment["ASTRA_CORS_ORIGINS"] == "http://127.0.0.1:9012"
@@ -139,6 +142,7 @@ def test_windows_service_bundle_uses_dpapi_store_without_embedding_secrets(monke
         api_root = ET.parse(output / "AstraApi.xml").getroot()
         api_environment = {element.attrib["name"]: element.attrib["value"] for element in api_root.findall("env")}
         assert "ASTRA_DATABASE_URL" not in api_environment
+        assert api_environment["ASTRA_ENVIRONMENT"] == "production"
         assert api_environment["ASTRA_CORS_ORIGINS"] == "https://astra-staging.trycloudflare.com"
         assert 'Strict-Transport-Security "max-age=31536000; includeSubDomains"' in (
             output / "config" / "Caddyfile"
@@ -168,6 +172,47 @@ def test_windows_service_bundle_uses_dpapi_store_without_embedding_secrets(monke
                 secret_store_path=secret_store,
                 public_origin="https://astra-staging.trycloudflare.com",
                 service_account="NT AUTHORITY\\NetworkService",
+            )
+
+
+def test_windows_service_bundle_preserves_staging_environment_semantics():
+    with _runtime_dir() as runtime:
+        install_root = runtime / "install"
+        (install_root / "backend").mkdir(parents=True)
+        binary = _fake_binary(runtime / "tool.exe", b"tool")
+
+        report = build_windows_service_drill_bundle(
+            output_dir=runtime / "bundle",
+            winsw_path=binary,
+            static_executable=binary,
+            python_executable=binary,
+            caddy_executable=binary,
+            install_root=install_root,
+            database_url_value="sqlite+pysqlite:///C:/astra-staging-drill.sqlite",
+            environment="staging",
+        )
+
+        assert report["environment"] == "staging"
+        api_root = ET.parse(runtime / "bundle" / "AstraApi.xml").getroot()
+        environment = {element.attrib["name"]: element.attrib["value"] for element in api_root.findall("env")}
+        assert environment["ASTRA_ENVIRONMENT"] == "staging"
+
+
+def test_windows_service_bundle_rejects_unknown_environment():
+    with _runtime_dir() as runtime:
+        install_root = runtime / "install"
+        (install_root / "backend").mkdir(parents=True)
+        binary = _fake_binary(runtime / "tool.exe", b"tool")
+
+        with pytest.raises(ValueError, match="environment must be staging or production"):
+            build_windows_service_drill_bundle(
+                output_dir=runtime / "bundle",
+                winsw_path=binary,
+                static_executable=binary,
+                python_executable=binary,
+                caddy_executable=binary,
+                install_root=install_root,
+                environment="development",
             )
 
 

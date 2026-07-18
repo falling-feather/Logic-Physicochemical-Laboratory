@@ -44,6 +44,7 @@ def build_windows_service_drill_bundle(
     database_url_value: str = "%ASTRA_DATABASE_URL%",
     secret_store_path: Path | None = None,
     public_origin: str | None = None,
+    environment: str = "production",
     admin_bootstrap_enabled: bool = False,
     service_account: str = "NT AUTHORITY\\LocalService",
     static_port: int = 9010,
@@ -63,6 +64,8 @@ def build_windows_service_drill_bundle(
         raise ValueError("install_root must contain the backend directory")
     if service_account not in ALLOWED_SERVICE_ACCOUNTS:
         raise ValueError("service_account is not in the approved built-in account allowlist")
+    if environment not in {"staging", "production"}:
+        raise ValueError("environment must be staging or production")
     ports = (static_port, api_port, proxy_port)
     if len(set(ports)) != len(ports) or any(port < 1024 or port > 65535 for port in ports):
         raise ValueError("service ports must be unique and between 1024 and 65535")
@@ -110,7 +113,7 @@ def build_windows_service_drill_bundle(
     base_environment = [
         ("PYTHONIOENCODING", "utf-8"),
         ("ASTRA_AUTO_CREATE_TABLES", "false"),
-        ("ASTRA_ENVIRONMENT", "production"),
+        ("ASTRA_ENVIRONMENT", environment),
         ("ASTRA_CORS_ORIGINS", credentialed_origin),
         ("ASTRA_BACKGROUND_TASK_WORKER_ENABLED", "false"),
     ]
@@ -227,6 +230,7 @@ def build_windows_service_drill_bundle(
         ),
         "secret_store_path_returned": False,
         "credentialed_origin": credentialed_origin,
+        "environment": environment,
         "admin_bootstrap_enabled": admin_bootstrap_enabled,
         "artifact_hashes": artifact_hashes,
         "commands": commands,
@@ -330,6 +334,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--database-url-value", default="%ASTRA_DATABASE_URL%")
     parser.add_argument("--secret-store-path", type=Path, default=None)
     parser.add_argument("--public-origin", default=None)
+    parser.add_argument("--environment", choices=("staging", "production"), default="production")
     parser.add_argument("--enable-admin-bootstrap", action="store_true")
     parser.add_argument("--service-account", default="NT AUTHORITY\\LocalService")
     parser.add_argument("--static-port", type=int, default=9010)
@@ -347,6 +352,7 @@ def main(argv: list[str] | None = None) -> int:
             database_url_value=args.database_url_value,
             secret_store_path=args.secret_store_path.resolve() if args.secret_store_path else None,
             public_origin=args.public_origin,
+            environment=args.environment,
             admin_bootstrap_enabled=args.enable_admin_bootstrap,
             service_account=args.service_account,
             static_port=args.static_port,

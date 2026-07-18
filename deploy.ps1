@@ -17,6 +17,8 @@ param(
     [string]$DatabaseUrlValue = "%ASTRA_DATABASE_URL%",
     [string]$SecretStorePath,
     [string]$PublicOrigin,
+    [ValidateSet("staging", "production")]
+    [string]$Environment = "production",
     [switch]$EnableAdminBootstrap,
     [ValidateSet("NT AUTHORITY\LocalService", "NT AUTHORITY\NetworkService")]
     [string]$ServiceAccount = "NT AUTHORITY\LocalService",
@@ -53,6 +55,7 @@ $arguments = @(
     "--caddy-executable", $CaddyExecutable,
     "--install-root", $InstallRoot,
     "--database-url-value", $DatabaseUrlValue,
+    "--environment", $Environment,
     "--service-account", $ServiceAccount,
     "--static-port", $StaticPort,
     "--api-port", $ApiPort,

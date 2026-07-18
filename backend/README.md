@@ -607,8 +607,11 @@ Windows 演练包应使用已单独下载并复核 hash 的 WinSW/Caddy 与合�
   -CaddyExecutable C:\staging\verified\caddy.exe `
   -OutputDir C:\englab\service-bundle `
   -SecretStorePath C:\englab\secrets\astra-staging.dpapi `
+  -Environment staging `
   -PublicOrigin $PublicOrigin
 ```
+
+`-Environment` 只接受 `staging` 或 `production`，并同时写入 API/worker XML 与生成报告；默认值为 production 以兼容旧调用。目标 staging 必须显式传入 staging，development 不属于目标服务包。
 
 密钥文件先从 `backend/` 运行 `python -m scripts.windows_dpapi_secret_store seal --output <dedicated-secrets-dir>\<store> --service-account "NT AUTHORITY\LocalService"`，并只从 stdin 输入进程内 `ASTRA_*` JSON。专用父目录和文件都使用 DPAPI LocalMachine 配套的受保护 DACL，只授权当前操作者、SYSTEM、Administrators 和所选 LocalService/NetworkService；已存在但 ACL 不匹配的目录直接拒绝，加密载荷与服务包必须绑定同一账号。生成后先复核 JSON 中的 `artifact_hashes`、`secret_store_provider`、`secret_store_required_keys`、四份 XML 和 `config/Caddyfile`，再按 `commands.install/start/stop/uninstall` 操作。生产数据库连接只允许由该 store 注入；bootstrap key 只注入 API、不进入 worker；根脚本不下载未校验工具、不开放端口，也不直接包装控制台程序。
 
