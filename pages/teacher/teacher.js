@@ -3,6 +3,12 @@
 
     const TEACHER_ASSET_VERSION = '20260710v6653PermissionMatrixP1';
     const API_BASE_STORAGE_KEY = 'astra-teacher-api-base';
+    const TEACHER_VIEWS = Object.freeze({
+        overview: '教学总览',
+        structure: '组织与课程',
+        assignments: '作业发布',
+        grading: '批改与学情'
+    });
 
     const state = {
         root: null,
@@ -18,6 +24,7 @@
         onAuthRequired: null,
         busy: false,
         user: null,
+        activeView: 'overview',
         writeLock: null,
         selected: {
             schoolId: '',
@@ -141,17 +148,15 @@
         state.root.innerHTML = `
             <header class="teacher-workbench__header">
                 <div class="teacher-workbench__title">
-                    <span class="teacher-workbench__eyebrow">
-                        <i data-lucide="presentation"></i>
-                        教师端
-                    </span>
+                    <span class="teacher-workbench__eyebrow"><a href="#planets">星序</a><b>/</b>教学工作台</span>
                     <h1>教学工作台</h1>
+                    <p>在星序中统一安排班级、课程、作业与学情，不进入任何单一学习单元的后台。</p>
                 </div>
                 <div class="teacher-workbench__actions">
-                    <label class="teacher-api-base">
-                        <span>API</span>
-                        <input type="url" data-teacher-api-base value="${escapeAttr(state.apiBase)}" placeholder="同源" autocomplete="off">
-                    </label>
+                    <details class="teacher-connection-settings">
+                        <summary><i data-lucide="server-cog"></i><span>连接设置</span></summary>
+                        <label class="teacher-api-base"><span>API 来源</span><input type="url" data-teacher-api-base value="${escapeAttr(state.apiBase)}" placeholder="同源" autocomplete="off"></label>
+                    </details>
                     <button type="button" class="teacher-icon-button" data-teacher-action="refresh" aria-label="刷新教师工作台">
                         <i data-lucide="refresh-cw"></i>
                         <span>刷新</span>
@@ -162,9 +167,14 @@
             <div class="teacher-write-lock" data-teacher-write-lock hidden role="alert"></div>
             <div class="teacher-flash" data-teacher-flash hidden></div>
             <div class="teacher-dashboard" data-teacher-dashboard hidden>
-                <section class="teacher-kpi-grid" data-teacher-kpis></section>
-                <section class="teacher-scope" data-teacher-scope></section>
-                <section class="teacher-panel-grid" data-teacher-panels></section>
+                <section class="teacher-summary-strip" data-teacher-kpis aria-label="教学运行摘要"></section>
+                <section class="teacher-scope-wrap" data-teacher-scope-panel></section>
+                <nav class="teacher-view-nav" role="tablist" aria-label="教师工作台分区">
+                    ${Object.entries(TEACHER_VIEWS).map(([key, label]) => `
+                        <button type="button" role="tab" data-teacher-view="${key}" aria-selected="${state.activeView === key}" class="${state.activeView === key ? 'is-active' : ''}">${label}</button>
+                    `).join('')}
+                </nav>
+                <section class="teacher-panel-grid" data-teacher-panels role="tabpanel"></section>
             </div>
         `;
         refreshIcons();
@@ -178,6 +188,11 @@
             if (refreshButton) {
                 if (state.busy) return;
                 refreshAll({ clearWriteLock: true });
+                return;
+            }
+            const viewButton = target.closest('[data-teacher-view], [data-teacher-view-target]');
+            if (viewButton) {
+                setActiveView(viewButton.dataset.teacherView || viewButton.dataset.teacherViewTarget);
                 return;
             }
             const memberButton = target.closest('[data-teacher-member-status]');
@@ -507,6 +522,7 @@
         if (dashboard) dashboard.hidden = !state.user || !['teacher', 'admin'].includes(state.user.role);
         renderKpis();
         renderScope();
+        syncViewNavigation();
         renderPanels();
         applyWriteAvailability();
         refreshIcons();
@@ -550,38 +566,34 @@
         if (!container) return;
         const activeClasses = state.data.classes.filter((item) => item.status === 'active').length;
         const visibleCourses = state.data.courses.filter((item) => item.status !== 'archived').length;
-        const activeAssignments = state.data.assignments.filter((item) => item.status === 'active').length;
         const activeStudents = state.data.members.filter((item) => item.role === 'student' && item.status === 'active').length;
         const pendingTotal = state.data.submissions.total || state.data.submissions.length || 0;
-        const knowledge = state.data.knowledge || {};
         const items = [
-            ['学校', state.data.schools.length, 'school'],
             ['班级', activeClasses, 'users'],
             ['课程', visibleCourses, 'book-open'],
-            ['待处理提交', pendingTotal, 'inbox'],
-            ['学生', activeStudents, 'graduation-cap'],
-            ['活跃作业', activeAssignments, 'clipboard-check'],
-            ['完成率', `${formatPercent(knowledge.completion_percent || 0)}`, 'target'],
-            ['平均得分', `${formatPercent(knowledge.average_score_percent || 0)}`, 'gauge']
+            ['待批改', pendingTotal, 'inbox'],
+            ['学生', activeStudents, 'graduation-cap']
         ];
         container.innerHTML = items.map(([label, value, icon]) => `
-            <article class="teacher-kpi">
-                <span class="teacher-kpi__icon"><i data-lucide="${icon}"></i></span>
-                <strong>${escapeHtml(String(value))}</strong>
-                <span>${escapeHtml(label)}</span>
-            </article>
+            <div class="teacher-summary"><i data-lucide="${icon}"></i><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>
         `).join('');
     }
 
     function renderScope() {
-        const container = state.root.querySelector('[data-teacher-scope]');
+        const container = state.root.querySelector('[data-teacher-scope-panel]');
         if (!container) return;
+        const isCompact = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 760px)').matches;
+        const summary = [selectedSchool() && selectedSchool().name, selectedClass() && selectedClass().name, selectedCourse() && selectedCourse().title]
+            .filter(Boolean).join(' · ') || '尚未建立教学范围';
         container.innerHTML = `
-            ${renderScopeSelect('schoolId', '学校', state.data.schools, state.selected.schoolId, (item) => `${item.name}${item.status !== 'active' ? ` · ${item.status}` : ''}`, state.errors.schools)}
-            ${renderScopeSelect('classId', '班级', state.data.classes, state.selected.classId, (item) => `${item.name}${item.status !== 'active' ? ` · ${item.status}` : ''}`, state.errors.classes)}
-            ${renderScopeSelect('courseId', '课程', state.data.courses, state.selected.courseId, (item) => `${item.title}${item.status !== 'published' ? ` · ${item.status}` : ''}`, state.errors.courses)}
-            ${renderScopeSelect('unitId', '单元', state.data.units, state.selected.unitId, (item) => `${item.position}. ${item.title}`, state.errors.units)}
-            ${renderScopeSelect('assignmentId', '作业', state.data.assignments, state.selected.assignmentId, (item) => `${item.title}${item.status !== 'active' ? ` · ${item.status}` : ''}`, state.errors.assignments)}
+            <details class="teacher-scope" ${isCompact ? '' : 'open'}>
+                <summary><span>当前教学范围</span><strong>${escapeHtml(summary)}</strong><i data-lucide="chevron-down"></i></summary>
+                <div class="teacher-scope__fields">
+                    ${renderScopeSelect('schoolId', '学校', state.data.schools, state.selected.schoolId, (item) => `${item.name}${item.status !== 'active' ? ` · ${item.status}` : ''}`, state.errors.schools)}
+                    ${renderScopeSelect('classId', '班级', state.data.classes, state.selected.classId, (item) => `${item.name}${item.status !== 'active' ? ` · ${item.status}` : ''}`, state.errors.classes)}
+                    ${renderScopeSelect('courseId', '课程', state.data.courses, state.selected.courseId, (item) => `${item.title}${item.status !== 'published' ? ` · ${item.status}` : ''}`, state.errors.courses)}
+                </div>
+            </details>
         `;
     }
 
@@ -600,66 +612,178 @@
     function renderPanels() {
         const container = state.root.querySelector('[data-teacher-panels]');
         if (!container) return;
-        container.innerHTML = [
-            renderSetupPanel(),
-            renderCoursePanel(),
-            renderMembersPanel(),
-            renderSubmissionsPanel(),
-            renderInsightPanel(),
-            renderReservedPanel()
-        ].join('');
+        const panels = {
+            overview: renderOverviewPanel,
+            structure: renderOrganizationPanel,
+            assignments: renderAssignmentWorkspace,
+            grading: renderGradingWorkspace
+        };
+        container.dataset.activeView = state.activeView;
+        container.innerHTML = (panels[state.activeView] || panels.overview)();
     }
 
-    function renderSetupPanel() {
+    function setActiveView(view) {
+        if (!Object.prototype.hasOwnProperty.call(TEACHER_VIEWS, view)) return;
+        state.activeView = view;
+        syncViewNavigation();
+        renderPanels();
+        applyWriteAvailability();
+        refreshIcons();
+    }
+
+    function syncViewNavigation() {
+        if (!state.root) return;
+        state.root.querySelectorAll('[data-teacher-view]').forEach((button) => {
+            const selected = button.dataset.teacherView === state.activeView;
+            button.classList.toggle('is-active', selected);
+            button.setAttribute('aria-selected', String(selected));
+            button.tabIndex = selected ? 0 : -1;
+        });
+    }
+
+    function renderOverviewPanel() {
+        const classLabel = selectedClassLabel();
+        const schoolLabel = selectedSchool() ? selectedSchool().name : '尚未选择学校';
+        const courseLabel = selectedCourseLabel();
+        const queue = state.errors.submissions
+            ? renderError(state.errors.submissions, '提交队列读取失败')
+            : !state.selected.classId
+                ? renderOverviewEmpty('先建立或选择班级', '选择班级后，这里会显示待批改、待发布与进行中的教学行动。', 'structure', '前往组织与课程')
+                : !state.data.submissions.length
+                    ? renderOverviewEmpty('暂无待批改的作业', '学生提交的作业会在这里形成行动队列，便于快速批改与反馈。', 'assignments', '查看作业发布')
+                    : renderSubmissionQueue();
+        return `
+            <div class="teacher-overview-layout">
+                <article class="teacher-overview-main">
+                    <header class="teacher-section-heading"><div><span>TEACHING NOW</span><h2>今日教学行动</h2></div><button type="button" data-teacher-view-target="grading">查看全部批改 <i data-lucide="arrow-right"></i></button></header>
+                    <div class="teacher-queue-tabs" aria-label="行动队列"><span class="is-active">待批改</span><span>待发布</span><span>进行中</span></div>
+                    ${queue}
+                </article>
+                <aside class="teacher-overview-aside">
+                    <section class="teacher-scope-tree">
+                        <header><span>CONTEXT</span><h2>当前教学范围</h2></header>
+                        <ol>
+                            <li><i data-lucide="school"></i><div><span>学校</span><strong>${escapeHtml(schoolLabel)}</strong></div></li>
+                            <li><i data-lucide="users"></i><div><span>班级</span><strong>${escapeHtml(classLabel)}</strong></div></li>
+                            <li><i data-lucide="book-open"></i><div><span>课程</span><strong>${escapeHtml(courseLabel)}</strong></div></li>
+                        </ol>
+                    </section>
+                    <section class="teacher-quick-actions">
+                        <header><span>NEXT STEP</span><h2>快速开始</h2></header>
+                        ${renderQuickAction('assignments', 'clipboard-plus', '发布作业', '布置新作业给当前教学范围')}
+                        ${renderQuickAction('structure', 'book-plus', '创建课程', '建立课程并挂接班级')}
+                        ${renderQuickAction('grading', 'chart-no-axes-combined', '查看学情', '查看学生进度与作业反馈')}
+                    </section>
+                </aside>
+            </div>
+        `;
+    }
+
+    function renderOverviewEmpty(title, text, view, action) {
+        return `
+            <div class="teacher-overview-empty">
+                <span class="teacher-overview-empty__icon"><i data-lucide="inbox"></i></span>
+                <strong>${escapeHtml(title)}</strong>
+                <p>${escapeHtml(text)}</p>
+                <button type="button" data-teacher-view-target="${escapeAttr(view)}">${escapeHtml(action)} <i data-lucide="arrow-right"></i></button>
+            </div>
+        `;
+    }
+
+    function renderQuickAction(view, icon, title, detail) {
+        return `<button type="button" class="teacher-quick-action" data-teacher-view-target="${escapeAttr(view)}"><span><i data-lucide="${escapeAttr(icon)}"></i></span><div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(detail)}</small></div><i data-lucide="chevron-right"></i></button>`;
+    }
+
+    function renderOrganizationPanel() {
         const schoolDisabled = !state.selected.schoolId || isSchoolReadOnly();
         const courseDisabled = !state.selected.courseId || isCourseReadOnly();
         const classDisabled = !state.selected.classId || isClassReadOnly();
+        return `
+            <div class="teacher-view teacher-view--structure">
+                <header class="teacher-view__header"><div><span>STRUCTURE</span><h2>组织与课程</h2><p>按学校 → 班级 → 课程顺序建立教学范围；每项操作独立展开，不再把所有表单铺在同一首屏。</p></div></header>
+                <div class="teacher-operation-list">
+                    ${renderOperation('school', 'school', '创建学校', '建立新的教学组织根节点', `
+                        <form class="teacher-form" data-teacher-form="school">
+                            <label><span>名称</span><input name="name" maxlength="160" required></label>
+                            <label><span>区域</span><input name="region" maxlength="160"></label>
+                            <button type="submit"><i data-lucide="plus"></i><span>创建学校</span></button>
+                        </form>
+                    `, !state.data.schools.length)}
+                    ${renderOperation('class', 'users', '创建班级', '在当前学校下建立班级', `
+                        <form class="teacher-form" data-teacher-form="class">
+                            <label><span>名称</span><input name="name" maxlength="160" required ${schoolDisabled ? 'disabled' : ''}></label>
+                            <label><span>年级</span><input name="grade" maxlength="64" ${schoolDisabled ? 'disabled' : ''}></label>
+                            <label><span>学期</span><input name="term" maxlength="64" ${schoolDisabled ? 'disabled' : ''}></label>
+                            <button type="submit" ${schoolDisabled ? 'disabled' : ''}><i data-lucide="users"></i><span>创建班级</span></button>
+                        </form>
+                    `)}
+                    ${renderOperation('course', 'book-plus', '创建课程', '在当前学校下建立课程内容', `
+                        <form class="teacher-form" data-teacher-form="course">
+                            <label><span>标题</span><input name="title" maxlength="180" required ${schoolDisabled ? 'disabled' : ''}></label>
+                            <label><span>状态</span><select name="status" ${schoolDisabled ? 'disabled' : ''}>${optionSet(['draft', 'published', 'archived'], 'draft')}</select></label>
+                            <label class="teacher-form__full"><span>摘要</span><textarea name="summary" maxlength="2000" rows="2" ${schoolDisabled ? 'disabled' : ''}></textarea></label>
+                            <button type="submit" ${schoolDisabled ? 'disabled' : ''}><i data-lucide="book-plus"></i><span>创建课程</span></button>
+                        </form>
+                    `)}
+                    ${renderOperation('attach', 'link', '课程挂班', '把当前课程挂接到当前班级', `
+                        <form class="teacher-form teacher-form--attach" data-teacher-form="attach">
+                            <p><strong>课程</strong>${escapeHtml(selectedCourseLabel())}</p><p><strong>班级</strong>${escapeHtml(selectedClassLabel())}</p>
+                            <button type="submit" ${courseDisabled || classDisabled ? 'disabled' : ''}><i data-lucide="link"></i><span>确认挂接</span></button>
+                        </form>
+                    `)}
+                </div>
+                ${renderMembersPanel()}
+            </div>
+        `;
+    }
+
+    function renderAssignmentWorkspace() {
+        return `
+            <div class="teacher-view teacher-view--assignments">
+                <header class="teacher-view__header"><div><span>ASSIGNMENTS</span><h2>作业发布</h2><p>选择课程中的单元与作业后，再管理受众、班级策略、积分与协作者。</p></div></header>
+                ${renderAssignmentScope()}
+                ${renderAssignmentCreationPanel()}
+                ${renderCoursePanel()}
+            </div>
+        `;
+    }
+
+    function renderGradingWorkspace() {
+        return `
+            <div class="teacher-view teacher-view--grading">
+                <header class="teacher-view__header"><div><span>REVIEW & INSIGHT</span><h2>批改与学情</h2><p>在同一教学范围中处理提交、反馈和学生学习进度。</p></div></header>
+                ${renderAssignmentScope()}
+                <div class="teacher-grading-grid">${renderSubmissionsPanel()}${renderInsightPanel()}</div>
+            </div>
+        `;
+    }
+
+    function renderAssignmentScope() {
+        return `
+            <div class="teacher-assignment-scope" aria-label="作业上下文">
+                ${renderScopeSelect('unitId', '单元', state.data.units, state.selected.unitId, (item) => `${item.position}. ${item.title}`, state.errors.units)}
+                ${renderScopeSelect('assignmentId', '作业', state.data.assignments, state.selected.assignmentId, (item) => `${item.title}${item.status !== 'active' ? ` · ${item.status}` : ''}`, state.errors.assignments)}
+            </div>
+        `;
+    }
+
+    function renderAssignmentCreationPanel() {
         const unitOptions = state.data.units.map((unit) => `<option value="${unit.id}"${String(unit.id) === state.selected.unitId ? ' selected' : ''}>${escapeHtml(unit.title)}</option>`).join('');
         const unitDisabled = !canCreateCourseUnit();
         const assignmentDisabled = !unitOptions || !canCreateCourseAssignment();
         return `
-            <article class="teacher-panel teacher-panel--wide">
-                <header class="teacher-panel__header">
-                    <h2><i data-lucide="layout-dashboard"></i>主路径</h2>
-                    <span class="teacher-status-pill teacher-status-pill--readonly">V6.6.53</span>
-                </header>
-                <div class="teacher-form-grid">
-                    <form class="teacher-form" data-teacher-form="school">
-                        <h3>学校</h3>
-                        <label><span>名称</span><input name="name" maxlength="160" required></label>
-                        <label><span>区域</span><input name="region" maxlength="160"></label>
-                        <button type="submit"><i data-lucide="plus"></i><span>创建</span></button>
-                    </form>
-                    <form class="teacher-form" data-teacher-form="class">
-                        <h3>班级</h3>
-                        <label><span>名称</span><input name="name" maxlength="160" required ${schoolDisabled ? 'disabled' : ''}></label>
-                        <label><span>年级</span><input name="grade" maxlength="64" ${schoolDisabled ? 'disabled' : ''}></label>
-                        <label><span>学期</span><input name="term" maxlength="64" ${schoolDisabled ? 'disabled' : ''}></label>
-                        <button type="submit" ${schoolDisabled ? 'disabled' : ''}><i data-lucide="users"></i><span>创建</span></button>
-                    </form>
-                    <form class="teacher-form" data-teacher-form="course">
-                        <h3>课程</h3>
-                        <label><span>标题</span><input name="title" maxlength="180" required ${schoolDisabled ? 'disabled' : ''}></label>
-                        <label><span>状态</span><select name="status" ${schoolDisabled ? 'disabled' : ''}>${optionSet(['draft', 'published', 'archived'], 'draft')}</select></label>
-                        <label class="teacher-form__full"><span>摘要</span><textarea name="summary" maxlength="2000" rows="2" ${schoolDisabled ? 'disabled' : ''}></textarea></label>
-                        <button type="submit" ${schoolDisabled ? 'disabled' : ''}><i data-lucide="book-plus"></i><span>创建</span></button>
-                    </form>
-                    <form class="teacher-form" data-teacher-form="attach">
-                        <h3>挂班</h3>
-                        <p>${escapeHtml(selectedCourseLabel())}</p>
-                        <p>${escapeHtml(selectedClassLabel())}</p>
-                        <button type="submit" ${courseDisabled || classDisabled ? 'disabled' : ''}><i data-lucide="link"></i><span>挂接</span></button>
-                    </form>
+            <div class="teacher-operation-list teacher-operation-list--compact">
+                ${renderOperation('unit', 'layers-3', '创建课程单元', '为当前课程追加可发布单元', `
                     <form class="teacher-form" data-teacher-form="unit">
-                        <h3>单元</h3>
                         <label><span>标题</span><input name="title" maxlength="180" required ${unitDisabled ? 'disabled' : ''}></label>
                         <label><span>序号</span><input name="position" type="number" min="1" value="${state.data.units.length + 1}" required ${unitDisabled ? 'disabled' : ''}></label>
                         <label><span>状态</span><select name="status" ${unitDisabled ? 'disabled' : ''}>${optionSet(['draft', 'published', 'archived'], 'published')}</select></label>
                         <label><span>内容 slug</span><input name="content_slug" maxlength="180" ${unitDisabled ? 'disabled' : ''}></label>
-                        <button type="submit" ${unitDisabled ? 'disabled' : ''}><i data-lucide="layers-3"></i><span>创建</span></button>
+                        <button type="submit" ${unitDisabled ? 'disabled' : ''}><i data-lucide="layers-3"></i><span>创建单元</span></button>
                     </form>
+                `, !state.data.units.length)}
+                ${renderOperation('assignment', 'clipboard-plus', '发布新作业', '设置满分、受众、截止时间和说明', `
                     <form class="teacher-form" data-teacher-form="assignment">
-                        <h3>作业</h3>
                         <label><span>单元</span><select name="unit_id" ${assignmentDisabled ? 'disabled' : ''}>${unitOptions || '<option value="">--</option>'}</select></label>
                         <label><span>标题</span><input name="title" maxlength="180" required ${assignmentDisabled ? 'disabled' : ''}></label>
                         <label><span>满分</span><input name="max_score" type="number" min="0" max="1000" value="100" ${assignmentDisabled ? 'disabled' : ''}></label>
@@ -667,10 +791,19 @@
                         <label><span>受众</span><select name="audience_mode" ${assignmentDisabled ? 'disabled' : ''}>${optionSet(['all_attached_classes', 'selected_classes'], 'all_attached_classes')}</select></label>
                         <label><span>截止</span><input name="due_at" type="datetime-local" ${assignmentDisabled ? 'disabled' : ''}></label>
                         <label class="teacher-form__full"><span>说明</span><textarea name="description" maxlength="4000" rows="2" ${assignmentDisabled ? 'disabled' : ''}></textarea></label>
-                        <button type="submit" ${assignmentDisabled ? 'disabled' : ''}><i data-lucide="clipboard-plus"></i><span>创建</span></button>
+                        <button type="submit" ${assignmentDisabled ? 'disabled' : ''}><i data-lucide="clipboard-plus"></i><span>发布作业</span></button>
                     </form>
-                </div>
-            </article>
+                `, !state.data.assignments.length)}
+            </div>
+        `;
+    }
+
+    function renderOperation(id, icon, title, detail, content, open) {
+        return `
+            <details class="teacher-operation" data-teacher-operation="${escapeAttr(id)}" ${open ? 'open' : ''}>
+                <summary><span class="teacher-operation__icon"><i data-lucide="${escapeAttr(icon)}"></i></span><span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(detail)}</small></span><i data-lucide="chevron-down"></i></summary>
+                <div class="teacher-operation__body">${content}</div>
+            </details>
         `;
     }
 
@@ -705,45 +838,50 @@
                         `, state.errors.assignments)}
                     </div>
                 </div>
-                <div class="teacher-subpanel-grid">
-                    <form class="teacher-form teacher-form--inline" data-teacher-form="assignment-audience">
-                        <h3>作业受众</h3>
-                        <label><span>作业</span><select name="assignment_id" ${selectedAssignment ? '' : 'disabled'}>${assignmentOptions()}</select></label>
-                        <label><span>模式</span><select name="audience_mode" ${audienceDisabled ? 'disabled' : ''}>${optionSet(['all_attached_classes', 'selected_classes'], selectedAssignment && selectedAssignment.audience_mode || 'all_attached_classes')}</select></label>
-                        <button type="submit" ${audienceDisabled ? 'disabled' : ''}><i data-lucide="users-round"></i><span>保存受众</span></button>
-                    </form>
-                    <form class="teacher-form teacher-form--inline teacher-form--class-policy" data-teacher-form="assignment-class-policy">
-                        <h3>当前班级策略</h3>
-                        <label class="teacher-checkbox"><input name="assigned" type="checkbox" ${policy.assigned ? 'checked' : ''} ${policyDisabled ? 'disabled' : ''}><span>分配给本班</span></label>
-                        <label><span>状态覆盖</span><select name="status_override" ${policyDisabled ? 'disabled' : ''}>${optionSet(['active', 'closed', 'archived'], policy.status_override || '', [['', '继承全局']])}</select></label>
-                        <label class="teacher-checkbox"><input name="due_at_overridden" type="checkbox" ${policy.due_at_overridden ? 'checked' : ''} ${policyDisabled ? 'disabled' : ''}><span>覆盖截止</span></label>
-                        <label><span>班级截止</span><input name="due_at_override" type="datetime-local" value="${escapeAttr(datetimeLocalValue(policy.due_at_override))}" ${policyDisabled ? 'disabled' : ''}></label>
-                        <label class="teacher-checkbox"><input name="override_points" type="checkbox" ${policyRule.source === 'class_override' ? 'checked' : ''} ${policyDisabled ? 'disabled' : ''}><span>覆盖积分</span></label>
-                        <label><span>每分积分</span><input name="points_per_score" type="number" min="0" max="1000" value="${escapeAttr(policyRule.points_per_score ?? 1)}" ${policyDisabled ? 'disabled' : ''}></label>
-                        <label><span>积分上限</span><input name="max_points" type="number" min="0" max="100000" value="${escapeAttr(policyRule.max_points ?? '')}" ${policyDisabled ? 'disabled' : ''}></label>
-                        <label class="teacher-checkbox"><input name="points_enabled" type="checkbox" ${policyRule.enabled !== false ? 'checked' : ''} ${policyDisabled ? 'disabled' : ''}><span>积分启用</span></label>
-                        <button type="submit" ${policyDisabled ? 'disabled' : ''}><i data-lucide="save"></i><span>保存班级策略</span></button>
-                        <button type="button" class="teacher-icon-button" data-teacher-class-policy-reset ${policyDisabled || !policy.persisted ? 'disabled' : ''}><i data-lucide="rotate-ccw"></i><span>恢复继承</span></button>
-                    </form>
-                    <form class="teacher-form teacher-form--inline" data-teacher-form="point-rule">
-                        <h3>积分规则</h3>
-                        <label><span>作业</span><select name="assignment_id" ${selectedAssignment ? '' : 'disabled'}>${assignmentOptions()}</select></label>
-                        <label class="teacher-checkbox"><input name="enabled" type="checkbox" ${rule.enabled !== false ? 'checked' : ''} ${selectedAssignment ? '' : 'disabled'}><span>启用</span></label>
-                        <label><span>每分积分</span><input name="points_per_score" type="number" min="0" max="1000" value="${escapeAttr(rule.points_per_score ?? 1)}" ${selectedAssignment ? '' : 'disabled'}></label>
-                        <label><span>上限</span><input name="max_points" type="number" min="0" max="100000" value="${escapeAttr(rule.max_points ?? '')}" ${selectedAssignment ? '' : 'disabled'}></label>
-                        <button type="submit" ${pointRuleDisabled ? 'disabled' : ''}><i data-lucide="save"></i><span>保存</span></button>
-                    </form>
-                    <form class="teacher-form teacher-form--inline" data-teacher-form="collaborator">
-                        <h3>协作者</h3>
-                        <label><span>用户 ID</span><input name="user_id" type="number" min="1" ${collaboratorDisabled ? 'disabled' : ''}></label>
-                        <label><span>角色</span><select name="role" ${collaboratorDisabled ? 'disabled' : ''}>${optionSet(['editor', 'content_editor', 'assessment_editor', 'viewer'], 'editor')}</select></label>
-                        <button type="submit" ${collaboratorDisabled ? 'disabled' : ''}><i data-lucide="user-plus"></i><span>添加</span></button>
-                    </form>
-                    <form class="teacher-form teacher-form--inline" data-teacher-form="collaborator-batch">
-                        <h3>批量协作者</h3>
-                        <label class="teacher-form__full"><span>每行：用户ID,角色,状态</span><textarea name="items" maxlength="12000" rows="4" placeholder="12,content_editor,active" ${collaboratorDisabled ? 'disabled' : ''}></textarea></label>
-                        <button type="submit" ${collaboratorDisabled ? 'disabled' : ''}><i data-lucide="list-plus"></i><span>逐项处理</span></button>
-                    </form>
+                <div class="teacher-operation-list teacher-operation-list--compact">
+                    ${renderOperation('assignment-audience', 'users-round', '作业受众', '设置当前作业的班级覆盖范围', `
+                        <form class="teacher-form" data-teacher-form="assignment-audience">
+                            <label><span>作业</span><select name="assignment_id" ${selectedAssignment ? '' : 'disabled'}>${assignmentOptions()}</select></label>
+                            <label><span>模式</span><select name="audience_mode" ${audienceDisabled ? 'disabled' : ''}>${optionSet(['all_attached_classes', 'selected_classes'], selectedAssignment && selectedAssignment.audience_mode || 'all_attached_classes')}</select></label>
+                            <button type="submit" ${audienceDisabled ? 'disabled' : ''}><i data-lucide="users-round"></i><span>保存受众</span></button>
+                        </form>
+                    `)}
+                    ${renderOperation('assignment-class-policy', 'sliders-horizontal', '当前班级策略', '覆盖状态、截止时间与积分策略', `
+                        <form class="teacher-form teacher-form--class-policy" data-teacher-form="assignment-class-policy">
+                            <label class="teacher-checkbox"><input name="assigned" type="checkbox" ${policy.assigned ? 'checked' : ''} ${policyDisabled ? 'disabled' : ''}><span>分配给本班</span></label>
+                            <label><span>状态覆盖</span><select name="status_override" ${policyDisabled ? 'disabled' : ''}>${optionSet(['active', 'closed', 'archived'], policy.status_override || '', [['', '继承全局']])}</select></label>
+                            <label class="teacher-checkbox"><input name="due_at_overridden" type="checkbox" ${policy.due_at_overridden ? 'checked' : ''} ${policyDisabled ? 'disabled' : ''}><span>覆盖截止</span></label>
+                            <label><span>班级截止</span><input name="due_at_override" type="datetime-local" value="${escapeAttr(datetimeLocalValue(policy.due_at_override))}" ${policyDisabled ? 'disabled' : ''}></label>
+                            <label class="teacher-checkbox"><input name="override_points" type="checkbox" ${policyRule.source === 'class_override' ? 'checked' : ''} ${policyDisabled ? 'disabled' : ''}><span>覆盖积分</span></label>
+                            <label><span>每分积分</span><input name="points_per_score" type="number" min="0" max="1000" value="${escapeAttr(policyRule.points_per_score ?? 1)}" ${policyDisabled ? 'disabled' : ''}></label>
+                            <label><span>积分上限</span><input name="max_points" type="number" min="0" max="100000" value="${escapeAttr(policyRule.max_points ?? '')}" ${policyDisabled ? 'disabled' : ''}></label>
+                            <label class="teacher-checkbox"><input name="points_enabled" type="checkbox" ${policyRule.enabled !== false ? 'checked' : ''} ${policyDisabled ? 'disabled' : ''}><span>积分启用</span></label>
+                            <button type="submit" ${policyDisabled ? 'disabled' : ''}><i data-lucide="save"></i><span>保存班级策略</span></button>
+                            <button type="button" class="teacher-icon-button" data-teacher-class-policy-reset ${policyDisabled || !policy.persisted ? 'disabled' : ''}><i data-lucide="rotate-ccw"></i><span>恢复继承</span></button>
+                        </form>
+                    `)}
+                    ${renderOperation('point-rule', 'badge-cent', '积分规则', '配置作业的积分换算与上限', `
+                        <form class="teacher-form" data-teacher-form="point-rule">
+                            <label><span>作业</span><select name="assignment_id" ${selectedAssignment ? '' : 'disabled'}>${assignmentOptions()}</select></label>
+                            <label class="teacher-checkbox"><input name="enabled" type="checkbox" ${rule.enabled !== false ? 'checked' : ''} ${selectedAssignment ? '' : 'disabled'}><span>启用</span></label>
+                            <label><span>每分积分</span><input name="points_per_score" type="number" min="0" max="1000" value="${escapeAttr(rule.points_per_score ?? 1)}" ${selectedAssignment ? '' : 'disabled'}></label>
+                            <label><span>上限</span><input name="max_points" type="number" min="0" max="100000" value="${escapeAttr(rule.max_points ?? '')}" ${selectedAssignment ? '' : 'disabled'}></label>
+                            <button type="submit" ${pointRuleDisabled ? 'disabled' : ''}><i data-lucide="save"></i><span>保存积分规则</span></button>
+                        </form>
+                    `)}
+                    ${renderOperation('collaborators', 'user-cog', '课程协作者', '添加或批量调整课程协作权限', `
+                        <div class="teacher-collaborator-forms">
+                            <form class="teacher-form" data-teacher-form="collaborator">
+                                <label><span>用户 ID</span><input name="user_id" type="number" min="1" ${collaboratorDisabled ? 'disabled' : ''}></label>
+                                <label><span>角色</span><select name="role" ${collaboratorDisabled ? 'disabled' : ''}>${optionSet(['editor', 'content_editor', 'assessment_editor', 'viewer'], 'editor')}</select></label>
+                                <button type="submit" ${collaboratorDisabled ? 'disabled' : ''}><i data-lucide="user-plus"></i><span>添加协作者</span></button>
+                            </form>
+                            <form class="teacher-form" data-teacher-form="collaborator-batch">
+                                <label class="teacher-form__full"><span>每行：用户ID,角色,状态</span><textarea name="items" maxlength="12000" rows="4" placeholder="12,content_editor,active" ${collaboratorDisabled ? 'disabled' : ''}></textarea></label>
+                                <button type="submit" ${collaboratorDisabled ? 'disabled' : ''}><i data-lucide="list-plus"></i><span>逐项处理</span></button>
+                            </form>
+                        </div>
+                    `)}
                 </div>
                 ${renderCollaborators()}
                 ${renderCollaboratorBatchResult()}
@@ -924,29 +1062,6 @@
                     <label><span>学生</span><select data-teacher-scope="studentId">${studentOptions()}</select></label>
                 </div>
                 ${state.errors.progress ? renderError(state.errors.progress, '学生进度读取失败') : renderProgress(progress)}
-            </article>
-        `;
-    }
-
-    function renderReservedPanel() {
-        const items = [
-            ['外部告警投递适配器', 'V6.6.54'],
-            ['任务队列执行治理', 'V6.6.55']
-        ];
-        return `
-            <article class="teacher-panel teacher-panel--reserved">
-                <header class="teacher-panel__header">
-                    <h2><i data-lucide="route"></i>后续入口</h2>
-                    <span class="teacher-status-pill teacher-status-pill--paused">预留</span>
-                </header>
-                <div class="teacher-reserved-list">
-                    ${items.map(([label, status]) => `
-                        <div>
-                            <span>${escapeHtml(label)}</span>
-                            ${statusBadge(status)}
-                        </div>
-                    `).join('')}
-                </div>
             </article>
         `;
     }

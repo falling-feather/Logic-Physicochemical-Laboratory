@@ -4,9 +4,9 @@
 
     if (global.AstraPageRegistry) return;
 
-    const ROLE_RESOURCE_VERSION = '20260716v7427RoleWorkflowGateP0';
+    const ROLE_RESOURCE_VERSION = '20260719v7437AstraWorkspaceP0';
     const ADMIN_RESOURCE_VERSION = '20260718v7432UnifiedAtlasP0';
-    const PLANETS_RESOURCE_VERSION = '20260718v7435QaCloseoutP0';
+    const PLANETS_RESOURCE_VERSION = '20260719v7437AstraWorkspaceP0';
 
     const definePage = (config) => Object.freeze({
         galaxy: config.galaxy || 'englab',
@@ -39,7 +39,7 @@
         algorithms: definePage({ galaxy: 'englab', tags: ['course'] }),
         biology: definePage({ galaxy: 'englab', tags: ['course'] }),
         student: definePage({
-            galaxy: 'englab',
+            galaxy: 'astra',
             roles: ['student'],
             styles: [`pages/student/student.css?v=${ROLE_RESOURCE_VERSION}`],
             script: `pages/student/student.js?v=${ROLE_RESOURCE_VERSION}`,
@@ -48,7 +48,7 @@
             leave: 'destroyStudent'
         }),
         teacher: definePage({
-            galaxy: 'englab',
+            galaxy: 'astra',
             roles: ['teacher', 'admin'],
             styles: [`pages/teacher/teacher.css?v=${ROLE_RESOURCE_VERSION}`],
             script: `pages/teacher/teacher.js?v=${ROLE_RESOURCE_VERSION}`,
@@ -57,7 +57,7 @@
             leave: 'destroyTeacher'
         }),
         admin: definePage({
-            galaxy: 'englab',
+            galaxy: 'astra',
             roles: ['admin'],
             styles: [`pages/admin/admin.css?v=${ADMIN_RESOURCE_VERSION}`],
             script: `pages/admin/admin.js?v=${ADMIN_RESOURCE_VERSION}`,

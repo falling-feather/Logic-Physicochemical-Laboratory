@@ -351,3 +351,325 @@
 @media (prefers-reduced-motion: reduce) {
     .app-auth-overlay *, .app-session-control * { scroll-behavior: auto !important; transition: none !important; }
 }
+
+/* V7.4.37 · 星序级角色工作区。角色页与三个学习单元并列归属于星序，
+   禁止继续继承工科试验室的学科导航壳层。 */
+.page.astra-workspace-page {
+    --astra-shell-bg: #050914;
+    --astra-shell-panel: #08111f;
+    --astra-shell-line: rgba(144, 181, 222, 0.16);
+    --astra-shell-text: #edf6ff;
+    --astra-shell-muted: #8496ad;
+    --astra-shell-accent: #66e7e2;
+    min-height: 100dvh;
+    padding-top: 0 !important;
+    overflow-x: clip;
+    color: var(--astra-shell-text);
+    background:
+        radial-gradient(circle at 82% 4%, rgba(75, 112, 239, 0.13), transparent 30rem),
+        radial-gradient(circle at 14% 78%, rgba(41, 196, 185, 0.07), transparent 28rem),
+        var(--astra-shell-bg);
+}
+
+.astra-workspace-shell {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    grid-template-columns: 232px minmax(0, 1fr);
+    width: 100%;
+    min-height: 100dvh;
+    background-image:
+        radial-gradient(circle, rgba(151, 203, 255, 0.64) 0 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(103, 231, 226, 0.35) 0 1px, transparent 1.5px);
+    background-position: 14% 9%, 86% 17%;
+    background-size: 197px 197px, 263px 263px;
+}
+
+.astra-workspace-rail {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    width: 232px;
+    height: 100dvh;
+    min-height: 620px;
+    padding: 26px 14px 18px;
+    border-right: 1px solid var(--astra-shell-line);
+    background: rgba(4, 10, 20, 0.94);
+    backdrop-filter: blur(18px);
+}
+
+.astra-workspace-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+    padding: 0 9px;
+    color: var(--astra-shell-text);
+    text-decoration: none;
+}
+
+.astra-workspace-brand__mark {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    color: var(--astra-shell-accent);
+    font-size: 1.65rem;
+    text-shadow: 0 0 24px rgba(102, 231, 226, 0.55);
+}
+
+.astra-workspace-brand > span:last-child {
+    display: grid;
+    gap: 4px;
+}
+
+.astra-workspace-brand strong {
+    font-size: 1.04rem;
+    line-height: 1;
+    letter-spacing: 0.04em;
+}
+
+.astra-workspace-brand small {
+    color: #9eb3ca;
+    font-size: 0.62rem;
+    letter-spacing: 0.3em;
+}
+
+.astra-workspace-nav {
+    display: grid;
+    gap: 22px;
+    margin-top: 36px;
+}
+
+.astra-workspace-nav__group {
+    display: grid;
+    gap: 5px;
+}
+
+.astra-workspace-nav__group > span {
+    padding: 0 11px 8px;
+    color: #667991;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+}
+
+.astra-workspace-nav__group a {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    min-height: 44px;
+    padding: 9px 11px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    color: #a9b8ca;
+    font-size: 0.83rem;
+    text-decoration: none;
+    transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.astra-workspace-nav__group a:hover,
+.astra-workspace-nav__group a:focus-visible {
+    border-color: rgba(102, 231, 226, 0.14);
+    background: rgba(55, 104, 158, 0.1);
+    color: #eef9ff;
+}
+
+.astra-workspace-nav__group a.is-current {
+    border-color: rgba(102, 231, 226, 0.12);
+    background: linear-gradient(90deg, rgba(45, 111, 156, 0.18), rgba(18, 49, 78, 0.08));
+    color: #f5fdff;
+}
+
+.astra-workspace-nav__group a.is-current::after {
+    content: '';
+    position: absolute;
+    top: 9px;
+    right: -1px;
+    bottom: 9px;
+    width: 2px;
+    background: var(--astra-shell-accent);
+    box-shadow: 0 0 14px rgba(102, 231, 226, 0.75);
+}
+
+.astra-workspace-nav svg,
+.astra-workspace-dock svg,
+.astra-workspace-mobile-header svg {
+    width: 19px;
+    height: 19px;
+    flex: 0 0 auto;
+}
+
+.astra-workspace-rail__foot {
+    display: grid;
+    gap: 4px;
+    margin-top: auto;
+    padding: 15px 11px 4px;
+    border-top: 1px solid var(--astra-shell-line);
+}
+
+.astra-workspace-rail__foot span {
+    color: #65778d;
+    font-size: 0.66rem;
+}
+
+.astra-workspace-rail__foot strong {
+    color: #b8c9db;
+    font-size: 0.78rem;
+}
+
+.astra-workspace-stage {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    min-height: 100dvh;
+}
+
+.astra-workspace-mobile-header,
+.astra-workspace-dock {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    /* Base page transitions reserve `will-change: transform`, which turns a
+       descendant `position: fixed` dock into a page-bottom element.  Role
+       workspaces own their mobile transition surface, so release that
+       containing block and keep the dock attached to the viewport. */
+    .page.astra-workspace-page.active {
+        transform: none !important;
+        will-change: auto !important;
+    }
+
+    .astra-workspace-shell {
+        display: block;
+        min-height: 100dvh;
+        background-size: 167px 167px, 229px 229px;
+    }
+
+    .astra-workspace-rail {
+        display: none;
+    }
+
+    .astra-workspace-stage {
+        min-height: 100dvh;
+        padding-bottom: calc(76px + env(safe-area-inset-bottom));
+    }
+
+    .astra-workspace-mobile-header {
+        position: relative;
+        z-index: 20;
+        display: grid;
+        gap: 18px;
+        padding: 21px 18px 0;
+        border-bottom: 1px solid var(--astra-shell-line);
+        background:
+            radial-gradient(circle at 92% 18%, rgba(102, 231, 226, 0.15), transparent 9rem),
+            rgba(4, 10, 20, 0.82);
+    }
+
+    .astra-workspace-mobile-header > div {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 44px;
+        font-size: 1.05rem;
+    }
+
+    .astra-workspace-mobile-header > div a {
+        color: #f5fbff;
+        font-weight: 800;
+        text-decoration: none;
+    }
+
+    .astra-workspace-mobile-header > div span {
+        color: #61758f;
+    }
+
+    .astra-workspace-mobile-header > div strong {
+        color: #dbe9f7;
+        font-size: 0.94rem;
+    }
+
+    .astra-workspace-mobile-header nav {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        margin: 0 -4px;
+    }
+
+    .astra-workspace-mobile-header nav a {
+        display: grid;
+        place-items: center;
+        align-content: center;
+        gap: 8px;
+        min-width: 0;
+        min-height: 82px;
+        padding: 10px 4px 13px;
+        border-bottom: 2px solid transparent;
+        color: #91a3b9;
+        font-size: 0.74rem;
+        text-align: center;
+        text-decoration: none;
+    }
+
+    .astra-workspace-mobile-header nav a:hover,
+    .astra-workspace-mobile-header nav a:focus-visible {
+        border-bottom-color: rgba(102, 231, 226, 0.5);
+        color: #eafaff;
+    }
+
+    .astra-workspace-mobile-header nav svg {
+        width: 25px;
+        height: 25px;
+    }
+
+    .astra-workspace-dock {
+        position: fixed;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 1190;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        min-height: calc(66px + env(safe-area-inset-bottom));
+        padding: 5px 12px env(safe-area-inset-bottom);
+        border-top: 1px solid rgba(145, 180, 220, 0.18);
+        background: rgba(4, 10, 20, 0.96);
+        backdrop-filter: blur(18px);
+    }
+
+    .astra-workspace-dock a {
+        position: relative;
+        display: grid;
+        place-items: center;
+        align-content: center;
+        gap: 4px;
+        min-height: 54px;
+        color: #8496ac;
+        font-size: 0.68rem;
+        text-decoration: none;
+    }
+
+    .astra-workspace-dock a.is-current {
+        color: var(--astra-shell-accent);
+    }
+
+    .astra-workspace-dock a.is-current::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        width: 30px;
+        height: 2px;
+        background: var(--astra-shell-accent);
+        box-shadow: 0 0 12px rgba(102, 231, 226, 0.65);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .astra-workspace-shell * {
+        scroll-behavior: auto !important;
+        transition: none !important;
+    }
+}

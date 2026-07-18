@@ -45,7 +45,7 @@
     <link rel="stylesheet" href="shared/css/fab-trigger.css?v=20260630mainV64">
     <!-- CSS: Pages -->
     <link rel="stylesheet" href="pages/home/home.css?v=20260715v7420HomeViewportClipP1">
-    <link rel="stylesheet" href="pages/planets/planets.css?v=20260718v7435QaCloseoutP0">
+    <link rel="stylesheet" href="pages/planets/planets.css?v=20260719v7437AstraWorkspaceP0">
     <link rel="stylesheet" href="pages/cosmos/cosmos.css?v=20260630mainV64">
     <link rel="stylesheet" href="pages/datascience/datascience.css?v=20260630mainV64">
     <link rel="stylesheet" href="pages/infotech/infotech.css?v=20260630mainV64">
@@ -58,7 +58,7 @@
     <link rel="stylesheet" href="pages/algorithms/algorithms.css?v=20260618algoTextP1">
     <link rel="stylesheet" href="pages/biology/biology.css?v=20260618neuralP1">
     <link rel="stylesheet" href="shared/css/auth-ui.css?v=20260716v7427RoleWorkflowGateP0">
-    <link rel="stylesheet" href="shared/css/app-session.css?v=20260715v7413PageRegistryP1">
+    <link rel="stylesheet" href="shared/css/app-session.css?v=20260719v7437AstraWorkspaceP0">
     <!-- v4.5-α1 全局搜索 -->
     <link rel="stylesheet" href="shared/css/global-search.css?v=20260606v62e">
     <!-- v4.5-α3 相关实验推荐 -->
@@ -120,7 +120,7 @@
         window.__astraBoot = (function () {
             var raw = (location.hash || '#planets').slice(1).split('/')[0] || 'planets';
             var frontierPages = ['frontier', 'cosmos', 'engineering', 'datascience', 'infotech', 'materials', 'humanities'];
-            var englabPages = ['home', 'mathematics', 'physics', 'chemistry', 'algorithms', 'biology', 'student', 'teacher', 'admin', 'license', 'changelog'];
+            var englabPages = ['home', 'mathematics', 'physics', 'chemistry', 'algorithms', 'biology', 'license', 'changelog'];
             var galaxy = frontierPages.indexOf(raw) > -1 ? 'frontier' : (englabPages.indexOf(raw) > -1 ? 'englab' : 'astra');
             var labels = {
                 astra: '正在进入星序',
@@ -5065,33 +5065,69 @@
             <div class="about-doc" id="about-changelog-content"></div>
         </section>
 
-        <!-- ═══════════════ Admin · 后端治理控制台 ═══════════════ -->
-        <section id="page-admin" class="page admin-page" aria-label="后端治理控制台">
-            <div class="admin-governance" data-admin-governance>
-                <div class="admin-loading">
-                    <i data-lucide="loader-circle"></i>
-                    <span>正在载入管理端</span>
+        <!-- ═══════════════ Admin · 星序全局治理工作台 ═══════════════ -->
+        <section id="page-admin" class="page astra-workspace-page admin-page" aria-label="星序全局治理工作台" data-astra-workspace="admin">
+            <div class="astra-workspace-shell">
+                <aside class="astra-workspace-rail" aria-label="星序层级导航">
+                    <a class="astra-workspace-brand" href="#planets" aria-label="返回星序总览"><span class="astra-workspace-brand__mark" aria-hidden="true">✦</span><span><strong>星序</strong><small>ASTRA</small></span></a>
+                    <nav class="astra-workspace-nav">
+                        <div class="astra-workspace-nav__group"><span>总览</span><a href="#planets"><i data-lucide="orbit"></i><span>星序总览</span></a></div>
+                        <div class="astra-workspace-nav__group"><span>学习单元</span><a href="#home"><i data-lucide="flask-conical"></i><span>工科试验室</span></a><a href="codevis/index.html"><i data-lucide="code-2"></i><span>代码空间</span></a><a href="#frontier"><i data-lucide="telescope"></i><span>未来星系</span></a></div>
+                        <div class="astra-workspace-nav__group"><span>身份工作区</span><a href="#student" data-app-roles="student"><i data-lucide="graduation-cap"></i><span>我的学习</span></a><a href="#teacher" data-app-roles="teacher,admin"><i data-lucide="presentation"></i><span>教学工作台</span></a><a class="is-current" href="#admin" data-app-roles="admin" aria-current="page"><i data-lucide="shield-check"></i><span>全局治理</span></a></div>
+                    </nav>
+                    <div class="astra-workspace-rail__foot"><span>星序角色平台</span><strong>全局治理</strong></div>
+                </aside>
+                <div class="astra-workspace-stage">
+                    <header class="astra-workspace-mobile-header"><div><a href="#planets">星序</a><span>/</span><strong>全局治理</strong></div><nav aria-label="学习单元"><a href="#home"><i data-lucide="flask-conical"></i><span>工科试验室</span></a><a href="codevis/index.html"><i data-lucide="code-2"></i><span>代码空间</span></a><a href="#frontier"><i data-lucide="telescope"></i><span>未来星系</span></a></nav></header>
+                    <div class="admin-governance" data-admin-governance>
+                        <div class="admin-loading"><i data-lucide="loader-circle"></i><span>正在载入星序全局治理台</span></div>
+                    </div>
                 </div>
+                <nav class="astra-workspace-dock" aria-label="星序移动导航"><a href="#planets"><i data-lucide="orbit"></i><span>星序</span></a><a href="#teacher" data-app-roles="teacher,admin"><i data-lucide="presentation"></i><span>教学</span></a><a class="is-current" href="#admin" data-app-roles="admin" aria-current="page"><i data-lucide="shield-check"></i><span>治理</span></a></nav>
             </div>
         </section>
 
-        <!-- ═══════════════ Teacher · 教师工作台 ═══════════════ -->
-        <section id="page-teacher" class="page teacher-page" aria-label="教师工作台">
-            <div class="teacher-workbench" data-teacher-workbench>
-                <div class="teacher-loading">
-                    <i data-lucide="loader-circle"></i>
-                    <span>正在载入教师工作台</span>
+        <!-- ═══════════════ Teacher · 星序教学工作台 ═══════════════ -->
+        <section id="page-teacher" class="page astra-workspace-page teacher-page" aria-label="星序教学工作台" data-astra-workspace="teacher">
+            <div class="astra-workspace-shell">
+                <aside class="astra-workspace-rail" aria-label="星序层级导航">
+                    <a class="astra-workspace-brand" href="#planets" aria-label="返回星序总览"><span class="astra-workspace-brand__mark" aria-hidden="true">✦</span><span><strong>星序</strong><small>ASTRA</small></span></a>
+                    <nav class="astra-workspace-nav">
+                        <div class="astra-workspace-nav__group"><span>总览</span><a href="#planets"><i data-lucide="orbit"></i><span>星序总览</span></a></div>
+                        <div class="astra-workspace-nav__group"><span>学习单元</span><a href="#home"><i data-lucide="flask-conical"></i><span>工科试验室</span></a><a href="codevis/index.html"><i data-lucide="code-2"></i><span>代码空间</span></a><a href="#frontier"><i data-lucide="telescope"></i><span>未来星系</span></a></div>
+                        <div class="astra-workspace-nav__group"><span>身份工作区</span><a href="#student" data-app-roles="student"><i data-lucide="graduation-cap"></i><span>我的学习</span></a><a class="is-current" href="#teacher" data-app-roles="teacher,admin" aria-current="page"><i data-lucide="presentation"></i><span>教学工作台</span></a><a href="#admin" data-app-roles="admin"><i data-lucide="shield-check"></i><span>全局治理</span></a></div>
+                    </nav>
+                    <div class="astra-workspace-rail__foot"><span>星序角色平台</span><strong>教学工作台</strong></div>
+                </aside>
+                <div class="astra-workspace-stage">
+                    <header class="astra-workspace-mobile-header"><div><a href="#planets">星序</a><span>/</span><strong>教学工作台</strong></div><nav aria-label="学习单元"><a href="#home"><i data-lucide="flask-conical"></i><span>工科试验室</span></a><a href="codevis/index.html"><i data-lucide="code-2"></i><span>代码空间</span></a><a href="#frontier"><i data-lucide="telescope"></i><span>未来星系</span></a></nav></header>
+                    <div class="teacher-workbench" data-teacher-workbench>
+                        <div class="teacher-loading"><i data-lucide="loader-circle"></i><span>正在载入星序教学工作台</span></div>
+                    </div>
                 </div>
+                <nav class="astra-workspace-dock" aria-label="星序移动导航"><a href="#planets"><i data-lucide="orbit"></i><span>星序</span></a><a class="is-current" href="#teacher" data-app-roles="teacher,admin" aria-current="page"><i data-lucide="presentation"></i><span>教学</span></a><a href="#admin" data-app-roles="admin"><i data-lucide="shield-check"></i><span>治理</span></a></nav>
             </div>
         </section>
 
-        <!-- Student · 学生学习台 -->
-        <section id="page-student" class="page student-page" aria-label="学生学习台">
-            <div class="student-workbench" data-student-workbench>
-                <div class="student-loading">
-                    <i data-lucide="loader-circle"></i>
-                    <span>正在载入学生学习台</span>
+        <!-- ═══════════════ Student · 星序学习工作台 ═══════════════ -->
+        <section id="page-student" class="page astra-workspace-page student-page" aria-label="星序学习工作台" data-astra-workspace="student">
+            <div class="astra-workspace-shell">
+                <aside class="astra-workspace-rail" aria-label="星序层级导航">
+                    <a class="astra-workspace-brand" href="#planets" aria-label="返回星序总览"><span class="astra-workspace-brand__mark" aria-hidden="true">✦</span><span><strong>星序</strong><small>ASTRA</small></span></a>
+                    <nav class="astra-workspace-nav">
+                        <div class="astra-workspace-nav__group"><span>总览</span><a href="#planets"><i data-lucide="orbit"></i><span>星序总览</span></a></div>
+                        <div class="astra-workspace-nav__group"><span>学习单元</span><a href="#home"><i data-lucide="flask-conical"></i><span>工科试验室</span></a><a href="codevis/index.html"><i data-lucide="code-2"></i><span>代码空间</span></a><a href="#frontier"><i data-lucide="telescope"></i><span>未来星系</span></a></div>
+                        <div class="astra-workspace-nav__group"><span>身份工作区</span><a class="is-current" href="#student" data-app-roles="student" aria-current="page"><i data-lucide="graduation-cap"></i><span>我的学习</span></a><a href="#teacher" data-app-roles="teacher,admin"><i data-lucide="presentation"></i><span>教学工作台</span></a><a href="#admin" data-app-roles="admin"><i data-lucide="shield-check"></i><span>全局治理</span></a></div>
+                    </nav>
+                    <div class="astra-workspace-rail__foot"><span>星序角色平台</span><strong>我的学习</strong></div>
+                </aside>
+                <div class="astra-workspace-stage">
+                    <header class="astra-workspace-mobile-header"><div><a href="#planets">星序</a><span>/</span><strong>我的学习</strong></div><nav aria-label="学习单元"><a href="#home"><i data-lucide="flask-conical"></i><span>工科试验室</span></a><a href="codevis/index.html"><i data-lucide="code-2"></i><span>代码空间</span></a><a href="#frontier"><i data-lucide="telescope"></i><span>未来星系</span></a></nav></header>
+                    <div class="student-workbench" data-student-workbench>
+                        <div class="student-loading"><i data-lucide="loader-circle"></i><span>正在载入星序学习工作台</span></div>
+                    </div>
                 </div>
+                <nav class="astra-workspace-dock" aria-label="星序移动导航"><a href="#planets"><i data-lucide="orbit"></i><span>星序</span></a><a class="is-current" href="#student" data-app-roles="student" aria-current="page"><i data-lucide="graduation-cap"></i><span>学习</span></a><a href="#teacher" data-app-roles="teacher,admin"><i data-lucide="presentation"></i><span>教学</span></a></nav>
             </div>
         </section>
     </main>
@@ -5199,14 +5235,14 @@
 
     <!-- Application Scripts: minimal boot path -->
     <script src="shared/js/config.js?v=20260716v7427RoleWorkflowGateP0"></script>
-    <script src="shared/js/api-client.js?v=20260718v7435QaCloseoutP0"></script>
+    <script src="shared/js/api-client.js?v=20260719v7437AstraWorkspaceP0"></script>
     <script src="shared/js/auth-ui.js?v=20260716v7427RoleWorkflowGateP0"></script>
-    <script src="shared/js/app-session.js?v=20260718v7435QaCloseoutP0"></script>
+    <script src="shared/js/app-session.js?v=20260719v7437AstraWorkspaceP0"></script>
     <script src="shared/js/backend-content.js?v=20260716v7427RoleWorkflowGateP0"></script>
     <script src="shared/js/experiment-registry.js?v=20260716v7427RoleWorkflowGateP0"></script>
-    <script src="shared/js/page-registry.js?v=20260718v7435QaCloseoutP0"></script>
-    <script src="shared/js/router.js?v=20260716v7427RoleWorkflowGateP0"></script>
-    <script src="shared/js/main.js?v=20260718v7435QaCloseoutP0"></script>
+    <script src="shared/js/page-registry.js?v=20260719v7437AstraWorkspaceP0"></script>
+    <script src="shared/js/router.js?v=20260719v7437AstraWorkspaceP0"></script>
+    <script src="shared/js/main.js?v=20260719v7437AstraWorkspaceP0"></script>
     <script>
         (function () {
             try {

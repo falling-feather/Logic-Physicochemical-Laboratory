@@ -125,7 +125,7 @@ const Router = {
         if (initNavbar) {
             const isFrontier = this._isFrontierPage(initialPage);
             initNavbar.classList.toggle('navbar--transparent', initialPage === 'home');
-            initNavbar.classList.toggle('navbar--hidden', initialPage === 'planets');
+            initNavbar.classList.toggle('navbar--hidden', this._galaxyForPage(initialPage) === 'astra');
             initNavbar.classList.toggle('navbar--frontier', isFrontier);
         }
         this._toggleGalaxyFooters(initialPage);
@@ -497,7 +497,7 @@ const Router = {
         if (navbar) {
             const isFrontier = this._isFrontierPage(page);
             navbar.classList.toggle('navbar--transparent', page === 'home');
-            navbar.classList.toggle('navbar--hidden', page === 'planets');
+            navbar.classList.toggle('navbar--hidden', this._galaxyForPage(page) === 'astra');
             navbar.classList.toggle('navbar--frontier', isFrontier);
         }
         this._toggleGalaxyFooters(page);
@@ -1090,7 +1090,7 @@ const Router = {
     },
 
     _usesEnglabFooter(page) {
-        return page !== 'home' && page !== 'planets' && !this._isFrontierPage(page);
+        return this._galaxyForPage(page) === 'englab' && page !== 'home';
     },
 
     _toggleGalaxyFooters(page) {

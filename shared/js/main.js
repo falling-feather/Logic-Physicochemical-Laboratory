@@ -195,7 +195,10 @@ function updateFooterVisibility() {
         const active = document.querySelector('.page.active');
         const page = active && active.id ? active.id.replace(/^page-/, '') : 'planets';
         const showFrontier = frontierPages.has(page);
-        const showEnglab = page !== 'home' && page !== 'planets' && !showFrontier;
+        const galaxy = window.AstraPageRegistry && typeof window.AstraPageRegistry.galaxyFor === 'function'
+            ? window.AstraPageRegistry.galaxyFor(page)
+            : null;
+        const showEnglab = galaxy === 'englab' && page !== 'home';
         if (footer) footer.style.display = showEnglab ? '' : 'none';
         if (frontierFooter) {
             frontierFooter.hidden = !showFrontier;
@@ -222,7 +225,7 @@ function updateFooterVisibility() {
 window.updateFooterVisibility = updateFooterVisibility;
 
 const ENGLAB_ASSET_VERSION = '20260716v7427RoleWorkflowGateP0';
-const ROLE_LANDING_ASSET_VERSION = '20260718v7435QaCloseoutP0';
+const ROLE_LANDING_ASSET_VERSION = '20260719v7437AstraWorkspaceP0';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',
@@ -238,12 +241,12 @@ const CORE_HTTP_FALLBACK_ASSETS = [
     './shared/js/app-session.js?v=' + ROLE_LANDING_ASSET_VERSION,
     './shared/js/experiment-registry.js?v=20260716v7427RoleWorkflowGateP0',
     './shared/js/page-registry.js?v=' + ROLE_LANDING_ASSET_VERSION,
-    './shared/js/router.js?v=20260716v7427RoleWorkflowGateP0',
+    './shared/js/router.js?v=20260719v7437AstraWorkspaceP0',
     './shared/js/main.js?v=' + ROLE_LANDING_ASSET_VERSION,
     './shared/js/backend-content.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/css/backend-content.css?v=' + ENGLAB_ASSET_VERSION,
     './shared/css/auth-ui.css?v=' + ENGLAB_ASSET_VERSION,
-    './shared/css/app-session.css?v=20260715v7413PageRegistryP1'
+    './shared/css/app-session.css?v=' + ROLE_LANDING_ASSET_VERSION
 ];
 
 const GALAXY_HTTP_FALLBACK_ASSETS = {

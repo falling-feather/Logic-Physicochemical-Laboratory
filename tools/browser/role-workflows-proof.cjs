@@ -710,7 +710,25 @@ async function mobileRoleInteraction(page, role, options = {}) {
 }
 
 async function teacherForm(page, type, fields, successText) {
+  const viewByForm = {
+    school: 'structure', class: 'structure', course: 'structure', attach: 'structure',
+    'student-batch-import': 'structure', 'student-transfer': 'structure',
+    unit: 'assignments', assignment: 'assignments', 'assignment-audience': 'assignments',
+    'assignment-class-policy': 'assignments', 'point-rule': 'assignments',
+    collaborator: 'assignments', 'collaborator-batch': 'assignments',
+    grade: 'grading',
+  };
+  const targetView = viewByForm[type];
+  if (targetView) {
+    const viewButton = page.locator(`[data-teacher-view="${targetView}"]`);
+    if (await viewButton.count()) await viewButton.click();
+  }
   const form = page.locator(`[data-teacher-form="${type}"]`);
+  await form.waitFor({ state: 'attached' });
+  await form.evaluate((node) => {
+    const disclosure = node.closest('details');
+    if (disclosure) disclosure.open = true;
+  });
   await form.waitFor({ state: 'visible' });
   for (const [name, value] of Object.entries(fields || {})) {
     const control = form.locator(`[name="${name}"]`);

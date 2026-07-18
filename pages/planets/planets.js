@@ -4,7 +4,7 @@
 (function attachPlanetsOverview(global) {
     'use strict';
 
-    const PLANETS_ASSET_VERSION = '20260718v7435QaCloseoutP0';
+    const PLANETS_ASSET_VERSION = '20260719v7437AstraWorkspaceP0';
     const ROLE_VIEW = Object.freeze({
         student: Object.freeze({
             label: '学生',
