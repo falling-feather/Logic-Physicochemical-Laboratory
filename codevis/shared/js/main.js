@@ -7,13 +7,18 @@
     function bootstrap() {
         // 注册页面
         if (window.CvRouter) {
-            CvRouter.register('home', {
-                onEnter: () => window.CvHome && CvHome.init(),
-                onLeave: () => window.CvHome && CvHome.destroy && CvHome.destroy()
+            CvRouter.register('catalog', { onEnter: () => window.CvCourseCatalog && CvCourseCatalog.init() });
+            CvRouter.register('lesson', { onEnter: () => window.CvCourseCatalog && CvCourseCatalog.renderLesson() });
+            CvRouter.register('challenge', {
+                onEnter: () => window.CvCourseChallenge && CvCourseChallenge.init(),
+                onLeave: () => window.CvCourseChallenge && CvCourseChallenge.cancel()
             });
             CvRouter.register('trace', {
                 onEnter: () => window.CodeTrace && CodeTrace.init(),
-                onLeave: () => window.CodeTrace && CodeTrace.destroy && CodeTrace.destroy()
+                onLeave: () => {
+                    window.CodeTrace && CodeTrace.destroy && CodeTrace.destroy();
+                    window.CvRuntime && CvRuntime.cancel();
+                }
             });
 
             CvRouter.init();

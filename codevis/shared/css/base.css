@@ -71,7 +71,7 @@ code, pre, kbd, samp {
     cursor: pointer;
     transition: all var(--cv-dur-fast) var(--cv-ease);
     text-decoration: none;
-    min-height: 34px;
+    min-height: 44px;
 }
 .cv-btn:hover {
     border-color: var(--cv-border-strong);

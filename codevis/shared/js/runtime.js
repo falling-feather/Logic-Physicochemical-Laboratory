@@ -48,10 +48,24 @@
 
         list() { return Object.keys(backends); },
 
+        cancel(language) {
+            if (language) {
+                const backend = backends[language];
+                if (backend && typeof backend.cancel === 'function') backend.cancel();
+                return;
+            }
+            Object.keys(backends).forEach(key => {
+                if (typeof backends[key].cancel === 'function') backends[key].cancel();
+            });
+        },
+
         async trace({ language, code, input, maxSteps = 2000 } = {}) {
             const be = backends[language];
             if (!be) return { steps: [], error: `未注册的语言后端：${language}` };
             try {
+                if (global.CvRuntimeLoader && language !== 'c' && language !== 'cpp') {
+                    await global.CvRuntimeLoader.ensure(language);
+                }
                 const result = await be.trace({ code, input, maxSteps });
                 if (!result || !Array.isArray(result.steps)) {
                     return { steps: [], error: '后端未返回有效 steps 数组' };

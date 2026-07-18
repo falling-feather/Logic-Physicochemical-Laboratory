@@ -1,8 +1,6 @@
 /* ============================================================
  * Codevis · JavaScript Runtime backend
- * 依赖：JS-Interpreter（Neil Fraser）
- *   <script src="https://cdn.jsdelivr.net/gh/NeilFraser/JS-Interpreter@master/acorn.js"></script>
- *   <script src="https://cdn.jsdelivr.net/gh/NeilFraser/JS-Interpreter@master/interpreter.js"></script>
+ * 依赖由 runtime-loader 按需载入；来源和许可证见 THIRD_PARTY_NOTICES.md。
  *
  * 注入的沙箱 API：
  *   print(...args)       — 写入 stdout
@@ -52,7 +50,7 @@
     const JsBackend = {
         async trace({ code, maxSteps = 2000 }) {
             if (typeof Interpreter !== 'function') {
-                return { steps: [], error: 'JS-Interpreter 未加载（请检查网络）' };
+                return { steps: [], error: '浏览器运行组件暂不可用，请检查本地资源后重试。' };
             }
             const stdout = [];
             let pendingHighlight = null;       // 由 markPtr 设置，下一步随 step 写入

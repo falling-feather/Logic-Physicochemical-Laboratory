@@ -1,6 +1,6 @@
 # 代码空间 · 「星序 Astra」子站
 
-「代码空间」（CodeSpace，目录代号 `codevis/`）是「星序 Astra」平台下属的代码可视化子站，聚焦「把代码执行过程变成可看得见的画面」。
+「代码空间」（CodeSpace，目录代号 `codevis/`）是「星序 Astra」平台下属的互动编程课程子站，聚焦通过“预测—运行—追踪—修正”把代码执行过程变成可观察、可解释的学习活动。
 与「工科实验室」同仓部署，通过 `/codevis/` 访问。
 
 ## 主色与品牌
@@ -13,23 +13,27 @@ codevis/
 ├── index.html              ← 独立 SPA 入口
 ├── shared/
 │   ├── css/   tokens · base · navbar · layout
-│   └── js/    router (hash 路由) · main (启动)
+│   └── js/    router · main · course-manifest · runtime-loader
+├── vendor/                 固定版本运行时、许可证与 SHA-256 清单
 └── pages/
-    ├── home/        粒子网络背景 + 特性卡片
-    └── code-trace/  代码执行追踪播放器
+    ├── course-catalog/    课程目录与独立子课
+    ├── course-challenge/  预测—运行—追踪—修正挑战
+    └── code-trace/        兼容代码追踪播放器
 ```
 
 ## 路由
-- `#home`  · 首页
-- `#trace` · 代码执行追踪
+- `#catalog`   · 默认课程目录
+- `#lesson?activity=<activity_key>`    · 可刷新恢复的当前子课程
+- `#challenge?activity=<activity_key>` · 可刷新恢复的当前可执行挑战
+- `#trace`     · 兼容代码执行追踪
 
 ## 当前阶段
-- **Phase 1（已上线）**：站点骨架 + 迁移 code-trace（预设 trace 演示）
-- **Phase 2（已上线）**：Runtime 抽象 + 多语言手写沙箱
+- **V7.5.4（已完成）**：6 个课程群、18 个稳定活动、独立子课与四步互动挑战；浏览器公开样例预检不等同于权威判题，正式提交等待 BE-005。
+- **浏览器学习运行时（已完成）**：固定版本、本地同源、按需加载；来源、许可证和哈希见 `vendor/manifest.json` 与 `THIRD_PARTY_NOTICES.md`。
   - JavaScript：[JS-Interpreter](https://github.com/NeilFraser/JS-Interpreter)（acorn + interpreter）
   - Python：[Skulpt](https://skulpt.org/)（纯 JS Python 3 子集）
   - C / C++：[JSCPP](https://github.com/felixhao28/JSCPP) v2.0.9（纯 JS C++ 子集，不支持 namespace/class）
-- **Phase 3（规划）**：数据结构画布（链表 / 树 / 图节点动画）
+- **待接入**：登录后的班级/课程上下文、BE-005 正式提交与教师查看；状态只在 `doc/02-项目规划.md` 维护。
 
 ## 沙箱 API 速查
 所有后端共享相同的"标记函数"协议，由 runtime 拦截后驱动可视化：
@@ -46,21 +50,26 @@ codevis/
 
 ## 本地预览
 ```powershell
-# 与工科实验室共用同一开发服务器
-python -m http.server 8080
-# 浏览器访问
-# http://localhost:8080/codevis/
+# 从仓库根目录与主站、后端共用 9001 同源入口
+powershell -ExecutionPolicy Bypass -File .\astra-local.ps1
+# 浏览器访问 http://127.0.0.1:9001/codevis/#catalog
 ```
 
 ## 开发约定
-- 命名空间统一前缀：`cv-` (CSS class) / `Cv*` (全局对象，如 `CvRouter`/`CvHome`)
-- 仅 `CodeTrace` 沿用原命名以便迁移
+- 命名空间统一前缀：`cv-` (CSS class) / `Cv*` (全局对象，如 `CvRouter`/`CvCourseManifest`)
+- `Course Trace` 沿用历史入口仅为兼容；新课程主路径只从 `#catalog` 进入
 - 全部 JS 使用 IIFE 暴露至 `window`，无构建步骤
 - 严格支持 `prefers-reduced-motion: reduce` 降级
+- `vendor/` 文件必须保持字节不变并通过 manifest SHA-256；禁止直接替换成 CDN 或浮动分支
+- 页面状态可接 BE-004 adapter，但前端隐藏不能代替后端授权；正式提交不得用浏览器结果伪造 accepted
 
 ## 📝 更新日志（子站视角）
 
 > 仅记录与代码空间子站直接相关的变更；平台级更新见 [主站 README](../README.md#-更新日志)。
+
+### V7.5.4 — 2026-07-19
+- 课程目录、独立子课和可执行挑战取代旧首页作为默认路径，首批 6 组/18 活动覆盖 JavaScript、Python、C、C++。
+- 新增 BE-004 发布状态 adapter、统一课程页脚、本地审计运行时清单和 C/C++ Worker 4.2 秒硬终止；移除学生页面的实现说明。
 
 ### v6.1.0-alpha（迭代中 · `feature/v6.1`）
 - **alpha2** — 2026-05-26 — 优化代码空间子站交互与更新规划口径

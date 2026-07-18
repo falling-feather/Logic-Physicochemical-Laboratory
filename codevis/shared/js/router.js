@@ -6,7 +6,8 @@
     'use strict';
 
     const CvRouter = {
-        currentPage: 'home',
+        currentPage: 'catalog',
+        currentParams: new URLSearchParams(),
         pages: {},
 
         register(pageId, hooks) {
@@ -19,14 +20,20 @@
             this._handle(true);
         },
 
-        navigateTo(pageId) {
-            if (this.currentPage === pageId) return;
-            window.location.hash = '#' + pageId;
+        navigateTo(pageId, params) {
+            const search = new URLSearchParams(params || {});
+            const nextHash = '#' + pageId + (search.size ? '?' + search.toString() : '');
+            if (window.location.hash === nextHash) return;
+            window.location.hash = nextHash;
         },
 
         _handle(isInitial) {
-            const hash = (window.location.hash || '#home').slice(1).split('?')[0] || 'home';
-            const target = document.getElementById('cv-page-' + hash) ? hash : 'home';
+            const rawHash = (window.location.hash || '#catalog').slice(1);
+            const separator = rawHash.indexOf('?');
+            const requested = (separator >= 0 ? rawHash.slice(0, separator) : rawHash) || 'catalog';
+            const query = separator >= 0 ? rawHash.slice(separator + 1) : '';
+            const target = document.getElementById('cv-page-' + requested) ? requested : 'catalog';
+            this.currentParams = new URLSearchParams(target === requested ? query : '');
 
             if (!isInitial && this.currentPage && this.pages[this.currentPage]) {
                 try { this.pages[this.currentPage].onLeave && this.pages[this.currentPage].onLeave(); }
@@ -48,7 +55,8 @@
             this.currentPage = target;
 
             // 滚动复位
-            window.scrollTo({ top: 0, behavior: isInitial ? 'auto' : 'smooth' });
+            const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            window.scrollTo({ top: 0, behavior: isInitial || reducedMotion ? 'auto' : 'smooth' });
 
             if (this.pages[target]) {
                 try { this.pages[target].onEnter && this.pages[target].onEnter(); }

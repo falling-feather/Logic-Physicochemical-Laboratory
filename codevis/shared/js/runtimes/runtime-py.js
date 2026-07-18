@@ -1,7 +1,7 @@
 /**
  * Codevis · Python Runtime backend
  *
- * 基于 Skulpt（纯 JS Python 子集解释器）。
+ * 浏览器 Python 追踪后端；来源和许可证见 THIRD_PARTY_NOTICES.md。
  *
  * Trace 策略：call-site 模型 —— 用户主动调用 sandbox API 时记录帧。
  *
@@ -33,7 +33,7 @@
     const pythonBackend = {
         async trace({ code, maxSteps = 3000 }) {
             if (typeof Sk === 'undefined') {
-                return { steps: [], error: 'Skulpt 未加载，无法执行 Python。' };
+                return { steps: [], error: '浏览器运行组件暂不可用，请检查本地资源后重试。' };
             }
 
             const steps = [];
@@ -127,8 +127,15 @@
                 return { steps, error: 'Python 错误：' + msg };
             }
 
-            if (steps.length === 0 && stdout.length > 0) {
-                steps.push({ line: 1, vars: {}, highlight: {}, msg: '', stdout: stdout.slice() });
+            if (stdout.length && (steps.length === 0 || stdout.length > steps[steps.length - 1].stdout.length)) {
+                steps.push({
+                    line: curLine() || 1,
+                    vars: Object.assign({}, lastVars),
+                    highlight: {},
+                    msg: '',
+                    stdout: stdout.slice(),
+                    arrOverride: pendingArr || (Array.isArray(lastVars.arr) && lastVars.arr.slice())
+                });
             }
 
             return { steps };
