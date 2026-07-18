@@ -7,7 +7,8 @@
         teacher: new Set(['teacher']),
         admin: new Set(['teacher', 'admin'])
     });
-    const ROLE_LANDING = Object.freeze({ student: 'student', teacher: 'teacher', admin: 'admin' });
+    const ROLE_LANDING = Object.freeze({ student: 'planets', teacher: 'planets', admin: 'planets' });
+    const ROLE_WORKSPACE = Object.freeze({ student: 'student', teacher: 'teacher', admin: 'admin' });
     const ROLE_LABEL = Object.freeze({ student: '学生', teacher: '教师', admin: '管理员' });
     const state = {
         user: null,
@@ -154,6 +155,10 @@
         return ROLE_LANDING[String(role || '')] || 'planets';
     }
 
+    function roleWorkspace(role) {
+        return ROLE_WORKSPACE[String(role || '')] || 'planets';
+    }
+
     function canAccessPage(page, role) {
         const target = String(page || 'planets');
         if (!PROTECTED_PAGES.has(target)) return true;
@@ -235,6 +240,7 @@
                 </span>
             </button>
             <div class="app-session-control__menu" data-session-menu hidden>
+                <button type="button" data-session-action="overview">返回星序总览</button>
                 <button type="button" data-session-action="workspace">进入${escapeHtml(ROLE_LABEL[state.user.role] || '')}工作台</button>
                 <button type="button" data-session-action="logout">安全退出</button>
             </div>`;
@@ -254,12 +260,21 @@
             actionNode.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
             return;
         }
-        if (action === 'workspace') {
+        if (action === 'overview') {
             if (menu) menu.hidden = true;
             if (global.Router && typeof global.Router.navigateTo === 'function') {
                 global.Router.navigateTo(roleLanding(state.user && state.user.role), true);
             } else {
                 global.location.hash = roleLanding(state.user && state.user.role);
+            }
+            return;
+        }
+        if (action === 'workspace') {
+            if (menu) menu.hidden = true;
+            if (global.Router && typeof global.Router.navigateTo === 'function') {
+                global.Router.navigateTo(roleWorkspace(state.user && state.user.role), true);
+            } else {
+                global.location.hash = roleWorkspace(state.user && state.user.role);
             }
             return;
         }
@@ -524,6 +539,7 @@
         getRole: function () { return state.user && state.user.role; },
         resolveApiBase: resolveApiBase,
         roleLanding: roleLanding,
+        roleWorkspace: roleWorkspace,
         canAccessPage: canAccessPage,
         guardPage: guardPage,
         applyRoleUI: applyRoleUI,

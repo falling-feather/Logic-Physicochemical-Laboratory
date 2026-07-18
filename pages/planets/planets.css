@@ -1,4 +1,4 @@
-/* 星序 Astra · 开放式轨道索引 v7.4.32 */
+/* 星序 Astra · 开放式轨道索引 v7.4.33 */
 #page-planets {
     --atlas-bg: #060a12;
     --atlas-surface: #0a101a;
@@ -222,6 +222,49 @@
     font: 0.66rem/1 'JetBrains Mono', monospace;
     letter-spacing: 0.12em;
     text-transform: uppercase;
+}
+
+.planets-topbar__actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.planets-session-exit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 13px;
+    gap: 7px;
+    border: 1px solid var(--atlas-line);
+    border-radius: 2px;
+    color: #c9d6e3;
+    background: transparent;
+    font: 600 0.68rem/1 'Noto Sans SC', sans-serif;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.planets-session-exit:hover,
+.planets-session-exit:focus-visible {
+    border-color: rgba(103, 232, 249, 0.52);
+    color: #fff;
+    background: rgba(103, 232, 249, 0.07);
+    outline: none;
+}
+
+.planets-session-exit:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+
+.planets-session-exit i,
+.planets-session-exit svg {
+    width: 16px;
+    height: 16px;
 }
 
 .planets-topbar p span {
@@ -670,6 +713,19 @@
 
     .planets-topbar__status {
         font-size: 0;
+    }
+
+    .planets-topbar__actions {
+        gap: 8px;
+    }
+
+    .planets-session-exit {
+        width: 44px;
+        padding: 0;
+    }
+
+    .planets-session-exit span {
+        display: none;
     }
 
     .planets-intro h1 {

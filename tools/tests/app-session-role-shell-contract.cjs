@@ -28,6 +28,11 @@ for (const endpoint of [
 assert.match(session, /student:\s*new Set\(\['student'\]\)/);
 assert.match(session, /teacher:\s*new Set\(\['teacher'\]\)/);
 assert.match(session, /admin:\s*new Set\(\['teacher', 'admin'\]\)/);
+assert.match(session, /ROLE_LANDING\s*=\s*Object\.freeze\(\{ student: 'planets', teacher: 'planets', admin: 'planets' \}\)/);
+assert.match(session, /ROLE_WORKSPACE\s*=\s*Object\.freeze\(\{ student: 'student', teacher: 'teacher', admin: 'admin' \}\)/);
+assert.match(session, /data-session-action="overview">返回星序总览/);
+assert.match(session, /global\.Router\.navigateTo\(roleWorkspace\(state\.user && state\.user\.role\), true\)/);
+assert.match(session, /roleWorkspace: roleWorkspace/);
 assert.match(session, /PROTECTED_PAGES\.forEach/);
 assert.match(session, /section\.hidden = !allowed/);
 assert.match(session, /section\.inert = !allowed/);
@@ -35,10 +40,16 @@ assert.match(session, /HttpOnly Cookie/);
 assert.doesNotMatch(session, /localStorage|sessionStorage|Authorization\s*:|\.access_token/);
 
 assert.match(main, /await window\.AstraApplicationSession\.bootstrap\(\);\s*initApp\(\)/);
+assert.match(main, /serviceWorker\.register\('\.\/sw\.js\?v=' \+ ROLE_LANDING_ASSET_VERSION\)/);
+assert.match(html, /page-registry\.js\?v=20260718v7433RoleLandingP0[\s\S]*main\.js\?v=20260718v7433RoleLandingP0/);
+assert.match(main, /page-registry\.js\?v=' \+ ROLE_LANDING_ASSET_VERSION/);
+assert.match(main, /main\.js\?v=' \+ ROLE_LANDING_ASSET_VERSION/);
 assert.doesNotMatch(main, /\ninitApp\(\);\s*$/);
 assert.match(router, /_guardParsedRoute\(this\._parseHash\(\)\)/);
 assert.match(router, /AstraApplicationSession\.canAccessPage\(page\)/);
 assert.match(router, /AstraApplicationSession\.guardPage\(page\)/);
+assert.match(html, /data-planets-session-action="logout"/);
+assert.match(html, /data-app-roles="student"[\s\S]*data-app-roles="teacher,admin"[\s\S]*data-app-roles="admin"/);
 
 for (const endpoint of ['/api/admin/users', '/api/admin/schools', '/api/admin/classes', '/api/health']) {
     assert.ok(admin.includes(endpoint), `admin governance must expose ${endpoint}`);

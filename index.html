@@ -45,7 +45,7 @@
     <link rel="stylesheet" href="shared/css/fab-trigger.css?v=20260630mainV64">
     <!-- CSS: Pages -->
     <link rel="stylesheet" href="pages/home/home.css?v=20260715v7420HomeViewportClipP1">
-    <link rel="stylesheet" href="pages/planets/planets.css?v=20260718v7432UnifiedAtlasP0">
+    <link rel="stylesheet" href="pages/planets/planets.css?v=20260718v7433RoleLandingP0">
     <link rel="stylesheet" href="pages/cosmos/cosmos.css?v=20260630mainV64">
     <link rel="stylesheet" href="pages/datascience/datascience.css?v=20260630mainV64">
     <link rel="stylesheet" href="pages/infotech/infotech.css?v=20260630mainV64">
@@ -445,7 +445,12 @@
                 <div class="planets-workspace">
                     <header class="planets-topbar">
                         <p><span>ASTRA /</span> 统一资源索引</p>
-                        <div class="planets-topbar__status"><span class="planets-presence" aria-hidden="true"></span>会话已验证</div>
+                        <div class="planets-topbar__actions">
+                            <div class="planets-topbar__status"><span class="planets-presence" aria-hidden="true"></span>会话已验证</div>
+                            <button type="button" class="planets-session-exit" data-planets-session-action="logout" aria-label="安全退出当前账号">
+                                <i data-lucide="log-out" aria-hidden="true"></i><span>安全退出</span>
+                            </button>
+                        </div>
                     </header>
 
                     <main class="planets-main">
@@ -5196,12 +5201,12 @@
     <script src="shared/js/config.js?v=20260716v7427RoleWorkflowGateP0"></script>
     <script src="shared/js/api-client.js?v=20260716v7427RoleWorkflowGateP0"></script>
     <script src="shared/js/auth-ui.js?v=20260716v7427RoleWorkflowGateP0"></script>
-    <script src="shared/js/app-session.js?v=20260716v7427RoleWorkflowGateP0"></script>
+    <script src="shared/js/app-session.js?v=20260718v7433RoleLandingP0"></script>
     <script src="shared/js/backend-content.js?v=20260716v7427RoleWorkflowGateP0"></script>
     <script src="shared/js/experiment-registry.js?v=20260716v7427RoleWorkflowGateP0"></script>
-    <script src="shared/js/page-registry.js?v=20260716v7427RoleWorkflowGateP0"></script>
+    <script src="shared/js/page-registry.js?v=20260718v7433RoleLandingP0"></script>
     <script src="shared/js/router.js?v=20260716v7427RoleWorkflowGateP0"></script>
-    <script src="shared/js/main.js?v=20260716v7427RoleWorkflowGateP0"></script>
+    <script src="shared/js/main.js?v=20260718v7433RoleLandingP0"></script>
     <script>
         (function () {
             try {

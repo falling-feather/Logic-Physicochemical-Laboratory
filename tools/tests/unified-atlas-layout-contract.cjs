@@ -23,6 +23,7 @@ assert.match(html, /我的轨道[\s\S]*data-planets-route-copy/);
 assert.doesNotMatch(html, /planets-starfield|planets-cursor-halo|planets-recommendation/);
 assert.match(planets, /ROLE_VIEW[\s\S]*student[\s\S]*teacher[\s\S]*admin/);
 assert.match(planets, /AstraApplicationSession[\s\S]*getUser/);
+assert.match(planets, /data-planets-session-action[\s\S]*session\.logout\(\)/);
 assert.match(planets, /window|global\.initPlanets/);
 assert.match(planetsCss, /--atlas-bg:\s*#060a12/);
 assert.match(planetsCss, /grid-template-columns:\s*204px minmax\(0, 1fr\)/);
@@ -47,8 +48,9 @@ assert.match(adminCss, /V7\.4\.32 · 星序全局治理台[\s\S]*\.admin-icon-bu
 assert.match(adminCss, /\.admin-panel__filters input,[\s\S]*\.admin-api-base input\s*\{[\s\S]*min-height:\s*44px/);
 assert.doesNotMatch(admin, /textarea[^>]+sql|execute\s+sql/i);
 
-for (const source of [html, registry, main, serviceWorker]) {
-    assert.match(source, /20260718v7432UnifiedAtlasP0/);
+for (const source of [html, planets, registry, main, serviceWorker]) {
+    assert.match(source, /20260718v7433RoleLandingP0/);
 }
+assert.match(registry, /20260718v7432UnifiedAtlasP0/, 'admin keeps its independently reviewed resource version');
 
 console.log('unified-atlas-layout-contract: ok');

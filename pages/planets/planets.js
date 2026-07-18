@@ -1,10 +1,10 @@
-/* 星序 Astra · 统一资源总览 v7.4.32
+/* 星序 Astra · 统一资源总览 v7.4.33
  * 契约：window.initPlanets / window.destroyPlanets 必须存在。
  */
 (function attachPlanetsOverview(global) {
     'use strict';
 
-    const PLANETS_ASSET_VERSION = '20260718v7432UnifiedAtlasP0';
+    const PLANETS_ASSET_VERSION = '20260718v7433RoleLandingP0';
     const ROLE_VIEW = Object.freeze({
         student: Object.freeze({
             label: '学生',
@@ -28,6 +28,7 @@
         active: false,
         details: [],
         sessionHandler: null,
+        actionHandler: null,
 
         init() {
             if (this.active) this.destroy();
@@ -43,6 +44,8 @@
             });
             this.sessionHandler = () => this.syncSession();
             global.addEventListener('astra:session-ready', this.sessionHandler);
+            this.actionHandler = (event) => this.handleAction(event);
+            this.root.addEventListener('click', this.actionHandler);
             this.syncSession();
             this.refreshIcons();
         },
@@ -55,8 +58,10 @@
                 }
             });
             if (this.sessionHandler) global.removeEventListener('astra:session-ready', this.sessionHandler);
+            if (this.root && this.actionHandler) this.root.removeEventListener('click', this.actionHandler);
             this.details = [];
             this.sessionHandler = null;
+            this.actionHandler = null;
             this.root = null;
             this.active = false;
         },
@@ -64,6 +69,24 @@
         syncDisclosure(detail) {
             const toggle = detail && detail.querySelector('.planets-galaxy-row__toggle');
             if (toggle) toggle.textContent = detail.open ? '收起资源' : '展开资源';
+        },
+
+        async handleAction(event) {
+            const actionNode = event.target instanceof Element
+                ? event.target.closest('[data-planets-session-action]')
+                : null;
+            if (!actionNode || !this.root || !this.root.contains(actionNode)) return;
+            if (actionNode.dataset.planetsSessionAction !== 'logout') return;
+            const session = global.AstraApplicationSession;
+            if (!session || typeof session.logout !== 'function' || actionNode.disabled) return;
+            actionNode.disabled = true;
+            actionNode.setAttribute('aria-busy', 'true');
+            try {
+                await session.logout();
+            } finally {
+                actionNode.disabled = false;
+                actionNode.removeAttribute('aria-busy');
+            }
         },
 
         syncSession() {
