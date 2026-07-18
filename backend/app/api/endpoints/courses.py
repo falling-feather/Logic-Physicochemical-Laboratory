@@ -1,3 +1,6 @@
+from datetime import UTC, datetime
+from uuid import uuid4
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import Session
@@ -31,6 +34,8 @@ from app.schemas.course import (
     CourseRead,
     CourseUnitCreate,
     CourseUnitRead,
+    CourseReleasePlanPatch,
+    CourseReleasePlanRead,
 )
 from app.services.audit import record_audit_log
 from app.services.assignment_policies import build_effective_assignment_policy, effective_assignment_payload
@@ -51,6 +56,17 @@ from app.services.access_control import (
     visible_class_ids,
 )
 from app.services.text import require_trimmed_text
+from app.services.course_release_plans import (
+    ensure_default_plans_for_course_class,
+    ensure_default_plans_for_course_unit,
+    get_course_class_or_404,
+    get_plan_rows,
+    plan_response_items,
+    resolve_student_course_class,
+    effective_unit_access,
+    school_is_active,
+    student_completed_unit_ids,
+)
 
 
 router = APIRouter()
@@ -121,10 +137,23 @@ def create_course(
     existing = db.scalar(select(Course).where(Course.school_id == payload.school_id, Course.title == title))
     if existing is not None:
         raise HTTPException(status_code=409, detail="Course already exists in this school")
+    galaxy_key = payload.galaxy_key or "englab"
+    course_key = payload.course_key or f"course-{uuid4().hex}"
+    existing_key = db.scalar(
+        select(Course.id).where(
+            Course.school_id == payload.school_id,
+            Course.galaxy_key == galaxy_key,
+            Course.course_key == course_key,
+        )
+    )
+    if existing_key is not None:
+        raise HTTPException(status_code=409, detail="Course key already exists in this school galaxy")
 
     course = Course(
         school_id=payload.school_id,
         creator_user_id=current_user.id,
+        galaxy_key=galaxy_key,
+        course_key=course_key,
         title=title,
         summary=(payload.summary or "").strip() or None,
         status=payload.status,
@@ -144,6 +173,8 @@ def create_course(
             "after": {
                 "school_id": course.school_id,
                 "creator_user_id": course.creator_user_id,
+                "galaxy_key": course.galaxy_key,
+                "course_key": course.course_key,
                 "title": course.title,
                 "summary": course.summary,
                 "status": course.status,
@@ -187,6 +218,8 @@ def attach_course_class(
     course_class = CourseClass(course_id=course.id, class_id=class_group.id)
     db.add(course_class)
     db.flush()
+    ensure_default_plans_for_course_class(db, course_class)
+    db.flush()
     record_audit_log(
         db,
         actor=current_user,
@@ -202,6 +235,7 @@ def attach_course_class(
                 "course_id": course_class.course_id,
                 "class_id": course_class.class_id,
                 "status": course_class.status,
+                "plan_version": course_class.plan_version,
             }
         },
     )
@@ -595,14 +629,60 @@ def update_course_collaborator(
 @router.get("/{course_id}/units", response_model=list[CourseUnitRead])
 def list_course_units(
     course_id: int,
+    class_id: int | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> list[CourseUnit]:
-    require_course_visible(db, current_user, course_id)
+) -> list[CourseUnitRead]:
+    course = require_course_visible(db, current_user, course_id)
     statement = select(CourseUnit).where(CourseUnit.course_id == course_id).order_by(CourseUnit.position)
-    if current_user.role == "student":
-        statement = statement.where(CourseUnit.status == "published")
-    return list(db.scalars(statement).all())
+    if current_user.role != "student":
+        return [CourseUnitRead.model_validate(unit) for unit in db.scalars(statement).all()]
+
+    class_group = resolve_student_course_class(
+        db,
+        student_id=current_user.id,
+        course_id=course.id,
+        class_id=class_id,
+        detail="class_id is required for student course units when course is attached to multiple classes",
+    )
+    course_class = get_course_class_or_404(db, course.id, class_group.id)
+    units_by_id = {unit.id: unit for unit in db.scalars(statement).all()}
+    plan_rows = get_plan_rows(db, course_class)
+    active_school = school_is_active(db, course.school_id)
+    completed_unit_ids = student_completed_unit_ids(
+        db,
+        student_id=current_user.id,
+        class_id=class_group.id,
+        course_id=course.id,
+    )
+    reads: list[CourseUnitRead] = []
+    for plan, unit in plan_rows:
+        access = effective_unit_access(
+            db,
+            course=course,
+            class_group=class_group,
+            unit=unit,
+            plan=plan,
+            student_id=current_user.id,
+            completed_unit_ids=completed_unit_ids,
+            school_active=active_school,
+        )
+        if access.state == "hidden" or unit.id not in units_by_id:
+            continue
+        reads.append(
+            CourseUnitRead(
+                id=unit.id,
+                course_id=unit.course_id,
+                activity_key=unit.activity_key,
+                title=unit.title,
+                position=plan.position,
+                content_slug=unit.content_slug,
+                status=unit.status,
+                effective_release_state=access.state,
+                lock_reasons=list(access.lock_reasons),
+            )
+        )
+    return reads
 
 
 @router.post("/{course_id}/units", response_model=CourseUnitRead, status_code=status.HTTP_201_CREATED)
@@ -624,6 +704,7 @@ def create_course_unit(
     )
     lock_active_school_for_write(db, course.school_id)
     content_slug = (payload.content_slug or "").strip() or None
+    activity_key = payload.activity_key or f"activity-{uuid4().hex}"
     title = require_trimmed_text(payload.title, "Course unit title is required")
     existing_position = db.scalar(
         select(CourseUnit).where(CourseUnit.course_id == course_id, CourseUnit.position == payload.position)
@@ -636,15 +717,26 @@ def create_course_unit(
         )
         if existing_slug is not None:
             raise HTTPException(status_code=409, detail="Course unit content slug already exists")
+    existing_activity_key = db.scalar(
+        select(CourseUnit.id).where(
+            CourseUnit.course_id == course_id,
+            CourseUnit.activity_key == activity_key,
+        )
+    )
+    if existing_activity_key is not None:
+        raise HTTPException(status_code=409, detail="Course unit activity key already exists")
 
     unit = CourseUnit(
         course_id=course_id,
+        activity_key=activity_key,
         title=title,
         position=payload.position,
         content_slug=content_slug,
         status=payload.status,
     )
     db.add(unit)
+    db.flush()
+    ensure_default_plans_for_course_unit(db, unit)
     db.flush()
     record_audit_log(
         db,
@@ -658,6 +750,7 @@ def create_course_unit(
         snapshot={
             "after": {
                 "course_id": unit.course_id,
+                "activity_key": unit.activity_key,
                 "title": unit.title,
                 "position": unit.position,
                 "content_slug": unit.content_slug,
@@ -668,6 +761,191 @@ def create_course_unit(
     db.commit()
     db.refresh(unit)
     return unit
+
+
+@router.get("/{course_id}/classes/{class_id}/release-plan", response_model=CourseReleasePlanRead)
+def get_course_release_plan(
+    course_id: int,
+    class_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CourseReleasePlanRead:
+    course = get_course(db, course_id)
+    class_group = db.get(ClassGroup, class_id)
+    if class_group is None:
+        raise HTTPException(status_code=404, detail="Class not found")
+    if class_group.school_id != course.school_id:
+        raise HTTPException(status_code=422, detail="Class does not belong to course school")
+    require_class_teacher_or_admin(
+        db,
+        current_user,
+        class_group,
+        detail="Course release plan requires class teacher scope",
+    )
+    course_class = get_course_class_or_404(db, course.id, class_group.id)
+    return CourseReleasePlanRead(
+        course_id=course.id,
+        class_id=class_group.id,
+        course_class_id=course_class.id,
+        plan_version=course_class.plan_version,
+        items=plan_response_items(
+            db,
+            course=course,
+            class_group=class_group,
+            course_class=course_class,
+            student_id=None,
+        ),
+    )
+
+
+@router.patch("/{course_id}/classes/{class_id}/release-plan", response_model=CourseReleasePlanRead)
+def patch_course_release_plan(
+    course_id: int,
+    class_id: int,
+    payload: CourseReleasePlanPatch,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CourseReleasePlanRead:
+    course = get_course(db, course_id)
+    class_group = db.get(ClassGroup, class_id)
+    if class_group is None:
+        raise HTTPException(status_code=404, detail="Class not found")
+    if class_group.school_id != course.school_id:
+        raise HTTPException(status_code=422, detail="Class does not belong to course school")
+    require_class_teacher_or_admin(
+        db,
+        current_user,
+        class_group,
+        detail="Course release plan requires class teacher scope",
+    )
+    lock_active_class_for_write(db, class_group.id)
+    course_class = db.scalar(
+        select(CourseClass)
+        .where(CourseClass.course_id == course.id, CourseClass.class_id == class_group.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if course_class is None:
+        raise HTTPException(status_code=403, detail="Course is not attached to this class")
+    if course_class.status != "active":
+        raise HTTPException(status_code=409, detail="Course attachment is not active")
+    ensure_default_plans_for_course_class(db, course_class)
+    db.flush()
+    if course_class.plan_version != payload.expected_version:
+        raise HTTPException(status_code=409, detail="Course release plan version changed; refresh and retry")
+
+    item_ids = [item.course_unit_id for item in payload.items]
+    if len(item_ids) != len(set(item_ids)):
+        raise HTTPException(status_code=422, detail="Course release plan cannot contain duplicate course_unit_id")
+    plan_rows = get_plan_rows(db, course_class)
+    plans_by_unit = {plan.course_unit_id: plan for plan, _ in plan_rows}
+    units_by_id = {unit.id: unit for _, unit in plan_rows}
+    if any(unit_id not in plans_by_unit for unit_id in item_ids):
+        raise HTTPException(status_code=422, detail="Course release plan unit must belong to this course class")
+
+    desired: dict[int, dict] = {
+        plan.course_unit_id: {
+            "position": plan.position,
+            "release_mode": plan.release_mode,
+            "open_at": plan.open_at,
+            "prerequisite_unit_id": plan.prerequisite_unit_id,
+        }
+        for plan, _ in plan_rows
+    }
+    for item in payload.items:
+        fields = item.model_fields_set
+        target = desired[item.course_unit_id]
+        for field in ("position", "release_mode", "open_at", "prerequisite_unit_id"):
+            if field in fields:
+                target[field] = getattr(item, field)
+
+    positions = [item["position"] for item in desired.values()]
+    if len(positions) != len(set(positions)):
+        raise HTTPException(status_code=422, detail="Course release plan positions must be unique")
+    for unit_id, item in desired.items():
+        prerequisite_unit_id = item["prerequisite_unit_id"]
+        if prerequisite_unit_id is None:
+            continue
+        if prerequisite_unit_id not in units_by_id:
+            raise HTTPException(status_code=422, detail="Prerequisite unit must belong to this course class")
+        if prerequisite_unit_id == unit_id:
+            raise HTTPException(status_code=422, detail="Course unit cannot be its own prerequisite")
+        if desired[prerequisite_unit_id]["position"] >= item["position"]:
+            raise HTTPException(status_code=422, detail="Prerequisite unit must be earlier in the class release plan")
+    _assert_plan_is_acyclic(desired)
+
+    changed_unit_ids = [
+        unit_id
+        for unit_id, target in desired.items()
+        if any(getattr(plans_by_unit[unit_id], field) != value for field, value in target.items())
+    ]
+    if changed_unit_ids:
+        before = {
+            str(unit_id): {
+                field: getattr(plans_by_unit[unit_id], field)
+                for field in ("position", "release_mode", "open_at", "prerequisite_unit_id")
+            }
+            for unit_id in changed_unit_ids
+        }
+        moved_unit_ids = [
+            unit_id
+            for unit_id in changed_unit_ids
+            if plans_by_unit[unit_id].position != desired[unit_id]["position"]
+        ]
+        # The final batch is valid as a set, but relational unique constraints are
+        # immediate on SQLite/MySQL. Park moved rows at unused positive positions
+        # first so a swap (1 <-> 2) remains one atomic PATCH.
+        temporary_base = max(positions) + len(plans_by_unit) + 1
+        for index, unit_id in enumerate(moved_unit_ids):
+            plans_by_unit[unit_id].position = temporary_base + index
+        if moved_unit_ids:
+            db.flush()
+        for unit_id in changed_unit_ids:
+            for field, value in desired[unit_id].items():
+                setattr(plans_by_unit[unit_id], field, value)
+        course_class.plan_version += 1
+        db.flush()
+        record_audit_log(
+            db,
+            actor=current_user,
+            action="course.release_plan.patch",
+            resource_type="course_class",
+            resource_id=course_class.id,
+            school_id=course.school_id,
+            class_id=class_group.id,
+            event_result="success",
+            request=request,
+            snapshot={
+                "expected_version": payload.expected_version,
+                "plan_version": course_class.plan_version,
+                "changed_unit_ids": changed_unit_ids,
+                "before": _json_safe_plan_snapshot(before),
+                "after": _json_safe_plan_snapshot(
+                    {str(unit_id): desired[unit_id] for unit_id in changed_unit_ids}
+                ),
+                "reason_provided": bool((payload.reason or "").strip()),
+            },
+        )
+        db.commit()
+    else:
+        db.rollback()
+        # A no-op is deliberately successful and does not consume a plan version.
+        course_class = get_course_class_or_404(db, course.id, class_group.id)
+    return CourseReleasePlanRead(
+        course_id=course.id,
+        class_id=class_group.id,
+        course_class_id=course_class.id,
+        plan_version=course_class.plan_version,
+        changed=bool(changed_unit_ids),
+        items=plan_response_items(
+            db,
+            course=course,
+            class_group=class_group,
+            course_class=course_class,
+            student_id=None,
+        ),
+    )
 
 
 @router.get("/{course_id}/assignments", response_model=list[AssignmentRead])
@@ -750,17 +1028,41 @@ def list_course_assignments(
             and_(AssignmentClassPolicy.assignment_id == Assignment.id, AssignmentClassPolicy.id.is_(None)),
         )
     rows = db.execute(statement).all()
-    return [
-        AssignmentRead.model_validate(
-            effective_assignment_payload(
-                assignment,
-                build_effective_assignment_policy(assignment, class_group.id, policy)
-                if class_group is not None
-                else None,
-            )
+    reads: list[AssignmentRead] = []
+    course_class = get_course_class_or_404(db, course.id, class_group.id) if class_group is not None else None
+    plan_by_unit = (
+        {unit.id: plan for plan, unit in get_plan_rows(db, course_class)}
+        if course_class is not None
+        else {}
+    )
+    for assignment, policy in rows:
+        effective = (
+            build_effective_assignment_policy(assignment, class_group.id, policy)
+            if class_group is not None
+            else None
         )
-        for assignment, policy in rows
-    ]
+        payload_data = effective_assignment_payload(assignment, effective)
+        if current_user.role == "student" and class_group is not None and course_class is not None:
+            unit = db.get(CourseUnit, assignment.unit_id)
+            if unit is None:
+                continue
+            plan = plan_by_unit.get(unit.id)
+            if plan is None:
+                continue
+            access = effective_unit_access(
+                db,
+                course=course,
+                class_group=class_group,
+                unit=unit,
+                plan=plan,
+                student_id=current_user.id,
+            )
+            if access.state == "hidden":
+                continue
+            payload_data["unit_release_state"] = access.state
+            payload_data["unit_lock_reasons"] = list(access.lock_reasons)
+        reads.append(AssignmentRead.model_validate(payload_data))
+    return reads
 
 
 @router.post(
@@ -880,3 +1182,31 @@ def _course_collaborator_snapshot(collaborator: CourseCollaborator) -> dict:
         "role": collaborator.role,
         "status": collaborator.status,
     }
+
+
+def _assert_plan_is_acyclic(desired: dict[int, dict]) -> None:
+    for start in desired:
+        seen: set[int] = set()
+        current = start
+        while desired[current]["prerequisite_unit_id"] is not None:
+            prerequisite = desired[current]["prerequisite_unit_id"]
+            if prerequisite in seen or prerequisite == start:
+                raise HTTPException(status_code=422, detail="Course release plan prerequisites cannot contain a cycle")
+            seen.add(prerequisite)
+            current = prerequisite
+
+
+def _json_safe_plan_snapshot(snapshot: dict[str, dict]) -> dict[str, dict]:
+    safe: dict[str, dict] = {}
+    for unit_id, values in snapshot.items():
+        safe[str(unit_id)] = {
+            field: (
+                value.replace(tzinfo=UTC).isoformat()
+                if isinstance(value, datetime) and value.tzinfo is None
+                else value.astimezone(UTC).isoformat()
+                if isinstance(value, datetime)
+                else value
+            )
+            for field, value in values.items()
+        }
+    return safe

@@ -13,8 +13,10 @@ from app.models import (
     Course,
     CourseClass,
     CourseUnit,
+    CourseUnitClassPlan,
     LearningEvent,
     PointLedger,
+    School,
     Submission,
     User,
 )
@@ -53,6 +55,12 @@ from app.services.points import (
     assignment_grade_point_total,
     points_for_assignment_score,
 )
+from app.services.course_release_plans import (
+    effective_unit_access,
+    get_course_class_or_404,
+    get_plan_for_unit,
+    require_student_unit_open,
+)
 
 
 router = APIRouter()
@@ -86,11 +94,26 @@ def list_my_assignments(
         ClassMembership.status == "active",
     )
     statement = (
-        select(ClassGroup, Course, CourseUnit, Assignment, Submission, AssignmentClassPolicy)
+        select(
+            ClassGroup,
+            Course,
+            CourseUnit,
+            Assignment,
+            Submission,
+            AssignmentClassPolicy,
+            CourseUnitClassPlan,
+        )
         .select_from(ClassGroup)
         .join(CourseClass, CourseClass.class_id == ClassGroup.id)
         .join(Course, Course.id == CourseClass.course_id)
         .join(CourseUnit, CourseUnit.course_id == Course.id)
+        .join(
+            CourseUnitClassPlan,
+            and_(
+                CourseUnitClassPlan.course_class_id == CourseClass.id,
+                CourseUnitClassPlan.course_unit_id == CourseUnit.id,
+            ),
+        )
         .join(Assignment, Assignment.unit_id == CourseUnit.id)
         .outerjoin(
             AssignmentClassPolicy,
@@ -112,6 +135,7 @@ def list_my_assignments(
             CourseClass.status == "active",
             Course.status == "published",
             CourseUnit.status == "published",
+            CourseUnitClassPlan.release_mode != "hidden",
             or_(
                 and_(
                     Assignment.audience_mode == "selected_classes",
@@ -151,20 +175,68 @@ def list_my_assignments(
     statement = statement.order_by(ClassGroup.id, Course.id, CourseUnit.position, Assignment.id)
     total = int(db.scalar(select(func.count()).select_from(statement.order_by(None).subquery())) or 0)
     rows = db.execute(statement.offset(offset).limit(limit)).all()
+    school_by_id = {
+        school.id: school
+        for school in db.scalars(select(School).where(School.id.in_({row[1].school_id for row in rows}))).all()
+    } if rows else {}
+    prerequisite_ids = {row[6].prerequisite_unit_id for row in rows if row[6].prerequisite_unit_id is not None}
+    completed_by_scope: dict[tuple[int, int], set[int]] = {}
+    if prerequisite_ids:
+        complete_rows = db.execute(
+            select(LearningEvent.class_id, LearningEvent.course_id, LearningEvent.unit_id).where(
+                LearningEvent.user_id == current_user.id,
+                LearningEvent.class_id.in_({row[0].id for row in rows}),
+                LearningEvent.course_id.in_({row[1].id for row in rows}),
+                LearningEvent.unit_id.in_(prerequisite_ids),
+                LearningEvent.event_type == "complete",
+            )
+        ).all()
+        for completed_class_id, completed_course_id, completed_unit_id in complete_rows:
+            completed_by_scope.setdefault((completed_class_id, completed_course_id), set()).add(completed_unit_id)
+    visible_rows = []
+    for row in rows:
+        row_class, course, unit, assignment, submission, policy, plan = row
+        access = effective_unit_access(
+            db,
+            course=course,
+            class_group=row_class,
+            unit=unit,
+            plan=plan,
+            student_id=current_user.id,
+            completed_unit_ids=completed_by_scope.get((row_class.id, course.id), set()),
+            school_active=school_by_id.get(course.school_id) is not None and school_by_id[course.school_id].status == "active",
+        )
+        visible_rows.append((*row, access))
+    rows = visible_rows
     items: list[StudentAssignmentCenterItem] = []
-    for row_class, course, unit, assignment, submission, policy in rows:
+    for row_class, course, unit, assignment, submission, policy, plan, access in rows:
         effective = build_effective_assignment_policy(assignment, row_class.id, policy)
         submit_block_reason = _assignment_submit_block_reason(
             effective.status,
             submission,
             row_class.status,
         )
+        if submit_block_reason is None and access.state != "open":
+            submit_block_reason = "unit_locked"
+        assignment_payload = effective_assignment_payload(assignment, effective)
+        assignment_payload["unit_release_state"] = access.state
+        assignment_payload["unit_lock_reasons"] = list(access.lock_reasons)
         items.append(
             StudentAssignmentCenterItem(
                 class_=ClassRead.model_validate(row_class),
                 course=CourseRead.model_validate(course),
-                unit=CourseUnitRead.model_validate(unit),
-                assignment=AssignmentRead.model_validate(effective_assignment_payload(assignment, effective)),
+                unit=CourseUnitRead(
+                    id=unit.id,
+                    course_id=unit.course_id,
+                    activity_key=unit.activity_key,
+                    title=unit.title,
+                    position=unit.position,
+                    content_slug=unit.content_slug,
+                    status=unit.status,
+                    effective_release_state=access.state,
+                    lock_reasons=list(access.lock_reasons),
+                ),
+                assignment=AssignmentRead.model_validate(assignment_payload),
                 submission=SubmissionRead.model_validate(submission) if submission is not None else None,
                 can_submit=submit_block_reason is None,
                 read_only=submit_block_reason is not None,
@@ -203,6 +275,13 @@ def create_submission(
         raise HTTPException(status_code=422, detail="Class does not belong to assignment school")
     if not course_attached_to_class(db, course.id, class_group.id):
         raise HTTPException(status_code=403, detail="Course is not attached to this class")
+    require_student_unit_open(
+        db,
+        course=course,
+        class_group=class_group,
+        unit=unit,
+        student_id=current_user.id,
+    )
     effective = resolve_assignment_class_policy(db, assignment, class_group.id)
     if not effective.assigned:
         raise HTTPException(status_code=403, detail="Assignment is not assigned to this class")
@@ -338,6 +417,20 @@ def read_assignment_review(
         submission,
         class_group.status,
     )
+    course_class = get_course_class_or_404(db, course.id, class_group.id)
+    plan = get_plan_for_unit(db, course_class, unit.id)
+    access = effective_unit_access(
+        db,
+        course=course,
+        class_group=class_group,
+        unit=unit,
+        plan=plan,
+        student_id=current_user.id,
+    )
+    if access.state == "hidden":
+        raise HTTPException(status_code=403, detail="Course unit is not visible in this class")
+    if submit_block_reason is None and access.state != "open":
+        submit_block_reason = "unit_locked"
     can_submit = submit_block_reason is None
     return AssignmentReviewRead(
         course_id=course.id,
@@ -370,12 +463,36 @@ def list_assignment_submissions(
                 raise HTTPException(status_code=403, detail="Course is not attached to this class")
             if not resolve_assignment_class_policy(db, assignment, class_id).assigned:
                 raise HTTPException(status_code=403, detail="Assignment is not assigned to this class")
+            course_class = get_course_class_or_404(db, course.id, class_id)
+            plan = get_plan_for_unit(db, course_class, unit.id)
+            access = effective_unit_access(
+                db,
+                course=course,
+                class_group=get_class(db, class_id),
+                unit=unit,
+                plan=plan,
+                student_id=current_user.id,
+            )
+            if access.state == "hidden":
+                raise HTTPException(status_code=403, detail="Course unit is not visible in this class")
             statement = statement.where(Submission.class_id == class_id)
         else:
             eligible_class_ids = [
                 eligible_class_id
                 for eligible_class_id in _active_user_course_class_ids(db, current_user.id, course.id)
                 if resolve_assignment_class_policy(db, assignment, eligible_class_id).assigned
+            ]
+            eligible_class_ids = [
+                eligible_class_id
+                for eligible_class_id in eligible_class_ids
+                if effective_unit_access(
+                    db,
+                    course=course,
+                    class_group=get_class(db, eligible_class_id),
+                    unit=unit,
+                    plan=get_plan_for_unit(db, get_course_class_or_404(db, course.id, eligible_class_id), unit.id),
+                    student_id=current_user.id,
+                ).state != "hidden"
             ]
             if not eligible_class_ids:
                 return []

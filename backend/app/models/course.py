@@ -1,6 +1,18 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -13,11 +25,16 @@ def _knowledge_window_datetime_type():
 
 class Course(TimestampMixin, Base):
     __tablename__ = "courses"
-    __table_args__ = (UniqueConstraint("school_id", "title", name="uq_courses_school_title"),)
+    __table_args__ = (
+        UniqueConstraint("school_id", "title", name="uq_courses_school_title"),
+        UniqueConstraint("school_id", "galaxy_key", "course_key", name="uq_courses_school_galaxy_course_key"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     school_id: Mapped[int] = mapped_column(ForeignKey("schools.id"), index=True, nullable=False)
     creator_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    galaxy_key: Mapped[str] = mapped_column(String(32), nullable=False)
+    course_key: Mapped[str] = mapped_column(String(96), nullable=False)
     title: Mapped[str] = mapped_column(String(180), nullable=False)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", nullable=False)
@@ -31,6 +48,7 @@ class CourseClass(TimestampMixin, Base):
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), index=True, nullable=False)
     class_id: Mapped[int] = mapped_column(ForeignKey("class_groups.id"), index=True, nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
+    plan_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
 
 class CourseCollaborator(TimestampMixin, Base):
@@ -49,14 +67,40 @@ class CourseUnit(TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("course_id", "position", name="uq_course_units_course_position"),
         UniqueConstraint("course_id", "content_slug", name="uq_course_units_course_content_slug"),
+        UniqueConstraint("course_id", "activity_key", name="uq_course_units_course_activity_key"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), index=True, nullable=False)
+    activity_key: Mapped[str] = mapped_column(String(120), nullable=False)
     title: Mapped[str] = mapped_column(String(180), nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     content_slug: Mapped[str | None] = mapped_column(String(180), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="published", nullable=False)
+
+
+class CourseUnitClassPlan(TimestampMixin, Base):
+    __tablename__ = "course_unit_class_plans"
+    __table_args__ = (
+        UniqueConstraint("course_class_id", "course_unit_id", name="uq_course_unit_class_plans_class_unit"),
+        UniqueConstraint("course_class_id", "position", name="uq_course_unit_class_plans_class_position"),
+        CheckConstraint("position > 0", name="ck_course_unit_class_plans_position_positive"),
+        CheckConstraint(
+            "release_mode IN ('hidden', 'locked', 'open')",
+            name="ck_course_unit_class_plans_release_mode",
+        ),
+        Index("ix_course_unit_class_plans_class_release_open", "course_class_id", "release_mode", "open_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    course_class_id: Mapped[int] = mapped_column(ForeignKey("course_classes.id"), index=True, nullable=False)
+    course_unit_id: Mapped[int] = mapped_column(ForeignKey("course_units.id"), index=True, nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    release_mode: Mapped[str] = mapped_column(String(16), default="open", nullable=False)
+    open_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    prerequisite_unit_id: Mapped[int | None] = mapped_column(
+        ForeignKey("course_units.id"), index=True, nullable=True
+    )
 
 
 class Assignment(TimestampMixin, Base):

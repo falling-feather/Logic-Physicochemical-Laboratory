@@ -9,22 +9,30 @@ from app.models import (
     AssignmentClassPolicy,
     ClassMembership,
     Course,
+    CourseClass,
     CourseUnit,
+    CourseUnitClassPlan,
     LearningEvent,
     PointLedger,
     Submission,
     User,
 )
 from app.schemas.course import ProgressSummary
+from app.schemas.course import StudentCourseProgressPage
 from app.services.access_control import (
     active_assignment_class_ids,
     get_class,
     require_class_member,
     require_class_teacher_or_admin,
+    get_course,
 )
 from app.services.assignment_policies import (
     assignment_class_effective_status_expression,
     assignment_class_is_assigned_expression,
+)
+from app.services.course_release_plans import (
+    build_student_course_progress_page,
+    get_course_class_or_404,
 )
 
 
@@ -78,6 +86,38 @@ def get_user_progress(
     if target_membership is None:
         raise HTTPException(status_code=403, detail="User is outside requested class scope")
     return _build_progress_summary(db, user_id, class_id, student_visible_resources=True)
+
+
+@router.get("/courses/{course_id}/classes/{class_id}/students", response_model=StudentCourseProgressPage)
+def get_course_class_student_progress(
+    course_id: int,
+    class_id: int,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> StudentCourseProgressPage:
+    course = get_course(db, course_id)
+    class_group = get_class(db, class_id)
+    if class_group.school_id != course.school_id:
+        raise HTTPException(status_code=422, detail="Class does not belong to course school")
+    require_class_teacher_or_admin(
+        db,
+        current_user,
+        class_group,
+        detail="Course progress matrix requires class teacher scope",
+    )
+    course_class = get_course_class_or_404(db, course.id, class_group.id)
+    return StudentCourseProgressPage.model_validate(
+        build_student_course_progress_page(
+            db,
+            course=course,
+            class_group=class_group,
+            course_class=course_class,
+            limit=limit,
+            offset=offset,
+        )
+    )
 
 
 def _build_progress_summary(
@@ -145,6 +185,20 @@ def _apply_student_visible_submission_filters(statement):
         statement.join(Assignment, Assignment.id == Submission.assignment_id)
         .join(CourseUnit, CourseUnit.id == Assignment.unit_id)
         .join(Course, Course.id == CourseUnit.course_id)
+        .join(
+            CourseClass,
+            and_(
+                CourseClass.course_id == Course.id,
+                CourseClass.class_id == Submission.class_id,
+            ),
+        )
+        .join(
+            CourseUnitClassPlan,
+            and_(
+                CourseUnitClassPlan.course_class_id == CourseClass.id,
+                CourseUnitClassPlan.course_unit_id == CourseUnit.id,
+            ),
+        )
         .outerjoin(
             AssignmentClassPolicy,
             and_(
@@ -155,6 +209,8 @@ def _apply_student_visible_submission_filters(statement):
         .where(
             Course.status == "published",
             CourseUnit.status == "published",
+            CourseClass.status == "active",
+            CourseUnitClassPlan.release_mode != "hidden",
             assignment_class_is_assigned_expression(),
             assignment_class_effective_status_expression() == "active",
         )
@@ -165,6 +221,20 @@ def _apply_student_visible_event_filters(statement):
     return (
         statement.outerjoin(Course, Course.id == LearningEvent.course_id)
         .outerjoin(CourseUnit, CourseUnit.id == LearningEvent.unit_id)
+        .outerjoin(
+            CourseClass,
+            and_(
+                CourseClass.course_id == LearningEvent.course_id,
+                CourseClass.class_id == LearningEvent.class_id,
+            ),
+        )
+        .outerjoin(
+            CourseUnitClassPlan,
+            and_(
+                CourseUnitClassPlan.course_class_id == CourseClass.id,
+                CourseUnitClassPlan.course_unit_id == LearningEvent.unit_id,
+            ),
+        )
         .outerjoin(Assignment, Assignment.id == LearningEvent.assignment_id)
         .outerjoin(
             AssignmentClassPolicy,
@@ -176,6 +246,13 @@ def _apply_student_visible_event_filters(statement):
         .where(
             or_(LearningEvent.course_id.is_(None), Course.status == "published"),
             or_(LearningEvent.unit_id.is_(None), CourseUnit.status == "published"),
+            or_(
+                LearningEvent.unit_id.is_(None),
+                and_(
+                    CourseClass.status == "active",
+                    CourseUnitClassPlan.release_mode != "hidden",
+                ),
+            ),
             or_(
                 LearningEvent.assignment_id.is_(None),
                 and_(
@@ -193,6 +270,20 @@ def _apply_student_visible_point_filters(statement):
         .outerjoin(CourseUnit, CourseUnit.id == Assignment.unit_id)
         .outerjoin(Course, Course.id == CourseUnit.course_id)
         .outerjoin(
+            CourseClass,
+            and_(
+                CourseClass.course_id == Course.id,
+                CourseClass.class_id == PointLedger.class_id,
+            ),
+        )
+        .outerjoin(
+            CourseUnitClassPlan,
+            and_(
+                CourseUnitClassPlan.course_class_id == CourseClass.id,
+                CourseUnitClassPlan.course_unit_id == CourseUnit.id,
+            ),
+        )
+        .outerjoin(
             AssignmentClassPolicy,
             and_(
                 AssignmentClassPolicy.assignment_id == PointLedger.assignment_id,
@@ -205,6 +296,8 @@ def _apply_student_visible_point_filters(statement):
                 and_(
                     Course.status == "published",
                     CourseUnit.status == "published",
+                    CourseClass.status == "active",
+                    CourseUnitClassPlan.release_mode != "hidden",
                     assignment_class_is_assigned_expression(),
                     assignment_class_effective_status_expression() == "active",
                 ),

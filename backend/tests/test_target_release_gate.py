@@ -935,7 +935,9 @@ def _ready_reports(manifest: dict) -> dict[str, dict]:
                 "mysql_expected_datetime_precision": 6,
                 "organization_governance_mismatches": {},
                 "organization_version_invalid_rows": {"class_groups": 0, "schools": 0},
-                "expected_organization_governance_revision": target_release_evidence.EXPECTED_ALEMBIC_REVISION,
+                "expected_organization_governance_revision": (
+                    target_release_evidence.EXPECTED_ORGANIZATION_GOVERNANCE_REVISION
+                ),
             },
             "api": {
                 "ok": True,

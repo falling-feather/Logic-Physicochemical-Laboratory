@@ -496,6 +496,8 @@ def test_mysql_representative_dataset_runs_all_explain_analyze_profiles(mysql_ur
         course = Course(
             school_id=school.id,
             creator_user_id=creator_id,
+            galaxy_key="englab",
+            course_key=f"mysql-perf-course-{run_token}",
             title=f"MySQL Performance Course {run_token}",
             status="published",
         )
@@ -503,6 +505,7 @@ def test_mysql_representative_dataset_runs_all_explain_analyze_profiles(mysql_ur
         db.flush()
         unit = CourseUnit(
             course_id=course.id,
+            activity_key=f"mysql-perf-unit-{run_token}",
             title=f"MySQL Performance Unit {run_token}",
             position=1,
             status="published",

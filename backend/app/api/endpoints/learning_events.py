@@ -9,8 +9,11 @@ from app.models import (
     AssignmentClassPolicy,
     ClassGroup,
     Course,
+    CourseClass,
     CourseUnit,
+    CourseUnitClassPlan,
     LearningEvent,
+    School,
     User,
 )
 from app.models.base import utc_now
@@ -27,6 +30,12 @@ from app.services.access_control import (
     teacher_class_ids,
 )
 from app.services.assignment_policies import resolve_assignment_class_policy
+from app.services.course_release_plans import (
+    effective_unit_access,
+    get_course_class_or_404,
+    get_plan_for_unit,
+    require_student_unit_open,
+)
 
 
 router = APIRouter()
@@ -56,6 +65,14 @@ def create_learning_event(
             raise HTTPException(status_code=422, detail="Class does not belong to course school")
         if not course_attached_to_class(db, course.id, class_group.id):
             raise HTTPException(status_code=403, detail="Course is not attached to this class")
+    if unit is not None and current_user.role == "student" and class_group is not None:
+        require_student_unit_open(
+            db,
+            course=course,
+            class_group=class_group,
+            unit=unit,
+            student_id=current_user.id,
+        )
     if assignment is not None and class_group is not None:
         effective = resolve_assignment_class_policy(db, assignment, class_group.id)
         if not effective.assigned:
@@ -107,8 +124,8 @@ def list_learning_events(
         if class_id is not None:
             require_class_member(db, current_user, class_id)
             statement = statement.where(LearningEvent.class_id == class_id)
-        statement = _apply_student_visible_event_filters(statement)
-        return list(db.scalars(statement).all())
+        events = list(db.scalars(_apply_student_visible_event_filters(statement)).all())
+        return _filter_student_events_by_release_plan(db, current_user.id, events)
 
     if class_id is not None:
         class_group = get_class(db, class_id)
@@ -198,3 +215,90 @@ def _apply_student_visible_event_filters(statement):
             ),
         )
     )
+
+
+def _filter_student_events_by_release_plan(
+    db: Session,
+    student_id: int,
+    events: list[LearningEvent],
+) -> list[LearningEvent]:
+    scoped = [
+        event
+        for event in events
+        if event.unit_id is not None and event.course_id is not None and event.class_id is not None
+    ]
+    if not scoped:
+        return [event for event in events if event.unit_id is None]
+    course_ids = {event.course_id for event in scoped if event.course_id is not None}
+    class_ids = {event.class_id for event in scoped if event.class_id is not None}
+    unit_ids = {event.unit_id for event in scoped if event.unit_id is not None}
+    courses = {course.id: course for course in db.scalars(select(Course).where(Course.id.in_(course_ids))).all()}
+    units = {unit.id: unit for unit in db.scalars(select(CourseUnit).where(CourseUnit.id.in_(unit_ids))).all()}
+    classes = {
+        class_group.id: class_group
+        for class_group in db.scalars(select(ClassGroup).where(ClassGroup.id.in_(class_ids))).all()
+    }
+    schools = {
+        school.id: school
+        for school in db.scalars(select(School).where(School.id.in_({course.school_id for course in courses.values()}))).all()
+    }
+    course_classes = list(
+        db.scalars(
+            select(CourseClass).where(
+                CourseClass.course_id.in_(course_ids),
+                CourseClass.class_id.in_(class_ids),
+            )
+        ).all()
+    )
+    course_class_by_scope = {(row.course_id, row.class_id): row for row in course_classes}
+    plan_by_scope = {
+        (plan.course_class_id, plan.course_unit_id): plan
+        for plan in db.scalars(
+            select(CourseUnitClassPlan).where(
+                CourseUnitClassPlan.course_class_id.in_([row.id for row in course_classes]),
+                CourseUnitClassPlan.course_unit_id.in_(unit_ids),
+            )
+        ).all()
+    } if course_classes else {}
+    prerequisite_ids = {plan.prerequisite_unit_id for plan in plan_by_scope.values() if plan.prerequisite_unit_id is not None}
+    completed_by_scope: dict[tuple[int, int], set[int]] = {}
+    if prerequisite_ids:
+        complete_rows = db.execute(
+            select(LearningEvent.class_id, LearningEvent.course_id, LearningEvent.unit_id).where(
+                LearningEvent.user_id == student_id,
+                LearningEvent.class_id.in_(class_ids),
+                LearningEvent.course_id.in_(course_ids),
+                LearningEvent.unit_id.in_(prerequisite_ids),
+                LearningEvent.event_type == "complete",
+            )
+        ).all()
+        for class_id, course_id, unit_id in complete_rows:
+            completed_by_scope.setdefault((class_id, course_id), set()).add(unit_id)
+
+    visible: list[LearningEvent] = []
+    for event in events:
+        if event.unit_id is None:
+            visible.append(event)
+            continue
+        if event.course_id is None or event.class_id is None:
+            continue
+        course = courses.get(event.course_id)
+        unit = units.get(event.unit_id)
+        class_group = classes.get(event.class_id)
+        course_class = course_class_by_scope.get((event.course_id, event.class_id))
+        plan = plan_by_scope.get((course_class.id, event.unit_id)) if course_class is not None else None
+        if course is None or unit is None or class_group is None or plan is None:
+            continue
+        access = effective_unit_access(
+            db,
+            course=course,
+            class_group=class_group,
+            unit=unit,
+            plan=plan,
+            student_id=student_id,
+            completed_unit_ids=completed_by_scope.get((event.class_id, event.course_id), set()),
+            school_active=schools.get(course.school_id) is not None and schools[course.school_id].status == "active",
+        )
+        if access.state != "hidden":
+            visible.append(event)
+    return visible

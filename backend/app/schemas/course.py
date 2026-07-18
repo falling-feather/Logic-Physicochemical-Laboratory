@@ -1,7 +1,8 @@
 from datetime import datetime
+import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.school import ClassRead
 
@@ -17,13 +18,52 @@ AssignmentPointRuleSource = Literal["default", "custom", "class_override"]
 CourseCollaboratorRole = Literal["editor", "content_editor", "assessment_editor", "viewer"]
 CourseCollaboratorStatus = Literal["active", "inactive"]
 StudentAssignmentFilter = Literal["all", "active", "feedback", "history"]
+ReleaseMode = Literal["hidden", "locked", "open"]
+EffectiveReleaseState = Literal["hidden", "locked", "open"]
+
+
+def _normalize_stable_key(
+    value: str,
+    *,
+    field_name: str,
+    max_length: int,
+    allow_periods: bool = False,
+) -> str:
+    normalized = re.sub(r"[\s_]+", "-", value.strip().lower())
+    normalized = re.sub(r"-+", "-", normalized).strip("-")
+    pattern = (
+        r"[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)*"
+        if allow_periods
+        else r"[a-z0-9][a-z0-9-]*"
+    )
+    if not normalized or len(normalized) > max_length or not re.fullmatch(pattern, normalized):
+        raise ValueError(
+            f"{field_name} must contain lowercase letters, digits, and hyphens, start with a letter or digit, and fit its length limit"
+        )
+    return normalized
 
 
 class CourseCreate(BaseModel):
     school_id: int
+    galaxy_key: str | None = Field(default=None, min_length=1, max_length=32)
+    course_key: str | None = Field(default=None, min_length=1, max_length=96)
     title: str = Field(min_length=1, max_length=180)
     summary: str | None = Field(default=None, max_length=2000)
     status: CourseStatus = "draft"
+
+    @field_validator("galaxy_key")
+    @classmethod
+    def normalize_galaxy_key(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return _normalize_stable_key(value, field_name="galaxy_key", max_length=32)
+
+    @field_validator("course_key")
+    @classmethod
+    def normalize_course_key(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return _normalize_stable_key(value, field_name="course_key", max_length=96)
 
 
 class CourseRead(BaseModel):
@@ -32,6 +72,8 @@ class CourseRead(BaseModel):
     id: int
     school_id: int
     creator_user_id: int
+    galaxy_key: str
+    course_key: str
     title: str
     summary: str | None = None
     status: str
@@ -48,6 +90,7 @@ class CourseClassRead(BaseModel):
     course_id: int
     class_id: int
     status: str
+    plan_version: int
 
 
 class CourseCollaboratorCreate(BaseModel):
@@ -107,10 +150,23 @@ class CourseOwnerTransfer(BaseModel):
 
 
 class CourseUnitCreate(BaseModel):
+    activity_key: str | None = Field(default=None, min_length=1, max_length=120)
     title: str = Field(min_length=1, max_length=180)
     position: int = Field(ge=1)
     content_slug: str | None = Field(default=None, max_length=180)
     status: UnitStatus = "published"
+
+    @field_validator("activity_key")
+    @classmethod
+    def normalize_activity_key(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return _normalize_stable_key(
+            value,
+            field_name="activity_key",
+            max_length=120,
+            allow_periods=True,
+        )
 
 
 class CourseUnitRead(BaseModel):
@@ -118,10 +174,48 @@ class CourseUnitRead(BaseModel):
 
     id: int
     course_id: int
+    activity_key: str
     title: str
     position: int
     content_slug: str | None = None
     status: str
+    effective_release_state: EffectiveReleaseState | None = None
+    lock_reasons: list[str] = Field(default_factory=list)
+
+
+class CourseReleasePlanPatchItem(BaseModel):
+    course_unit_id: int
+    position: int | None = Field(default=None, ge=1)
+    release_mode: ReleaseMode | None = None
+    open_at: datetime | None = None
+    prerequisite_unit_id: int | None = None
+
+
+class CourseReleasePlanPatch(BaseModel):
+    expected_version: int = Field(ge=1)
+    items: list[CourseReleasePlanPatchItem] = Field(min_length=1, max_length=100)
+    reason: str | None = Field(default=None, max_length=4000)
+
+
+class CourseReleasePlanItemRead(BaseModel):
+    id: int
+    course_unit_id: int
+    activity_key: str
+    position: int
+    release_mode: ReleaseMode
+    open_at: datetime | None = None
+    prerequisite_unit_id: int | None = None
+    effective_release_state: EffectiveReleaseState
+    lock_reasons: list[str] = Field(default_factory=list)
+
+
+class CourseReleasePlanRead(BaseModel):
+    course_id: int
+    class_id: int
+    course_class_id: int
+    plan_version: int
+    changed: bool = False
+    items: list[CourseReleasePlanItemRead]
 
 
 class AssignmentCreate(BaseModel):
@@ -146,6 +240,8 @@ class AssignmentRead(BaseModel):
     audience_mode: str = "all_attached_classes"
     effective_class_id: int | None = None
     policy_source: Literal["base", "class_policy"] = "base"
+    unit_release_state: EffectiveReleaseState | None = None
+    unit_lock_reasons: list[str] = Field(default_factory=list)
 
 
 class AssignmentAudienceUpdate(BaseModel):
@@ -295,3 +391,32 @@ class ProgressSummary(BaseModel):
     completed_events: int
     total_points: int
     completion_percent: float
+
+
+class StudentBlockProgressRead(BaseModel):
+    course_unit_id: int
+    activity_key: str
+    position: int
+    started: bool
+    completed: bool
+    submitted: int
+    graded: int
+    recent_activity_at: datetime | None = None
+    effective_release_state: EffectiveReleaseState
+
+
+class StudentCourseProgressRow(BaseModel):
+    student_id: int
+    display_name: str
+    blocks: list[StudentBlockProgressRead]
+
+
+class StudentCourseProgressPage(BaseModel):
+    course_id: int
+    class_id: int
+    plan_version: int
+    items: list[StudentCourseProgressRow]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None

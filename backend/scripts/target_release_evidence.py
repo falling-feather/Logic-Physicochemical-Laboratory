@@ -18,7 +18,8 @@ from urllib.parse import urlsplit
 TARGET_RELEASE_SCHEMA_VERSION = "target-release-v2"
 EVIDENCE_SCHEMA_VERSION = "target-release-evidence-v1"
 ARTIFACT_MANIFEST_SCHEMA_VERSION = "release-artifact-manifest-v1"
-EXPECTED_ALEMBIC_REVISION = "20260716_0047"
+EXPECTED_ALEMBIC_REVISION = "20260719_0048"
+EXPECTED_ORGANIZATION_GOVERNANCE_REVISION = "20260716_0047"
 MAX_EVIDENCE_AGE = timedelta(days=7)
 MAX_ARTIFACT_MANIFEST_BYTES = 10 * 1024 * 1024
 REQUIRED_EVIDENCE = (
@@ -517,7 +518,8 @@ def _deploy_smoke_ready(report: dict[str, Any], **context: Any) -> bool:
         and schema.get("mysql_expected_datetime_precision") == 6
         and schema.get("organization_governance_mismatches") == {}
         and invalid_rows == {"class_groups": 0, "schools": 0}
-        and schema.get("expected_organization_governance_revision") == EXPECTED_ALEMBIC_REVISION
+        and schema.get("expected_organization_governance_revision")
+        == EXPECTED_ORGANIZATION_GOVERNANCE_REVISION
         and api.get("ok") is True
         and api.get("status") == "healthy"
         and api.get("status_code") == 200
