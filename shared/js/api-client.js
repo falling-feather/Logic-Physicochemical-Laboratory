@@ -334,6 +334,9 @@
 
     function isAllowedApiOrigin(url, currentOrigin) {
         const current = new URL(currentOrigin);
+        if (global.ASTRA_LOCAL_PREVIEW_SAME_ORIGIN === true) {
+            return url.origin === current.origin;
+        }
         if (current.protocol === 'https:' && url.protocol !== 'https:') return false;
         if (url.origin === current.origin) return true;
         if (isLocalHostname(url.hostname) && isLocalHostname(current.hostname)) return true;

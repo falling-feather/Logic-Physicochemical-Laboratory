@@ -222,7 +222,7 @@ function updateFooterVisibility() {
 window.updateFooterVisibility = updateFooterVisibility;
 
 const ENGLAB_ASSET_VERSION = '20260716v7427RoleWorkflowGateP0';
-const ROLE_LANDING_ASSET_VERSION = '20260718v7433RoleLandingP0';
+const ROLE_LANDING_ASSET_VERSION = '20260718v7434LocalPreviewP0';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',
@@ -234,7 +234,7 @@ const CORE_HTTP_FALLBACK_ASSETS = [
     './shared/css/responsive.css?v=' + ENGLAB_ASSET_VERSION,
     './shared/js/lucide.min.js?v=20260417d',
     './shared/js/config.js?v=' + ENGLAB_ASSET_VERSION,
-    './shared/js/api-client.js?v=' + ENGLAB_ASSET_VERSION,
+    './shared/js/api-client.js?v=' + ROLE_LANDING_ASSET_VERSION,
     './shared/js/app-session.js?v=' + ROLE_LANDING_ASSET_VERSION,
     './shared/js/experiment-registry.js?v=20260716v7427RoleWorkflowGateP0',
     './shared/js/page-registry.js?v=' + ROLE_LANDING_ASSET_VERSION,

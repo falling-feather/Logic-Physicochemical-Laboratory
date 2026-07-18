@@ -10,6 +10,7 @@
 
 ## 当前状态
 
+- V7.4.34 新增根目录 `astra-local.ps1`：自动建立 Python 3.12+ 隔离环境、按哈希锁安装依赖、迁移本机 SQLite，并从 `http://127.0.0.1:9001/` 同源提供主站、代码空间和 `/api`。公开面只挂载审核过的静态白名单；数据目录哈希绑定并发互斥和实例识别，same-origin-only 模式拒绝旧跨端口 API；首管理员可经交互式 stdin 引导创建，脚本不接收或保存命令行密码。该入口仅用于 development/本机验收，不替代 `deploy.ps1`、MySQL、TLS 或 R6 目标发布证据。
 - V7.4.12 建立 `doc/00-项目总纲.md` 与项目对接控制面；`houduan` 由主开发单写，FE/OPS/QA 通过长期只读任务完成方案审查和独立验收。
 - V7.4.13 建立 19 个主站页面的只读注册表并通过 V7.4.15 独立 QA；V7.4.16 的 88 项冻结实验注册结构已通过 QA-002，V7.4.17—V7.4.18 已将 23 项升级为经离开/重入验证的 cleanup，并补齐排序与细胞结构的取消协议。QA-003 随后发现 DNA/遗传模式控件未挂载到真实 DOM，V7.4.19 已修正挂载锚点和失真的合同夹具；QA-005 已对精确提交 `572f9e314fa45f6e45b762ac0835e724b70cc9b3` 完成 DNA、光合作用与遗传的桌面/390×844 三轮独立复验并通过。V7.4.20 又恢复活动首页的固定视口裁剪，消除通用 `.page.active` 覆盖引起的 390px 根级横向溢出。
 - V7.4.26 已关闭 R4b 实验模块切换生命周期：`AstraExperimentRegistry.cleanupModule(subject, id)` 只对 23 项 `verified:true` owner 执行精确 cleanup，65 项 legacy 全部保持 fail closed，0 项 missing；A→B、B→画廊、画廊→A 和整页离开由 transition generation、Zoom 前置关闭、失败中止与页面级兼容清理共同约束，迟到资源/init/焦点/相关推荐任务不能写入新模块。五大学科桌面三轮、精确 390×844、整页离开重入和独立只读复审均通过。
@@ -31,7 +32,25 @@
 
 ## 快速开始
 
-### 1. 启动静态主站
+### 推荐：9001 单入口一键启动
+
+在 Windows PowerShell 中从仓库根目录执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\astra-local.ps1
+```
+
+脚本会自动创建仓库内忽略的 `.venv`、按 `backend/requirements.lock` 安装哈希锁依赖、执行 Alembic 迁移，并把前端与 API 同源启动在 `http://127.0.0.1:9001/`。数据默认保存在 `%LOCALAPPDATA%\Astra\local-preview`；再次执行会识别已经运行的星序站点，停止使用 `Ctrl+C`。
+
+全新数据目录需要首个管理员时，使用交互式入口；密码只在隐藏输入和当前进程内短暂存在，不写入参数、脚本或仓库：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\astra-local.ps1 -BootstrapAdmin
+```
+
+这是本机 development/验收入口，不配置域名、TLS、Windows 服务或正式 MySQL，也不能作为 staging/production 发布证据。完整边界见 [`doc/04-部署指南.md`](doc/04-部署指南.md)。
+
+### 手动拆分 1：启动静态主站
 
 需要 `.node-version` 指定的 Node.js 22.20.0（配套 npm 10.9.3）。先按锁安装测试/浏览器证明工具，不执行依赖安装脚本：
 
@@ -42,7 +61,7 @@ node server/dev-static-server.mjs --port 8766
 
 访问 `http://127.0.0.1:8766/`。该开发服务器使用显式公开白名单，不会暴露 `backend/`、`doc/`、`.git/` 或仓库根目录中的其他文件。
 
-### 2. 启动 Python 业务后端
+### 手动拆分 2：启动 Python 业务后端
 
 需要 Python 3.12+：
 
@@ -63,7 +82,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 http://127.0.0.1:8766/?backendSchema=1&apiBase=http%3A%2F%2F127.0.0.1%3A8000#home
 ```
 
-### 3. 可选 C++ 静态服务
+### 手动拆分 3：可选 C++ 静态服务
 
 需要 CMake 与完整支持 C++17 filesystem 的编译器（GCC 9.1+、现代 Clang 或 MSVC）：
 

@@ -51,6 +51,14 @@ async function main() {
         () => client.buildUrl('https://evil.example/api/demo'),
         (error) => error.code === 'invalid_api_origin'
     );
+    global.ASTRA_LOCAL_PREVIEW_SAME_ORIGIN = true;
+    assert.equal(client.normalizeBaseUrl('https://api.astra.test'), '', 'local preview must reject every cross-origin API base');
+    assert.equal(client.normalizeBaseUrl('https://astra.test'), 'https://astra.test');
+    assert.throws(
+        () => client.buildUrl('/api/users/me', 'https://api.astra.test'),
+        (error) => error.code === 'invalid_api_origin'
+    );
+    delete global.ASTRA_LOCAL_PREVIEW_SAME_ORIGIN;
 
     assert.deepEqual(global.localStorage.snapshot(), { 'safe-setting': 'keep' }, 'module load must scrub legacy local tokens globally');
     assert.deepEqual(global.sessionStorage.snapshot(), { 'safe-session': 'keep' }, 'module load must scrub legacy session tokens globally');

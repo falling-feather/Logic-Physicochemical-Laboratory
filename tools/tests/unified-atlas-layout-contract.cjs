@@ -49,7 +49,7 @@ assert.match(adminCss, /\.admin-panel__filters input,[\s\S]*\.admin-api-base inp
 assert.doesNotMatch(admin, /textarea[^>]+sql|execute\s+sql/i);
 
 for (const source of [html, planets, registry, main, serviceWorker]) {
-    assert.match(source, /20260718v7433RoleLandingP0/);
+    assert.match(source, /20260718v7434LocalPreviewP0/);
 }
 assert.match(registry, /20260718v7432UnifiedAtlasP0/, 'admin keeps its independently reviewed resource version');
 
