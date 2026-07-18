@@ -2,7 +2,7 @@
 
 > **文档定位**：后端本地开发、API/服务边界、配置、迁移、运维脚本和验证入口。V7.4.12 起完成事实见 [`../doc/03-开发历史.md`](../doc/03-开发历史.md)，更早实机证据见 [`../doc/03-发布历史.md`](../doc/03-发布历史.md)，未来任务见 [`../doc/02-项目规划.md`](../doc/02-项目规划.md)。
 >
-> **当前基线**：FastAPI + SQLAlchemy + Alembic 0047；SQLite 为安全本地默认，MySQL 为发布目标。V7.4.34 已增加 `app.local_preview` 与根目录 `astra-local.ps1`，用于 9001 同源本机验收；V7.4.35 候选只对齐本机三角色证明与启动时预置管理员，不放宽 `/api/admin/bootstrap` 的运行时关闭边界。V7.4.29 已补齐 Windows DPAPI 受保护密钥存储、服务账号绑定、正式 HTTPS origin/HSTS 服务包参数和 target staging 浏览器证明模式；V7.4.25 已将学校/班级受约束治理接入管理 UI，并补齐凭据型 PUT 预检；V7.4.24 已完成组织治理 API、乐观并发、责任人保护、审计与活动组织边界；V7.4.22 已硬化浏览器 Cookie-only/非浏览器 Bearer 双通道契约；V7.4.9 已建立 Python 3.12 通用哈希锁和 CI 漂移门禁；V7.4.8 已完成管理 API 全部分域拆分，`admin.py` 为纯路由聚合器；V6.6.63 后端阶段、真实 MySQL、四服务拓扑、Release 构建/回滚和 15/15 stage gate 已完成。
+> **当前基线**：FastAPI + SQLAlchemy + Alembic 0047；SQLite 为安全本地默认，MySQL 为发布目标。V7.4.36 已关闭 R5c：根 `astra-local.ps1` 的 9001 同源本机入口、启动时首管理员预置和 V7.4.35 三角色证明已由 QA-009 在真实 Edge 150、全新 SQLite 上独立通过。运行时 bootstrap 按状态失败关闭：未预置且开关关闭为 403，已预置后的重复请求为 409 single-use，均非 201 且不新增管理员。V7.4.29 已补齐 Windows DPAPI 受保护密钥存储、服务账号绑定、正式 HTTPS origin/HSTS 服务包参数和 target staging 浏览器证明模式；V7.4.25 已将学校/班级受约束治理接入管理 UI，并补齐凭据型 PUT 预检；V7.4.24 已完成组织治理 API、乐观并发、责任人保护、审计与活动组织边界；V7.4.22 已硬化浏览器 Cookie-only/非浏览器 Bearer 双通道契约；V7.4.9 已建立 Python 3.12 通用哈希锁和 CI 漂移门禁；V7.4.8 已完成管理 API 全部分域拆分，`admin.py` 为纯路由聚合器；V6.6.63 后端阶段、真实 MySQL、四服务拓扑、Release 构建/回滚和 15/15 stage gate 已完成。公网 R6 仍按用户要求暂缓。
 >
 > **最后更新**：2026-07-18
 
