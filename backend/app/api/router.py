@@ -5,6 +5,7 @@ from app.api.endpoints import (
     assignment_policies,
     auth,
     classes,
+    code_judge,
     content,
     courses,
     health,
@@ -26,6 +27,7 @@ api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(schools.router, prefix="/schools", tags=["schools"])
 api_router.include_router(classes.router, prefix="/classes", tags=["classes"])
+api_router.include_router(code_judge.router, tags=["code-judge"])
 api_router.include_router(courses.router, prefix="/courses", tags=["courses"])
 api_router.include_router(assignment_policies.router, tags=["assignments"])
 api_router.include_router(knowledge.router, tags=["knowledge"])

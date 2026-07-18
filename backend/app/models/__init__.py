@@ -19,6 +19,7 @@ from app.models.content import (
     ContentScriptAssetScanRun,
     ContentScriptHostPolicy,
 )
+from app.models.code_judge import CodeJudgeAttempt, CodeProblem, CodeProblemVersion, CodeSubmission
 from app.models.course import (
     Assignment,
     AssignmentClassPolicy,
@@ -62,6 +63,10 @@ __all__ = [
     "ContentScriptAsset",
     "ContentScriptAssetScanRun",
     "ContentScriptHostPolicy",
+    "CodeJudgeAttempt",
+    "CodeProblem",
+    "CodeProblemVersion",
+    "CodeSubmission",
     "Course",
     "CourseClass",
     "CourseCollaborator",

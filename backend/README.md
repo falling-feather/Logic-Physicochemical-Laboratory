@@ -2,9 +2,9 @@
 
 > **文档定位**：后端本地开发、API/服务边界、配置、迁移、运维脚本和验证入口。V7.4.12 起完成事实见 [`../doc/03-开发历史.md`](../doc/03-开发历史.md)，更早实机证据见 [`../doc/03-发布历史.md`](../doc/03-发布历史.md)，未来任务见 [`../doc/02-项目规划.md`](../doc/02-项目规划.md)。
 >
-> **当前基线**：FastAPI + SQLAlchemy + Alembic 0048；SQLite 为安全本地默认，MySQL 为发布目标。V7.5.3 已增加稳定课程/活动键、班级发布计划三态、乐观并发和教师学生进度矩阵；0048 已通过 SQLite 往返与 MySQL DDL 条件门禁，真实 MySQL 尚未补证。V7.4.36 已关闭 R5c：根 `astra-local.ps1` 的 9001 同源本机入口、启动时首管理员预置和 V7.4.35 三角色证明已由 QA-009 在真实 Edge 150、全新 SQLite 上独立通过。运行时 bootstrap 按状态失败关闭：未预置且开关关闭为 403，已预置后的重复请求为 409 single-use，均非 201 且不新增管理员。V7.4.29 已补齐 Windows DPAPI 受保护密钥存储、服务账号绑定、正式 HTTPS origin/HSTS 服务包参数和 target staging 浏览器证明模式；V7.4.25 已将学校/班级受约束治理接入管理 UI，并补齐凭据型 PUT 预检；V7.4.24 已完成组织治理 API、乐观并发、责任人保护、审计与活动组织边界；V7.4.22 已硬化浏览器 Cookie-only/非浏览器 Bearer 双通道契约；V7.4.9 已建立 Python 3.12 通用哈希锁和 CI 漂移门禁；V7.4.8 已完成管理 API 全部分域拆分，`admin.py` 为纯路由聚合器；V6.6.63 后端阶段、真实 MySQL、四服务拓扑、Release 构建/回滚和 15/15 stage gate 已完成。公网 R6 仍按用户要求暂缓。
+> **当前基线**：FastAPI + SQLAlchemy + Alembic 0049；SQLite 为安全本地默认，MySQL 为发布目标。V7.5.3 已增加稳定课程/活动键、班级发布计划三态、乐观并发和教师学生进度矩阵；V7.5.6 又增加 provider-neutral 题目版本、代码提交、判题尝试/租约、稳定活动发现与授权分页查询。0048/0049 已通过 SQLite 往返与 MySQL DDL 条件门禁，真实 MySQL 尚未补证；默认 runner 关闭且 API 不执行、shell、动态求值或外呼学生源码。V7.4.36 已关闭 R5c：根 `astra-local.ps1` 的 9001 同源本机入口、启动时首管理员预置和 V7.4.35 三角色证明已由 QA-009 在真实 Edge 150、全新 SQLite 上独立通过。运行时 bootstrap 按状态失败关闭：未预置且开关关闭为 403，已预置后的重复请求为 409 single-use，均非 201 且不新增管理员。V7.4.29 已补齐 Windows DPAPI 受保护密钥存储、服务账号绑定、正式 HTTPS origin/HSTS 服务包参数和 target staging 浏览器证明模式；V7.4.22 已硬化浏览器 Cookie-only/非浏览器 Bearer 双通道契约；V7.4.9 已建立 Python 3.12 通用哈希锁和 CI 漂移门禁；V6.6.63 后端阶段、真实 MySQL、四服务拓扑、Release 构建/回滚和 15/15 stage gate 已完成。公网 R6 仍按用户要求暂缓。
 >
-> **最后更新**：2026-07-18
+> **最后更新**：2026-07-19
 
 后端当前承担认证与会话、学校/班级/课程、作业/提交/批改、积分与知识状态、内容草稿/审核/发布/回滚、脚本隔离、管理治理、DB-backed 任务和审计链。`server/` 中的 Node/C++ 进程只承担显式白名单静态资源，不是业务 API。
 
@@ -57,6 +57,14 @@ curl http://127.0.0.1:8000/api/health
 ```
 
 公开健康响应只返回数据库连接状态，不返回数据库 URL、主机、库名或本地文件路径；`database.url_returned=false` 是拓扑门禁的一部分。
+
+### V7.5.6 代码题目与判题契约
+
+- `POST /api/code-problems`、`POST /api/code-problems/{problem_id}/versions`：课程编辑者或管理员为稳定 `CourseUnit.activity_key` 建题并追加不可变版本；学生响应不返回私有测试用例。
+- `GET /api/code-problems/by-activity?course_id=...&activity_key=...&class_id=...`：按稳定课程身份发现题目；学生必须显式提供班级并经过 BE-004 发布状态，hidden/撤回发布失败关闭。
+- `POST /api/code-problems/{problem_id}/submissions`：仅学生、仅 open 分块；语言规范为 `javascript/python/c/cpp`，源码与输入按 UTF-8 字节限制。学生+题目版本+班级构成幂等范围，相同内容重放返回原记录，不同内容返回 409。
+- `GET /api/code-submissions` 及明细/source/attempts：学生只能读取本人且当前非 hidden 的历史；班级教师和管理员在授权范围内按班级、课程、活动数据库分页并可读源码。
+- `DisabledCodeRunnerAdapter` 是唯一默认适配器，只持久化 `runner_unavailable`。`app.services.code_judge` 仅定义问题/资源快照、原子 claim、租约过期重排与终态写回；任何真实执行器必须部署在 API 进程外并另行完成 CPU、墙钟、内存、输出、进程、无网络和无文件系统隔离验收。
 
 首个内容协议样例会在 `ASTRA_AUTO_CREATE_TABLES=true` 的开发/测试初始化阶段写入 `content_pages`，并经过 Pydantic schema 校验后返回。内置 seed 已升级到 `2026.07-v6.5-schema.2`，所有 section/source 都带稳定 `sectionId/sourceId`：
 
@@ -478,7 +486,7 @@ python -m pytest backend/tests/test_backend_performance.py backend/tests/test_ap
 node tools/tests/v6653-permission-analytics-contract.cjs
 ```
 
-迁移最低门禁需验证 `upgrade 20260710_0043 -> upgrade head -> downgrade 20260710_0043 -> upgrade head`，最终 `alembic current` 必须为 `20260719_0048`；0044 绑定最后编辑者/审核 schema hash，0045 串行化 admin 安全控制面，0046 将知识快照窗口字段提升为 MySQL DATETIME(6)，0047 增加学校/班级说明与乐观并发版本，0048 增加稳定课程/活动键和班级发布计划。V6.6.61 的真实 MySQL 证据只覆盖至 0046；0047/0048 必须在新的隔离 MySQL 或目标环境补证。
+迁移最低门禁需验证 `upgrade 20260710_0043 -> upgrade head -> downgrade 20260710_0043 -> upgrade head`，最终 `alembic current` 必须为 `20260719_0049`；0044 绑定最后编辑者/审核 schema hash，0045 串行化 admin 安全控制面，0046 将知识快照窗口字段提升为 MySQL DATETIME(6)，0047 增加学校/班级说明与乐观并发版本，0048 增加稳定课程/活动键和班级发布计划，0049 增加代码题目、版本、提交与判题尝试。V6.6.61 的真实 MySQL 证据只覆盖至 0046；0047—0049 必须在新的隔离 MySQL 或目标环境补证。
 
 权限范围回归可单独运行：
 
@@ -494,7 +502,7 @@ $env:ASTRA_DATABASE_URL='sqlite+pysqlite:///:memory:'
 python -m alembic upgrade head
 ```
 
-当前 Alembic head：`20260719_0048`。`0043` 为审计时间线/资源线、Bug/同步账本、知识 run、脚本扫描 run 和待批改队列新增 10 个复合索引；`0044/0045` 分别增加内容审核绑定和安全控制锁；`0046` 将个人/班级快照及 run 的 period_start/period_end 统一为 MySQL DATETIME(6)；`0047` 为学校/班级增加 nullable description 与非空默认 version=1；`0048` 为课程/单元增加稳定键并建立班级发布计划。0048 已完成 SQLite 历史行往返和条件式 MySQL DDL 门禁，真实 MySQL 仍待新环境补证。
+当前 Alembic head：`20260719_0049`。`0043` 为审计时间线/资源线、Bug/同步账本、知识 run、脚本扫描 run 和待批改队列新增 10 个复合索引；`0044/0045` 分别增加内容审核绑定和安全控制锁；`0046` 将个人/班级快照及 run 的 period_start/period_end 统一为 MySQL DATETIME(6)；`0047` 为学校/班级增加 nullable description 与非空默认 version=1；`0048` 为课程/单元增加稳定键并建立班级发布计划；`0049` 建立 `code_problems/code_problem_versions/code_submissions/code_judge_attempts`。0048/0049 已完成 SQLite 往返和条件式 MySQL DDL 门禁，真实 MySQL 仍待新环境补证。
 
 内容脚本远端漂移 CLI：
 
@@ -640,7 +648,7 @@ python -m scripts.target_release_evidence seal --manifest ../evidence/target-rel
 python -m scripts.target_release_gate --manifest ../evidence/target-release.json
 ```
 
-总闸固定为 51/51：拒绝示例 origin、制品清单缺失/篡改/版本不一致、manifest 自选 `status_path/expected`、匿名或自定义第八 evidence、空壳 `ok=true`、跨目标/跨 revision/跨 bundle、重复 run、过期 envelope 或超出总闸当前窗口的旧 raw、路径逃逸/hash 篡改、非单一 0048 MySQL、未绑定/未解析公网探针、仅服务名 SCM、缺少三角色/409/组织归档恢复浏览器语义和敏感正文。正式 CLI 完全拒绝时间覆盖；测试只能直接调用内部函数注入时钟。真实证据包、DSN、secret 和备份内容不得进入仓库；完整执行顺序见 `doc/04-部署指南.md`。
+总闸固定为 51/51：拒绝示例 origin、制品清单缺失/篡改/版本不一致、manifest 自选 `status_path/expected`、匿名或自定义第八 evidence、空壳 `ok=true`、跨目标/跨 revision/跨 bundle、重复 run、过期 envelope 或超出总闸当前窗口的旧 raw、路径逃逸/hash 篡改、非单一 0049 MySQL、未绑定/未解析公网探针、仅服务名 SCM、缺少三角色/409/组织归档恢复浏览器语义和敏感正文。正式 CLI 完全拒绝时间覆盖；测试只能直接调用内部函数注入时钟。真实证据包、DSN、secret 和备份内容不得进入仓库；完整执行顺序见 `doc/04-部署指南.md`。
 
 正式内容初始化：
 

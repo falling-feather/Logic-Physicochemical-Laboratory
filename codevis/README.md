@@ -28,12 +28,13 @@ codevis/
 - `#trace`     · 兼容代码执行追踪
 
 ## 当前阶段
-- **V7.5.4（已完成）**：6 个课程群、18 个稳定活动、独立子课与四步互动挑战；浏览器公开样例预检不等同于权威判题，正式提交等待 BE-005。
+- **V7.5.4（已完成）**：6 个课程群、18 个稳定活动、独立子课与四步互动挑战；浏览器公开样例预检不等同于权威判题。
+- **V7.5.6（后端已完成）**：0049 已提供稳定 activity 题目发现、不可变题目版本、学生源码提交、判题状态和教师分页查看；本子站的正式提交按钮仍等待 FE-010 注入登录后的班级/课程上下文并接入 API。
 - **浏览器学习运行时（已完成）**：固定版本、本地同源、按需加载；来源、许可证和哈希见 `vendor/manifest.json` 与 `THIRD_PARTY_NOTICES.md`。
   - JavaScript：[JS-Interpreter](https://github.com/NeilFraser/JS-Interpreter)（acorn + interpreter）
   - Python：[Skulpt](https://skulpt.org/)（纯 JS Python 3 子集）
   - C / C++：[JSCPP](https://github.com/felixhao28/JSCPP) v2.0.9（纯 JS C++ 子集，不支持 namespace/class）
-- **待接入**：登录后的班级/课程上下文、BE-005 正式提交与教师查看；状态只在 `doc/02-项目规划.md` 维护。
+- **待接入**：登录后的班级/课程上下文、V7.5.6 正式提交 adapter 与教师工作台视图；状态只在 `doc/02-项目规划.md` 维护。
 
 ## 沙箱 API 速查
 所有后端共享相同的"标记函数"协议，由 runtime 拦截后驱动可视化：
