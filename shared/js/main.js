@@ -222,7 +222,7 @@ function updateFooterVisibility() {
 window.updateFooterVisibility = updateFooterVisibility;
 
 const ENGLAB_ASSET_VERSION = '20260716v7427RoleWorkflowGateP0';
-const ROLE_LANDING_ASSET_VERSION = '20260718v7434LocalPreviewP0';
+const ROLE_LANDING_ASSET_VERSION = '20260718v7435QaCloseoutP0';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',

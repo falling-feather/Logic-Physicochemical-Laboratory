@@ -10,8 +10,9 @@
 
 ## 当前状态
 
+- V7.4.35 正在执行 QA-009 独立复验：首轮从 9001 启动后发现旧三角色证明仍尝试运行时创建管理员，与本机入口“只允许启动时交互预置首管理员”的边界冲突。候选修正允许证明进程通过成对的临时环境变量消费 `-BootstrapAdmin` 已创建的管理员，不放宽运行时 bootstrap；同时对齐统一星序落点、集中治理分区和归档/恢复按钮语义。主开发真实 Edge 全流程已通过，仍以 QA 长期组对精确提交的全新数据目录回执为最终结论。
 - V7.4.34 新增根目录 `astra-local.ps1`：自动建立 Python 3.12+ 隔离环境、按哈希锁安装依赖、迁移本机 SQLite，并从 `http://127.0.0.1:9001/` 同源提供主站、代码空间和 `/api`。公开面只挂载审核过的静态白名单；数据目录哈希绑定并发互斥和实例识别，same-origin-only 模式拒绝旧跨端口 API；首管理员可经交互式 stdin 引导创建，脚本不接收或保存命令行密码。该入口仅用于 development/本机验收，不替代 `deploy.ps1`、MySQL、TLS 或 R6 目标发布证据。
-- V7.4.12 建立 `doc/00-项目总纲.md` 与项目对接控制面；`houduan` 由主开发单写，FE/OPS/QA 通过长期只读任务完成方案审查和独立验收。
+- V7.4.12 建立 `doc/00-项目总纲.md` 与项目对接控制面；`houduan` 由主开发单写，FE/UI/OPS/QA 通过长期只读任务完成方案审查、概念—实装对照和独立验收。
 - V7.4.13 建立 19 个主站页面的只读注册表并通过 V7.4.15 独立 QA；V7.4.16 的 88 项冻结实验注册结构已通过 QA-002，V7.4.17—V7.4.18 已将 23 项升级为经离开/重入验证的 cleanup，并补齐排序与细胞结构的取消协议。QA-003 随后发现 DNA/遗传模式控件未挂载到真实 DOM，V7.4.19 已修正挂载锚点和失真的合同夹具；QA-005 已对精确提交 `572f9e314fa45f6e45b762ac0835e724b70cc9b3` 完成 DNA、光合作用与遗传的桌面/390×844 三轮独立复验并通过。V7.4.20 又恢复活动首页的固定视口裁剪，消除通用 `.page.active` 覆盖引起的 390px 根级横向溢出。
 - V7.4.26 已关闭 R4b 实验模块切换生命周期：`AstraExperimentRegistry.cleanupModule(subject, id)` 只对 23 项 `verified:true` owner 执行精确 cleanup，65 项 legacy 全部保持 fail closed，0 项 missing；A→B、B→画廊、画廊→A 和整页离开由 transition generation、Zoom 前置关闭、失败中止与页面级兼容清理共同约束，迟到资源/init/焦点/相关推荐任务不能写入新模块。五大学科桌面三轮、精确 390×844、整页离开重入和独立只读复审均通过。
 - V7.4.27 已关闭 R5 当前构建三角色终验：QA-007 使用全新一次性 SQLite、隔离账号和真实 Edge，证明匿名登录门禁与 Service Worker 先于首个业务写入，学生/教师/管理员只加载各自允许的 CSS/JS，角色资源与 `/api` 均不进入 CacheStorage；注册后退出并在新上下文显式登录、建课/发布、真实批量导入、入班/提交/反馈、批改、审批、用户与组织治理、审计和越权拒绝全部通过。桌面与精确 390×844、5 张截图、浏览器诊断及同库只读总账均通过，R1—R5 已形成仓库发布候选；真实 MySQL、staging 和指定目标环境发布仍只由 R6/OPS-001 关闭。
@@ -95,7 +96,7 @@ C++ 进程只承担静态资源和内部存活探针，业务 `/api/*` 必须由
 
 ## 质量门禁
 
-```bash
+```powershell
 # 后端全量回归；真实 MySQL 专项在未提供隔离数据库时会显式跳过
 python -m pytest backend
 
@@ -103,8 +104,20 @@ python -m pytest backend
 npm ci --ignore-scripts
 npm test
 
-# 三角色业务证明（只允许一次性本地数据库；需先启动静态站和 testing/development API）
-node tools/browser/role-workflows-proof.cjs --api http://127.0.0.1:8000 --web http://127.0.0.1:8766 --confirm-isolated-environment
+# 9001 三角色业务证明：先以全新 -DataDirectory 和 -BootstrapAdmin 启动服务；
+# 再只在当前证明进程临时提供同一管理员用户名/密码，--out 指向仓库外空目录。
+$env:ASTRA_QA_ADMIN_USERNAME = '<刚才创建的管理员用户名>'
+$secret = Read-Host '管理员密码' -AsSecureString
+$secretPtr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
+$proofOut = Join-Path $env:TEMP ('astra-role-proof-' + [guid]::NewGuid().ToString('N'))
+try {
+  $env:ASTRA_QA_ADMIN_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($secretPtr)
+  node tools/browser/role-workflows-proof.cjs --api http://127.0.0.1:9001 --web http://127.0.0.1:9001 --out $proofOut --confirm-isolated-environment
+} finally {
+  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($secretPtr)
+  Remove-Item Env:ASTRA_QA_ADMIN_PASSWORD -ErrorAction SilentlyContinue
+  Remove-Item Env:ASTRA_QA_ADMIN_USERNAME -ErrorAction SilentlyContinue
+}
 
 # 指定 staging 使用 --confirm-target-staging；API/web 必须是同一真实 HTTPS origin，
 # Git 必须干净，--out 必须显式指向仓库外不存在或为空的目录，

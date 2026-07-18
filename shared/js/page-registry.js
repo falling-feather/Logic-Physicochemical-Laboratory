@@ -6,7 +6,7 @@
 
     const ROLE_RESOURCE_VERSION = '20260716v7427RoleWorkflowGateP0';
     const ADMIN_RESOURCE_VERSION = '20260718v7432UnifiedAtlasP0';
-    const PLANETS_RESOURCE_VERSION = '20260718v7434LocalPreviewP0';
+    const PLANETS_RESOURCE_VERSION = '20260718v7435QaCloseoutP0';
 
     const definePage = (config) => Object.freeze({
         galaxy: config.galaxy || 'englab',

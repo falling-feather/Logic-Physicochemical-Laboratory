@@ -1509,6 +1509,32 @@
     color: #6edbff;
 }
 
+.admin-icon-button.admin-icon-button--danger {
+    border-color: rgba(232,133,108,.46);
+    background: rgba(92,35,29,.3);
+    color: #ffc5b7;
+}
+
+.admin-icon-button.admin-icon-button--restore {
+    border-color: rgba(111,224,164,.46);
+    background: rgba(31,128,79,.22);
+    color: #bff5d5;
+}
+
+.admin-icon-button.admin-icon-button--danger:hover,
+.admin-icon-button.admin-icon-button--danger:focus-visible {
+    border-color: rgba(255,197,183,.7);
+    background: rgba(122,43,34,.38);
+    color: #ffe0d7;
+}
+
+.admin-icon-button.admin-icon-button--restore:hover,
+.admin-icon-button.admin-icon-button--restore:focus-visible {
+    border-color: rgba(191,245,213,.72);
+    background: rgba(31,128,79,.34);
+    color: #ddffea;
+}
+
 .admin-auth-state,
 .admin-notice {
     width: min(100% - 80px, 1560px);

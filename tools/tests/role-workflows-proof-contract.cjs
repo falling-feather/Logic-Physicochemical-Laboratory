@@ -24,6 +24,16 @@ assert.match(source, /target staging HTTPS and production-like environment guard
 assert.match(source, /\['staging', 'production'\]\.includes/);
 assert.match(source, /process\.env\.ASTRA_ADMIN_BOOTSTRAP_TOKEN/);
 assert.match(source, /Target staging bootstrap token must be injected through ASTRA_ADMIN_BOOTSTRAP_TOKEN/);
+assert.match(source, /process\.env\.ASTRA_QA_ADMIN_USERNAME/);
+assert.match(source, /process\.env\.ASTRA_QA_ADMIN_PASSWORD/);
+assert.match(source, /Local pre-provisioned admin requires both ASTRA_QA_ADMIN_USERNAME and ASTRA_QA_ADMIN_PASSWORD/);
+assert.match(source, /pre-provisioned local admin selected without runtime bootstrap/);
+assert.match(source, /credentialSource:\s*'process-environment'/);
+assert.match(source, /adminProvisioning = 'pre-provisioned-local-environment'/);
+assert.ok(
+  source.indexOf('if (usePreProvisionedLocalAdmin)') < source.indexOf('const adminBootstrapToken = targetMode'),
+  'local pre-provisioned credentials must bypass only the runtime bootstrap branch'
+);
 assert.match(source, /development'[\s\S]*'test'[\s\S]*'testing/);
 assert.match(source, /gitHead:\s*currentGitHead\(\)/);
 assert.match(source, /gitStatusShort:\s*currentGitStatusShort\(\)/);
@@ -70,6 +80,11 @@ assert.match(source, /await loginFromUi\(studentRuntime\.page, 'student', accoun
 assert.match(source, /serviceWorkerRoleEvidence\(teacherRuntime\.page, 'teacher'/);
 assert.match(source, /serviceWorkerRoleEvidence\(studentRuntime\.page, 'student'/);
 assert.match(source, /serviceWorkerRoleEvidence\(adminRuntime\.page, 'admin'/);
+assert.match(source, /teacher forbidden admin hash falls back to planets before admin CSS or script load/);
+assert.match(source, /goto\(roleUrl\(webBase, apiBase, 'admin'\)[\s\S]*waitForURL\(\/#planets\$\/\)[\s\S]*#page-planets\.page\.active/);
+assert.match(source, /teacher forbidden admin hash falls back[\s\S]*window\.location\.hash = 'teacher'[\s\S]*data-teacher-dashboard/);
+assert.match(source, /role shell falls back to planets before protected CSS or script load/);
+assert.match(source, /goto\(roleUrl\(webBase, apiBase, 'teacher'\)[\s\S]*waitForURL\(\/#planets\$\/\)[\s\S]*Student must not load teacher or admin page resources/);
 assert.match(source, /cookieSessionEvidence[\s\S]*astra_session[\s\S]*HttpOnly[\s\S]*SameSite=Lax[\s\S]*cookie-only/);
 assert.match(source, /markTargetReleaseCheck\('cookie_session'\)/);
 assert.match(source, /markTargetReleaseCheck\('service_worker_api_no_store'\)/);
@@ -83,12 +98,19 @@ assert.ok(
 assert.match(source, /student-batch-import[\s\S]*batchImportRequests === 1/);
 assert.match(source, /submissionWriteCount === 1/);
 assert.match(source, /data-admin-user-governance[\s\S]*governedPatchCount === 1/);
+assert.match(source, /data-admin-panel-form="users"[\s\S]*accounts\.governed\.username[\s\S]*button\[type="submit"\]/);
 assert.match(source, /role:\s*'teacher',[\s\S]*status:\s*'disabled'/);
 assert.match(source, /governedSessionAfter\.status === 401/);
 assert.match(source, /admin\.user\.update/);
 assert.match(source, /admin full domain data map matches authoritative stats/);
+assert.match(source, /async function selectAdminSection/);
+assert.match(source, /selectAdminSection\(adminRuntime\.page, 'organizations', '\[data-admin-panel="join-requests"\]'/);
+assert.match(source, /selectAdminSection\(adminRuntime\.page, 'identity', '\[data-admin-panel="users"\]'/);
+assert.match(source, /selectAdminSection\(adminRuntime\.page, 'operations', '\[data-admin-panel="audit-logs"\]'/);
+assert.match(source, /selectAdminSection\(adminRuntime\.page, 'overview', '\[data-admin-overview\]'/);
 
 assert.match(source, /async function mobileRoleInteraction/);
+assert.match(source, /mobileRoleInteraction[\s\S]*selectAdminSection\(page, 'organizations', '\[data-admin-panel="schools"\]'/);
 assert.match(source, /data-student-panel=\"assignments\"[^`]*data-student-assignment-id/);
 assert.match(source, /setViewportSize\(\{ width: 390, height: 844 \}\)[\s\S]*mobileRoleInteraction/);
 assert.match(source, /waitForResponse[\s\S]*searchParams\.get\('filter'\) === filter[\s\S]*response\.status\(\) === 200/);

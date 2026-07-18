@@ -693,7 +693,8 @@ async function mobileRoleInteraction(page, role, options = {}) {
   if (role === 'admin') {
     await page.locator('[data-admin-action="refresh"]:not([disabled])').click();
     await page.locator('[data-admin-action="refresh"]:not([disabled])').waitFor({ state: 'visible' });
-    await page.locator('[data-admin-open-panel="schools"]:visible').first().click();
+    await selectAdminSection(page, 'organizations', '[data-admin-panel="schools"]');
+    await page.locator('[data-admin-panel="schools"]').focus();
     await page.waitForFunction(() => document.activeElement?.matches('[data-admin-panel="schools"]'));
   }
   return page.evaluate(({ currentRole }) => ({
@@ -830,6 +831,7 @@ async function organizationFocusEvidence(page, label, expectedSelector = '') {
 }
 
 async function openOrganizationEditor(page, panelId, entityName) {
+  await selectAdminSection(page, 'organizations', `[data-admin-panel="${panelId}"]`);
   const row = page.locator(`[data-admin-panel="${panelId}"] tbody tr`).filter({ hasText: entityName }).first();
   await row.waitFor({ state: 'visible' });
   await row.locator('[data-admin-organization-edit]').click();
@@ -838,6 +840,13 @@ async function openOrganizationEditor(page, panelId, entityName) {
   await dialog.locator('[data-admin-organization-form]').waitFor({ state: 'visible' });
   await organizationFocusEvidence(page, `open ${panelId} organization editor`);
   return dialog;
+}
+
+async function selectAdminSection(page, sectionId, visibleSelector) {
+  const button = page.locator(`[data-admin-section-button="${sectionId}"]`);
+  await button.waitFor({ state: 'visible' });
+  if (await button.getAttribute('aria-current') !== 'page') await button.click();
+  if (visibleSelector) await page.locator(visibleSelector).first().waitFor({ state: 'visible' });
 }
 
 async function closeOrganizationEditor(dialog) {
@@ -851,6 +860,11 @@ async function main() {
   const targetMode = args['confirm-target-staging'] === true;
   const rawApiBase = String(args.api || '').trim();
   const rawWebBase = String(args.web || '').trim();
+  const localAdminUsername = String(process.env.ASTRA_QA_ADMIN_USERNAME || '').trim();
+  const localAdminPassword = String(process.env.ASTRA_QA_ADMIN_PASSWORD || '');
+  const hasLocalAdminUsername = localAdminUsername.length > 0;
+  const hasLocalAdminPassword = localAdminPassword.length > 0;
+  const usePreProvisionedLocalAdmin = localMode && hasLocalAdminUsername && hasLocalAdminPassword;
   let apiBase = localMode ? stripTrailingSlash(rawApiBase) : rawApiBase;
   let webBase = localMode ? stripTrailingSlash(rawWebBase) : rawWebBase;
   const outDir = path.resolve(args.out || path.join('test-screenshots', 'role-workflows'));
@@ -869,6 +883,7 @@ async function main() {
       gitStatusShort: currentGitStatusShort(),
       artifactSha256: null,
       serviceWorkerSource: null,
+      adminProvisioning: null,
     },
     checks: [],
     entities: {},
@@ -913,6 +928,10 @@ async function main() {
     assert(localMode !== targetMode, 'Pass exactly one of --confirm-isolated-environment or --confirm-target-staging');
     if (localMode) {
       assert(isLocalUrl(apiBase) && isLocalUrl(webBase), 'Local role workflow proof only accepts local API and web URLs');
+      assert(
+        hasLocalAdminUsername === hasLocalAdminPassword,
+        'Local pre-provisioned admin requires both ASTRA_QA_ADMIN_USERNAME and ASTRA_QA_ADMIN_PASSWORD'
+      );
     } else {
       assert(
         isExactTargetHttpsOrigin(rawApiBase)
@@ -996,7 +1015,9 @@ async function main() {
       governed: { username: `e2e_governed_${runId}`, displayName: '用户治理对象', password },
       applicant: { username: `e2e_applicant_${runId}`, displayName: '审批申请学生', password },
       outsider: { username: `e2e_outsider_${runId}`, displayName: '越权验证学生', password },
-      admin: { username: `e2e_admin_${runId}`, displayName: '端到端管理员', password },
+      admin: usePreProvisionedLocalAdmin
+        ? { username: localAdminUsername, displayName: '预置验收管理员', password: localAdminPassword }
+        : { username: `e2e_admin_${runId}`, displayName: '端到端管理员', password },
     };
 
     report.timeline.firstMutationAt = new Date().toISOString();
@@ -1008,21 +1029,31 @@ async function main() {
       assert(!args['admin-bootstrap-token'], 'Target staging bootstrap token must be injected through ASTRA_ADMIN_BOOTSTRAP_TOKEN');
       assert(process.env.ASTRA_ADMIN_BOOTSTRAP_TOKEN, 'Target staging requires ASTRA_ADMIN_BOOTSTRAP_TOKEN');
     }
-    const adminBootstrapToken = targetMode
-      ? process.env.ASTRA_ADMIN_BOOTSTRAP_TOKEN
-      : (args['admin-bootstrap-token'] || process.env.ASTRA_ADMIN_BOOTSTRAP_TOKEN);
-    const bootstrap = await fetchJson(`${apiBase}/api/admin/bootstrap`, {
-      method: 'POST',
-      body: {
+    if (usePreProvisionedLocalAdmin) {
+      report.environment.adminProvisioning = 'pre-provisioned-local-environment';
+      report.accounts.admin = { username: accounts.admin.username, id: null };
+      record('pre-provisioned local admin selected without runtime bootstrap', {
         username: accounts.admin.username,
-        display_name: accounts.admin.displayName,
-        password: accounts.admin.password,
-        ...(adminBootstrapToken ? { bootstrap_token: String(adminBootstrapToken) } : {}),
-      },
-    });
-    assert(bootstrap.status === 201, `Admin bootstrap failed with ${bootstrap.status}: ${bootstrap.text}`);
-    report.accounts.admin = { username: accounts.admin.username, id: String(bootstrap.body && bootstrap.body.id) };
-    record('controlled admin bootstrap', { role: bootstrap.body && bootstrap.body.role });
+        credentialSource: 'process-environment',
+      });
+    } else {
+      const adminBootstrapToken = targetMode
+        ? process.env.ASTRA_ADMIN_BOOTSTRAP_TOKEN
+        : (args['admin-bootstrap-token'] || process.env.ASTRA_ADMIN_BOOTSTRAP_TOKEN);
+      const bootstrap = await fetchJson(`${apiBase}/api/admin/bootstrap`, {
+        method: 'POST',
+        body: {
+          username: accounts.admin.username,
+          display_name: accounts.admin.displayName,
+          password: accounts.admin.password,
+          ...(adminBootstrapToken ? { bootstrap_token: String(adminBootstrapToken) } : {}),
+        },
+      });
+      assert(bootstrap.status === 201, `Admin bootstrap failed with ${bootstrap.status}: ${bootstrap.text}`);
+      report.environment.adminProvisioning = targetMode ? 'target-runtime-bootstrap' : 'isolated-runtime-bootstrap';
+      report.accounts.admin = { username: accounts.admin.username, id: String(bootstrap.body && bootstrap.body.id) };
+      record('controlled admin bootstrap', { role: bootstrap.body && bootstrap.body.role });
+    }
 
     const auxiliaryRegistrations = {};
     for (const key of ['batchStudent', 'governed']) {
@@ -1264,8 +1295,8 @@ async function main() {
       teacherOrganization: [403, 403],
     });
     await teacherRuntime.page.goto(roleUrl(webBase, apiBase, 'admin'), { waitUntil: 'domcontentloaded' });
-    await teacherRuntime.page.waitForURL(/#teacher$/);
-    await teacherRuntime.page.locator('[data-teacher-dashboard]:not([hidden])').waitFor({ state: 'visible' });
+    await teacherRuntime.page.waitForURL(/#planets$/);
+    await teacherRuntime.page.locator('#page-planets.page.active').waitFor({ state: 'visible' });
     const forbiddenAdminResources = await teacherRuntime.page.evaluate(() => ({
       scripts: document.querySelectorAll('script[data-router-page-script="admin"]').length,
       styles: Array.from(document.querySelectorAll('link[data-astra-role-resource]'))
@@ -1275,7 +1306,10 @@ async function main() {
       forbiddenAdminResources.scripts === 0 && forbiddenAdminResources.styles === 0,
       `teacher must not load admin resources: ${JSON.stringify(forbiddenAdminResources)}`
     );
-    record('teacher forbidden admin hash redirects before admin CSS or script load', forbiddenAdminResources);
+    record('teacher forbidden admin hash falls back to planets before admin CSS or script load', forbiddenAdminResources);
+    await teacherRuntime.page.evaluate(() => { window.location.hash = 'teacher'; });
+    await teacherRuntime.page.waitForURL(/#teacher$/);
+    await teacherRuntime.page.locator('[data-teacher-dashboard]:not([hidden])').waitFor({ state: 'visible' });
 
     const applicantRuntime = await createRolePage(browser, report, webBase, apiBase, 'student');
     contexts.push(applicantRuntime.context);
@@ -1334,6 +1368,7 @@ async function main() {
       loadedScripts: report.serviceWorker.admin.loadedScripts,
       cookieSession: report.cookieSession,
     });
+    await selectAdminSection(adminRuntime.page, 'organizations', '[data-admin-panel="join-requests"]');
     const approve = adminRuntime.page.locator(`[data-admin-join-review="approved"][data-join-request-id="${joinRequestId}"]`);
     await approve.waitFor({ state: 'visible' });
     await approve.click();
@@ -1350,6 +1385,10 @@ async function main() {
     record('teacher batch import audit is visible to admin', { total: batchAudit.body.total });
 
     const governedUserId = String(auxiliaryRegistrations.governed.id);
+    await selectAdminSection(adminRuntime.page, 'identity', '[data-admin-panel="users"]');
+    const governedUserFilter = adminRuntime.page.locator('[data-admin-panel-form="users"]');
+    await governedUserFilter.locator('[name="q"]').fill(accounts.governed.username);
+    await governedUserFilter.locator('button[type="submit"]').click();
     const governedControls = adminRuntime.page.locator(`[data-admin-user-governance="${governedUserId}"]`);
     await governedControls.waitFor({ state: 'visible' });
     let governedPatchCount = 0;
@@ -1394,6 +1433,7 @@ async function main() {
       `/api/admin/audit-logs?action=admin.user.update&resource_id=${governedUserId}`
     );
     assert(governedAudit.status === 200 && governedAudit.body.total === 1, 'admin user governance audit reconciliation failed');
+    await selectAdminSection(adminRuntime.page, 'operations', '[data-admin-panel="audit-logs"]');
     await adminRuntime.page.locator('[data-admin-panel="audit-logs"] tbody tr')
       .filter({ hasText: 'admin.user.update' })
       .filter({ hasText: governedUserId })
@@ -1425,6 +1465,7 @@ async function main() {
     const archivedClassPage = await pageApi(adminRuntime.page, apiBase, '/api/admin/classes?status=archived&limit=1&offset=0');
     const authoritativeStats = await pageApi(adminRuntime.page, apiBase, '/api/admin/stats');
     assert(authoritativeStats.status === 200, `admin stats reread failed with ${authoritativeStats.status}`);
+    await selectAdminSection(adminRuntime.page, 'overview', '[data-admin-overview]');
     const entityCounts = await adminRuntime.page.evaluate(() => Object.fromEntries(
       Array.from(document.querySelectorAll('[data-admin-database-map] [data-entity]')).map((item) => [
         item.getAttribute('data-entity'),
@@ -1459,6 +1500,7 @@ async function main() {
     assert(visualCounts.classes[1] === archivedClassPage.body.total, 'archived class visual total must match API');
     record('admin organization status visualization matches authoritative totals', visualCounts);
 
+    await selectAdminSection(adminRuntime.page, 'organizations', '[data-admin-panel="schools"]');
     const schoolRow = adminRuntime.page.locator('[data-admin-panel="schools"] tbody tr').filter({ hasText: schoolName }).first();
     const schoolEditorTrigger = schoolRow.locator('[data-admin-organization-edit]');
     let releaseSchoolRead;
@@ -1882,14 +1924,14 @@ async function main() {
     markTargetReleaseCheck('unauthorized_requests_denied');
 
     await studentRuntime.page.goto(roleUrl(webBase, apiBase, 'teacher'), { waitUntil: 'domcontentloaded' });
-    await studentRuntime.page.waitForURL(/#student$/);
+    await studentRuntime.page.waitForURL(/#planets$/);
     const deniedRoleScripts = await studentRuntime.page.locator('script[data-router-page-script="teacher"], script[data-router-page-script="admin"]').count();
     const deniedRoleStyles = await studentRuntime.page.evaluate(() => Array.from(
       document.querySelectorAll('link[data-astra-role-resource]')
     ).filter((node) => /\/pages\/(teacher|admin)\//.test(new URL(node.href).pathname)).length);
     assert(deniedRoleScripts === 0 && deniedRoleStyles === 0, 'Student must not load teacher or admin page resources');
-    await studentRuntime.page.locator('[data-student-dashboard]:not([hidden])').waitFor({ state: 'visible' });
-    record('role shell redirects forbidden hash before protected CSS or script load', {
+    await studentRuntime.page.locator('#page-planets.page.active').waitFor({ state: 'visible' });
+    record('role shell falls back to planets before protected CSS or script load', {
       forbiddenScripts: deniedRoleScripts,
       forbiddenStyles: deniedRoleStyles,
     });

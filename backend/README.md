@@ -2,7 +2,7 @@
 
 > **文档定位**：后端本地开发、API/服务边界、配置、迁移、运维脚本和验证入口。V7.4.12 起完成事实见 [`../doc/03-开发历史.md`](../doc/03-开发历史.md)，更早实机证据见 [`../doc/03-发布历史.md`](../doc/03-发布历史.md)，未来任务见 [`../doc/02-项目规划.md`](../doc/02-项目规划.md)。
 >
-> **当前基线**：FastAPI + SQLAlchemy + Alembic 0047；SQLite 为安全本地默认，MySQL 为发布目标。V7.4.34 已增加 `app.local_preview` 与根目录 `astra-local.ps1`，用于 9001 同源本机验收；V7.4.29 已补齐 Windows DPAPI 受保护密钥存储、服务账号绑定、正式 HTTPS origin/HSTS 服务包参数和 target staging 浏览器证明模式；V7.4.25 已将学校/班级受约束治理接入管理 UI，并补齐凭据型 PUT 预检；V7.4.24 已完成组织治理 API、乐观并发、责任人保护、审计与活动组织边界；V7.4.22 已硬化浏览器 Cookie-only/非浏览器 Bearer 双通道契约；V7.4.9 已建立 Python 3.12 通用哈希锁和 CI 漂移门禁；V7.4.8 已完成管理 API 全部分域拆分，`admin.py` 为纯路由聚合器；V6.6.63 后端阶段、真实 MySQL、四服务拓扑、Release 构建/回滚和 15/15 stage gate 已完成。
+> **当前基线**：FastAPI + SQLAlchemy + Alembic 0047；SQLite 为安全本地默认，MySQL 为发布目标。V7.4.34 已增加 `app.local_preview` 与根目录 `astra-local.ps1`，用于 9001 同源本机验收；V7.4.35 候选只对齐本机三角色证明与启动时预置管理员，不放宽 `/api/admin/bootstrap` 的运行时关闭边界。V7.4.29 已补齐 Windows DPAPI 受保护密钥存储、服务账号绑定、正式 HTTPS origin/HSTS 服务包参数和 target staging 浏览器证明模式；V7.4.25 已将学校/班级受约束治理接入管理 UI，并补齐凭据型 PUT 预检；V7.4.24 已完成组织治理 API、乐观并发、责任人保护、审计与活动组织边界；V7.4.22 已硬化浏览器 Cookie-only/非浏览器 Bearer 双通道契约；V7.4.9 已建立 Python 3.12 通用哈希锁和 CI 漂移门禁；V7.4.8 已完成管理 API 全部分域拆分，`admin.py` 为纯路由聚合器；V6.6.63 后端阶段、真实 MySQL、四服务拓扑、Release 构建/回滚和 15/15 stage gate 已完成。
 >
 > **最后更新**：2026-07-18
 
@@ -38,6 +38,8 @@ powershell -ExecutionPolicy Bypass -File .\astra-local.ps1
 ```
 
 入口自动准备 `.venv`、安装 `requirements.lock`、迁移 SQLite，并以前台 Uvicorn 进程从 `127.0.0.1:9001` 同源提供静态站和现有 FastAPI。`app.local_preview` 只挂载 `pages/`、`shared/`、`UI/`、`codevis/` 及三个根文件，不公开 `backend/`、`doc/`、`server/`、`.git/` 或仓库根目录。需要首管理员时只在全新/尚无管理员的本机数据库上增加 `-BootstrapAdmin`，凭据经交互式 stdin 进入权威 `/api/admin/bootstrap`。
+
+三角色本机证明不得再次调用已关闭的运行时 bootstrap。先由 `astra-local.ps1 -BootstrapAdmin` 预置临时管理员，再仅在证明 Node 进程中成对设置 `ASTRA_QA_ADMIN_USERNAME` 与 `ASTRA_QA_ADMIN_PASSWORD`；脚本只消费该账号登录，不把密码写入报告。缺少任一变量时立即失败，目标 staging 仍使用独立的 `ASTRA_ADMIN_BOOTSTRAP_TOKEN` 语义，二者不可混用。
 
 该入口强制 development + SQLite，只供本机功能验收；正式 staging/production 仍使用 `app.main`、MySQL、受保护 secret 与目标服务包，不能引用本机结果替代发布证据。
 
