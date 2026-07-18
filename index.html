@@ -45,7 +45,7 @@
     <link rel="stylesheet" href="shared/css/fab-trigger.css?v=20260630mainV64">
     <!-- CSS: Pages -->
     <link rel="stylesheet" href="pages/home/home.css?v=20260715v7420HomeViewportClipP1">
-    <link rel="stylesheet" href="pages/planets/planets.css?v=20260704qianduanV72">
+    <link rel="stylesheet" href="pages/planets/planets.css?v=20260718v7432UnifiedAtlasP0">
     <link rel="stylesheet" href="pages/cosmos/cosmos.css?v=20260630mainV64">
     <link rel="stylesheet" href="pages/datascience/datascience.css?v=20260630mainV64">
     <link rel="stylesheet" href="pages/infotech/infotech.css?v=20260630mainV64">
@@ -422,88 +422,131 @@
             </div>
         </section>
 
-        <!-- ────────── PLANETS · 星序顶层星系入口 (v7.0) ────────── -->
-        <section id="page-planets" class="page active" aria-label="星序星系入口">
-            <canvas id="planets-starfield" class="planets-starfield" aria-hidden="true"></canvas>
-            <div class="planets-cursor-halo" aria-hidden="true"></div>
-
+        <!-- ────────── PLANETS · 星序统一资源总览 (v7.4.32) ────────── -->
+        <section id="page-planets" class="page active" aria-label="星序统一资源总览">
             <div class="planets-atlas">
-                <header class="planets-topbar">
-                    <a class="planets-mark" href="#planets" aria-label="返回星序总览">
-                        <span class="planets-mark__symbol">星</span>
-                        <span class="planets-mark__text">
-                            <strong>星序</strong>
-                            <span>Astra</span>
-                        </span>
+                <aside class="planets-rail" aria-label="星序角色导航">
+                    <a class="planets-brand" href="#planets" aria-label="返回星序总览">
+                        <span class="planets-brand__signal" aria-hidden="true"></span>
+                        <span><strong>星序</strong><small>ASTRA</small></span>
                     </a>
-                    <span class="planets-topbar__meta" aria-hidden="true">Star Atlas · Online</span>
-                </header>
+                    <nav class="planets-role-nav" aria-label="当前身份可用入口">
+                        <a href="#planets" aria-current="page"><i data-lucide="orbit"></i><span>星序总览</span></a>
+                        <a href="#student" data-app-roles="student"><i data-lucide="graduation-cap"></i><span>我的学习</span></a>
+                        <a href="#teacher" data-app-roles="teacher,admin"><i data-lucide="presentation"></i><span>教学工作台</span></a>
+                        <a href="#admin" data-app-roles="admin"><i data-lucide="shield-check"></i><span>全局治理</span></a>
+                    </nav>
+                    <div class="planets-rail__session" aria-live="polite">
+                        <span class="planets-presence" aria-hidden="true"></span>
+                        <div><strong data-planets-identity-name>已验证用户</strong><small data-planets-identity-role>正在同步身份</small></div>
+                    </div>
+                </aside>
 
-                <main class="planets-hero">
-                    <section class="planets-stage" aria-label="星序星系拨盘（拖动旋转选择星系）">
-                        <button class="planets-galaxy planets-galaxy--eng" type="button" data-galaxy="englab" aria-label="选择工科试验室星系">
-                            <span class="planets-galaxy-disc">
-                                <span class="planets-galaxy-core"></span>
-                                <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
-                            </span>
-                            <span class="planets-galaxy-no" aria-hidden="true">02</span>
-                            <span class="planets-galaxy-label">
-                                <strong>工科试验室</strong>
-                                <span>Engineering Lab</span>
-                            </span>
-                        </button>
+                <div class="planets-workspace">
+                    <header class="planets-topbar">
+                        <p><span>ASTRA /</span> 统一资源索引</p>
+                        <div class="planets-topbar__status"><span class="planets-presence" aria-hidden="true"></span>会话已验证</div>
+                    </header>
 
-                        <button class="planets-galaxy planets-galaxy--code" type="button" data-galaxy="codespace" aria-label="选择代码空间星系">
-                            <span class="planets-galaxy-disc planets-galaxy-disc--code">
-                                <span class="planets-galaxy-core"></span>
-                                <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
-                            </span>
-                            <span class="planets-galaxy-no" aria-hidden="true">01</span>
-                            <span class="planets-galaxy-label">
-                                <strong>代码空间</strong>
-                                <span>Code Space</span>
-                            </span>
-                        </button>
+                    <main class="planets-main">
+                        <section class="planets-intro" aria-labelledby="planets-main-title">
+                            <span class="planets-eyebrow">ORBITAL LEARNING ATLAS · 03 GALAXIES</span>
+                            <h1 id="planets-main-title">星序总览</h1>
+                            <p>三个星系，一处抵达。课程、实验与代码资源按学习单元集中呈现，身份能力在同一层级自然展开。</p>
+                        </section>
 
-                        <button class="planets-galaxy planets-galaxy--roadmap" type="button" data-galaxy="frontier" aria-label="选择未来星系">
-                            <span class="planets-galaxy-disc planets-galaxy-disc--roadmap">
-                                <span class="planets-galaxy-core"></span>
-                                <span class="planets-galaxy-orbit planets-galaxy-orbit--one"></span>
-                            </span>
-                            <span class="planets-galaxy-no" aria-hidden="true">03</span>
-                            <span class="planets-galaxy-label">
-                                <strong>未来星系</strong>
-                                <span>Frontier</span>
-                            </span>
-                        </button>
-                    </section>
+                        <div class="planets-overview-grid">
+                            <section class="planets-directory" aria-labelledby="planets-directory-title">
+                                <div class="planets-section-heading">
+                                    <h2 id="planets-directory-title">星系目录</h2>
+                                    <span>GALAXY INDEX</span>
+                                </div>
 
-                    <section class="planets-intro" aria-labelledby="planets-main-title">
-                        <span class="planets-intro__eyebrow">Galaxy Directory</span>
-                        <h1 id="planets-main-title">星序</h1>
-                        <p class="planets-intro__sub">A·S·T·R·A</p>
-                        <p class="planets-intro__copy">面向未来学习者的星系化学科探索平台。拨动右侧星盘，将星系对准准星即可展开二级目录。</p>
-                        <p class="planets-intro__hint">Drag to rotate · Scroll to shift</p>
-                        <div class="planets-recommendation" aria-label="推荐学习主线">
-                            <span>推荐路径</span>
-                            <strong>从未来星系进入材料样板路线</strong>
-                            <p>星序总览 → 未来星系 → 材料微观 → 实验台 → 状态回查</p>
-                            <div class="planets-recommendation__actions">
-                                <a href="#frontier-frontier-route">学习主线</a>
-                                <a href="#frontier-materials-route">材料样板</a>
-                                <a href="#frontier">未来星系</a>
-                            </div>
+                                <details class="planets-galaxy-row planets-galaxy-row--englab" data-galaxy="englab" open>
+                                    <summary>
+                                        <span class="planets-galaxy-row__number">01</span>
+                                        <span class="planets-galaxy-row__orbit" aria-hidden="true"><i></i></span>
+                                        <span class="planets-galaxy-row__name"><strong>工科试验室</strong><small>Engineering Lab · 基础学科实验</small></span>
+                                        <span class="planets-galaxy-row__toggle">展开资源</span>
+                                    </summary>
+                                    <nav class="planets-resource-links" aria-label="工科试验室资源">
+                                        <a href="#home"><span>00</span>总览</a>
+                                        <a href="#mathematics"><span>01</span>数学</a>
+                                        <a href="#physics"><span>02</span>物理</a>
+                                        <a href="#chemistry"><span>03</span>化学</a>
+                                        <a href="#algorithms"><span>04</span>算法</a>
+                                        <a href="#biology"><span>05</span>生物</a>
+                                    </nav>
+                                </details>
+
+                                <details class="planets-galaxy-row planets-galaxy-row--codespace" data-galaxy="codespace" open>
+                                    <summary>
+                                        <span class="planets-galaxy-row__number">02</span>
+                                        <span class="planets-galaxy-row__orbit" aria-hidden="true"><i></i></span>
+                                        <span class="planets-galaxy-row__name"><strong>代码空间</strong><small>Code Space · 运行与追踪</small></span>
+                                        <span class="planets-galaxy-row__toggle">展开资源</span>
+                                    </summary>
+                                    <nav class="planets-resource-links" aria-label="代码空间资源">
+                                        <a href="codevis/index.html#home"><span>00</span>空间首页</a>
+                                        <a href="codevis/index.html#trace"><span>01</span>代码追踪</a>
+                                        <a href="codevis/index.html#trace"><span>02</span>JavaScript</a>
+                                        <a href="codevis/index.html#trace"><span>03</span>Python</a>
+                                        <a href="codevis/index.html#trace"><span>04</span>C / C++</a>
+                                    </nav>
+                                </details>
+
+                                <details class="planets-galaxy-row planets-galaxy-row--frontier" data-galaxy="frontier" open>
+                                    <summary>
+                                        <span class="planets-galaxy-row__number">03</span>
+                                        <span class="planets-galaxy-row__orbit" aria-hidden="true"><i></i></span>
+                                        <span class="planets-galaxy-row__name"><strong>未来星系</strong><small>Frontier · 跨学科学习路线</small></span>
+                                        <span class="planets-galaxy-row__toggle">展开资源</span>
+                                    </summary>
+                                    <nav class="planets-resource-links" aria-label="未来星系资源">
+                                        <a href="#frontier"><span>00</span>星系总览</a>
+                                        <a href="#cosmos"><span>01</span>宇宙</a>
+                                        <a href="#engineering"><span>02</span>工程</a>
+                                        <a href="#datascience"><span>03</span>数据与 AI</a>
+                                        <a href="#infotech"><span>04</span>信息技术</a>
+                                        <a href="#materials"><span>05</span>材料</a>
+                                        <a href="#humanities"><span>06</span>人文</a>
+                                    </nav>
+                                </details>
+                            </section>
+
+                            <aside class="planets-route" aria-labelledby="planets-route-title">
+                                <div class="planets-section-heading">
+                                    <h2 id="planets-route-title">我的轨道</h2>
+                                    <span data-planets-route-code>ROLE SYNC</span>
+                                </div>
+                                <div class="planets-route__line" aria-hidden="true"><i></i><i></i><i></i></div>
+                                <p data-planets-route-copy>正在根据当前身份整理可用入口。</p>
+                                <div class="planets-route__actions">
+                                    <a href="#student" data-app-roles="student">进入我的学习 <span>↗</span></a>
+                                    <a href="#teacher" data-app-roles="teacher,admin">进入教学工作台 <span>↗</span></a>
+                                    <a href="#admin" data-app-roles="admin">进入全局治理 <span>↗</span></a>
+                                </div>
+                            </aside>
                         </div>
-                    </section>
 
-                    <aside class="planets-menu" id="planets-menu" aria-live="polite" aria-label="星系二级菜单">
-                        <button class="planets-menu__close" type="button" data-close-menu aria-label="关闭二级菜单">×</button>
-                        <span class="planets-menu__state" id="planets-menu-state">进入星系</span>
-                        <h2 id="planets-menu-title">工科试验室</h2>
-                        <p id="planets-menu-copy">选择学科后进入该星系自己的二级内容。</p>
-                        <nav class="planets-module-menu" id="planets-module-menu" aria-label="二级模块"></nav>
-                    </aside>
-                </main>
+                        <section class="planets-resource-index" aria-labelledby="planets-resource-index-title">
+                            <div class="planets-section-heading">
+                                <h2 id="planets-resource-index-title">资源索引</h2>
+                                <span>QUICK ROUTES</span>
+                            </div>
+                            <a href="#home"><span>工程基础</span><strong>实验与可视化学科目录</strong><i>ENG / 01</i></a>
+                            <a href="codevis/index.html#trace"><span>代码追踪</span><strong>多语言执行过程与状态观察</strong><i>CODE / 02</i></a>
+                            <a href="#frontier-frontier-route"><span>跨学科路线</span><strong>从星图进入材料与未来方向</strong><i>FRONTIER / 03</i></a>
+                        </section>
+                    </main>
+                </div>
+
+                <nav class="planets-mobile-dock" aria-label="移动端角色导航">
+                    <a href="#planets" aria-current="page"><i data-lucide="orbit"></i><span>总览</span></a>
+                    <a href="#student" data-app-roles="student"><i data-lucide="graduation-cap"></i><span>学习</span></a>
+                    <a href="#teacher" data-app-roles="teacher,admin"><i data-lucide="presentation"></i><span>教学</span></a>
+                    <a href="#admin" data-app-roles="admin"><i data-lucide="shield-check"></i><span>治理</span></a>
+                </nav>
             </div>
         </section>
 

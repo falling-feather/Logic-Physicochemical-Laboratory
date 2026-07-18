@@ -5,6 +5,7 @@
     if (global.AstraPageRegistry) return;
 
     const ROLE_RESOURCE_VERSION = '20260716v7427RoleWorkflowGateP0';
+    const ADMIN_RESOURCE_VERSION = '20260718v7432UnifiedAtlasP0';
 
     const definePage = (config) => Object.freeze({
         galaxy: config.galaxy || 'englab',
@@ -20,7 +21,7 @@
     const definitions = Object.freeze({
         planets: definePage({
             galaxy: 'astra',
-            script: 'pages/planets/planets.js?v=20260704qianduanV72',
+            script: 'pages/planets/planets.js?v=20260718v7432UnifiedAtlasP0',
             ready: 'initPlanets',
             enter: 'initPlanets',
             leave: 'destroyPlanets'
@@ -57,8 +58,8 @@
         admin: definePage({
             galaxy: 'englab',
             roles: ['admin'],
-            styles: [`pages/admin/admin.css?v=${ROLE_RESOURCE_VERSION}`],
-            script: `pages/admin/admin.js?v=${ROLE_RESOURCE_VERSION}`,
+            styles: [`pages/admin/admin.css?v=${ADMIN_RESOURCE_VERSION}`],
+            script: `pages/admin/admin.js?v=${ADMIN_RESOURCE_VERSION}`,
             ready: 'initAdmin',
             enter: 'initAdmin',
             leave: 'destroyAdmin'

@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    const ADMIN_ASSET_VERSION = '20260716v7426ModuleSwitchLifecycleP4';
+    const ADMIN_ASSET_VERSION = '20260718v7432UnifiedAtlasP0';
     const API_BASE_STORAGE_KEY = 'astra-admin-api-base';
 
     const state = {
@@ -11,6 +11,7 @@
         busy: false,
         initialized: false,
         active: false,
+        activeSection: 'overview',
         online: navigator.onLine !== false,
         runtimeBound: false,
         lifecycleController: null,
@@ -31,6 +32,28 @@
         panelData: {},
         summaryData: {}
     };
+
+    const GOVERNANCE_SECTIONS = Object.freeze([
+        Object.freeze({ id: 'overview', label: '治理总览', meta: 'OVERVIEW', icon: 'radar' }),
+        Object.freeze({ id: 'identity', label: '账号与权限', meta: 'IDENTITY', icon: 'users-round' }),
+        Object.freeze({ id: 'organizations', label: '组织与班级', meta: 'ORGANIZATION', icon: 'landmark' }),
+        Object.freeze({ id: 'content', label: '内容与脚本', meta: 'CONTENT', icon: 'file-code-2' }),
+        Object.freeze({ id: 'operations', label: '运行与审计', meta: 'OPERATIONS', icon: 'activity' })
+    ]);
+
+    const PANEL_SECTIONS = Object.freeze({
+        users: 'identity',
+        schools: 'organizations',
+        classes: 'organizations',
+        'join-requests': 'organizations',
+        'content-drafts': 'content',
+        'script-assets': 'content',
+        'script-hosts': 'content',
+        'snapshot-runs': 'operations',
+        outbox: 'operations',
+        'audit-logs': 'operations',
+        bugs: 'operations'
+    });
 
     const SUMMARY_CONFIGS = [
         {
@@ -549,21 +572,65 @@
         });
     }
 
+    function sectionLabel(sectionId) {
+        const section = GOVERNANCE_SECTIONS.find((item) => item.id === sectionId);
+        return section ? section.label : GOVERNANCE_SECTIONS[0].label;
+    }
+
+    function applyActiveSection(options) {
+        if (!state.root) return;
+        const activeSection = GOVERNANCE_SECTIONS.some((item) => item.id === state.activeSection)
+            ? state.activeSection
+            : 'overview';
+        state.activeSection = activeSection;
+        const overview = state.root.querySelector('[data-admin-overview]');
+        if (overview) overview.hidden = activeSection !== 'overview';
+        state.root.querySelectorAll('[data-admin-section]').forEach((panel) => {
+            panel.hidden = panel.dataset.adminSection !== activeSection;
+        });
+        state.root.querySelectorAll('[data-admin-section-button]').forEach((button) => {
+            const selected = button.dataset.adminSectionButton === activeSection;
+            if (selected) button.setAttribute('aria-current', 'page');
+            else button.removeAttribute('aria-current');
+        });
+        const title = state.root.querySelector('[data-admin-current-section-title]');
+        if (title) title.textContent = sectionLabel(activeSection);
+        if (options && options.focus) {
+            const target = activeSection === 'overview'
+                ? state.root.querySelector('[data-admin-overview]')
+                : state.root.querySelector(`[data-admin-section="${activeSection}"]`);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                try { target.focus({ preventScroll: true }); } catch (error) { target.focus(); }
+            }
+        }
+    }
+
+    function setActiveSection(sectionId, options) {
+        if (!GOVERNANCE_SECTIONS.some((item) => item.id === sectionId)) return;
+        state.activeSection = sectionId;
+        applyActiveSection(options);
+    }
+
     function renderShell() {
         state.root.innerHTML = `
             <header class="admin-governance__header">
                 <div class="admin-governance__title">
                     <span class="admin-governance__eyebrow">
-                        <i data-lucide="shield-check"></i>
-                        管理端治理
+                        <i data-lucide="orbit"></i>
+                        ASTRA GOVERNANCE
                     </span>
-                    <h1>治理总览</h1>
+                    <h1>全局治理</h1>
+                    <p>三个星系，一张总账。所有写入继续经过领域校验、权限控制与审计。</p>
                 </div>
                 <div class="admin-governance__actions">
-                    <label class="admin-api-base">
-                        <span>API</span>
-                        <input type="url" data-admin-api-base value="${escapeAttr(state.apiBase)}" placeholder="同源" autocomplete="off">
-                    </label>
+                    <details class="admin-connection-settings">
+                        <summary><i data-lucide="waypoints"></i><span>连接设置</span></summary>
+                        <label class="admin-api-base">
+                            <span>API</span>
+                            <input type="url" data-admin-api-base value="${escapeAttr(state.apiBase)}" placeholder="同源" autocomplete="off">
+                        </label>
+                    </details>
                     <button type="button" class="admin-icon-button" data-admin-action="refresh" data-admin-refresh-control aria-label="刷新治理总览">
                         <i data-lucide="refresh-cw"></i>
                         <span>刷新</span>
@@ -573,23 +640,55 @@
             <div class="admin-auth-state" data-admin-auth-state></div>
             <div class="admin-notice" data-admin-notice hidden role="status" aria-live="polite"></div>
             <div class="admin-dashboard" data-admin-dashboard hidden>
-                <section class="admin-kpi-grid" data-admin-stats></section>
-                <section class="admin-database-map" data-admin-database-map></section>
+                <div class="admin-governance-layout">
+                    <aside class="admin-governance-index" aria-label="全局治理索引">
+                        <section class="admin-galaxy-scope" aria-labelledby="admin-galaxy-scope-title">
+                            <span id="admin-galaxy-scope-title">治理范围</span>
+                            <strong>全部星系</strong>
+                            <ol>
+                                <li><i>01</i><span>工科试验室</span></li>
+                                <li><i>02</i><span>代码空间</span></li>
+                                <li><i>03</i><span>未来星系</span></li>
+                            </ol>
+                            <p>统一账号、组织、内容与审计边界；不再维护星系内的独立管理页。</p>
+                        </section>
+                        <nav class="admin-section-nav" aria-label="治理领域">
+                            ${GOVERNANCE_SECTIONS.map((section) => `
+                                <button type="button" data-admin-section-button="${section.id}"${state.activeSection === section.id ? ' aria-current="page"' : ''}>
+                                    <i data-lucide="${section.icon}"></i>
+                                    <span>${escapeHtml(section.label)}<small>${escapeHtml(section.meta)}</small></span>
+                                </button>
+                            `).join('')}
+                        </nav>
+                    </aside>
+                    <div class="admin-governance-workspace">
+                        <header class="admin-workspace-heading">
+                            <span>GOVERNED DOMAIN</span>
+                            <h2 data-admin-current-section-title>${escapeHtml(sectionLabel(state.activeSection))}</h2>
+                        </header>
+                        <section class="admin-overview" data-admin-overview tabindex="-1"${state.activeSection === 'overview' ? '' : ' hidden'}>
+                            <section class="admin-kpi-grid" data-admin-stats></section>
+                            <section class="admin-database-map" data-admin-database-map></section>
+                            <section class="admin-summary-grid" data-admin-summary></section>
+                        </section>
+                        <section class="admin-panel-grid" data-admin-panels>
+                            ${PANEL_CONFIGS.map(renderPanelShell).join('')}
+                        </section>
+                    </div>
+                </div>
                 <dialog class="admin-organization-dialog" data-admin-organization-dialog aria-labelledby="admin-organization-dialog-title" aria-describedby="admin-organization-dialog-description">
                     <div data-admin-organization-editor></div>
                 </dialog>
-                <section class="admin-summary-grid" data-admin-summary></section>
-                <section class="admin-panel-grid" data-admin-panels>
-                    ${PANEL_CONFIGS.map(renderPanelShell).join('')}
-                </section>
             </div>
         `;
+        applyActiveSection();
         refreshIcons();
     }
 
     function renderPanelShell(config) {
+        const sectionId = PANEL_SECTIONS[config.id] || 'operations';
         return `
-            <article class="admin-panel" data-admin-panel="${config.id}" tabindex="-1">
+            <article class="admin-panel" data-admin-panel="${config.id}" data-admin-section="${sectionId}" tabindex="-1"${state.activeSection === sectionId ? '' : ' hidden'}>
                 <header class="admin-panel__header">
                     <div>
                         <h2><i data-lucide="${config.icon}"></i>${escapeHtml(config.title)}</h2>
@@ -640,6 +739,12 @@
 
     function bindEvents() {
         state.root.addEventListener('click', (event) => {
+            const sectionButton = event.target.closest('[data-admin-section-button]');
+            if (sectionButton) {
+                setActiveSection(sectionButton.dataset.adminSectionButton, { focus: true });
+                return;
+            }
+
             const refreshAllButton = event.target.closest('[data-admin-action="refresh"]');
             if (refreshAllButton) {
                 if (state.busy) return;
@@ -1082,10 +1187,10 @@
                 `).join('')}
             </div>
             <div class="admin-database-map__roles" aria-label="用户角色分布">
-                ${['student', 'teacher', 'admin'].map((role) => {
+                ${[['student', '学生'], ['teacher', '教师'], ['admin', '管理员']].map(([role, label]) => {
                     const total = Number((stats.users_by_role || {})[role] || 0);
                     const width = Math.max(total ? 4 : 0, Math.round(total / roleTotal * 100));
-                    return `<div><span>${escapeHtml(role)}</span><b><i style="width:${width}%"></i></b><strong>${formatNumber(total)}</strong></div>`;
+                    return `<div><span>${escapeHtml(label)}</span><b><i style="width:${width}%"></i></b><strong>${formatNumber(total)}</strong></div>`;
                 }).join('')}
             </div>
             <div class="admin-database-map__organizations" data-admin-organization-summary aria-label="学校与班级状态分布">
@@ -1294,6 +1399,7 @@
 
     function focusOrganizationPanel(panelId) {
         if (!['schools', 'classes'].includes(panelId)) return;
+        setActiveSection('organizations');
         const panel = state.root && state.root.querySelector(`[data-admin-panel="${panelId}"]`);
         if (!panel) return;
         panel.scrollIntoView({ behavior: 'smooth', block: 'start' });

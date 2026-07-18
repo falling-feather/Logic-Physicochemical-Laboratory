@@ -18,6 +18,7 @@ vm.runInNewContext(registrySource, context, { filename: 'shared/js/page-registry
 const registry = context.window.AstraPageRegistry;
 const normalize = (items) => Array.from(items);
 const version = '20260716v7427RoleWorkflowGateP0';
+const adminVersion = '20260718v7432UnifiedAtlasP0';
 const student = [
     `pages/student/student.css?v=${version}`,
     `pages/student/student.js?v=${version}`
@@ -28,8 +29,8 @@ const teacher = [
 ];
 const admin = [
     ...teacher,
-    `pages/admin/admin.css?v=${version}`,
-    `pages/admin/admin.js?v=${version}`
+    `pages/admin/admin.css?v=${adminVersion}`,
+    `pages/admin/admin.js?v=${adminVersion}`
 ];
 
 assert.deepEqual(normalize(registry.resourcesForRole('student')), student);

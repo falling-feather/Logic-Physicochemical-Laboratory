@@ -21,8 +21,8 @@ const APP_SHELL = [
   './shared/css/auth-ui.css?v=20260716v7427RoleWorkflowGateP0',
   './shared/css/app-session.css?v=20260715v7413PageRegistryP1',
   './shared/css/responsive.css?v=20260716v7427RoleWorkflowGateP0',
-  './pages/planets/planets.css?v=20260704qianduanV72',
-  './pages/planets/planets.js?v=20260704qianduanV72',
+  './pages/planets/planets.css?v=20260718v7432UnifiedAtlasP0',
+  './pages/planets/planets.js?v=20260718v7432UnifiedAtlasP0',
   './UI/future-galaxy/future-galaxy-hero-sky.png',
   './UI/future-galaxy/future-galaxy-hero-nebula.png',
 ];
