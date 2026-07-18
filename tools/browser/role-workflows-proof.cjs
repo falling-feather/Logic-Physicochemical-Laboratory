@@ -4,11 +4,18 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
+const { isIP } = require('node:net');
+const {
+  buildTargetBrowserEvidence,
+  createTargetReleaseChecks,
+} = require('./target-browser-evidence.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const REQUIRED_BROWSER_CHANNEL = 'msedge';
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const DEFAULT_WORKFLOW_TIMEOUT_MS = 15 * 60_000;
+const TARGET_BROWSER_EVIDENCE_FILENAME = 'target-browser-smoke.json';
+const EXAMPLE_DOMAIN_ROOTS = Object.freeze(['example.com', 'example.net', 'example.org', 'example.edu']);
 const ROLE_RESOURCE_PATHS = Object.freeze([
   '/pages/student/student.css',
   '/pages/student/student.js',
@@ -82,6 +89,78 @@ function isLocalUrl(value) {
   }
 }
 
+function isExactTargetHttpsOrigin(value) {
+  try {
+    const raw = String(value || '').trim();
+    if (!/^https:\/\/[^/?#]+$/iu.test(raw)) {
+      return false;
+    }
+    const parsed = new URL(raw);
+    const hostname = parsed.hostname.toLowerCase();
+    const authority = raw.slice(raw.indexOf('://') + 3).toLowerCase();
+    const labels = hostname.split('.');
+    const reservedSuffixes = ['.example', '.invalid', '.localhost', '.local', '.test'];
+    const exampleDomain = EXAMPLE_DOMAIN_ROOTS.some(
+      (root) => hostname === root || hostname.endsWith(`.${root}`)
+    );
+    const publicDnsName = labels.length >= 2
+      && labels.every((label) => /^(?!-)[a-z0-9-]{1,63}(?<!-)$/u.test(label))
+      && /[a-z]/u.test(labels.at(-1))
+      && !reservedSuffixes.some((suffix) => hostname.endsWith(suffix))
+      && !exampleDomain
+      && isIP(hostname) === 0;
+    const exactAuthority = authority === hostname || authority === `${hostname}:443`;
+    return parsed.protocol === 'https:'
+      && exactAuthority
+      && parsed.username === ''
+      && parsed.password === ''
+      && parsed.port === ''
+      && parsed.pathname === '/'
+      && parsed.search === ''
+      && parsed.hash === ''
+      && publicDnsName;
+  } catch {
+    return false;
+  }
+}
+
+function isPathWithin(parent, candidate) {
+  const relative = path.relative(parent, candidate);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+async function prepareProofDirectory(outDir, options = {}) {
+  const targetMode = options.targetMode === true;
+  if (targetMode) {
+    assert(typeof options.explicitOut === 'string' && options.explicitOut.trim(), 'Target role workflow proof requires an explicit --out directory');
+    assert(!isPathWithin(REPO_ROOT, outDir), 'Target role workflow proof output must be outside the Git worktree');
+  }
+
+  let existing = null;
+  try {
+    existing = await fs.stat(outDir);
+  } catch (error) {
+    if (!error || error.code !== 'ENOENT') throw error;
+  }
+  if (existing) {
+    assert(existing.isDirectory(), 'Role workflow proof output must be a directory');
+    if (targetMode) {
+      const entries = await fs.readdir(outDir);
+      assert(entries.length === 0, 'Target role workflow proof output must start empty');
+    }
+  } else {
+    await fs.mkdir(outDir, { recursive: true });
+  }
+
+  if (targetMode) {
+    const [realRepoRoot, realOutDir] = await Promise.all([
+      fs.realpath(REPO_ROOT),
+      fs.realpath(outDir),
+    ]);
+    assert(!isPathWithin(realRepoRoot, realOutDir), 'Target role workflow proof output resolves inside the Git worktree');
+  }
+}
+
 function safeName(value) {
   return String(value || '').replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 80);
 }
@@ -120,7 +199,9 @@ async function fileSha256(relativePath) {
 async function criticalArtifactHashes() {
   const files = [
     'tools/browser/role-workflows-proof.cjs',
+    'tools/browser/target-browser-evidence.cjs',
     'tools/tests/role-workflows-proof-contract.cjs',
+    'tools/tests/target-browser-evidence-contract.cjs',
     'index.html',
     'shared/js/app-session.js',
     'shared/js/main.js',
@@ -211,8 +292,15 @@ function roleUrl(webBase, apiBase, role) {
 function attachDiagnostics(page, bucket, label) {
   page.__astraInflightRequests = new Set();
   page.__astraDiagnosticsFrozen = false;
+  page.__astraBrowserAuthorizationHeaderSeen = false;
   page.on('request', (request) => {
     page.__astraInflightRequests.add(request);
+    try {
+      const resource = new URL(request.url());
+      if (resource.pathname.startsWith('/api/') && request.headers().authorization) {
+        page.__astraBrowserAuthorizationHeaderSeen = true;
+      }
+    } catch {}
   });
   page.on('requestfinished', (request) => {
     page.__astraInflightRequests.delete(request);
@@ -260,6 +348,32 @@ function attachDiagnostics(page, bucket, label) {
     if (expectedAuthChallenge || expectedPermissionDenial) return;
     bucket.push({ kind: 'http', label, status: response.status(), url: response.url() });
   });
+}
+
+async function cookieSessionEvidence(roleRuntimes, apiBase, targetMode) {
+  const evidence = {};
+  for (const [role, runtime] of Object.entries(roleRuntimes)) {
+    const sessionCookie = (await runtime.context.cookies(apiBase))
+      .find((cookie) => cookie.name === 'astra_session');
+    assert(sessionCookie, `${role} browser session cookie is missing`);
+    assert(sessionCookie.httpOnly === true, `${role} browser session cookie must be HttpOnly`);
+    assert(sessionCookie.sameSite === 'Lax', `${role} browser session cookie must use SameSite=Lax`);
+    if (targetMode) {
+      assert(sessionCookie.secure === true, `${role} target browser session cookie must be Secure`);
+    }
+    const authorizationHeaderSeen = runtime.context.pages().some(
+      (page) => page.__astraBrowserAuthorizationHeaderSeen === true
+    );
+    assert(!authorizationHeaderSeen, `${role} browser requests must remain cookie-only`);
+    evidence[role] = {
+      cookieName: sessionCookie.name,
+      httpOnly: sessionCookie.httpOnly,
+      sameSite: sessionCookie.sameSite,
+      secure: sessionCookie.secure,
+      authorizationHeaderSeen: false,
+    };
+  }
+  return evidence;
 }
 
 async function waitForNetworkQuiet(page, quietMs = 500, timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS) {
@@ -733,8 +847,12 @@ async function closeOrganizationEditor(dialog) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const apiBase = stripTrailingSlash(args.api || '');
-  const webBase = stripTrailingSlash(args.web || '');
+  const localMode = args['confirm-isolated-environment'] === true;
+  const targetMode = args['confirm-target-staging'] === true;
+  const rawApiBase = String(args.api || '').trim();
+  const rawWebBase = String(args.web || '').trim();
+  let apiBase = localMode ? stripTrailingSlash(rawApiBase) : rawApiBase;
+  let webBase = localMode ? stripTrailingSlash(rawWebBase) : rawWebBase;
   const outDir = path.resolve(args.out || path.join('test-screenshots', 'role-workflows'));
   const report = {
     ok: false,
@@ -743,7 +861,10 @@ async function main() {
       apiBase,
       webBase,
       browserChannel: null,
+      browserVersion: null,
+      mode: null,
       isolatedConfirmation: false,
+      targetConfirmation: false,
       gitHead: currentGitHead(),
       gitStatusShort: currentGitStatusShort(),
       artifactSha256: null,
@@ -753,6 +874,8 @@ async function main() {
     entities: {},
     accounts: {},
     serviceWorker: {},
+    cookieSession: {},
+    targetReleaseChecks: createTargetReleaseChecks(),
     timeline: {
       swReadyAt: null,
       firstMutationAt: null,
@@ -760,8 +883,10 @@ async function main() {
     stableUi: {},
     responsive: {},
     externalGates: {
-      sqliteDirectReconciliation: 'required-after-browser-proof',
-      targetEnvironmentRelease: 'not-in-scope',
+      databaseDirectReconciliation: localMode
+        ? 'required-sqlite-after-browser-proof'
+        : 'required-mysql-after-browser-proof',
+      targetEnvironmentRelease: targetMode ? 'required-after-browser-proof' : 'not-in-scope',
     },
     browserIssues: [],
     failure: null,
@@ -771,19 +896,45 @@ async function main() {
   let workflowCompleted = false;
   let watchdogExpired = false;
   let watchdogTimer = null;
+  let proofDirectoryReady = false;
   const workflowTimeoutMs = Number(args['workflow-timeout-ms'] || DEFAULT_WORKFLOW_TIMEOUT_MS);
 
   function record(name, evidence = {}) {
     report.checks.push({ name, ok: true, evidence });
   }
 
+  function markTargetReleaseCheck(name) {
+    assert(Object.hasOwn(report.targetReleaseChecks, name), `Unknown target-release-v2 browser check: ${name}`);
+    report.targetReleaseChecks[name] = true;
+  }
+
   try {
     assert(Number.isFinite(workflowTimeoutMs) && workflowTimeoutMs >= 60_000 && workflowTimeoutMs <= 30 * 60_000, 'Workflow timeout must be between 60000 and 1800000 ms');
-    assert(args['confirm-isolated-environment'] === true, 'Pass --confirm-isolated-environment for a disposable local database');
-    assert(isLocalUrl(apiBase) && isLocalUrl(webBase), 'Role workflow proof only accepts local API and web URLs');
+    assert(localMode !== targetMode, 'Pass exactly one of --confirm-isolated-environment or --confirm-target-staging');
+    if (localMode) {
+      assert(isLocalUrl(apiBase) && isLocalUrl(webBase), 'Local role workflow proof only accepts local API and web URLs');
+    } else {
+      assert(
+        isExactTargetHttpsOrigin(rawApiBase)
+          && isExactTargetHttpsOrigin(rawWebBase)
+          && new URL(rawApiBase).origin === new URL(rawWebBase).origin,
+        'Target role workflow proof requires one exact non-local HTTPS origin for API and web',
+      );
+      apiBase = new URL(rawApiBase).origin;
+      webBase = new URL(rawWebBase).origin;
+      report.environment.apiBase = apiBase;
+      report.environment.webBase = webBase;
+    }
     assert(report.environment.gitHead, 'QA-007 requires an exact Git HEAD');
     assert(Array.isArray(report.environment.gitStatusShort), 'QA-007 requires readable Git working-tree provenance');
-    report.environment.isolatedConfirmation = true;
+    if (targetMode) {
+      assert(report.environment.gitStatusShort.length === 0, 'Target role workflow proof requires a clean frozen Git worktree');
+    }
+    report.environment.mode = targetMode ? 'target-staging' : 'isolated-local';
+    report.environment.isolatedConfirmation = localMode;
+    report.environment.targetConfirmation = targetMode;
+    await prepareProofDirectory(outDir, { targetMode, explicitOut: args.out });
+    proofDirectoryReady = true;
     report.environment.artifactSha256 = await criticalArtifactHashes();
     report.environment.serviceWorkerSource = await serviceWorkerSourceEvidence(webBase);
     record('exact Git and critical artifact provenance', {
@@ -795,13 +946,18 @@ async function main() {
 
     const health = await fetchJson(`${apiBase}/api/health`);
     assert(health.status === 200, `API health failed with ${health.status}`);
-    assert(['development', 'test', 'testing'].includes(health.body && health.body.environment), 'API must report development/test/testing');
-    record('isolated local environment guard', { environment: health.body.environment });
+    if (localMode) {
+      assert(['development', 'test', 'testing'].includes(health.body && health.body.environment), 'Local API must report development/test/testing');
+      record('isolated local environment guard', { environment: health.body.environment });
+    } else {
+      assert(['staging', 'production'].includes(health.body && health.body.environment), 'Target API must report staging or production');
+      record('target staging HTTPS and production-like environment guard', { environment: health.body.environment });
+    }
 
-    await fs.mkdir(outDir, { recursive: true });
     const launched = await launchBrowser(args);
     browser = launched.browser;
     report.environment.browserChannel = launched.channel;
+    report.environment.browserVersion = await browser.version();
     watchdogTimer = setTimeout(() => {
       watchdogExpired = true;
       if (browser) browser.close().catch(() => {});
@@ -826,6 +982,7 @@ async function main() {
       };
       report.timeline.swReadyAt = new Date().toISOString();
       record('anonymous authentication gate and Service Worker preflight before any business mutation', report.serviceWorker.anonymous);
+      markTargetReleaseCheck('login_before_shell');
     } finally {
       await anonymousPreflight.context.close();
     }
@@ -847,13 +1004,20 @@ async function main() {
       Date.parse(report.timeline.swReadyAt) <= Date.parse(report.timeline.firstMutationAt),
       `Service Worker preflight must precede the first mutation: ${JSON.stringify(report.timeline)}`
     );
+    if (targetMode) {
+      assert(!args['admin-bootstrap-token'], 'Target staging bootstrap token must be injected through ASTRA_ADMIN_BOOTSTRAP_TOKEN');
+      assert(process.env.ASTRA_ADMIN_BOOTSTRAP_TOKEN, 'Target staging requires ASTRA_ADMIN_BOOTSTRAP_TOKEN');
+    }
+    const adminBootstrapToken = targetMode
+      ? process.env.ASTRA_ADMIN_BOOTSTRAP_TOKEN
+      : (args['admin-bootstrap-token'] || process.env.ASTRA_ADMIN_BOOTSTRAP_TOKEN);
     const bootstrap = await fetchJson(`${apiBase}/api/admin/bootstrap`, {
       method: 'POST',
       body: {
         username: accounts.admin.username,
         display_name: accounts.admin.displayName,
         password: accounts.admin.password,
-        ...(args['admin-bootstrap-token'] ? { bootstrap_token: String(args['admin-bootstrap-token']) } : {}),
+        ...(adminBootstrapToken ? { bootstrap_token: String(adminBootstrapToken) } : {}),
       },
     });
     assert(bootstrap.status === 201, `Admin bootstrap failed with ${bootstrap.status}: ${bootstrap.text}`);
@@ -1159,8 +1323,16 @@ async function main() {
       teacherWorkspaceVisited: true,
       expectedCacheName: report.environment.serviceWorkerSource.cacheName,
     });
+    report.cookieSession = await cookieSessionEvidence({
+      student: studentRuntime,
+      teacher: teacherRuntime,
+      admin: adminRuntime,
+    }, apiBase, targetMode);
+    markTargetReleaseCheck('cookie_session');
+    markTargetReleaseCheck('service_worker_api_no_store');
     record('admin reaches teacher workspace and returns to global governance', {
       loadedScripts: report.serviceWorker.admin.loadedScripts,
+      cookieSession: report.cookieSession,
     });
     const approve = adminRuntime.page.locator(`[data-admin-join-review="approved"][data-join-request-id="${joinRequestId}"]`);
     await approve.waitFor({ state: 'visible' });
@@ -1534,6 +1706,7 @@ async function main() {
       authorityVersion: classVersion + 1,
       uiPatchCount: 1,
     });
+    markTargetReleaseCheck('organization_stale_version_409');
     await closeOrganizationEditor(organizationDialog);
 
     organizationDialog = await openOrganizationEditor(adminRuntime.page, 'classes', className);
@@ -1621,6 +1794,8 @@ async function main() {
       archiveVisual,
       focus: { archivedFocus, restoredFocus },
     });
+    markTargetReleaseCheck('organization_archive');
+    markTargetReleaseCheck('organization_restore');
     await closeOrganizationEditor(organizationDialog);
 
     organizationDialog = await openOrganizationEditor(adminRuntime.page, 'schools', schoolName);
@@ -1704,6 +1879,7 @@ async function main() {
     const outsiderReview = await pageApi(outsiderRuntime.page, apiBase, `/api/assignments/${assignmentId}/review`);
     assert(outsiderReview.status === 403, `Outsider assignment review expected 403, got ${outsiderReview.status}`);
     record('outsider assignment denial', { status: outsiderReview.status });
+    markTargetReleaseCheck('unauthorized_requests_denied');
 
     await studentRuntime.page.goto(roleUrl(webBase, apiBase, 'teacher'), { waitUntil: 'domcontentloaded' });
     await studentRuntime.page.waitForURL(/#student$/);
@@ -1717,6 +1893,8 @@ async function main() {
       forbiddenScripts: deniedRoleScripts,
       forbiddenStyles: deniedRoleStyles,
     });
+    markTargetReleaseCheck('role_navigation_isolation');
+    markTargetReleaseCheck('role_resource_isolation');
     await studentRuntime.page.goto(roleUrl(webBase, apiBase, 'student'), { waitUntil: 'domcontentloaded' });
     await studentRuntime.page.locator('[data-auth-ui="account"][data-auth-role="student"]').waitFor({ state: 'visible' });
 
@@ -1730,6 +1908,8 @@ async function main() {
     report.responsive.student = await responsiveEvidence(studentRuntime.page, 'student', outDir, { assignmentId });
     report.responsive.teacher = await responsiveEvidence(teacherRuntime.page, 'teacher', outDir);
     report.responsive.admin = await responsiveEvidence(adminRuntime.page, 'admin', outDir);
+    assert(report.responsive.adminOrganization, 'Admin organization responsive evidence is missing');
+    markTargetReleaseCheck('no_horizontal_overflow');
     record('three-role 390x844 responsive evidence');
 
     await studentRuntime.page.setViewportSize({ width: 1440, height: 1000 });
@@ -1738,7 +1918,14 @@ async function main() {
     report.responsive.desktopScreenshot = desktopScreenshot;
 
     await freezeDiagnostics(contexts);
+    const browserAuthorizationHeaderPages = contexts.flatMap((context) => context.pages())
+      .filter((page) => page.__astraBrowserAuthorizationHeaderSeen === true);
+    assert(browserAuthorizationHeaderPages.length === 0, 'Browser role workflows must not send Authorization headers');
     assert(report.browserIssues.length === 0, `Browser issues detected: ${JSON.stringify(report.browserIssues)}`);
+    assert(!report.browserIssues.some((issue) => issue.kind === 'console'), 'Browser console diagnostics must remain clean');
+    assert(!report.browserIssues.some((issue) => issue.kind === 'pageerror'), 'Browser page errors must remain clean');
+    markTargetReleaseCheck('no_console_errors');
+    markTargetReleaseCheck('no_page_errors');
     record('browser console and request diagnostics clean');
     workflowCompleted = true;
   } catch (error) {
@@ -1758,8 +1945,28 @@ async function main() {
     }
     report.ok = Boolean(workflowCompleted && !watchdogExpired && !report.failure && report.browserIssues.length === 0);
     report.completedAt = new Date().toISOString();
-    await fs.mkdir(outDir, { recursive: true });
-    await fs.writeFile(path.join(outDir, 'role-workflows-report.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+    let targetBrowserEvidence = null;
+    if (report.ok && targetMode) {
+      try {
+        targetBrowserEvidence = buildTargetBrowserEvidence(report);
+      } catch (error) {
+        report.ok = false;
+        report.failure = {
+          message: String(error && error.message || error),
+          stack: String(error && error.stack || '').split('\n').slice(0, 12),
+        };
+      }
+    }
+    if (proofDirectoryReady) {
+      await fs.writeFile(path.join(outDir, 'role-workflows-report.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+      if (targetBrowserEvidence) {
+        await fs.writeFile(
+          path.join(outDir, TARGET_BROWSER_EVIDENCE_FILENAME),
+          `${JSON.stringify(targetBrowserEvidence, null, 2)}\n`,
+          'utf8'
+        );
+      }
+    }
   }
 
   console.log(JSON.stringify(report, null, 2));

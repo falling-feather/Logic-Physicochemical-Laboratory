@@ -2,9 +2,9 @@
 
 > **文档定位**：后端本地开发、API/服务边界、配置、迁移、运维脚本和验证入口。V7.4.12 起完成事实见 [`../doc/03-开发历史.md`](../doc/03-开发历史.md)，更早实机证据见 [`../doc/03-发布历史.md`](../doc/03-发布历史.md)，未来任务见 [`../doc/02-项目规划.md`](../doc/02-项目规划.md)。
 >
-> **当前基线**：FastAPI + SQLAlchemy + Alembic 0047；SQLite 为安全本地默认，MySQL 为发布目标。V7.4.25 已将学校/班级受约束治理接入管理 UI，并补齐凭据型 PUT 预检；V7.4.24 已完成组织治理 API、乐观并发、责任人保护、审计与活动组织边界；V7.4.22 已硬化浏览器 Cookie-only/非浏览器 Bearer 双通道契约；V7.4.9 已建立 Python 3.12 通用哈希锁和 CI 漂移门禁；V7.4.8 已完成管理 API 全部分域拆分，`admin.py` 为纯路由聚合器；V6.6.63 后端阶段、真实 MySQL、四服务拓扑、Release 构建/回滚和 15/15 stage gate 已完成。
+> **当前基线**：FastAPI + SQLAlchemy + Alembic 0047；SQLite 为安全本地默认，MySQL 为发布目标。V7.4.29 已补齐 Windows DPAPI 受保护密钥存储、服务账号绑定、正式 HTTPS origin/HSTS 服务包参数和 target staging 浏览器证明模式；V7.4.25 已将学校/班级受约束治理接入管理 UI，并补齐凭据型 PUT 预检；V7.4.24 已完成组织治理 API、乐观并发、责任人保护、审计与活动组织边界；V7.4.22 已硬化浏览器 Cookie-only/非浏览器 Bearer 双通道契约；V7.4.9 已建立 Python 3.12 通用哈希锁和 CI 漂移门禁；V7.4.8 已完成管理 API 全部分域拆分，`admin.py` 为纯路由聚合器；V6.6.63 后端阶段、真实 MySQL、四服务拓扑、Release 构建/回滚和 15/15 stage gate 已完成。
 >
-> **最后更新**：2026-07-16
+> **最后更新**：2026-07-18
 
 后端当前承担认证与会话、学校/班级/课程、作业/提交/批改、积分与知识状态、内容草稿/审核/发布/回滚、脚本隔离、管理治理、DB-backed 任务和审计链。`server/` 中的 Node/C++ 进程只承担显式白名单静态资源，不是业务 API。
 
@@ -605,12 +605,16 @@ Windows 演练包应使用已单独下载并复核 hash 的 WinSW/Caddy 与合�
   -WinSwPath C:\staging\verified\WinSW-x64.exe `
   -StaticExecutable C:\staging\build\englab_server.exe `
   -CaddyExecutable C:\staging\verified\caddy.exe `
-  -OutputDir C:\englab\service-bundle
+  -OutputDir C:\englab\service-bundle `
+  -SecretStorePath C:\englab\secrets\astra-staging.dpapi `
+  -PublicOrigin $PublicOrigin
 ```
 
-生成后先复核 JSON 中的 `artifact_hashes`、四份 XML 和 `config/Caddyfile`，再按 `commands.install/start/stop/uninstall` 操作。生产数据库连接只允许由服务账号环境或 secret store 提供；根脚本不再下载未校验 NSSM、不开放端口，也不再用 `sc.exe` 直接包装控制台程序。
+密钥文件先从 `backend/` 运行 `python -m scripts.windows_dpapi_secret_store seal --output <dedicated-secrets-dir>\<store> --service-account "NT AUTHORITY\LocalService"`，并只从 stdin 输入进程内 `ASTRA_*` JSON。专用父目录和文件都使用 DPAPI LocalMachine 配套的受保护 DACL，只授权当前操作者、SYSTEM、Administrators 和所选 LocalService/NetworkService；已存在但 ACL 不匹配的目录直接拒绝，加密载荷与服务包必须绑定同一账号。生成后先复核 JSON 中的 `artifact_hashes`、`secret_store_provider`、`secret_store_required_keys`、四份 XML 和 `config/Caddyfile`，再按 `commands.install/start/stop/uninstall` 操作。生产数据库连接只允许由该 store 注入；bootstrap key 只注入 API、不进入 worker；根脚本不下载未校验工具、不开放端口，也不直接包装控制台程序。
 
-目标发布证据使用 `target-release-v2`。先基于 `backend/release-artifact-manifest.example.json` 建立同包 `release-artifact-manifest-v1`，固定 version/revision 以及 static/API/worker/proxy/migrations 五类不可变制品引用、SHA 和大小；再完成 `backend/target-release-manifest.example.json` 中的目标实例、HTTPS origin、版本、冻结 revision、制品清单路径/SHA 和 bundle ID。四份自动报告必须保留执行时生成的 `generated_at` raw JSON，恢复/回滚/浏览器三类报告从 fail-closed 模板开始。所有 raw 报告必须由统一封装器校验并绑定唯一 run ID：
+指定 staging 三角色证明运行 `node tools/browser/role-workflows-proof.cjs --api <same-https-origin> --web <same-https-origin> --out <empty-directory-outside-repo> --confirm-target-staging ...`。目标模式要求公开 DNS、标准 443 的同源 HTTPS，拒绝 IP、单标签、保留/示例域和非标准端口；health `environment` 必须明确为 `staging` 或 `production`，Git 必须干净冻结，`--out` 必须显式指向仓库外不存在或为空的目录，bootstrap token 只从 `ASTRA_ADMIN_BOOTSTRAP_TOKEN` 环境注入并拒绝 CLI 值。推荐使用 DPAPI runner 的 `--executable <node.exe>` 启动；成功后完整诊断写入 `role-workflows-report.json`，可封装的固定 raw 直接写入 `target-browser-smoke.json`，其 12 项语义、真实 Edge 版本和 `release_revision` 均由运行断言生成。浏览器成功后仍须对同一 MySQL 做独立只读总账，再把该 raw 进入精确七类 `target-release-v2` evidence 封装。
+
+目标发布证据使用 `target-release-v2`。先基于 `backend/release-artifact-manifest.example.json` 建立同包 `release-artifact-manifest-v1`，固定 version/revision 以及 static/API/worker/proxy/migrations 五类不可变制品引用、SHA 和大小；再完成 `backend/target-release-manifest.example.json` 中的目标实例、HTTPS origin、版本、冻结 revision、制品清单路径/SHA 和 bundle ID。四份自动报告必须保留执行时生成的 `generated_at` raw JSON；恢复/回滚从 fail-closed 模板开始，目标浏览器模板只作 schema 参考，真实 ready raw 必须由 target proof 直接生成。所有 raw 报告必须由统一封装器校验并绑定唯一 run ID：
 
 ```bash
 cd backend

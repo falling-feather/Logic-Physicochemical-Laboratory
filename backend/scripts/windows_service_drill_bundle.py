@@ -9,6 +9,9 @@ import shutil
 import sys
 from xml.etree import ElementTree as ET
 
+from scripts.target_release_evidence import normalize_public_https_origin
+from scripts.windows_dpapi_secret_store import inspect_secret_store
+
 
 SERVICE_NAMES = ("EngLab", "AstraApi", "AstraWorker", "AstraProxy")
 ALLOWED_SERVICE_ACCOUNTS = {
@@ -19,8 +22,6 @@ SERVICE_ACCOUNT_PARTS = {
     "NT AUTHORITY\\LocalService": ("NT AUTHORITY", "LocalService"),
     "NT AUTHORITY\\NetworkService": ("NT AUTHORITY", "NetworkService"),
 }
-
-
 @dataclass(frozen=True)
 class ServiceSpec:
     service_id: str
@@ -41,6 +42,9 @@ def build_windows_service_drill_bundle(
     caddy_executable: Path,
     install_root: Path,
     database_url_value: str = "%ASTRA_DATABASE_URL%",
+    secret_store_path: Path | None = None,
+    public_origin: str | None = None,
+    admin_bootstrap_enabled: bool = False,
     service_account: str = "NT AUTHORITY\\LocalService",
     static_port: int = 9010,
     api_port: int = 9011,
@@ -66,6 +70,19 @@ def build_windows_service_drill_bundle(
         "sqlite+pysqlite:///"
     ):
         raise ValueError("only the environment placeholder or a non-secret SQLite drill URL may be written")
+    if secret_store_path is not None:
+        if not secret_store_path.is_file():
+            raise ValueError("secret_store_path must identify an existing Windows DPAPI store")
+        if database_url_value != "%ASTRA_DATABASE_URL%":
+            raise ValueError("secret_store_path cannot be combined with an inline database URL")
+        secret_store_metadata = inspect_secret_store(secret_store_path)
+        if secret_store_metadata["service_account"] != service_account:
+            raise ValueError("secret store service account does not match the Windows service account")
+    credentialed_origin = (
+        _validated_public_origin(public_origin)
+        if public_origin is not None
+        else f"http://127.0.0.1:{proxy_port}"
+    )
 
     output_dir.mkdir(parents=True, exist_ok=True)
     bin_dir = output_dir / "bin"
@@ -82,21 +99,49 @@ def build_windows_service_drill_bundle(
     for service_name in SERVICE_NAMES:
         shutil.copy2(winsw_path, output_dir / f"{service_name}.exe")
 
-    caddyfile = _caddyfile(static_port=static_port, api_port=api_port, proxy_port=proxy_port)
+    caddyfile = _caddyfile(
+        static_port=static_port,
+        api_port=api_port,
+        proxy_port=proxy_port,
+        hsts_enabled=public_origin is not None,
+    )
     (config_dir / "Caddyfile").write_text(caddyfile, encoding="utf-8", newline="\n")
 
-    common_environment = (
+    base_environment = [
         ("PYTHONIOENCODING", "utf-8"),
-        ("ASTRA_DATABASE_URL", database_url_value),
         ("ASTRA_AUTO_CREATE_TABLES", "false"),
         ("ASTRA_ENVIRONMENT", "production"),
-        ("ASTRA_ADMIN_BOOTSTRAP_ENABLED", "false"),
-        ("ASTRA_CORS_ORIGINS", f"http://127.0.0.1:{proxy_port}"),
+        ("ASTRA_CORS_ORIGINS", credentialed_origin),
         ("ASTRA_BACKGROUND_TASK_WORKER_ENABLED", "false"),
-    )
+    ]
+    if secret_store_path is None:
+        base_environment.append(("ASTRA_DATABASE_URL", database_url_value))
+    api_environment = [
+        *base_environment,
+        ("ASTRA_ADMIN_BOOTSTRAP_ENABLED", "true" if admin_bootstrap_enabled else "false"),
+    ]
+    worker_environment = [
+        *base_environment,
+        ("ASTRA_ADMIN_BOOTSTRAP_ENABLED", "false"),
+    ]
     install_root_windows = str(PureWindowsPath(install_root))
     backend_root_windows = str(PureWindowsPath(install_root / "backend"))
     python_windows = str(PureWindowsPath(python_executable))
+    api_secret_prefix = ""
+    worker_secret_prefix = ""
+    if secret_store_path is not None:
+        secret_store_windows = str(PureWindowsPath(secret_store_path))
+        worker_secret_prefix = (
+            '-m scripts.windows_dpapi_secret_store run '
+            f'--store "{secret_store_windows}" '
+            '--required-key ASTRA_DATABASE_URL '
+            '--required-key ASTRA_AUDIT_IP_HASH_SALT '
+        )
+        api_secret_prefix = worker_secret_prefix
+        if admin_bootstrap_enabled:
+            api_secret_prefix += '--required-key ASTRA_ADMIN_BOOTSTRAP_TOKEN '
+        api_secret_prefix += '-- '
+        worker_secret_prefix += '-- '
     specs = (
         ServiceSpec(
             service_id="EngLab",
@@ -109,17 +154,19 @@ def build_windows_service_drill_bundle(
             service_id="AstraApi",
             description="Astra FastAPI business API service",
             executable=python_windows,
-            arguments=f"-m uvicorn app.main:app --host 127.0.0.1 --port {api_port}",
+            arguments=f"{api_secret_prefix}-m uvicorn app.main:app --host 127.0.0.1 --port {api_port}",
             working_directory=backend_root_windows,
-            environment=common_environment,
+            environment=tuple(api_environment),
         ),
         ServiceSpec(
             service_id="AstraWorker",
             description="Astra independent background task worker",
             executable=python_windows,
-            arguments="-m scripts.run_background_tasks --worker-id astra-windows-worker",
+            arguments=(
+                f"{worker_secret_prefix}-m scripts.run_background_tasks --worker-id astra-windows-worker"
+            ),
             working_directory=backend_root_windows,
-            environment=common_environment,
+            environment=tuple(worker_environment),
         ),
         ServiceSpec(
             service_id="AstraProxy",
@@ -157,8 +204,30 @@ def build_windows_service_drill_bundle(
         "static_bind_host": "127.0.0.1",
         "database_url_returned": False,
         "database_url_source": (
-            "service_environment" if database_url_value == "%ASTRA_DATABASE_URL%" else "non_secret_sqlite_drill"
+            "windows_dpapi_local_machine"
+            if secret_store_path is not None
+            else (
+                "service_environment"
+                if database_url_value == "%ASTRA_DATABASE_URL%"
+                else "non_secret_sqlite_drill"
+            )
         ),
+        "secret_store_enabled": secret_store_path is not None,
+        "secret_store_provider": "WindowsDPAPI-LocalMachine" if secret_store_path is not None else None,
+        "secret_store_required_keys": (
+            sorted(
+                {
+                    "ASTRA_AUDIT_IP_HASH_SALT",
+                    "ASTRA_DATABASE_URL",
+                    *({"ASTRA_ADMIN_BOOTSTRAP_TOKEN"} if admin_bootstrap_enabled else set()),
+                }
+            )
+            if secret_store_path is not None
+            else []
+        ),
+        "secret_store_path_returned": False,
+        "credentialed_origin": credentialed_origin,
+        "admin_bootstrap_enabled": admin_bootstrap_enabled,
         "artifact_hashes": artifact_hashes,
         "commands": commands,
         "sensitive_values_returned": False,
@@ -204,7 +273,18 @@ def _text_element(parent: ET.Element, name: str, value: str) -> ET.Element:
     return element
 
 
-def _caddyfile(*, static_port: int, api_port: int, proxy_port: int) -> str:
+def _caddyfile(
+    *,
+    static_port: int,
+    api_port: int,
+    proxy_port: int,
+    hsts_enabled: bool,
+) -> str:
+    hsts = (
+        '\theader Strict-Transport-Security "max-age=31536000; includeSubDomains"\n'
+        if hsts_enabled
+        else ""
+    )
     return (
         "{\n"
         "\tadmin off\n"
@@ -212,6 +292,7 @@ def _caddyfile(*, static_port: int, api_port: int, proxy_port: int) -> str:
         "}\n\n"
         f"http://127.0.0.1:{proxy_port} {{\n"
         "\tbind 127.0.0.1\n"
+        f"{hsts}"
         "\t@api path /api/*\n"
         "\thandle @api {\n"
         f"\t\treverse_proxy 127.0.0.1:{api_port}\n"
@@ -221,6 +302,13 @@ def _caddyfile(*, static_port: int, api_port: int, proxy_port: int) -> str:
         "\t}\n"
         "}\n"
     )
+
+
+def _validated_public_origin(value: str) -> str:
+    normalized, _ = normalize_public_https_origin(value)
+    if normalized is None:
+        raise ValueError("public_origin must be an exact HTTPS origin")
+    return normalized
 
 
 def _file_sha256(path: Path) -> str:
@@ -240,6 +328,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--caddy-executable", type=Path, required=True)
     parser.add_argument("--install-root", type=Path, required=True)
     parser.add_argument("--database-url-value", default="%ASTRA_DATABASE_URL%")
+    parser.add_argument("--secret-store-path", type=Path, default=None)
+    parser.add_argument("--public-origin", default=None)
+    parser.add_argument("--enable-admin-bootstrap", action="store_true")
     parser.add_argument("--service-account", default="NT AUTHORITY\\LocalService")
     parser.add_argument("--static-port", type=int, default=9010)
     parser.add_argument("--api-port", type=int, default=9011)
@@ -254,6 +345,9 @@ def main(argv: list[str] | None = None) -> int:
             caddy_executable=args.caddy_executable.resolve(),
             install_root=args.install_root.resolve(),
             database_url_value=args.database_url_value,
+            secret_store_path=args.secret_store_path.resolve() if args.secret_store_path else None,
+            public_origin=args.public_origin,
+            admin_bootstrap_enabled=args.enable_admin_bootstrap,
             service_account=args.service_account,
             static_port=args.static_port,
             api_port=args.api_port,

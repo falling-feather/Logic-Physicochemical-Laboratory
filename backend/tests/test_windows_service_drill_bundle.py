@@ -1,11 +1,13 @@
 from contextlib import contextmanager
 from pathlib import Path
 import shutil
+import sys
 from uuid import uuid4
 from xml.etree import ElementTree as ET
 
 import pytest
 
+import scripts.windows_service_drill_bundle as bundle_module
 from scripts.windows_service_drill_bundle import build_windows_service_drill_bundle
 
 
@@ -21,6 +23,9 @@ def test_root_deploy_wrapper_forwards_reviewed_generator_contract_and_exit_code(
         ("$CaddyExecutable", '"--caddy-executable"'),
         ("$InstallRoot", '"--install-root"'),
         ("$DatabaseUrlValue", '"--database-url-value"'),
+        ("$SecretStorePath", '"--secret-store-path"'),
+        ("$PublicOrigin", '"--public-origin"'),
+        ("$EnableAdminBootstrap", '"--enable-admin-bootstrap"'),
         ("$ServiceAccount", '"--service-account"'),
         ("$StaticPort", '"--static-port"'),
         ("$ApiPort", '"--api-port"'),
@@ -83,6 +88,121 @@ def test_windows_service_bundle_is_loopback_minimal_and_reversible():
         assert "bind 127.0.0.1" in caddyfile
         assert caddyfile.index("@api path /api/*") < caddyfile.index("reverse_proxy 127.0.0.1:9010")
         assert "reverse_proxy 127.0.0.1:9011" in caddyfile
+
+
+def test_windows_service_bundle_uses_dpapi_store_without_embedding_secrets(monkeypatch):
+    with _runtime_dir() as runtime:
+        install_root = runtime / "install"
+        (install_root / "backend").mkdir(parents=True)
+        binary = _fake_binary(runtime / "tool.exe", b"tool")
+        secret_store = runtime / "secrets" / "astra-staging.dpapi"
+        if sys.platform == "win32":
+            from scripts.windows_dpapi_secret_store import seal_secret_store
+
+            seal_secret_store(
+                secret_store,
+                {
+                    "ASTRA_DATABASE_URL": "private-database-value",
+                    "ASTRA_AUDIT_IP_HASH_SALT": "private-audit-value",
+                    "ASTRA_ADMIN_BOOTSTRAP_TOKEN": "private-bootstrap-value",
+                },
+            )
+        else:
+            secret_store.parent.mkdir(parents=True)
+            secret_store.write_bytes(b"encrypted-test-placeholder")
+            monkeypatch.setattr(
+                bundle_module,
+                "inspect_secret_store",
+                lambda _path: {"service_account": "NT AUTHORITY\\LocalService"},
+            )
+        output = runtime / "bundle"
+
+        report = build_windows_service_drill_bundle(
+            output_dir=output,
+            winsw_path=binary,
+            static_executable=binary,
+            python_executable=binary,
+            caddy_executable=binary,
+            install_root=install_root,
+            secret_store_path=secret_store,
+            public_origin="https://astra-staging.trycloudflare.com",
+            admin_bootstrap_enabled=True,
+        )
+
+        assert report["ok"] is True
+        assert report["database_url_source"] == "windows_dpapi_local_machine"
+        assert report["secret_store_enabled"] is True
+        assert report["secret_store_provider"] == "WindowsDPAPI-LocalMachine"
+        assert report["secret_store_path_returned"] is False
+        assert report["credentialed_origin"] == "https://astra-staging.trycloudflare.com"
+        assert report["admin_bootstrap_enabled"] is True
+        api_root = ET.parse(output / "AstraApi.xml").getroot()
+        api_environment = {element.attrib["name"]: element.attrib["value"] for element in api_root.findall("env")}
+        assert "ASTRA_DATABASE_URL" not in api_environment
+        assert api_environment["ASTRA_CORS_ORIGINS"] == "https://astra-staging.trycloudflare.com"
+        assert 'Strict-Transport-Security "max-age=31536000; includeSubDomains"' in (
+            output / "config" / "Caddyfile"
+        ).read_text(encoding="utf-8")
+        arguments = api_root.findtext("arguments") or ""
+        assert "scripts.windows_dpapi_secret_store run" in arguments
+        assert "--required-key ASTRA_DATABASE_URL" in arguments
+        assert "--required-key ASTRA_AUDIT_IP_HASH_SALT" in arguments
+        assert "--required-key ASTRA_ADMIN_BOOTSTRAP_TOKEN" in arguments
+        assert "mysql+pymysql" not in arguments
+        worker_root = ET.parse(output / "AstraWorker.xml").getroot()
+        worker_environment = {
+            element.attrib["name"]: element.attrib["value"] for element in worker_root.findall("env")
+        }
+        worker_arguments = worker_root.findtext("arguments") or ""
+        assert worker_environment["ASTRA_ADMIN_BOOTSTRAP_ENABLED"] == "false"
+        assert "--required-key ASTRA_ADMIN_BOOTSTRAP_TOKEN" not in worker_arguments
+
+        with pytest.raises(ValueError, match="does not match the Windows service account"):
+            build_windows_service_drill_bundle(
+                output_dir=runtime / "mismatched-bundle",
+                winsw_path=binary,
+                static_executable=binary,
+                python_executable=binary,
+                caddy_executable=binary,
+                install_root=install_root,
+                secret_store_path=secret_store,
+                public_origin="https://astra-staging.trycloudflare.com",
+                service_account="NT AUTHORITY\\NetworkService",
+            )
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "http://127.0.0.1:9012",
+        "https://127.0.0.1",
+        "https://10.0.0.8",
+        "https://staging",
+        "https://staging.invalid",
+        "https://learn.example",
+        "https://example.com",
+        "https://learn.example.net",
+        "https://learn.example.org",
+        "https://learn.example.edu",
+        "https://learn.astra.school:444",
+    ],
+)
+def test_windows_service_bundle_rejects_non_public_https_origin(origin):
+    with _runtime_dir() as runtime:
+        install_root = runtime / "install"
+        (install_root / "backend").mkdir(parents=True)
+        binary = _fake_binary(runtime / "tool.exe", b"tool")
+
+        with pytest.raises(ValueError, match="exact HTTPS origin"):
+            build_windows_service_drill_bundle(
+                output_dir=runtime / "bundle",
+                winsw_path=binary,
+                static_executable=binary,
+                python_executable=binary,
+                caddy_executable=binary,
+                install_root=install_root,
+                public_origin=origin,
+            )
 
 
 def test_windows_service_bundle_rejects_secret_bearing_database_url():

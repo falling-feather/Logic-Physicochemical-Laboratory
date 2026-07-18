@@ -90,6 +90,75 @@ def test_target_release_gate_rejects_example_origin_even_when_https(tmp_path):
     assert blockers["target_public_origin"] == "public_origin_placeholder_domain_not_allowed"
 
 
+def test_target_release_gate_rejects_fully_rehashed_non_public_origin_bundles(tmp_path):
+    scenarios = (
+        ("reserved-local", "https://learn.local", "public_origin_placeholder_domain_not_allowed"),
+        ("legacy-loopback", "https://127.1", "public_origin_must_use_approved_domain"),
+    )
+    for name, origin, reason in scenarios:
+        bundle_root = tmp_path / name
+        bundle_root.mkdir()
+        manifest_path = _write_bundle(bundle_root)
+        _rewrite_bundle_origin(manifest_path, origin)
+
+        report = target_release_gate.build_target_release_report(manifest_path, now=NOW)
+
+        assert report["ok"] is False
+        assert report["counts"] == {"total": 51, "passed": 50, "blocked": 1}
+        assert report["blockers"] == [
+            {
+                "control": "target_public_origin",
+                "ok": False,
+                "reason": reason,
+            }
+        ]
+
+
+def test_target_public_origin_validator_rejects_invalid_dns_labels():
+    invalid_origins = (
+        "https://learn.local",
+        "https://bad_label.astra.school",
+        "https://-bad.astra.school",
+        "https://bad-.astra.school",
+        "https://astra",
+        "https://127.0.0.1",
+        "https://[v1.foo]",
+        "https://learn.astra.school?",
+        "https://learn.astra.school#",
+        "https://learn.astra.school:0443",
+        "https://127.1",
+        "https://0177.1",
+        "https://0x7f.1",
+        "https://foo.123",
+        "https://1.2.3.4.5",
+    )
+
+    for origin in invalid_origins:
+        normalized, reason = target_release_evidence.normalize_public_https_origin(origin)
+        assert normalized is None
+        assert reason != "ready"
+
+    assert target_release_evidence.normalize_public_https_origin(f"{ORIGIN}:443") == (
+        ORIGIN,
+        "ready",
+    )
+    assert target_release_gate._public_probe_host("127.1") is False
+    assert target_release_gate._public_probe_host("0177.1") is False
+    assert target_release_gate._public_probe_host("0x7f.1") is False
+    assert target_release_gate._public_probe_host("bad_label.astra.school") is False
+    assert target_release_gate._public_probe_host("-bad.astra.school") is False
+    assert target_release_gate._public_probe_host("foo.123") is False
+    assert target_release_gate._public_probe_host("[v1.foo]") is False
+    assert target_release_gate._public_probe_host("[edge.astra.school]") is False
+    assert target_release_gate._public_probe_host("[8.8.8.8]") is False
+    assert target_release_gate._public_probe_host("[2606:4700:4700::1111") is False
+    assert target_release_gate._public_probe_host("2606:4700:4700::1111]") is False
+    assert target_release_gate._public_probe_host("[::1]") is False
+    assert target_release_gate._public_probe_host("8.8.8.8") is True
+    assert target_release_gate._public_probe_host("[2606:4700:4700::1111]") is True
+    assert target_release_gate._public_probe_host("edge.astra.school") is True
+
+
 def test_target_release_gate_rejects_evidence_hash_path_and_fixed_semantics(tmp_path):
     manifest_path = _write_bundle(tmp_path)
     manifest = _read_json(manifest_path)
@@ -354,6 +423,22 @@ def test_target_release_gate_requires_browser_archive_and_restore_checks(tmp_pat
     assert blockers["evidence.target_browser_smoke"] == "target_browser_smoke_semantics_invalid"
 
 
+def test_target_release_gate_requires_browser_report_release_revision(tmp_path):
+    manifest_path = _write_bundle(tmp_path)
+    manifest = _read_json(manifest_path)
+    browser_path = tmp_path / "evidence" / "target-browser-smoke.json"
+    envelope = _read_json(browser_path)
+    envelope["report"]["release_revision"] = "3" * 40
+    _write_json(browser_path, envelope)
+    manifest["evidence"][6]["sha256"] = _sha256(browser_path)
+    _write_json(manifest_path, manifest)
+
+    report = target_release_gate.build_target_release_report(manifest_path, now=NOW)
+
+    blockers = {item["control"]: item["reason"] for item in report["blockers"]}
+    assert blockers["evidence.target_browser_smoke"] == "target_browser_smoke_semantics_invalid"
+
+
 def test_target_release_gate_rejects_browser_completion_outside_gate_window(tmp_path):
     manifest_path = _write_bundle(tmp_path)
     manifest = _read_json(manifest_path)
@@ -391,9 +476,12 @@ def test_target_release_gate_requires_recent_target_controls(tmp_path):
 
 def test_target_release_evidence_cli_seals_valid_report_without_overwriting_input(tmp_path, capsys):
     manifest_path = _write_bundle(tmp_path)
+    manifest = _read_json(manifest_path)
+    manifest["target"]["public_origin"] = f"{ORIGIN}:443"
+    _write_json(manifest_path, manifest)
     raw_path = tmp_path / "raw-preflight.json"
     output_path = tmp_path / "sealed-preflight.json"
-    raw = _ready_reports(_read_json(manifest_path))["deploy_preflight"]
+    raw = _ready_reports(manifest)["deploy_preflight"]
     raw["generated_at"] = datetime.now(UTC).isoformat()
     _write_json(raw_path, raw)
 
@@ -432,6 +520,37 @@ def test_target_release_evidence_cli_seals_valid_report_without_overwriting_inpu
         "artifact_manifest_sha256": ARTIFACT_MANIFEST_SHA256,
         "evidence_bundle_id": BUNDLE_ID,
     }
+
+
+def test_target_release_evidence_cli_rejects_local_origin_manifest(tmp_path, capsys):
+    manifest_path = _write_bundle(tmp_path)
+    manifest = _read_json(manifest_path)
+    manifest["target"]["public_origin"] = "https://learn.local"
+    _write_json(manifest_path, manifest)
+    raw_path = tmp_path / "raw-preflight.json"
+    output_path = tmp_path / "sealed-preflight.json"
+    _write_json(raw_path, _ready_reports(manifest)["deploy_preflight"])
+
+    exit_code = target_release_evidence.main(
+        [
+            "seal",
+            "--manifest",
+            str(manifest_path),
+            "--evidence-id",
+            "deploy_preflight",
+            "--run-id",
+            "deploy-preflight-run-20260716-local",
+            "--input",
+            str(raw_path),
+            "--output",
+            str(output_path),
+        ]
+    )
+    summary = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 1
+    assert summary["reason"] == "manifest_target_origin_invalid"
+    assert output_path.exists() is False
 
 
 def test_target_release_evidence_manual_template_is_fail_closed(tmp_path, capsys):
@@ -545,6 +664,42 @@ def _write_bundle(root: Path) -> Path:
     manifest_path = root / "target-release.json"
     _write_json(manifest_path, manifest)
     return manifest_path
+
+
+def _rewrite_bundle_origin(manifest_path: Path, new_origin: str) -> None:
+    manifest = _read_json(manifest_path)
+    old_origin = manifest["target"]["public_origin"]
+    old_host = old_origin.removeprefix("https://")
+    new_host = new_origin.removeprefix("https://")
+    manifest = _replace_origin_values(manifest, old_origin, new_origin, old_host, new_host)
+    for item in manifest["evidence"]:
+        evidence_path = manifest_path.parent / item["path"]
+        envelope = _replace_origin_values(
+            _read_json(evidence_path),
+            old_origin,
+            new_origin,
+            old_host,
+            new_host,
+        )
+        _write_json(evidence_path, envelope)
+        item["sha256"] = _sha256(evidence_path)
+    _write_json(manifest_path, manifest)
+
+
+def _replace_origin_values(value, old_origin: str, new_origin: str, old_host: str, new_host: str):
+    if isinstance(value, dict):
+        return {
+            key: _replace_origin_values(child, old_origin, new_origin, old_host, new_host)
+            for key, child in value.items()
+        }
+    if isinstance(value, list):
+        return [
+            _replace_origin_values(child, old_origin, new_origin, old_host, new_host)
+            for child in value
+        ]
+    if isinstance(value, str):
+        return value.replace(old_origin, new_origin).replace(old_host, new_host)
+    return value
 
 
 def _manifest() -> dict:
@@ -860,6 +1015,7 @@ def _ready_reports(manifest: dict) -> dict[str, dict]:
             "status": "ready",
             "completed_at": (NOW - timedelta(hours=1, minutes=10)).isoformat(),
             "public_origin": ORIGIN,
+            "release_revision": manifest["release"]["revision"],
             "browser": {"name": "Microsoft Edge", "version": "150.0.0"},
             "roles": ["student", "teacher", "admin"],
             "viewports": ["desktop", "390x844"],

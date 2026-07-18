@@ -15,6 +15,7 @@
 - V7.4.26 已关闭 R4b 实验模块切换生命周期：`AstraExperimentRegistry.cleanupModule(subject, id)` 只对 23 项 `verified:true` owner 执行精确 cleanup，65 项 legacy 全部保持 fail closed，0 项 missing；A→B、B→画廊、画廊→A 和整页离开由 transition generation、Zoom 前置关闭、失败中止与页面级兼容清理共同约束，迟到资源/init/焦点/相关推荐任务不能写入新模块。五大学科桌面三轮、精确 390×844、整页离开重入和独立只读复审均通过。
 - V7.4.27 已关闭 R5 当前构建三角色终验：QA-007 使用全新一次性 SQLite、隔离账号和真实 Edge，证明匿名登录门禁与 Service Worker 先于首个业务写入，学生/教师/管理员只加载各自允许的 CSS/JS，角色资源与 `/api` 均不进入 CacheStorage；注册后退出并在新上下文显式登录、建课/发布、真实批量导入、入班/提交/反馈、批改、审批、用户与组织治理、审计和越权拒绝全部通过。桌面与精确 390×844、5 张截图、浏览器诊断及同库只读总账均通过，R1—R5 已形成仓库发布候选；真实 MySQL、staging 和指定目标环境发布仍只由 R6/OPS-001 关闭。
 - V7.4.28 已完成 R5b 目标发布证据语义收束，并由 OPS/QA 长期组独立复审为 0 blocker：`target-release-v2` 的 51 项总闸把 target instance/origin 与 release version/revision、同包五类制品清单路径/SHA、evidence bundle 绑定，原始 evidence 数组必须精确七项、run ID 唯一，自动 raw 与目标浏览器完成时间同时受封装时刻和总闸当前时刻约束。示例域名、manifest 自选状态、匿名/自定义第八项、空壳 `ok=true`、跨环境/跨提交拼装、敏感正文和正式时间回拨均失败；目标 topology 还强制绑定可解析公网 host、外部探测引用、公网原始 API 端口不可达与四服务逐项 SCM，deploy smoke 固定 0047 组织治理列和现存 `version >= 1`，目标浏览器固定组织归档/恢复。该版本只强化仓库发布闸，未生成真实目标环境证据，R6/OPS-001 仍外部阻塞。
+- V7.4.29 已解除 R6 的仓库侧建设前置：Windows DPAPI store 的专用父目录和文件从创建时使用受保护 DACL，并把加密载荷、LocalService/NetworkService 与服务包账号绑定；`deploy.ps1` 可传公开 DNS、标准 443 的精确 HTTPS origin、store 与临时 bootstrap 开关，生成的 Caddy 配置同步 HSTS，XML/报告不含 DSN 或 secret，bootstrap token 只进入 API、不进入 worker；三角色 proof 新增同源公网 HTTPS、显式 staging/production health、干净 Git、仓库外空证据目录和环境变量 bootstrap token 的 target staging 模式，成功后直接生成绑定当前 Git revision 的 `target-browser-smoke.json`。用户已指定当前 Windows 工作区为 staging，真实 MySQL、四服务、公网入口、备份恢复、监控、七证据与 51/51 正在实施，完成前不宣称 production 或 R6 通过。
 - V7.4.22 已完成认证双通道契约硬化：浏览器继续只使用 HttpOnly Cookie，非浏览器客户端保留显式 Bearer；Cookie+Bearer、重复会话 Cookie、重复 Authorization 和畸形 Authorization 全部 fail closed，不再允许凭据静默覆盖。登录响应保留的兼容 token 只供非浏览器 API 客户端使用，浏览器必须忽略且不得存储或回传。
 - V7.4.23 已完成并通过 QA-008 独立验收：`#student/#teacher/#admin` 的 CSS/JS 只在 `/api/users/me` 确认权威角色后按矩阵加载；角色资源不进入 APP_SHELL、星系 HTTP fallback 或 Service Worker 共享 CacheStorage，登出、401 与跨角色切换会清理旧角色样式并整页重载。精确提交 `4ea2fe732437792a145339c8f339f7380b5e14c2` 的 163 个受跟踪 JavaScript、17/17 合同及三角色桌面/390×844、强制 Service Worker、CacheStorage 矩阵均通过；前端裁剪只减少暴露面和误执行，服务端授权仍是安全边界。
 - V7.4.24 已完成 R3 管理组织受约束治理：管理员只能通过学校/班级白名单 schema、必填原因和 `expected_version` 修改元数据或执行归档/恢复；最后责任人、活动子班级、跨校注入、陈旧版本和无变化写入均被拒绝，所有成功动作审计并权威回读。Alembic 0047、活动组织写门禁、当前学情/进度归档过滤和条件式 MySQL schema 门禁已同步；真实 MySQL 仍须在指定隔离库或目标环境补证。
@@ -85,6 +86,11 @@ npm test
 
 # 三角色业务证明（只允许一次性本地数据库；需先启动静态站和 testing/development API）
 node tools/browser/role-workflows-proof.cjs --api http://127.0.0.1:8000 --web http://127.0.0.1:8766 --confirm-isolated-environment
+
+# 指定 staging 使用 --confirm-target-staging；API/web 必须是同一真实 HTTPS origin，
+# Git 必须干净，--out 必须显式指向仓库外不存在或为空的目录，
+# bootstrap token 只通过 ASTRA_ADMIN_BOOTSTRAP_TOKEN 环境注入；成功后直接使用
+# <out>/target-browser-smoke.json 进入 target-release-v2 seal，完整诊断保留在同目录。
 
 # 工作区差异检查
 git diff --check

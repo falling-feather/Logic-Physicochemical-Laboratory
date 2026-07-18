@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import re
+import socket
 import sys
 import tempfile
 from typing import Any, Callable
@@ -74,6 +75,9 @@ _RELEASE_VERSION_RE = re.compile(r"V\d+\.\d+\.\d+")
 _REVISION_RE = re.compile(r"[0-9a-fA-F]{40}")
 _SHA256_RE = re.compile(r"[0-9a-fA-F]{64}")
 _IDENTIFIER_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{5,127}")
+_PUBLIC_DNS_LABEL_RE = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)")
+_RESERVED_PUBLIC_SUFFIXES = (".example", ".invalid", ".localhost", ".local", ".test")
+_EXAMPLE_DOMAIN_ROOTS = ("example.com", "example.net", "example.org", "example.edu")
 _SENSITIVE_KEY_PARTS = (
     "password",
     "secret",
@@ -85,6 +89,71 @@ _SENSITIVE_KEY_PARTS = (
     "database_url",
     "dsn",
 )
+
+
+def normalize_public_https_origin(value: Any) -> tuple[str | None, str]:
+    """Validate and normalize one exact public HTTPS origin."""
+    text = str(value or "").strip()
+    if not text or _placeholder(text):
+        return None, "public_origin_placeholder_not_replaced"
+    try:
+        parsed = urlsplit(text)
+        port = parsed.port
+    except ValueError:
+        return None, "public_origin_invalid"
+    if (
+        parsed.scheme.lower() != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+    ):
+        return None, "public_origin_must_be_https_origin"
+    if parsed.path or "?" in text or "#" in text or port not in {None, 443}:
+        return None, "public_origin_must_not_include_path_query_fragment_or_nonstandard_port"
+
+    hostname = parsed.hostname.lower()
+    authority = parsed.netloc.lower()
+    if authority not in {hostname, f"{hostname}:443"}:
+        return None, "public_origin_domain_invalid"
+    if any(
+        hostname == suffix[1:] or hostname.endswith(suffix)
+        for suffix in _RESERVED_PUBLIC_SUFFIXES
+    ) or any(
+        hostname == root or hostname.endswith(f".{root}") for root in _EXAMPLE_DOMAIN_ROOTS
+    ):
+        return None, "public_origin_placeholder_domain_not_allowed"
+    try:
+        ipaddress.ip_address(hostname)
+        return None, "public_origin_must_use_approved_domain"
+    except ValueError:
+        pass
+    if is_legacy_ipv4_literal(hostname):
+        return None, "public_origin_must_use_approved_domain"
+    if (
+        not has_public_dns_syntax(hostname)
+    ):
+        return None, "public_origin_domain_invalid"
+    return f"https://{hostname}", "ready"
+
+
+def has_public_dns_syntax(value: Any) -> bool:
+    hostname = str(value or "").strip().lower()
+    labels = hostname.split(".")
+    return bool(
+        len(hostname) <= 253
+        and len(labels) >= 2
+        and all(_PUBLIC_DNS_LABEL_RE.fullmatch(label) for label in labels)
+        and re.search(r"[a-z]", labels[-1])
+    )
+
+
+def is_legacy_ipv4_literal(value: Any) -> bool:
+    """Return whether a string uses inet_aton-compatible legacy IPv4 notation."""
+    try:
+        socket.inet_aton(str(value or "").strip())
+        return True
+    except (OSError, UnicodeError):
+        return False
 
 
 def validate_evidence_envelope(
@@ -282,6 +351,7 @@ def manual_evidence_template(evidence_id: str) -> dict[str, Any]:
             "status": "replace_template",
             "completed_at": "REPLACE_WITH_ISO8601_COMPLETION_TIME",
             "public_origin": "REPLACE_WITH_TARGET_PUBLIC_ORIGIN",
+            "release_revision": "REPLACE_WITH_40_HEX_RELEASE_REVISION",
             "browser": {"name": "REPLACE_WITH_BROWSER_NAME", "version": "REPLACE_WITH_BROWSER_VERSION"},
             "roles": ["student", "teacher", "admin"],
             "viewports": ["desktop", "390x844"],
@@ -658,6 +728,7 @@ def _runtime_rollback_ready(report: dict[str, Any], **context: Any) -> bool:
 
 def _target_browser_smoke_ready(report: dict[str, Any], **context: Any) -> bool:
     target = _mapping(context.get("target"))
+    release = _mapping(context.get("release"))
     generated_at = context.get("generated_at")
     completed_at = _parse_datetime(report.get("completed_at"))
     browser = _mapping(report.get("browser"))
@@ -666,6 +737,8 @@ def _target_browser_smoke_ready(report: dict[str, Any], **context: Any) -> bool:
         report.get("ok") is True
         and report.get("status") == "ready"
         and report.get("public_origin") == target.get("public_origin")
+        and str(report.get("release_revision") or "").lower()
+        == str(release.get("revision") or "").lower()
         and _present(browser.get("name"))
         and _present(browser.get("version"))
         and len(_string_list(report.get("roles"))) == len(REQUIRED_BROWSER_ROLES)
@@ -683,18 +756,17 @@ def _manifest_context(manifest: Any) -> tuple[dict[str, Any], dict[str, Any], di
         raise ValueError("manifest_must_use_target_release_v2")
     target = _mapping(manifest.get("target"))
     environment = str(target.get("environment") or "").strip().lower()
-    public_origin = str(target.get("public_origin") or "").strip()
+    public_origin, _ = normalize_public_https_origin(target.get("public_origin"))
     instance_id = str(target.get("instance_id") or "").strip()
-    parsed = urlsplit(public_origin)
     if environment not in {"staging", "production"}:
         raise ValueError("manifest_target_environment_invalid")
-    if parsed.scheme != "https" or not parsed.hostname or _placeholder(public_origin):
+    if public_origin is None:
         raise ValueError("manifest_target_origin_invalid")
     if not _valid_identifier(instance_id):
         raise ValueError("manifest_target_instance_invalid")
     target = {
         "environment": environment,
-        "public_origin": public_origin.rstrip("/"),
+        "public_origin": public_origin,
         "instance_id": instance_id,
     }
 

@@ -15,6 +15,9 @@ param(
     [string]$InstallRoot = $PSScriptRoot,
     [string]$PythonExecutable = "python",
     [string]$DatabaseUrlValue = "%ASTRA_DATABASE_URL%",
+    [string]$SecretStorePath,
+    [string]$PublicOrigin,
+    [switch]$EnableAdminBootstrap,
     [ValidateSet("NT AUTHORITY\LocalService", "NT AUTHORITY\NetworkService")]
     [string]$ServiceAccount = "NT AUTHORITY\LocalService",
     [ValidateRange(1024, 65535)]
@@ -55,6 +58,16 @@ $arguments = @(
     "--api-port", $ApiPort,
     "--proxy-port", $ProxyPort
 )
+
+if ($SecretStorePath) {
+    $arguments += @("--secret-store-path", $SecretStorePath)
+}
+if ($PublicOrigin) {
+    $arguments += @("--public-origin", $PublicOrigin)
+}
+if ($EnableAdminBootstrap) {
+    $arguments += "--enable-admin-bootstrap"
+}
 
 & $pythonCommand.Source @arguments
 if ($LASTEXITCODE -ne 0) {

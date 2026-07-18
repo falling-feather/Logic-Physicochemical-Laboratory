@@ -8,12 +8,14 @@ import json
 from pathlib import Path
 import re
 from typing import Any
-from urllib.parse import urlsplit
 
 from scripts.target_release_evidence import (
     ARTIFACT_MANIFEST_SCHEMA_VERSION,
     REQUIRED_EVIDENCE,
     TARGET_RELEASE_SCHEMA_VERSION,
+    has_public_dns_syntax,
+    is_legacy_ipv4_literal,
+    normalize_public_https_origin,
     validate_release_artifact_manifest,
     validate_evidence_envelope,
 )
@@ -75,8 +77,10 @@ def build_target_release_report(
 
     target = _mapping(manifest.get("target"))
     environment = str(target.get("environment") or "").strip().lower()
-    public_origin = str(target.get("public_origin") or "").strip()
-    origin_ok, origin_reason = _public_https_origin(public_origin)
+    raw_public_origin = str(target.get("public_origin") or "").strip()
+    normalized_public_origin, origin_reason = normalize_public_https_origin(raw_public_origin)
+    origin_ok = normalized_public_origin is not None
+    public_origin = normalized_public_origin or raw_public_origin
     approved_at = _parse_datetime(target.get("approved_at"))
     check("target_environment", environment in {"staging", "production"}, "target_must_be_staging_or_production")
     check("target_public_origin", origin_ok, origin_reason)
@@ -433,45 +437,33 @@ def _sensitive_manifest_paths(value: Any, prefix: str = "$") -> list[str]:
 
 
 def _public_https_origin(value: str) -> tuple[bool, str]:
-    try:
-        if not _present(value):
-            return False, "public_origin_placeholder_not_replaced"
-        parsed = urlsplit(value)
-        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
-            return False, "public_origin_must_be_https_origin"
-        if parsed.path or parsed.query or parsed.fragment or parsed.port not in {None, 443}:
-            return False, "public_origin_must_not_include_path_query_fragment_or_nonstandard_port"
-        hostname = parsed.hostname.lower()
-        if hostname.endswith((".example", ".invalid", ".test", ".localhost")) or any(
-            hostname == root or hostname.endswith(f".{root}") for root in _EXAMPLE_DOMAIN_ROOTS
-        ):
-            return False, "public_origin_placeholder_domain_not_allowed"
-        if hostname in {"localhost", "127.0.0.1", "::1"}:
-            return False, "public_origin_must_not_be_local"
-        try:
-            ipaddress.ip_address(hostname)
-            return False, "public_origin_must_use_approved_domain"
-        except ValueError:
-            pass
-        if "." not in hostname:
-            return False, "public_origin_domain_invalid"
-        return True, "ready"
-    except Exception:
-        return False, "public_origin_invalid"
+    normalized, reason = normalize_public_https_origin(value)
+    return normalized is not None, reason
 
 
 def _public_probe_host(value: Any) -> bool:
-    host = str(value or "").strip().lower().strip("[]")
+    host = str(value or "").strip().lower()
     if not _present(host) or re.search(r"\s|/|@", host):
         return False
+    if host.startswith("[") or host.endswith("]"):
+        if not (host.startswith("[") and host.endswith("]")):
+            return False
+        if host.count("[") != 1 or host.count("]") != 1:
+            return False
+        try:
+            address = ipaddress.ip_address(host[1:-1])
+        except ValueError:
+            return False
+        return isinstance(address, ipaddress.IPv6Address) and bool(address.is_global)
     if host in {"localhost", "0.0.0.0", "::", "::1"}:
         return False
     try:
         address = ipaddress.ip_address(host)
         return bool(address.is_global)
     except ValueError:
-        pass
-    if "." not in host or host.endswith((".example", ".invalid", ".test", ".localhost", ".local", ".internal")):
+        if is_legacy_ipv4_literal(host):
+            return False
+    if not has_public_dns_syntax(host) or host.endswith((".example", ".invalid", ".test", ".localhost", ".local", ".internal")):
         return False
     return not any(host == root or host.endswith(f".{root}") for root in _EXAMPLE_DOMAIN_ROOTS)
 
