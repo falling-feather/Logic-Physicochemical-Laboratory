@@ -282,22 +282,9 @@ const GALAXY_HTTP_FALLBACK_ASSETS = {
         './pages/home/home.js?v=20260704qianduanV70'
     ],
     frontier: [
-        './shared/js/frontier-learning.js?v=20260630mainV64',
-        './shared/js/scroll-animations.js?v=20260630mainV64',
-        './shared/js/cards.js?v=20260630mainV64',
-        './shared/js/common.js?v=20260417d',
-        './pages/cosmos/cosmos.css?v=20260630mainV64',
-        './pages/cosmos/earth-sun.js?v=20260630mainV64',
-        './pages/datascience/datascience.css?v=20260630mainV64',
-        './pages/datascience/linear-regression.js?v=20260630mainV64',
-        './pages/infotech/infotech.css?v=20260630mainV64',
-        './pages/infotech/network-layers.js?v=20260630mainV64',
-        './pages/materials/materials.css?v=20260630mainV64',
-        './pages/materials/materials-lab.js?v=20260630mainV64',
-        './pages/humanities/humanities.css?v=20260630mainV64',
-        './pages/humanities/text-lab.js?v=20260630mainV64',
-        './pages/engineering/engineering.css?v=20260630mainV64',
-        './pages/engineering/bridge-truss.js?v=20260630mainV64'
+        './pages/frontier/frontier.css?v=20260719v755Game001',
+        './pages/frontier/frontier-manifest.js?v=20260719v755Game001',
+        './shared/js/frontier-learning.js?v=20260719v755Game001'
     ]
 };
 

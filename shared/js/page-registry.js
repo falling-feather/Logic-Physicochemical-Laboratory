@@ -65,54 +65,68 @@
             enter: 'initAdmin',
             leave: 'destroyAdmin'
         }),
-        frontier: definePage({ galaxy: 'frontier', tags: ['frontier'] }),
+        frontier: definePage({
+            galaxy: 'frontier',
+            tags: ['frontier'],
+            styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
+            script: 'shared/js/frontier-learning.js?v=20260719v755Game001',
+            ready: 'initFrontierCourse',
+            enter: 'initFrontierCourse',
+            leave: 'destroyFrontierCourse'
+        }),
         cosmos: definePage({
             galaxy: 'frontier',
             tags: ['frontier'],
-            script: 'pages/cosmos/earth-sun.js?v=20260630mainV64',
-            ready: 'initCosmosSeasons',
-            enter: 'initCosmosSeasons',
-            leave: 'destroyCosmosSeasons'
+            styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
+            script: 'shared/js/frontier-learning.js?v=20260719v755Game001',
+            ready: 'initFrontierCourse',
+            enter: 'initFrontierCourse',
+            leave: 'destroyFrontierCourse'
         }),
         engineering: definePage({
             galaxy: 'frontier',
             tags: ['frontier'],
-            script: 'pages/engineering/bridge-truss.js?v=20260630mainV64',
-            ready: 'initBridgeTruss',
-            enter: 'initBridgeTruss',
-            leave: 'destroyBridgeTruss'
+            styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
+            script: 'shared/js/frontier-learning.js?v=20260719v755Game001',
+            ready: 'initFrontierCourse',
+            enter: 'initFrontierCourse',
+            leave: 'destroyFrontierCourse'
         }),
         datascience: definePage({
             galaxy: 'frontier',
             tags: ['frontier'],
-            script: 'pages/datascience/linear-regression.js?v=20260630mainV64',
-            ready: 'initLinearRegressionLab',
-            enter: 'initLinearRegressionLab',
-            leave: 'destroyLinearRegressionLab'
+            styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
+            script: 'shared/js/frontier-learning.js?v=20260719v755Game001',
+            ready: 'initFrontierCourse',
+            enter: 'initFrontierCourse',
+            leave: 'destroyFrontierCourse'
         }),
         infotech: definePage({
             galaxy: 'frontier',
             tags: ['frontier'],
-            script: 'pages/infotech/network-layers.js?v=20260630mainV64',
-            ready: 'initNetworkLayersLab',
-            enter: 'initNetworkLayersLab',
-            leave: 'destroyNetworkLayersLab'
+            styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
+            script: 'shared/js/frontier-learning.js?v=20260719v755Game001',
+            ready: 'initFrontierCourse',
+            enter: 'initFrontierCourse',
+            leave: 'destroyFrontierCourse'
         }),
         materials: definePage({
             galaxy: 'frontier',
             tags: ['frontier'],
-            script: 'pages/materials/materials-lab.js?v=20260630mainV64',
-            ready: 'initMaterialsLab',
-            enter: 'initMaterialsLab',
-            leave: 'destroyMaterialsLab'
+            styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
+            script: 'shared/js/frontier-learning.js?v=20260719v755Game001',
+            ready: 'initFrontierCourse',
+            enter: 'initFrontierCourse',
+            leave: 'destroyFrontierCourse'
         }),
         humanities: definePage({
             galaxy: 'frontier',
             tags: ['frontier'],
-            script: 'pages/humanities/text-lab.js?v=20260630mainV64',
-            ready: 'initHumanitiesLab',
-            enter: 'initHumanitiesLab',
-            leave: 'destroyHumanitiesLab'
+            styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
+            script: 'shared/js/frontier-learning.js?v=20260719v755Game001',
+            ready: 'initFrontierCourse',
+            enter: 'initFrontierCourse',
+            leave: 'destroyFrontierCourse'
         }),
         license: definePage({
             galaxy: 'englab',

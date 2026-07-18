@@ -1,1443 +1,514 @@
-// ===== Frontier Galaxy Learning Frame =====
-const FrontierLearning = {
-    pages: ['cosmos', 'engineering', 'datascience', 'infotech', 'materials', 'humanities'],
-    sectionPlans: {
-        cosmos: [
-            { key: 'lab', selector: '.cosmos-lab', label: '实验台', note: '拖动日期和纬度，观察赤纬、昼长与太阳高度。', evidence: 'NOAA：太阳计算近似', protocol: { adjust: '日期与纬度', observe: '赤纬、昼长、太阳高度', boundary: '按 NOAA 近似理解趋势' }, legend: [
-                { tone: 'input', label: '日期/纬度', note: '调参入口' },
-                { tone: 'signal', label: '太阳高度', note: '曲线观察' },
-                { tone: 'boundary', label: '昼长趋势', note: '近似判读' }
-            ] },
-            { key: 'read', selector: '.cosmos-interpretation', label: '判读', note: '把季节图读成地轴、赤纬、纬度和近似边界。', evidence: 'NASA/JPL：季节图像' },
-            { key: 'reference', selector: '.cosmos-reference', label: '资料', note: '回到 NASA 与 NOAA 资料确认模型边界。', evidence: '来源索引：3 条' }
-        ],
-        engineering: [
-            { key: 'chain', selector: '.engineering-model-chain', label: '判断链', note: '按模型假设、整体反力、节点杆力和设计边界推进。', evidence: '静力平衡：受力图' },
-            { key: 'lab', selector: '.engineering-lab', label: '实验台', note: '调整荷载位置，观察支座反力和杆件拉压。', evidence: '节点法：杆力符号', protocol: { adjust: '荷载位置', observe: '支座反力、杆件拉压', boundary: '只作二维静定桁架入门' }, legend: [
-                { tone: 'load', label: '荷载', note: '外力输入' },
-                { tone: 'reaction', label: '支座反力', note: '整体平衡' },
-                { tone: 'signal', label: '杆件拉压', note: '节点判读' }
-            ] },
-            { key: 'read', selector: '.engineering-interpretation', label: '判读', note: '区分整体平衡、节点平衡、拉压符号和真实验算。', evidence: 'OpenStax：静态平衡' },
-            { key: 'reference', selector: '.engineering-reference', label: '资料', note: '核对静力学教材中的桁架和节点法依据。', evidence: '来源索引：5 条' }
-        ],
-        datascience: [
-            { key: 'map', selector: '.datascience-model-map', label: '模型链', note: '把数据、参数、损失和解释边界串起来。', evidence: 'Google ML：线性回归' },
-            { key: 'lab', selector: '.datascience-lab', label: '实验台', note: '调节斜率、截距和学习率，观察损失变化。', evidence: 'Google ML：损失函数', protocol: { adjust: '斜率、截距、学习率', observe: '损失、残差、预测线', boundary: '不作样本外保证' }, legend: [
-                { tone: 'input', label: '样本点', note: '训练数据' },
-                { tone: 'signal', label: '预测线', note: '当前模型' },
-                { tone: 'boundary', label: '残差/损失', note: '只在样本范围判读' }
-            ] },
-            { key: 'read', selector: '.datascience-interpretation', label: '判读', note: '用残差、样本范围和异常点检查模型。', evidence: 'scikit-learn：模型 API 边界' },
-            { key: 'reference', selector: '.datascience-reference', label: '资料', note: '对照开放统计教材与机器学习资料。', evidence: '来源索引：4 条' }
-        ],
-        infotech: [
-            { key: 'protocols', selector: '.infotech-protocols', label: '协议层', note: '建立 DNS、HTTP/2、TCP 与 IPv6 的角色边界。', evidence: 'RFC 1034 / 9113 / 9293 / 8200' },
-            { key: 'lab', selector: '.infotech-lab', label: '实验台', note: '切换请求阶段，观察封装和逐跳转发。', evidence: 'RFC：封装角色', protocol: { adjust: '请求阶段', observe: '封装层、逐跳转发', boundary: '真实抓包受 TLS/MTU 等影响' }, legend: [
-                { tone: 'model', label: '封装层', note: '应用到链路' },
-                { tone: 'signal', label: '路径节点', note: '逐跳转发' },
-                { tone: 'boundary', label: '教学近似', note: 'TLS/MTU 另行影响' }
-            ] },
-            { key: 'read', selector: '.infotech-interpretation', label: '判读', note: '区分教学包头模型和真实抓包开销。', evidence: 'TCP/IPv6：真实边界' },
-            { key: 'reference', selector: '.infotech-reference', label: '资料', note: '回到 IETF RFC 原文确认协议定义。', evidence: '来源索引：4 条' }
-        ],
-        materials: [
-            { key: 'topics', selector: '.materials-topic-map', label: '专题地图', note: '把材料样板拆成晶体结构、晶粒尺度、性能趋势和来源附录。', evidence: '四分支导通' },
-            { key: 'pages', selector: '.materials-topic-pages', label: '专题页骨架', note: '把四个专题整理成可迁移为真实路由的页面蓝图。', evidence: '四条可寻址专题页路径' },
-            { key: 'modules', selector: '.materials-topic-modules', label: '专题模块', note: '把四个专题拆成学习看点、操作动作和来源边界。', evidence: '四张任务卡' },
-            { key: 'deep', selector: '.materials-deep-panels', label: '深层面板', note: '用折叠面板呈现准独立专题页的讲解脚本和拆页方向。', evidence: '四个专题面板' },
-            { key: 'visuals', selector: '.materials-visual-atlas', label: '视觉图谱', note: '用三张自制教学示意连接晶格、晶界和趋势曲线。', evidence: '自制 SVG 素材：3 组' },
-            { key: 'trust', selector: '.materials-trust-ledger', label: '可信审查', note: '前置事实依据、教学近似、不可外推和回查动作。', evidence: '模型边界前置' },
-            { key: 'scale', selector: '.materials-scales', label: '尺度桥', note: '区分理想晶胞、位错、晶界和加工历史。', evidence: '尺度边界：晶胞到晶粒' },
-            { key: 'judge', selector: '.materials-judgement', label: '判断链', note: '把显微图像转成有边界的材料判断。', evidence: 'Hall-Petch：统计边界' },
-            { key: 'lab', selector: '.materials-lab', label: '实验台', note: '切换晶体结构与晶粒尺寸，观察相对趋势。', evidence: '晶体结构 + 晶粒趋势', protocol: { adjust: '晶体结构、晶粒尺寸', observe: '配位、堆积、相对强度趋势', boundary: 'Hall-Petch 不无限外推' }, legend: [
-                { tone: 'model', label: '晶胞模型', note: '理想结构' },
-                { tone: 'signal', label: '晶界密度', note: '相对趋势' },
-                { tone: 'boundary', label: '强度指数', note: '不可无限外推' }
-            ] },
-            { key: 'read', selector: '.materials-interpretation', label: '判读', note: '限定 Hall-Petch 趋势和不可外推场景。', evidence: 'Hall-Petch：破裂场景' },
-            { key: 'reference', selector: '.materials-reference', label: '资料', note: '核对晶体结构和晶粒强化参考资料。', evidence: '来源索引：3 条' }
-        ],
-        humanities: [
-            { key: 'chain', selector: '.humanities-evidence-chain', label: '证据链', note: '按清理文本、观察分布、回读和继续求证推进。', evidence: 'LOC：原始资料回读' },
-            { key: 'lab', selector: '.humanities-lab', label: '实验台', note: '切换文本和视角，观察图表如何提出问题。', evidence: 'Voyant：视图解释', protocol: { adjust: '文本与分析视角', observe: '词频、上下文、共现', boundary: '回到原文和语境解释' }, legend: [
-                { tone: 'input', label: '文本样本', note: '材料范围' },
-                { tone: 'signal', label: '词频/共现', note: '提出问题' },
-                { tone: 'boundary', label: '原文回读', note: '语境解释' }
-            ] },
-            { key: 'read', selector: '.humanities-interpretation', label: '判读', note: '回到原文、出处和语境中解释数量线索。', evidence: 'TEI / IR：标注与词频' },
-            { key: 'reference', selector: '.humanities-reference', label: '资料', note: '对照 Voyant、国会图书馆和信息检索教材。', evidence: '来源索引：4 条' }
-        ]
-    },
-
-    labDecorators: {
-        cosmos: {
-            workbench: '.cosmos-workbench',
-            controls: '.cosmos-controls',
-            canvas: '.cosmos-canvas-wrap',
-            readout: '.cosmos-info'
-        },
-        engineering: {
-            workbench: '.truss-workbench',
-            controls: '.truss-controls',
-            canvas: '.truss-canvas-wrap',
-            readout: '.truss-info'
-        },
-        datascience: {
-            workbench: '.regression-workbench',
-            controls: '.regression-controls',
-            canvas: '.regression-canvas-wrap',
-            readout: '.regression-info'
-        },
-        infotech: {
-            workbench: '.network-workbench',
-            controls: '.network-controls',
-            canvas: '.network-canvas-wrap',
-            readout: '.network-info'
-        },
-        materials: {
-            workbench: '.materials-workbench',
-            controls: '.materials-controls',
-            canvas: '.materials-canvas-wrap',
-            readout: '.materials-info'
-        },
-        humanities: {
-            workbench: '.humanities-workbench',
-            controls: '.humanities-controls',
-            canvas: '.humanities-canvas-wrap',
-            readout: '.humanities-info'
-        }
-    },
-
-    subjectModules: {
-        cosmos: [
-            { label: '太阳路径模型', href: '#frontier-cosmos-lab', icon: 'sun', note: '调节日期和纬度，观察太阳高度、昼长和赤纬变化。' },
-            { label: '季节判读', href: '#frontier-cosmos-read', icon: 'orbit', note: '把地轴倾角、直射点和纬度差异连成解释链。' },
-            { label: '极区与低纬', href: '#frontier-cosmos-lab', icon: 'globe-2', note: '用预设纬度快速比较不同地区的日照节奏。' },
-            { label: '资料回查', href: '#frontier-cosmos-reference', icon: 'book-open-check', note: '回到公开资料确认模型近似和适用边界。' }
-        ],
-        engineering: [
-            { label: '结构模型', href: '#frontier-engineering-chain', icon: 'construction', note: '先确认支座、节点和杆件的二维静定假设。' },
-            { label: '荷载路径', href: '#frontier-engineering-lab', icon: 'weight', note: '移动荷载位置，观察支座反力和杆件拉压变化。' },
-            { label: '节点判读', href: '#frontier-engineering-read', icon: 'git-fork', note: '区分整体平衡、节点平衡和拉压符号。' },
-            { label: '设计边界', href: '#frontier-engineering-reference', icon: 'shield-check', note: '把教学桁架和真实工程验算明确分层。' }
-        ],
-        datascience: [
-            { label: '样本与特征', href: '#frontier-datascience-map', icon: 'scatter-chart', note: '从数据点、参数和预测线建立模型坐标。' },
-            { label: '损失函数', href: '#frontier-datascience-lab', icon: 'line-chart', note: '调节斜率、截距和学习率，观察损失变化。' },
-            { label: '残差判读', href: '#frontier-datascience-read', icon: 'scan-line', note: '用残差、样本范围和异常点检查模型解释。' },
-            { label: '模型边界', href: '#frontier-datascience-reference', icon: 'book-marked', note: '回到资料说明训练样本与样本外预测边界。' }
-        ],
-        infotech: [
-            { label: '协议分层', href: '#frontier-infotech-protocols', icon: 'layers-3', note: '建立 DNS、HTTP、TCP、IPv6 的角色边界。' },
-            { label: '请求旅程', href: '#frontier-infotech-lab', icon: 'network', note: '切换请求阶段，观察封装和逐跳转发。' },
-            { label: '包头判读', href: '#frontier-infotech-read', icon: 'binary', note: '区分教学包头模型和真实抓包开销。' },
-            { label: '标准回查', href: '#frontier-infotech-reference', icon: 'file-search', note: '对照 RFC 原文确认协议定义和省略内容。' }
-        ],
-        materials: [
-            { label: '晶体结构', href: '#frontier-materials-topic-page-crystal', icon: 'box', note: '比较 SC、BCC、FCC、HCP 的几何读数。' },
-            { label: '晶粒尺度', href: '#frontier-materials-topic-page-grain', icon: 'grip', note: '理解晶界、位错和加工历史如何影响趋势。' },
-            { label: '性能趋势', href: '#frontier-materials-topic-page-performance', icon: 'activity', note: '用相对曲线练习趋势判断和不可外推边界。' },
-            { label: '来源回查', href: '#frontier-materials-trust', icon: 'book-open-check', note: '查看资料用途、模型边界和本地来源附录。' }
-        ],
-        humanities: [
-            { label: '文本清理', href: '#frontier-humanities-chain', icon: 'text-cursor-input', note: '先确认语料、分词和停用词的处理边界。' },
-            { label: '词频上下文', href: '#frontier-humanities-lab', icon: 'list-filter', note: '切换文本视角，观察词项如何提出回读问题。' },
-            { label: '共现网络', href: '#frontier-humanities-read', icon: 'network', note: '把数量线索放回原文和语境解释。' },
-            { label: '资料回读', href: '#frontier-humanities-reference', icon: 'book-open-text', note: '回到来源、标注规则和阅读方法确认解释边界。' }
-        ]
-    },
-
-    _runtimes: Object.create(null),
-    _activeRuntimePage: null,
-
-    init(page) {
-        if (typeof CONFIG === 'undefined' || !CONFIG.learningDesign) return;
-        const targetPage = page || (window.Router && Router.currentPage) || (location.hash || '').slice(1).split('/')[0];
-        if (this.pages.includes(targetPage)) {
-            this._activateRuntime(targetPage);
-            this.renderPage(targetPage);
-            this.bindHashDetailsTarget();
-        } else if (targetPage === 'all') {
-            this.pages.forEach((item) => {
-                this._activateRuntime(item);
-                this.renderPage(item);
-            });
-            this._activeRuntimePage = null;
-        }
-    },
-
-    destroy(page) {
-        const targets = page && page !== 'all' ? [page] : Object.keys(this._runtimes);
-        targets.forEach((item) => this._destroyRuntime(item));
-    },
-
-    _activateRuntime(page) {
-        this._destroyRuntime(page);
-        this._activeRuntimePage = page;
-        this._runtimes[page] = { cleanups: [] };
-    },
-
-    _destroyRuntime(page) {
-        const runtime = this._runtimes[page];
-        if (runtime && Array.isArray(runtime.cleanups)) {
-            runtime.cleanups.splice(0).reverse().forEach((cleanup) => {
-                try { cleanup(); } catch (e) { /* noop */ }
-            });
-        }
-        delete this._runtimes[page];
-        if (this._activeRuntimePage === page) this._activeRuntimePage = null;
-        this._clearRuntimeFlags(page);
-    },
-
-    _trackCleanup(cleanup) {
-        const runtime = this._activeRuntimePage ? this._runtimes[this._activeRuntimePage] : null;
-        if (runtime && typeof cleanup === 'function') runtime.cleanups.push(cleanup);
-    },
-
-    _listen(target, type, handler, options) {
-        if (!target || !target.addEventListener || !target.removeEventListener) return;
-        target.addEventListener(type, handler, options);
-        const capture = typeof options === 'boolean' ? options : Boolean(options && options.capture);
-        this._trackCleanup(() => target.removeEventListener(type, handler, capture));
-    },
-
-    _observe(observer, target, options) {
-        if (!observer || !target || !observer.observe) return;
-        observer.observe(target, options);
-        this._trackCleanup(() => observer.disconnect());
-    },
-
-    _setTimeout(handler, delay) {
-        const id = window.setTimeout(handler, delay);
-        this._trackCleanup(() => window.clearTimeout(id));
-        return id;
-    },
-
-    _requestFrame(handler) {
-        const id = window.requestAnimationFrame(handler);
-        this._trackCleanup(() => window.cancelAnimationFrame(id));
-        return id;
-    },
-
-    _clearRuntimeFlags(page) {
-        const pageEl = document.getElementById(`page-${page}`);
-        if (!pageEl) return;
-        pageEl.querySelectorAll('[data-frontier-lab-control-element-observer]').forEach((node) => {
-            delete node.dataset.frontierLabControlElementObserver;
-        });
-        pageEl.querySelectorAll('[data-frontier-lab-status-observer]').forEach((node) => {
-            delete node.dataset.frontierLabStatusObserver;
-            delete node.dataset.frontierLabStatusPending;
-        });
-        pageEl.querySelectorAll('[data-frontier-lab-status-source-preview]').forEach((node) => {
-            delete node.dataset.frontierLabStatusSourcePreview;
-        });
-        pageEl.querySelectorAll('[data-frontier-lab-panel-observer]').forEach((node) => {
-            delete node.dataset.frontierLabPanelObserver;
-        });
-        pageEl.querySelectorAll('.frontier-section-rail[data-bound]').forEach((node) => {
-            delete node.dataset.bound;
-        });
-        pageEl.querySelectorAll('[data-frontier-lab-source-active="status"]').forEach((node) => {
-            delete node.dataset.frontierLabSourceActive;
-        });
-        pageEl.querySelectorAll('[data-frontier-lab-source-arrival="status"]').forEach((node) => {
-            delete node.dataset.frontierLabSourceArrival;
-        });
-        pageEl.querySelectorAll('.frontier-lab-status__item[data-frontier-lab-status-active="true"]').forEach((node) => {
-            delete node.dataset.frontierLabStatusActive;
-            node.setAttribute('aria-pressed', 'false');
-        });
-    },
-
-    renderPage(page) {
-        const pageEl = document.getElementById(`page-${page}`);
-        const shell = pageEl ? pageEl.querySelector(`.${page}-shell`) : null;
-        const learning = CONFIG.learningDesign.subjects && CONFIG.learningDesign.subjects[page];
-        const meta = CONFIG.pages && CONFIG.pages[page];
-        if (!pageEl || !shell || !learning || !meta) return;
-        this.hideLegacyOverview(page, shell);
-        shell.classList.add('frontier-study-shell');
-        if (!shell.querySelector('.frontier-brief')) {
-
-        const subjectLinks = [
-            '<a href="#frontier">未来星系总览</a>',
-            ...this.pages.map((id) => {
-            const item = CONFIG.pages[id] || {};
-            const label = this.escape(item.label || id);
-            const active = id === page ? ' aria-current="page"' : '';
-            return `<a href="#${this.escapeAttr(id)}"${active}>${label}</a>`;
-            })
-        ].join('');
-
-        const sourceItems = this.getSourceItems(learning, page);
-        const sourceLinks = sourceItems.map((source) => this.renderSourceItem(source)).join('');
-        const sourceSummary = sourceItems.length
-            ? `本页列出 ${sourceItems.length} 条资料，用于回查概念定义、模型边界和拓展阅读。`
-            : '本页会在学习框架中列出可回查的公开资料。';
-
-        const title = `${this.escape(meta.title || meta.label || '学习主题')} · 二级总览`;
-        const overview = this.escape(learning.overview || '本页围绕一个跨学科主题建立观察路径。');
-        const teachingNote = this.escape(learning.teachingNote || '先确认模型假设，再解释可视化结果。');
-        const guardrail = this.escape(learning.guardrail || '不要只看图形结果；先回到模型假设、样本范围和来源资料。');
-        const sourceNote = this.escape(CONFIG.learningDesign.sourceNote || '学习内容参考开放教材与权威资料。');
-
-        const frame = document.createElement('section');
-        frame.className = 'frontier-brief';
-        frame.setAttribute('aria-label', `${meta.label || meta.title}学习框架`);
-        frame.innerHTML = `
-            <div class="frontier-brief__head">
-                <span class="frontier-brief__mark"><i data-lucide="sparkles"></i>未来星系二级目录</span>
-                <h2>${title}</h2>
-                <p>${sourceNote}</p>
-            </div>
-            <nav class="frontier-brief__nav" aria-label="未来星系二级目录">
-                ${subjectLinks}
-            </nav>
-            <div class="frontier-brief__grid">
-                <article class="frontier-brief__card">
-                    <span><i data-lucide="target"></i>学习任务</span>
-                    <p>${overview}</p>
-                </article>
-                <article class="frontier-brief__card">
-                    <span><i data-lucide="sliders-horizontal"></i>模型边界</span>
-                    <p>${teachingNote}</p>
-                </article>
-                <article class="frontier-brief__card frontier-brief__card--guardrail">
-                    <span><i data-lucide="shield-check"></i>误解防护</span>
-                    <p>${guardrail}</p>
-                </article>
-                <article class="frontier-brief__card frontier-brief__card--sources">
-                    <span><i data-lucide="book-open-check"></i>来源索引</span>
-                    <p class="frontier-brief__source-summary">${this.escape(sourceSummary)}</p>
-                    <div class="frontier-brief__sources">${sourceLinks}</div>
-                </article>
-            </div>
-        `;
-
-        shell.insertBefore(frame, shell.firstElementChild);
-        }
-        this.renderSubjectOverview(page, shell, learning, meta);
-        this.renderPathway(page, shell, learning, meta);
-    },
-
-    hideLegacyOverview(page, shell) {
-        const selector = `.${page}-overview`;
-        const overview = shell ? shell.querySelector(selector) : null;
-        if (!overview) return;
-        overview.hidden = true;
-        overview.dataset.frontierLegacyOverview = 'hidden';
-    },
-
-    renderSubjectOverview(page, shell, learning, meta) {
-        if (!shell || shell.querySelector('.frontier-subject-overview')) return;
-        const modules = this.subjectModules[page] || [];
-        if (!modules.length) return;
-
-        const cards = modules.map((item, index) => `
-            <a class="frontier-subject-module" href="${this.escapeAttr(item.href || '#')}" data-frontier-subject-module="${this.escapeAttr(page)}-${index + 1}">
-                <span class="frontier-subject-module__index">${String(index + 1).padStart(2, '0')}</span>
-                <i data-lucide="${this.escapeAttr(item.icon || 'sparkles')}"></i>
-                <strong>${this.escape(item.label)}</strong>
-                <p>${this.escape(item.note)}</p>
-            </a>
-        `).join('');
-
-        const overview = document.createElement('section');
-        overview.className = 'frontier-subject-overview';
-        overview.setAttribute('aria-label', `${meta.label || meta.title}学科总览`);
-        overview.innerHTML = `
-            <div class="frontier-subject-overview__head">
-                <span><i data-lucide="layout-dashboard"></i>学科总览</span>
-                <h2>${this.escape(meta.label || meta.title || '学习主题')} · 先选模块再进入细节</h2>
-                <p>${this.escape(learning.overview || '先建立主题坐标，再进入实验、判读和资料回查。')}</p>
-            </div>
-            <div class="frontier-subject-overview__grid">
-                ${cards}
-            </div>
-        `;
-
-        const brief = shell.querySelector('.frontier-brief');
-        if (brief) {
-            brief.insertAdjacentElement('afterend', overview);
-        } else {
-            shell.insertBefore(overview, shell.firstElementChild);
-        }
-    },
-
-    renderPathway(page, shell, learning, meta) {
-        if (!shell) return;
-        const sections = this.collectSections(page, shell);
-        if (!sections.length) return;
-
-        if (!shell.querySelector('.frontier-pathway')) {
-            const links = sections.map((item) => {
-                const evidence = item.evidence
-                    ? `<em class="frontier-pathway__evidence"><i data-lucide="book-marked"></i>${this.escape(item.evidence)}</em>`
-                    : '';
-                return `
-                    <a class="frontier-pathway__step" href="#${this.escapeAttr(item.id)}" data-frontier-target="${this.escapeAttr(item.id)}">
-                        <span>${item.index}</span>
-                        <strong>${this.escape(item.label)}</strong>
-                        <p>${this.escape(item.note)}</p>
-                        ${evidence}
-                    </a>
-                `;
-            }).join('');
-
-            const sourceCount = this.getSourceItems(learning, page).length;
-            const pathway = document.createElement('section');
-            pathway.className = 'frontier-pathway';
-            pathway.setAttribute('aria-label', `${meta.label || meta.title}页内学习路径`);
-            pathway.innerHTML = `
-                <div class="frontier-pathway__head">
-                    <span><i data-lucide="route"></i>页内学习路径</span>
-                    <h2>${this.escape(meta.label || meta.title || '学习主题')} · 从问题到证据</h2>
-                    <p>按顺序完成概览、模型、实验台、判读和资料核对，避免只看动画而跳过模型边界。</p>
-                </div>
-                <div class="frontier-pathway__meta" aria-label="本页结构摘要">
-                    <div><span>路径节点</span><strong>${sections.length}</strong></div>
-                    <div><span>资料来源</span><strong>${sourceCount}</strong></div>
-                </div>
-                <nav class="frontier-pathway__steps" aria-label="${meta.label || meta.title}页内目录">
-                    ${links}
-                </nav>
-            `;
-
-            const brief = shell.querySelector('.frontier-brief');
-            if (brief) {
-                brief.insertAdjacentElement('afterend', pathway);
-            } else {
-                shell.insertBefore(pathway, shell.firstElementChild);
-            }
-        }
-
-        this.renderSectionRail(page, shell, sections, meta);
-        this.bindSectionRail(page, shell, sections);
-        this.refreshIcons();
-    },
-
-    collectSections(page, shell) {
-        const plan = this.sectionPlans[page] || [];
-        return plan.map((item, index) => {
-            const target = shell.querySelector(item.selector);
-            if (!target) return null;
-            const id = target.id || `frontier-${page}-${item.key}`;
-            const stepIndex = String(index + 1).padStart(2, '0');
-            target.id = id;
-            target.classList.add('frontier-anchor-section');
-            target.classList.toggle('frontier-anchor-section--overview', item.key === 'overview');
-            target.classList.toggle('frontier-anchor-section--body', item.key !== 'overview');
-            target.classList.toggle('frontier-anchor-section--lab', item.key === 'lab');
-            if (item.key === 'lab') {
-                this.decorateLabSection(page, target, item);
-            }
-            target.dataset.frontierIndex = stepIndex;
-            target.dataset.frontierLabel = item.label;
-            target.dataset.frontierNote = item.note;
-            if (item.key !== 'overview') {
-                this.ensureSectionContext(target, item, stepIndex, id);
-            }
-            return {
-                id,
-                index: stepIndex,
-                label: item.label,
-                note: item.note,
-                evidence: item.evidence || '',
-                protocol: item.protocol || null
-            };
-        }).filter(Boolean);
-    },
-
-    decorateLabSection(page, target, item) {
-        if (!target) return;
-        const selectors = this.labDecorators[page] || {};
-        const roleNodes = {};
-        target.classList.add('frontier-lab-stage');
-        target.dataset.frontierLab = page;
-        this.decorateLabShell(page, target, item);
-        this.decorateLabHeader(page, target, item);
-
-        [
-            ['workbench', selectors.workbench, 'frontier-lab-workbench'],
-            ['controls', selectors.controls, 'frontier-lab-controls'],
-            ['canvas', selectors.canvas, 'frontier-lab-canvas'],
-            ['readout', selectors.readout, 'frontier-lab-readout']
-        ].forEach(([role, selector, className]) => {
-            const node = selector ? target.querySelector(selector) : null;
-            if (!node) return;
-            roleNodes[role] = node;
-            node.classList.add(className);
-            node.dataset.frontierLabRole = role;
-            this.decorateLabZone(node, role, page);
-            if (role === 'controls') {
-                this.decorateLabControlPanels(node);
-            }
-            if (role === 'canvas') {
-                this.decorateLabCanvas(node, page, item);
-            }
-            if (role === 'readout') {
-                this.decorateLabReadoutPanels(node);
-            }
-        });
-        this.decorateLabLayout(target, roleNodes);
-        const labContainer = roleNodes.workbench || target;
-        this.renderLabInstrumentHeader(labContainer, item);
-        this.renderLabEvidence(labContainer, item);
-        this.renderLabFlow(labContainer, item);
-        this.renderLabStatus(labContainer, item, roleNodes);
-    },
-
-    decorateLabShell(page, target, item) {
-        if (!target) return;
-        target.classList.add('frontier-lab-shell');
-        target.dataset.frontierLabShell = 'active';
-        target.dataset.frontierLabShellPage = page || 'frontier';
-        if (!target.getAttribute('aria-label') && !target.getAttribute('aria-labelledby')) {
-            target.setAttribute('aria-label', `${this.escapeAttr(item.label || '实验台')}学习舱体`);
-        }
-    },
-
-    decorateLabHeader(page, target, item) {
-        if (!target) return;
-        const header = Array.from(target.children || [])
-            .find((child) => child.nodeType === 1 && /(^|\s)[\w-]+-lab__header(\s|$)/.test(child.className || ''));
-        if (!header) return;
-
-        header.classList.add('frontier-lab-header');
-        header.dataset.frontierLabHeader = page || 'frontier';
-        header.setAttribute('aria-label', `${this.escapeAttr(item.label || '实验台')}标题区`);
-
-        const copy = header.querySelector('div');
-        if (copy) copy.classList.add('frontier-lab-header__copy');
-
-        const eyebrow = Array.from(header.querySelectorAll('span'))
-            .find((node) => /(^|\s)[\w-]+-lab__eyebrow(\s|$)/.test(node.className || ''));
-        if (eyebrow) {
-            eyebrow.classList.add('frontier-lab-header__eyebrow');
-            eyebrow.dataset.frontierLabHeaderRole = 'eyebrow';
-        }
-
-        const title = header.querySelector('h2');
-        if (title) title.classList.add('frontier-lab-header__title');
-
-        const description = copy ? copy.querySelector('p') : header.querySelector('p');
-        if (description) description.classList.add('frontier-lab-header__desc');
-
-        const badge = Array.from(header.children || [])
-            .find((node) => node.tagName === 'SPAN' && /(^|\s)[\w-]+-lab__badge(\s|$)/.test(node.className || ''));
-        if (badge) {
-            badge.classList.add('frontier-lab-header__badge');
-            badge.dataset.frontierLabHeaderRole = 'badge';
-        }
-    },
-
-    decorateLabZone(node, role, page) {
-        const zones = {
-            controls: ['input', '调参区', '调整变量与操作入口'],
-            canvas: ['visual', '可视区', '承载模型画布与读图标记'],
-            readout: ['feedback', '读数区', '汇总观察量与边界反馈']
-        };
-        const zone = zones[role];
-        if (!node || !zone) return;
-        node.classList.add('frontier-lab-zone');
-        node.dataset.frontierLabZone = zone[0];
-        node.dataset.frontierLabZoneLabel = zone[1];
-        node.dataset.frontierLabZoneNote = zone[2];
-        node.dataset.frontierLabZonePage = page || 'frontier';
-        this.renderLabZoneHeader(node, zone[0], zone[1], zone[2]);
-        this.ensureLabSourceId(node, page, role);
-    },
-
-    renderLabZoneHeader(node, key, label, note) {
-        if (!node) return;
-        const existing = Array.from(node.children || [])
-            .find((child) => child.nodeType === 1 && child.classList.contains('frontier-lab-zone-head'));
-        const header = existing || document.createElement('div');
-        const signature = `${key || 'zone'}|${label || '分区'}|${note || ''}`;
-        header.className = 'frontier-lab-zone-head';
-        header.dataset.frontierLabZoneHead = key || 'zone';
-        if (header.dataset.frontierLabZoneSignature !== signature) {
-            header.dataset.frontierLabZoneSignature = signature;
-            header.innerHTML = `
-                <span class="frontier-lab-zone-head__mark">${this.escape((key || 'zone').toUpperCase())}</span>
-                <strong>${this.escape(label || '分区')}</strong>
-                <em>${this.escape(note || '')}</em>
-            `;
-        }
-        if (!existing) {
-            node.insertBefore(header, node.firstElementChild);
-        }
-    },
-
-    decorateLabLayout(target, roleNodes) {
-        const workbench = roleNodes && roleNodes.workbench ? roleNodes.workbench : target;
-        if (!workbench) return;
-        workbench.dataset.frontierLabLayout = 'instrument';
-        workbench.dataset.frontierLabLayoutRoles = ['controls', 'canvas', 'readout']
-            .filter((role) => roleNodes && roleNodes[role])
-            .join(' ');
-        if (target) target.dataset.frontierLabLayout = 'instrument';
-    },
-
-    decorateLabControlPanels(controls) {
-        if (!controls) return;
-        controls.dataset.frontierLabControls = 'true';
-
-        Array.from(controls.children || []).forEach((child) => {
-            child.classList.add('frontier-lab-control-panel');
-            child.dataset.frontierLabControl = this.getLabControlKind(child);
-        });
-        this.decorateLabControlElements(controls);
-        this.bindLabControlElementObserver(controls);
-    },
-
-    decorateLabControlElements(controls) {
-        if (!controls) return;
-        Array.from(controls.querySelectorAll('button')).forEach((button) => {
-            button.classList.add('frontier-lab-control-button');
-            button.dataset.frontierLabControlElement = 'button';
-        });
-        Array.from(controls.querySelectorAll('input[type="range"]')).forEach((input) => {
-            input.classList.add('frontier-lab-range');
-            input.dataset.frontierLabControlElement = 'range';
-        });
-    },
-
-    bindLabControlElementObserver(controls) {
-        if (!controls || controls.dataset.frontierLabControlElementObserver === 'true' || typeof MutationObserver === 'undefined') return;
-        controls.dataset.frontierLabControlElementObserver = 'true';
-        const observer = new MutationObserver((mutations) => {
-            const hasControlElement = mutations.some((mutation) => Array.from(mutation.addedNodes || []).some((node) => {
-                if (node.nodeType !== 1) return false;
-                if (node.matches && node.matches('button, input[type="range"]')) return true;
-                return Boolean(node.querySelector && node.querySelector('button, input[type="range"]'));
-            }));
-            if (hasControlElement) this.decorateLabControlElements(controls);
-        });
-        this._observe(observer, controls, { childList: true, subtree: true });
-    },
-
-    getLabControlKind(child) {
-        const className = child && child.className ? child.className : '';
-        if (/note/.test(className)) return 'boundary-note';
-        if (/actions/.test(className)) return 'action-group';
-        const buttons = child ? child.querySelectorAll('button').length : 0;
-        const ranges = child ? child.querySelectorAll('input[type="range"]').length : 0;
-        const actionButton = child && child.querySelector('button[id$="step"], button[id$="fit"], button[id$="reset"]');
-        if (actionButton) return 'action-group';
-        if (/presets|samples|modes|buttons|processes|focus-list/.test(className) || (buttons > 1 && ranges === 0)) return 'option-group';
-        return 'parameter';
-    },
-
-    decorateLabCanvas(canvasFrame, page, item) {
-        if (!canvasFrame) return;
-        canvasFrame.dataset.frontierLabCanvas = page || 'visual-stage';
-        canvasFrame.setAttribute('aria-label', canvasFrame.getAttribute('aria-label') || '实验台可视化画布');
-
-        Array.from(canvasFrame.querySelectorAll('canvas, svg')).forEach((surface) => {
-            surface.classList.add('frontier-lab-canvas-surface');
-            surface.dataset.frontierLabSurface = surface.tagName.toLowerCase();
-        });
-
-        Array.from(canvasFrame.children || []).forEach((child) => {
-            if (/^(CANVAS|SVG)$/.test(child.tagName)) return;
-            child.classList.add('frontier-lab-canvas-layer');
-        });
-
-        this.renderLabLegend(canvasFrame, item);
-        this.renderLabCanvasAnnotations(canvasFrame, item);
-    },
-
-    renderLabLegend(canvasFrame, item) {
-        const legend = item && Array.isArray(item.legend) ? item.legend : [];
-        if (!canvasFrame || !legend.length) return;
-        const existing = canvasFrame.querySelector('.frontier-lab-legend');
-        const panel = existing || document.createElement('div');
-        const rows = legend.map((entry) => `
-            <span class="frontier-lab-legend__item" data-frontier-legend-tone="${this.escapeAttr(entry.tone || 'signal')}">
-                <i aria-hidden="true"></i>
-                <b>${this.escape(entry.label || '')}</b>
-                <em>${this.escape(entry.note || '')}</em>
-            </span>
-        `).join('');
-        panel.className = 'frontier-lab-legend frontier-lab-canvas-layer';
-        panel.setAttribute('aria-label', `${this.escapeAttr(item.label || '实验台')}图例`);
-        panel.innerHTML = `
-            <span class="frontier-lab-legend__title">图例</span>
-            <span class="frontier-lab-legend__items">${rows}</span>
-        `;
-        canvasFrame.dataset.frontierLabLegend = String(legend.length);
-        if (!existing) canvasFrame.insertBefore(panel, canvasFrame.firstElementChild);
-    },
-
-    renderLabCanvasAnnotations(canvasFrame, item) {
-        const legend = item && Array.isArray(item.legend) ? item.legend : [];
-        if (!canvasFrame || !legend.length) return;
-
-        const existing = canvasFrame.querySelector('.frontier-lab-annotations');
-        const panel = existing || document.createElement('div');
-        const rows = legend.slice(0, 3).map((entry, index) => `
-            <span class="frontier-lab-annotations__item" data-frontier-annotation-tone="${this.escapeAttr(entry.tone || 'signal')}">
-                <b>${String(index + 1).padStart(2, '0')}</b>
-                <em>${this.escape(entry.label || '')}</em>
-                <i>${this.escape(entry.note || '')}</i>
-            </span>
-        `).join('');
-
-        panel.className = 'frontier-lab-annotations frontier-lab-canvas-layer';
-        panel.setAttribute('aria-label', `${this.escapeAttr(item.label || '实验台')}画布标注`);
-        panel.innerHTML = `
-            <span class="frontier-lab-annotations__title">读图层</span>
-            <span class="frontier-lab-annotations__list">${rows}</span>
-        `;
-        canvasFrame.dataset.frontierLabAnnotations = String(Math.min(legend.length, 3));
-        if (!existing) canvasFrame.appendChild(panel);
-    },
-
-    renderLabInstrumentHeader(container, item) {
-        const note = item && item.note ? item.note : '';
-        const evidence = item && item.evidence ? item.evidence : '';
-        if (!container || (!note && !evidence)) return;
-
-        const existing = container.querySelector('.frontier-lab-instrument');
-        const panel = existing || document.createElement('div');
-        const headline = item && item.label && item.label !== '实验台' ? item.label : '当前任务';
-        panel.className = 'frontier-lab-instrument';
-        panel.setAttribute('aria-label', `${this.escapeAttr(item.label || '实验台')}仪器栏`);
-        panel.innerHTML = `
-            <span class="frontier-lab-instrument__mark">实验台</span>
-            <span class="frontier-lab-instrument__body">
-                <strong>${this.escape(headline)}</strong>
-                <em>${this.escape(note)}</em>
-            </span>
-            ${evidence ? `<span class="frontier-lab-instrument__source">回查 ${this.escape(evidence)}</span>` : ''}
-        `;
-        container.dataset.frontierLabInstrument = 'true';
-        if (!existing) container.insertBefore(panel, container.firstElementChild);
-    },
-
-    renderLabEvidence(container, item) {
-        const evidence = item && item.evidence ? item.evidence : '';
-        const boundary = item && item.protocol && item.protocol.boundary ? item.protocol.boundary : '';
-        if (!container || (!evidence && !boundary)) return;
-
-        const existing = container.querySelector('.frontier-lab-evidence');
-        const panel = existing || document.createElement('div');
-        const chips = [
-            ['证据回查', evidence, 'book-marked'],
-            ['模型边界', boundary, 'shield-check']
-        ].filter((entry) => entry[1]).map(([label, value, icon]) => `
-            <span class="frontier-lab-evidence__chip">
-                <i data-lucide="${this.escapeAttr(icon)}" aria-hidden="true"></i>
-                <b>${this.escape(label)}</b>
-                <em>${this.escape(value)}</em>
-            </span>
-        `).join('');
-
-        panel.className = 'frontier-lab-evidence';
-        this.ensureLabSourceId(panel, this.getLabPageFromNode(container), 'boundary');
-        panel.setAttribute('aria-label', `${this.escapeAttr(item.label || '实验台')}证据边界`);
-        panel.innerHTML = `
-            <span class="frontier-lab-evidence__title">证据边界</span>
-            <span class="frontier-lab-evidence__chips">${chips}</span>
-        `;
-        container.dataset.frontierLabEvidence = 'true';
-        if (!existing) {
-            const instrument = container.querySelector('.frontier-lab-instrument');
-            if (instrument) {
-                instrument.insertAdjacentElement('afterend', panel);
-            } else {
-                container.insertBefore(panel, container.firstElementChild);
-            }
-        }
-    },
-
-    renderLabFlow(container, item) {
-        const protocol = item && item.protocol ? item.protocol : null;
-        const evidence = item && item.evidence ? item.evidence : '';
-        if (!container || !protocol) return;
-
-        const entries = [
-            ['调参', protocol.adjust, 'sliders-horizontal'],
-            ['观察', protocol.observe, 'scan-line'],
-            ['回查', evidence || protocol.boundary, 'book-open-check']
-        ].filter((entry) => entry[1]);
-        if (!entries.length) return;
-
-        const existing = container.querySelector('.frontier-lab-flow');
-        const panel = existing || document.createElement('div');
-        const rows = entries.map(([label, value, icon], index) => `
-            <span class="frontier-lab-flow__step" data-frontier-lab-flow-step="${index + 1}">
-                <i data-lucide="${this.escapeAttr(icon)}" aria-hidden="true"></i>
-                <b>${this.escape(label)}</b>
-                <em>${this.escape(value)}</em>
-            </span>
-        `).join('');
-
-        panel.className = 'frontier-lab-flow';
-        panel.setAttribute('aria-label', `${this.escapeAttr(item.label || '实验台')}操作流`);
-        panel.innerHTML = `
-            <span class="frontier-lab-flow__title">操作流</span>
-            <span class="frontier-lab-flow__steps">${rows}</span>
-        `;
-        container.dataset.frontierLabFlow = String(entries.length);
-
-        if (!existing) {
-            const evidencePanel = container.querySelector('.frontier-lab-evidence');
-            if (evidencePanel) {
-                evidencePanel.insertAdjacentElement('afterend', panel);
-            } else {
-                container.insertBefore(panel, container.firstElementChild);
-            }
-        }
-    },
-
-    renderLabStatus(container, item, roleNodes) {
-        roleNodes = roleNodes || {};
-        if (!container || (!roleNodes.controls && !roleNodes.readout)) return;
-
-        const existing = container.querySelector('.frontier-lab-status');
-        const panel = existing || document.createElement('div');
-        panel.className = 'frontier-lab-status';
-        panel.setAttribute('aria-label', `${this.escapeAttr(item.label || '实验台')}状态读数`);
-        panel.innerHTML = `
-            <span class="frontier-lab-status__title">状态读数</span>
-            <span class="frontier-lab-status__items" aria-live="polite"></span>
-        `;
-        container.dataset.frontierLabStatus = 'true';
-        if (!existing) {
-            const flow = container.querySelector('.frontier-lab-flow');
-            if (flow) {
-                flow.insertAdjacentElement('afterend', panel);
-            } else {
-                container.insertBefore(panel, container.firstElementChild);
-            }
-        }
-
-        const update = () => this.refreshLabStatus(panel, item, roleNodes);
-        update();
-        this.bindLabStatusUpdates(panel, roleNodes, update);
-        this.bindLabStatusSourcePreview(panel);
-    },
-
-    refreshLabStatus(panel, item, roleNodes) {
-        if (!panel) return;
-        const items = panel.querySelector('.frontier-lab-status__items');
-        if (!items) return;
-        const entries = this.getLabStatusEntries(item, roleNodes);
-        panel.dataset.frontierLabStatusItems = String(entries.length);
-        items.innerHTML = entries.map(([key, label, value], index) => {
-            const itemId = this.getLabStatusItemId(panel, key, index);
-            const labelId = `${itemId}-label`;
-            const valueId = `${itemId}-value`;
-            const source = this.getLabStatusSource(panel, roleNodes, key);
-            const sourceAttr = source.ids.length ? ` aria-details="${this.escapeAttr(source.ids.join(' '))}"` : '';
-            const controlsAttr = source.ids.length ? ` aria-controls="${this.escapeAttr(source.ids.join(' '))}"` : '';
-            return `
-            <button type="button" class="frontier-lab-status__item" id="${this.escapeAttr(itemId)}" data-frontier-lab-status-key="${this.escapeAttr(key)}" data-frontier-lab-status-index="${String(index + 1).padStart(2, '0')}" data-frontier-lab-status-source="${this.escapeAttr(source.type)}" data-frontier-lab-status-source-ids="${this.escapeAttr(source.ids.join(' '))}" data-frontier-lab-status-source-label="${this.escapeAttr(source.label)}" aria-labelledby="${this.escapeAttr(labelId)}" aria-describedby="${this.escapeAttr(valueId)}" aria-pressed="false"${sourceAttr}${controlsAttr}>
-                <b id="${this.escapeAttr(labelId)}" data-frontier-lab-status-part="label">${this.escape(label)}</b>
-                <em id="${this.escapeAttr(valueId)}" data-frontier-lab-status-part="value">${this.escape(value)}</em>
-            </button>
-        `;
-        }).join('');
-    },
-
-    getLabStatusEntries(item, roleNodes) {
-        const controlSummary = this.getLabControlSummary(roleNodes.controls);
-        const readoutSummary = this.getLabReadoutSummary(roleNodes.readout);
-        const boundary = item && item.protocol && item.protocol.boundary ? item.protocol.boundary : '';
-
-        return [
-            ['control', '当前调参', controlSummary],
-            ['readout', '观测读数', readoutSummary],
-            ['boundary', '模型边界', boundary]
-        ].filter((entry) => entry[2]);
-    },
-
-    getLabStatusItemId(panel, key, index) {
-        const lab = panel && panel.closest ? panel.closest('.frontier-lab-stage') : null;
-        const page = lab && lab.dataset.frontierLab ? lab.dataset.frontierLab : 'frontier';
-        return `frontier-lab-status-${this.normalizeLabReadoutId(page)}-${this.normalizeLabReadoutId(key)}-${String((index || 0) + 1).padStart(2, '0')}`;
-    },
-
-    getLabStatusSource(panel, roleNodes, key) {
-        const page = this.getLabPageFromNode(panel);
-        const map = {
-            control: {
-                type: 'controls',
-                label: '控件区',
-                nodes: [roleNodes && roleNodes.controls]
-            },
-            readout: {
-                type: 'readout',
-                label: '读数区',
-                nodes: [roleNodes && roleNodes.readout]
-            },
-            boundary: {
-                type: 'boundary',
-                label: '边界条',
-                nodes: [panel && panel.parentElement ? panel.parentElement.querySelector('.frontier-lab-evidence') : null]
-            }
-        };
-        const source = map[key] || { type: 'unknown', label: '来源', nodes: [] };
-        const ids = source.nodes
-            .filter(Boolean)
-            .map((node, index) => this.ensureLabSourceId(node, page, source.type || key, index))
-            .filter(Boolean);
-        return {
-            type: source.type,
-            label: source.label,
-            ids
-        };
-    },
-
-    ensureLabSourceId(node, page, role, index) {
-        if (!node) return '';
-        const suffix = index ? `-${String(index + 1).padStart(2, '0')}` : '';
-        const id = node.id || `frontier-lab-source-${this.normalizeLabReadoutId(page || this.getLabPageFromNode(node))}-${this.normalizeLabReadoutId(role || 'source')}${suffix}`;
-        node.id = id;
-        node.dataset.frontierLabSource = role || 'source';
-        if (!node.hasAttribute('tabindex')) {
-            node.setAttribute('tabindex', '-1');
-        }
-        return id;
-    },
-
-    getLabPageFromNode(node) {
-        const lab = node && node.closest ? node.closest('.frontier-lab-stage') : null;
-        return lab && lab.dataset.frontierLab ? lab.dataset.frontierLab : 'frontier';
-    },
-
-    getLabControlSummary(controls) {
-        if (!controls) return '';
-        const activeButtons = Array.from(controls.querySelectorAll('button[aria-pressed="true"], button.is-active, button.active'))
-            .map((node) => this.getCompactText(node))
-            .filter(Boolean);
-
-        const rangeValues = Array.from(controls.querySelectorAll('input[type="range"]'))
-            .map((input) => this.getRangeStatusText(controls, input))
-            .filter(Boolean);
-
-        return this.compactStatusValue(this.uniqueStatusParts([...activeButtons, ...rangeValues]).slice(0, 4).join(' / '), 72);
-    },
-
-    getRangeStatusText(controls, input) {
-        if (!input) return '';
-        const labels = Array.from(controls.querySelectorAll('label'));
-        const linked = input.id ? labels.find((label) => label.getAttribute('for') === input.id) : null;
-        const label = linked || input.closest('label') || (input.closest('.frontier-lab-control-panel') || input.parentElement || controls).querySelector('label');
-        const name = label ? this.getCompactText(label.querySelector('span')) : '';
-        const value = label ? this.getCompactText(label.querySelector('strong')) : '';
-        const fallback = input.value ? this.getCompactText(input) || input.value : '';
-        return [name, value || fallback].filter(Boolean).join(' ');
-    },
-
-    getLabReadoutSummary(readout) {
-        if (!readout) return '';
-        const panels = this.getLabReadoutPanels(readout)
-            .slice(0, 3);
-        const parts = panels.map((panel) => {
-            if (panel.dataset.frontierLabReadoutSummary) return panel.dataset.frontierLabReadoutSummary;
-            const label = this.getCompactText(panel.querySelector('[class$="__label"], [class*="__label"]'));
-            const value = this.getCompactText(panel.querySelector('strong'));
-            return [label, value].filter(Boolean).join(' ');
-        }).filter(Boolean);
-        return this.compactStatusValue(this.uniqueStatusParts(parts).join(' / '), 84);
-    },
-
-    bindLabStatusUpdates(panel, roleNodes, update) {
-        if (!panel || panel.dataset.frontierLabStatusObserver === 'true') return;
-        panel.dataset.frontierLabStatusObserver = 'true';
-
-        const schedule = () => {
-            if (panel.dataset.frontierLabStatusPending === 'true') return;
-            panel.dataset.frontierLabStatusPending = 'true';
-            this._requestFrame(() => {
-                panel.dataset.frontierLabStatusPending = 'false';
-                update();
-            });
-        };
-
-        ['click', 'input', 'change'].forEach((eventName) => {
-            if (roleNodes.controls) this._listen(roleNodes.controls, eventName, schedule, true);
-            if (roleNodes.readout) this._listen(roleNodes.readout, eventName, schedule, true);
-        });
-
-        if (typeof MutationObserver === 'undefined') return;
-        const observer = new MutationObserver(schedule);
-        if (roleNodes.controls) {
-            this._observe(observer, roleNodes.controls, {
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['aria-pressed', 'class', 'value']
-            });
-        }
-        if (roleNodes.readout) {
-            this._observe(observer, roleNodes.readout, {
-                subtree: true,
-                childList: true,
-                characterData: true
-            });
-        }
-    },
-
-    bindLabStatusSourcePreview(panel) {
-        if (!panel || panel.dataset.frontierLabStatusSourcePreview === 'true') return;
-        panel.dataset.frontierLabStatusSourcePreview = 'true';
-        const clear = () => {
-            const lab = panel.closest ? panel.closest('.frontier-lab-stage') : null;
-            if (!lab) return;
-            lab.querySelectorAll('[data-frontier-lab-source-active="status"]').forEach((node) => {
-                delete node.dataset.frontierLabSourceActive;
-            });
-            lab.querySelectorAll('[data-frontier-lab-source-arrival="status"]').forEach((node) => {
-                delete node.dataset.frontierLabSourceArrival;
-            });
-            lab.querySelectorAll('.frontier-lab-status__item[data-frontier-lab-status-active="true"]').forEach((node) => {
-                delete node.dataset.frontierLabStatusActive;
-                node.setAttribute('aria-pressed', 'false');
-            });
-        };
-        const isActiveSource = (node) => Boolean(node && node.closest && node.closest('[data-frontier-lab-source-active="status"]'));
-        const shouldKeepActive = (node) => panel.contains(node) || isActiveSource(node) || isActiveSource(document.activeElement);
-        const arrivalTimers = new WeakMap();
-        const focusSource = (source) => {
-            if (!source || !source.focus) return;
-            try {
-                source.focus({ preventScroll: true });
-            } catch (error) {
-                source.focus();
-            }
-        };
-        const showArrival = (source) => {
-            if (!source) return;
-            const previousTimer = arrivalTimers.get(source);
-            if (previousTimer) {
-                window.clearTimeout(previousTimer);
-            }
-            delete source.dataset.frontierLabSourceArrival;
-            void source.offsetWidth;
-            source.dataset.frontierLabSourceArrival = 'status';
-            const timer = this._setTimeout(() => {
-                if (source.dataset.frontierLabSourceArrival === 'status') {
-                    delete source.dataset.frontierLabSourceArrival;
-                }
-                arrivalTimers.delete(source);
-            }, 900);
-            arrivalTimers.set(source, timer);
-        };
-        const activate = (target, options) => {
-            const item = target && target.closest ? target.closest('.frontier-lab-status__item') : null;
-            if (!item) return;
-            clear();
-            const ids = (item.dataset.frontierLabStatusSourceIds || '').split(/\s+/).filter(Boolean);
-            const sources = ids.map((id) => document.getElementById(id)).filter(Boolean);
-            item.dataset.frontierLabStatusActive = 'true';
-            item.setAttribute('aria-pressed', 'true');
-            sources.forEach((source) => {
-                source.dataset.frontierLabSourceActive = 'status';
-            });
-            if (options && options.locate && sources[0] && sources[0].scrollIntoView) {
-                sources[0].scrollIntoView({ block: 'nearest', inline: 'nearest' });
-                showArrival(sources[0]);
-                this._requestFrame(() => focusSource(sources[0]));
-            }
-        };
-        this._listen(panel, 'pointerover', (event) => activate(event.target));
-        this._listen(panel, 'mouseover', (event) => activate(event.target));
-        this._listen(panel, 'click', (event) => activate(event.target, { locate: true }));
-        this._listen(panel, 'focusin', (event) => activate(event.target));
-        this._listen(panel, 'keydown', (event) => {
-            if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return;
-            event.preventDefault();
-            activate(event.target, { locate: true });
-        });
-        this._listen(panel, 'pointerout', (event) => {
-            if (!shouldKeepActive(event.relatedTarget)) clear();
-        });
-        this._listen(panel, 'mouseout', (event) => {
-            if (!shouldKeepActive(event.relatedTarget)) clear();
-        });
-        this._listen(panel, 'focusout', (event) => {
-            if (!shouldKeepActive(event.relatedTarget)) clear();
-        });
-        this._trackCleanup(clear);
-    },
-
-    uniqueStatusParts(parts) {
-        const seen = new Set();
-        return parts.filter((part) => {
-            const value = this.compactStatusValue(part, 96);
-            if (!value || seen.has(value)) return false;
-            seen.add(value);
-            return true;
-        });
-    },
-
-    getCompactText(node) {
-        return node && node.textContent ? node.textContent.trim().replace(/\s+/g, ' ') : '';
-    },
-
-    compactStatusValue(value, limit) {
-        const text = value ? String(value).trim().replace(/\s+/g, ' ') : '';
-        if (!text || !limit || text.length <= limit) return text;
-        return `${text.slice(0, Math.max(0, limit - 1))}…`;
-    },
-
-    decorateLabReadoutPanels(readout) {
-        if (!readout) return;
-        readout.setAttribute('aria-label', readout.getAttribute('aria-label') || '实验台读数反馈');
-
-        const decorate = (root) => {
-            this.renderLabZoneHeader(root, 'feedback', '读数区', '汇总观察量与边界反馈');
-            const panels = this.getLabReadoutPanels(root);
-            panels.forEach((child, index) => {
-                child.classList.add('frontier-lab-readout-panel');
-                child.dataset.frontierLabRole = 'feedback-panel';
-                child.dataset.frontierLabReadoutIndex = String(index + 1).padStart(2, '0');
-                this.decorateLabReadoutPanelParts(child, index);
-            });
-            readout.dataset.frontierLabReadoutCount = String(panels.length);
-            this.renderLabReadoutHeader(root, panels);
-        };
-
-        decorate(readout);
-        if (readout.dataset.frontierLabPanelObserver === 'true' || typeof MutationObserver === 'undefined') return;
-        readout.dataset.frontierLabPanelObserver = 'true';
-
-        const observer = new MutationObserver((mutations) => {
-            const changed = mutations.some((mutation) => (
-                mutation.type === 'characterData' ||
-                ((mutation.addedNodes || []).length > 0) ||
-                ((mutation.removedNodes || []).length > 0)
-            ));
-            if (changed) decorate(readout);
-        });
-        this._observe(observer, readout, { childList: true, subtree: true, characterData: true });
-    },
-
-    getLabReadoutPanels(readout) {
-        return Array.from((readout && readout.children) || [])
-            .filter((child) => child.nodeType === 1
-                && !child.classList.contains('frontier-lab-zone-head')
-                && !child.classList.contains('frontier-lab-readout-head'));
-    },
-
-    renderLabReadoutHeader(readout, panels) {
-        if (!readout) return;
-        const panelList = panels || this.getLabReadoutPanels(readout);
-        const labels = panelList.map((panel) => this.getLabReadoutLabel(panel)).filter(Boolean);
-        const summary = labels.slice(0, 4).join(' / ');
-        const title = panelList.length ? `${panelList.length} 项` : '待刷新';
-        const signature = `${title}|${summary}`;
-        let header = Array.from(readout.children || [])
-            .find((child) => child.nodeType === 1 && child.classList.contains('frontier-lab-readout-head'));
-        if (!header) {
-            header = document.createElement('div');
-            header.className = 'frontier-lab-readout-head';
-            header.dataset.frontierLabReadoutHead = 'true';
-            readout.insertBefore(header, panelList[0] || null);
-        }
-        if (header.dataset.frontierLabReadoutSignature === signature) return;
-        header.dataset.frontierLabReadoutSignature = signature;
-        header.setAttribute('aria-label', `读数反馈：${title}`);
-        header.innerHTML = `
-            <span class="frontier-lab-readout-head__mark">读数反馈</span>
-            <strong>${this.escape(title)}</strong>
-            ${summary ? `<em>${this.escape(summary)}</em>` : ''}
-        `;
-    },
-
-    decorateLabReadoutPanelParts(panel, index) {
-        if (!panel) return;
-        const label = panel.querySelector('.frontier-lab-readout-label, [class$="panel__label"]');
-        if (label) {
-            label.classList.add('frontier-lab-readout-label');
-            label.dataset.frontierLabReadoutPart = 'label';
-        }
-        const valueNodes = Array.from(panel.querySelectorAll('strong'));
-        valueNodes.forEach((node) => {
-            node.classList.add('frontier-lab-readout-value');
-            node.dataset.frontierLabReadoutPart = 'value';
-        });
-        const noteNodes = Array.from(panel.querySelectorAll('p'));
-        noteNodes.forEach((node) => {
-            node.classList.add('frontier-lab-readout-note');
-            node.dataset.frontierLabReadoutPart = 'note';
-        });
-
-        const labelText = this.getLabReadoutLabel(panel);
-        const valueText = this.getLabReadoutValue(panel);
-        const readoutKey = this.getLabReadoutKey(labelText, index);
-        const panelId = this.getLabReadoutPanelId(panel, readoutKey, index);
-        const labelId = label ? this.assignLabReadoutPartId(label, panelId, 'label', 0) : '';
-        const valueIds = valueNodes.map((node, nodeIndex) => this.assignLabReadoutPartId(node, panelId, 'value', nodeIndex));
-        const noteIds = noteNodes.map((node, nodeIndex) => this.assignLabReadoutPartId(node, panelId, 'note', nodeIndex));
-        const labelledBy = [labelId, valueIds[0]].filter(Boolean).join(' ');
-        const describedBy = noteIds.filter(Boolean).join(' ');
-        panel.dataset.frontierLabReadoutKey = readoutKey;
-        panel.dataset.frontierLabReadoutLabel = labelText || '';
-        panel.dataset.frontierLabReadoutTone = this.getLabReadoutTone(readoutKey, labelText);
-        panel.dataset.frontierLabReadoutId = panelId;
-        panel.dataset.frontierLabReadoutSummary = this.getLabReadoutAria(labelText, valueText, index);
-        panel.id = panelId;
-        panel.setAttribute('role', 'group');
-        panel.setAttribute('aria-label', this.getLabReadoutAria(labelText, valueText, index));
-        if (labelledBy) {
-            panel.setAttribute('aria-labelledby', labelledBy);
-        } else {
-            panel.removeAttribute('aria-labelledby');
-        }
-        if (describedBy) {
-            panel.setAttribute('aria-describedby', describedBy);
-        } else {
-            panel.removeAttribute('aria-describedby');
-        }
-    },
-
-    getLabReadoutLabel(panel) {
-        const label = panel ? panel.querySelector('.frontier-lab-readout-label, [class$="panel__label"]') : null;
-        return this.getCompactText(label);
-    },
-
-    getLabReadoutValue(panel) {
-        const value = panel ? panel.querySelector('.frontier-lab-readout-value, strong') : null;
-        return this.compactStatusValue(this.getCompactText(value), 72);
-    },
-
-    getLabReadoutKey(label, index) {
-        const map = {
-            '太阳赤纬': 'solar-declination',
-            '正午太阳高度': 'solar-noon-altitude',
-            '理论昼长': 'daylight-duration',
-            '季节判断': 'season-reading',
-            '支座反力': 'support-reaction',
-            '最大杆力': 'maximum-member-force',
-            '当前荷载': 'active-load',
-            '近零杆件': 'near-zero-member',
-            '当前模型': 'current-model',
-            '损失与解释度': 'loss-fit',
-            '最小二乘线': 'least-squares-line',
-            '读图边界': 'reading-boundary',
-            'DNS': 'dns-resolution',
-            'TCP': 'tcp-transfer',
-            'IPv6': 'ipv6-network',
-            '逐跳转发': 'hop-forwarding',
-            '晶体结构': 'crystal-structure',
-            '晶胞数据': 'unit-cell',
-            '晶粒尺度': 'grain-size',
-            '性能趋势': 'property-trend',
-            '适用范围': 'model-scope',
-            '词项分布': 'term-distribution',
-            '回读位置': 'close-reading-position',
-            '共现线索': 'cooccurrence-clue',
-            '方法边界': 'method-boundary'
-        };
-        if (label && map[label]) return map[label];
-        return `metric-${String((index || 0) + 1).padStart(2, '0')}`;
-    },
-
-    getLabReadoutPanelId(panel, key, index) {
-        const lab = panel && panel.closest ? panel.closest('.frontier-lab-stage') : null;
-        const page = lab && lab.dataset.frontierLab ? lab.dataset.frontierLab : 'frontier';
-        return `frontier-lab-readout-${this.normalizeLabReadoutId(page)}-${this.normalizeLabReadoutId(key)}-${String((index || 0) + 1).padStart(2, '0')}`;
-    },
-
-    assignLabReadoutPartId(node, panelId, part, index) {
-        if (!node || !panelId || !part) return '';
-        const suffix = index ? `-${index + 1}` : '';
-        const id = `${panelId}-${part}${suffix}`;
-        node.id = id;
-        return id;
-    },
-
-    normalizeLabReadoutId(value) {
-        const slug = String(value || '')
-            .trim()
-            .toLowerCase()
-            .replace(/[^a-z0-9_-]+/g, '-')
-            .replace(/^-+|-+$/g, '');
-        return slug || 'metric';
-    },
-
-    getLabReadoutTone(key, label) {
-        const text = `${key || ''} ${label || ''}`;
-        if (/boundary|scope|边界|范围/.test(text)) return 'boundary';
-        if (/model|structure|unit-cell|dns|tcp|ipv6|模型|结构|数据/.test(text)) return 'model';
-        if (/load|grain-size|active|荷载|尺度/.test(text)) return 'input';
-        return 'signal';
-    },
-
-    getLabReadoutAria(label, value, index) {
-        const fallback = `读数 ${String((index || 0) + 1).padStart(2, '0')}`;
-        const name = label || fallback;
-        return value ? `${name}：${value}` : name;
-    },
-
-    ensureSectionContext(target, item, stepIndex, targetId) {
-        const parent = target && target.parentElement;
-        if (!parent) return;
-        const existing = Array.from(parent.querySelectorAll('.frontier-section-context'))
-            .find((node) => node.dataset.frontierFor === targetId);
-        const context = existing || document.createElement('div');
-        const labProtocol = this.renderLabProtocol(item);
-        context.className = 'frontier-section-context';
-        context.dataset.frontierFor = targetId;
-        context.setAttribute('aria-label', `${item.label}本节坐标`);
-        context.innerHTML = `
-            <span class="frontier-section-context__index">${this.escape(stepIndex)}</span>
-            <span class="frontier-section-context__label">本节坐标</span>
-            <strong>${this.escape(item.label)}</strong>
-            <p>${this.escape(item.note)}</p>
-            ${labProtocol}
-            ${item.evidence ? `<span class="frontier-section-context__evidence"><i data-lucide="book-marked"></i>证据回查：${this.escape(item.evidence)}</span>` : ''}
-        `;
-        if (!existing) parent.insertBefore(context, target);
-    },
-
-    renderLabProtocol(item) {
-        if (!item || !item.protocol) return '';
-        const entries = [
-            ['调参', item.protocol.adjust],
-            ['观察', item.protocol.observe],
-            ['边界', item.protocol.boundary]
-        ].filter((entry) => entry[1]);
-        if (!entries.length) return '';
-        const rows = entries.map(([label, value]) => `
-            <span><b>${this.escape(label)}</b>${this.escape(value)}</span>
-        `).join('');
-        return `<div class="frontier-lab-protocol" aria-label="${this.escapeAttr(item.label)}实验台协议">${rows}</div>`;
-    },
-
-    renderSectionRail(page, shell, sections, meta) {
-        if (!shell || shell.querySelector('.frontier-section-rail')) return;
-        const links = sections.map((item, index) => {
-            const current = index === 0 ? ' aria-current="location"' : '';
-            return `
-                <a href="#${this.escapeAttr(item.id)}" data-frontier-target="${this.escapeAttr(item.id)}"${current}>
-                    <span>${item.index}</span>${this.escape(item.label)}
-                </a>
-            `;
-        }).join('');
-        const rail = document.createElement('nav');
-        rail.className = 'frontier-section-rail';
-        rail.setAttribute('aria-label', `${meta.label || meta.title}章节航线`);
-        rail.innerHTML = `
-            <div class="frontier-section-rail__inner">
-                <span class="frontier-section-rail__label"><i data-lucide="compass"></i>学习航线</span>
-                <div class="frontier-section-rail__links">
-                    ${links}
-                </div>
-            </div>
-        `;
-        const brief = shell.querySelector('.frontier-brief');
-        const pathway = shell.querySelector('.frontier-pathway');
-        if (pathway) {
-            pathway.insertAdjacentElement('afterend', rail);
-        } else if (brief) {
-            brief.insertAdjacentElement('afterend', rail);
-        } else {
-            shell.insertBefore(rail, shell.firstElementChild);
-        }
-    },
-
-    renderSourceItem(source) {
-        return `
-            <a class="frontier-brief__source" href="${source.url}" target="_blank" rel="noopener">${source.label}</a>
-        `;
-    },
-
-    getSourceItems(learning) {
-        const sources = Array.isArray(learning && learning.sources) ? learning.sources : [];
-        return sources.map((source) => {
-            const rawLabel = source && source.label ? String(source.label) : '';
-            const rawUrl = source && source.url ? String(source.url) : '';
-            const label = rawLabel ? this.escape(rawLabel) : '';
-            const url = this.safeUrl(rawUrl);
-            if (!label || url === '#') return null;
-            return { label, url };
-        }).filter(Boolean);
-    },
-
-    bindHashDetailsTarget() {
-        this._listen(window, 'hashchange', () => {
-            this._setTimeout(() => this.openTargetDetailsFromHash(), 0);
-        });
-        this._requestFrame(() => this.openTargetDetailsFromHash());
-        this._setTimeout(() => this.openTargetDetailsFromHash(), 120);
-    },
-
-    openTargetDetailsFromHash() {
-        const rawHash = (window.location.hash || '').slice(1);
-        if (!rawHash) return;
-        let target = null;
-        try {
-            target = document.getElementById(decodeURIComponent(rawHash));
-        } catch (e) {
-            target = document.getElementById(rawHash);
-        }
-        if (!target) return;
-        const details = target.tagName && target.tagName.toLowerCase() === 'details'
-            ? target
-            : target.closest && target.closest('details');
-        if (details && !details.open) details.open = true;
-    },
-
-
-    bindSectionRail(page, shell, sections) {
-        const rail = shell ? shell.querySelector('.frontier-section-rail') : null;
-        if (!rail || rail.dataset.bound === 'true') return;
-        rail.dataset.bound = 'true';
-        const update = () => {
-            const pageEl = document.getElementById(`page-${page}`);
-            if (!pageEl || !pageEl.classList.contains('active')) return;
-            let currentId = sections[0] && sections[0].id;
-            sections.forEach((item) => {
-                const target = document.getElementById(item.id);
-                if (!target) return;
-                if (target.getBoundingClientRect().top <= 144) currentId = item.id;
-            });
-            rail.querySelectorAll('a[data-frontier-target]').forEach((link) => {
-                const active = link.dataset.frontierTarget === currentId;
-                if (active) {
-                    link.setAttribute('aria-current', 'location');
-                } else {
-                    link.removeAttribute('aria-current');
-                }
-            });
-        };
-        this._listen(window, 'scroll', update, { passive: true });
-        this._listen(window, 'hashchange', () => this._setTimeout(update, 80));
-        this._requestFrame(update);
-        this._setTimeout(update, 300);
-    },
-
-    refreshIcons() {
-        if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
-            lucide.createIcons();
-        }
-    },
-
-    escape(value) {
-        return String(value)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    },
-
-    escapeAttr(value) {
-        return this.escape(value).replace(/`/g, '&#96;');
-    },
-
-    safeUrl(value) {
-        const raw = String(value || '#');
-        if (/^https?:\/\//i.test(raw)) return this.escapeAttr(raw);
-        return '#';
+// GAME-001 replaces the legacy long-form frontier sections at runtime.  The manifest
+// remains the only source of course/activity keys and availability fallback state.
+(function installFutureGalaxyCourseRuntime(global) {
+    'use strict';
+
+    // Router support can request the same asset after the direct boot script. Keep
+    // one listener/runtime generation instead of registering a second course shell.
+    if (global.__futureGalaxyCourseRuntimeInstalled) return;
+    global.__futureGalaxyCourseRuntimeInstalled = true;
+
+    const FrontierLearning = global.FrontierLearning || {};
+    global.FrontierLearning = FrontierLearning;
+
+    let activeRuntime = null;
+    let hashListenerInstalled = false;
+    let generation = 0;
+    let manifestPromise = null;
+    let stylePromise = null;
+
+    const MANAGED_PAGES = new Set(['frontier', 'cosmos', 'engineering', 'datascience', 'infotech', 'materials', 'humanities']);
+    const $ = (root, selector) => root.querySelector(selector);
+    const esc = (value) => String(value || '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
+    const getManifest = () => global.FrontierCourseManifest || null;
+    const pageFromHash = () => (global.location.hash || '#frontier').replace(/^#/, '').split('/')[0] || 'frontier';
+    const activityFromHash = () => (global.location.hash || '').replace(/^#/, '').split('/')[1] || '';
+    const isReducedMotion = () => !!(global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    const courseAccess = (availability, course) => {
+        if (availability.availability === 'default-open') return { state: 'open' };
+        return availability.course_access[course.course_key] || { state: 'unavailable' };
+    };
+    const activityAccess = (availability, activity) => {
+        if (availability.availability === 'default-open') return { state: 'open' };
+        return availability.activity_access[activity.activity_key] || { state: 'unavailable' };
+    };
+
+    function addCleanup(runtime, cleanup) {
+        runtime.cleanups.push(cleanup);
+        return cleanup;
     }
-};
 
-window.FrontierLearning = FrontierLearning;
+    function ensureManifest() {
+        if (getManifest()) return Promise.resolve(getManifest());
+        if (manifestPromise) return manifestPromise;
+        manifestPromise = new Promise((resolve, reject) => {
+            const source = 'pages/frontier/frontier-manifest.js?v=20260719v755Game001';
+            const existing = Array.from(document.scripts).find((script) => (script.getAttribute('src') || '').split('?')[0] === source.split('?')[0]);
+            if (existing) {
+                existing.addEventListener('load', () => getManifest() ? resolve(getManifest()) : reject(new Error('Future manifest unavailable')), { once: true });
+                existing.addEventListener('error', () => reject(new Error('Future manifest failed to load')), { once: true });
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = source;
+            script.async = true;
+            script.dataset.frontierManifest = 'true';
+            script.addEventListener('load', () => getManifest() ? resolve(getManifest()) : reject(new Error('Future manifest unavailable')), { once: true });
+            script.addEventListener('error', () => reject(new Error('Future manifest failed to load')), { once: true });
+            document.head.appendChild(script);
+        }).catch((error) => { manifestPromise = null; throw error; });
+        return manifestPromise;
+    }
+
+    function ensureCourseStyle() {
+        const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).find((link) => {
+            try { return new URL(link.href, document.baseURI).pathname.endsWith('/pages/frontier/frontier.css'); } catch (error) { return false; }
+        });
+        if (existing) {
+            existing.dataset.frontierCourseStyle = 'true';
+            return Promise.resolve();
+        }
+        if (stylePromise) return stylePromise;
+        stylePromise = new Promise((resolve, reject) => {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'pages/frontier/frontier.css?v=20260719v755Game001';
+            link.dataset.frontierCourseStyle = 'true';
+            link.addEventListener('load', resolve, { once: true });
+            link.addEventListener('error', () => reject(new Error('Future course style failed to load')), { once: true });
+            document.head.appendChild(link);
+        }).catch((error) => { stylePromise = null; throw error; });
+        return stylePromise;
+    }
+
+    function cleanupRuntime(runtime) {
+        if (!runtime || runtime.destroyed) return;
+        runtime.destroyed = true;
+        runtime.abort.abort();
+        if (runtime.visual && typeof runtime.visual.dispose === 'function') runtime.visual.dispose();
+        runtime.visual = null;
+        runtime.cleanups.splice(0).reverse().forEach((cleanup) => {
+            try { cleanup(); } catch (error) { /* cleanup must not block a route leave */ }
+        });
+    }
+
+    function clearActive(page) {
+        if (!activeRuntime) return;
+        if (page && activeRuntime.page !== page) return;
+        cleanupRuntime(activeRuntime);
+        activeRuntime = null;
+    }
+
+    function resolveRoute(requestedPage) {
+        const manifest = getManifest();
+        if (!manifest) return null;
+        const page = requestedPage || pageFromHash();
+        if (page === 'frontier') return { page, course: null, activity: null, availability: manifest.resolveAvailability() };
+        const course = manifest.getCourseByPage(page);
+        if (!course) return null;
+        const availability = manifest.resolveAvailability();
+        const requestedActivity = activityFromHash();
+        const defaultActivity = course.activities.find((item) => activityAccess(availability, item).state === 'open') || course.activities.find((item) => activityAccess(availability, item).state !== 'hidden') || course.activities[0];
+        const activity = course.activities.find((item) => item.route_slug === requestedActivity) || defaultActivity;
+        return { page, course, activity, availability, courseAccess: courseAccess(availability, course), access: activityAccess(availability, activity) };
+    }
+
+    function renderCatalogue(runtime, manifest) {
+        const availability = manifest.resolveAvailability();
+        const visibleCourses = manifest.courses.filter((course) => course.activities.some((activity) => activityAccess(availability, activity).state !== 'hidden'));
+        const routes = visibleCourses.map((course, index) => {
+            const visibleActivities = course.activities.filter((activity) => activityAccess(availability, activity).state !== 'hidden');
+            const firstOpen = visibleActivities.find((activity) => activityAccess(availability, activity).state === 'open');
+            const access = firstOpen ? { state: 'open' } : courseAccess(availability, course);
+            const routeBody = `
+                <span class="fg-route-index">0${index + 1}</span>
+                <h3>${esc(course.title)}</h3>
+                <p>${esc(course.question)}</p>
+                <span class="fg-route-list">${visibleActivities.map((activity) => `<span data-activity-key="${esc(activity.activity_key)}">${esc(activity.title)}</span>`).join('')}</span>
+                <span class="fg-route-arrow" aria-hidden="true">${access.state === 'open' ? '↗' : '—'}</span>`;
+            if (access.state === 'open') return `<a class="fg-route" href="#${esc(course.page)}/${esc(firstOpen.route_slug)}" data-page="${esc(course.page)}" data-galaxy-key="${esc(course.galaxy_key)}" data-course-key="${esc(course.course_key)}">${routeBody}</a>`;
+            return `<div class="fg-route fg-route--${esc(access.state)}" data-galaxy-key="${esc(course.galaxy_key)}" data-course-key="${esc(course.course_key)}" aria-label="${esc(course.title)}目前不可用">${routeBody}</div>`;
+        }).join('');
+        const stateNotice = availability.availability === 'unavailable' ? '<aside class="fg-state" aria-live="polite"><strong>课程状态暂不可用</strong><span>请稍后再试。</span></aside>' : '';
+        runtime.mount.innerHTML = `
+            <main class="fg-shell fg-overview" data-galaxy-key="${esc(manifest.galaxy_key)}">
+                <section class="fg-hero" aria-labelledby="future-galaxy-title">
+                    <div>
+                        <div class="fg-eyebrow">FUTURE GALAXY / COURSE ATLAS</div>
+                        <h1 id="future-galaxy-title">把未来拆成<br>可操纵的问题</h1>
+                        <p>六条航线从一个问题开始：先作预测，再操纵变量、观察证据，最后写下能被检验的判断。</p>
+                    </div>
+                    <figure class="fg-observatory">
+                        <img src="UI/future-galaxy/orbit-observatory.webp" width="1600" height="900" alt="群山与星空下的天文观测站" loading="lazy" decoding="async">
+                        <figcaption>OBSERVATION IS A METHOD</figcaption>
+                    </figure>
+                </section>
+                ${stateNotice}
+                <section class="fg-catalogue" aria-labelledby="future-catalogue-title">
+                    <div class="fg-catalogue-head"><div><div class="fg-eyebrow">SIX ROUTES</div><h2 id="future-catalogue-title">课程目录</h2></div><p>内容范围由已发布的课程清单决定。</p></div>
+                    ${routes}
+                </section>
+            </main>`;
+    }
+
+    function activityAnswers(activity) {
+        const answers = {
+            'cosmos.day-season': [['地轴倾角改变了不同半球的受光条件', true], ['夏季只因离太阳更近', false]],
+            'cosmos.orbital-scale': [['改变位置不会取消地轴倾角造成的受光差异', true], ['轨道位置单独决定昼夜长短', false]],
+            'cosmos.evidence-log': [['同地阴影方向随太阳方位改变', true], ['阴影方向与观测时刻无关', false]],
+            'engineering.load-path': [['连续的杆件路径把载荷传向支座', true], ['载荷只作用在被点击的一个节点', false]],
+            'engineering.member-choice': [['斜杆改变会让力在其他构件中重新分配', true], ['删去斜杆不会改变受力路径', false]],
+            'engineering.safety-check': [['较大载荷需要比较关键杆件与约束', true], ['安全校核只看一根杆件的颜色', false]],
+            'datascience.model-fit': [['要比较残差和趋势是否合理', true], ['只要直线经过最多点就足够', false]],
+            'datascience.outlier-test': [['离群点可能明显拉动拟合结果', true], ['离群点不会影响任何模型参数', false]],
+            'datascience.evidence-claim': [['结论应说明样本范围与不确定性', true], ['图上有趋势就能断言因果', false]],
+            'infotech.packet-route': [['更多跳数会增加需要观察的路径环节', true], ['每一跳都忽略上层请求状态', false]],
+            'infotech.layer-contract': [['分层让每层处理相对明确的职责', true], ['分层表示所有信息都在同一层完成', false]],
+            'infotech.fault-trace': [['先沿可见路径定位异常节点更可检验', true], ['故障发生时无需查看路径', false]],
+            'materials.grain-boundary': [['更细晶粒通常带来更多晶界线索', true], ['晶粒大小与边界数量无关', false]],
+            'materials.defect-path': [['缺陷位置会影响需要追踪的传播路径', true], ['缺陷只是一种与材料无关的装饰', false]],
+            'materials.process-window': [['工艺变化应结合组织尺度一起判断', true], ['冷却速率不会改变任何组织特征', false]],
+            'humanities.context-map': [['关系图提示回读语境，而非替代解释', true], ['连接最多的词自动等于唯一事实', false]],
+            'humanities.voice-shift': [['切换材料会改变被强调的关系', true], ['叙事视角不影响任何线索', false]],
+            'humanities.claim-review': [['较高证据阈值会移除较弱的关联', true], ['所有连接都拥有相同证据强度', false]]
+        };
+        return (answers[activity.activity_key] || [['先回看观察证据', true], ['跳过观察直接下结论', false]])
+            .map(([text, correct]) => ({ text, correct }));
+    }
+
+    const OWNER_CONFIG = Object.freeze({
+        'earth-space': { script: 'pages/cosmos/earth-sun.js?v=20260719v755Game001', init: 'initCosmosSeasons', destroy: 'destroyCosmosSeasons' },
+        'engineering-systems': { script: 'pages/engineering/bridge-truss.js?v=20260719v755Game001', init: 'initBridgeTruss', destroy: 'destroyBridgeTruss' },
+        'data-ai': { script: 'pages/datascience/linear-regression.js?v=20260719v755Game001', init: 'initLinearRegressionLab', destroy: 'destroyLinearRegressionLab' },
+        'information-technology': { script: 'pages/infotech/network-layers.js?v=20260719v755Game001', init: 'initNetworkLayersLab', destroy: 'destroyNetworkLayersLab' },
+        'materials-science': { script: 'pages/materials/materials-lab.js?v=20260719v755Game001', init: 'initMaterialsLab', destroy: 'destroyMaterialsLab' },
+        'humanities-futures': { script: 'pages/humanities/text-lab.js?v=20260719v755Game001', init: 'initHumanitiesLab', destroy: 'destroyHumanitiesLab' }
+    });
+
+    function ownerMarkup(courseKey) {
+        const views = {
+            'earth-space': `<div class="fg-owner-controls"><label>年内日期 <output id="cosmos-day-value">6月 21日</output><input id="cosmos-day" type="range" min="1" max="365" value="172"></label><label>观察纬度 <output id="cosmos-latitude-value">39.9°N</output><input id="cosmos-latitude" type="range" min="-66.5" max="66.5" step="0.5" value="39.9"></label><div><button type="button" data-cosmos-lat="0">赤道</button><button type="button" data-cosmos-lat="39.9">中纬度</button><button type="button" data-cosmos-lat="-23.5">南回归线</button></div></div><canvas id="earth-sun-canvas" aria-label="太阳高度、地轴倾角与昼长图"></canvas><div id="cosmos-info" class="fg-owner-info" aria-live="polite"></div>`,
+            'engineering-systems': `<div class="fg-owner-controls"><label>竖向载荷 <output id="truss-load-value">60 kN</output><input id="truss-load" type="range" min="20" max="120" step="5" value="60"></label><div><button type="button" data-truss-joint="B">左跨 B</button><button type="button" data-truss-joint="C">中跨 C</button><button type="button" data-truss-joint="D">右跨 D</button></div></div><canvas id="bridge-truss-canvas" aria-label="Warren 桁架桥受力图"></canvas><div id="truss-info" class="fg-owner-info" aria-live="polite"></div>`,
+            'data-ai': `<div class="fg-owner-controls"><div><button type="button" data-regression-dataset="study">学习时长</button><button type="button" data-regression-dataset="climate">温度销量</button><button type="button" data-regression-dataset="outlier">异常点</button></div><label>斜率 w <output id="regression-slope-value">6.00</output><input id="regression-slope" type="range" min="-8" max="16" step="0.05" value="6"></label><label>截距 b <output id="regression-intercept-value">38.0</output><input id="regression-intercept" type="range" min="-20" max="120" step="0.5" value="38"></label><label>学习率 <output id="regression-rate-value">0.15</output><input id="regression-rate" type="range" min="0.02" max="0.6" step="0.01" value="0.15"></label><div><button type="button" id="regression-step">梯度下降一步</button><button type="button" id="regression-fit">最小二乘线</button><button type="button" id="regression-reset">重置</button></div></div><canvas id="linear-regression-canvas" aria-label="线性回归散点、残差与损失图"></canvas><div id="regression-info" class="fg-owner-info" aria-live="polite"></div>`,
+            'information-technology': `<div class="fg-owner-controls"><div><button type="button" data-network-scenario="web">网页请求</button><button type="button" data-network-scenario="media">视频片段</button><button type="button" data-network-scenario="form">表单提交</button><button type="button" data-network-scenario="sync">同步消息</button></div><label>应用数据 <output id="network-payload-value">1800 B</output><input id="network-payload" type="range" min="300" max="6000" step="100" value="1800"></label><label>路径跳数 <output id="network-hops-value">4</output><input id="network-hops" type="range" min="2" max="8" value="4"></label></div><canvas id="network-layers-canvas" aria-label="网络封装与分组路由图"></canvas><div id="network-info" class="fg-owner-info" aria-live="polite"></div>`,
+            'materials-science': `<div class="fg-owner-controls"><div><button type="button" data-material-cell="sc">SC</button><button type="button" data-material-cell="bcc">BCC</button><button type="button" data-material-cell="fcc">FCC</button><button type="button" data-material-cell="hcp">HCP</button></div><label>平均晶粒 <output id="materials-grain-size-value">45 μm</output><input id="materials-grain-size" type="range" min="5" max="120" value="45"></label><div><button type="button" data-material-preset="refined">快速凝固</button><button type="button" data-material-preset="recrystallized">再结晶</button><button type="button" data-material-preset="annealed">退火</button></div></div><canvas id="materials-canvas" aria-label="晶胞、晶粒与相对强度图"></canvas><div id="materials-info" class="fg-owner-info" aria-live="polite"></div>`,
+            'humanities-futures': `<div class="fg-owner-controls"><div><button type="button" data-humanities-sample="learning">学习札记</button><button type="button" data-humanities-sample="city">城市水利</button><button type="button" data-humanities-sample="primary">史料方法</button></div><div><button type="button" data-humanities-mode="terms">词项分布</button><button type="button" data-humanities-mode="contexts">上下文</button><button type="button" data-humanities-mode="network">共现网络</button></div><div id="humanities-focus-list" aria-label="关注词项"></div></div><canvas id="humanities-canvas" aria-label="词项、语境与共现关系图"></canvas><div id="humanities-info" class="fg-owner-info" aria-live="polite"></div>`
+        };
+        return views[courseKey] || '';
+    }
+
+    function ensureOwner(config) {
+        if (typeof global[config.init] === 'function') return Promise.resolve();
+        return new Promise((resolve, reject) => {
+            const plain = config.script.split('?')[0];
+            const existing = Array.from(document.scripts).find((script) => (script.getAttribute('src') || '').split('?')[0] === plain);
+            if (existing) {
+                existing.addEventListener('load', () => typeof global[config.init] === 'function' ? resolve() : reject(new Error('Course owner unavailable')), { once: true });
+                existing.addEventListener('error', () => reject(new Error('Course owner failed to load')), { once: true });
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = config.script;
+            script.async = true;
+            script.dataset.frontierOwner = config.init;
+            script.addEventListener('load', () => typeof global[config.init] === 'function' ? resolve() : reject(new Error('Course owner unavailable')), { once: true });
+            script.addEventListener('error', () => reject(new Error('Course owner failed to load')), { once: true });
+            document.body.appendChild(script);
+        });
+    }
+
+    function mountOwnerVisual(runtime, route, stage) {
+        const config = OWNER_CONFIG[route.course.course_key];
+        if (!config) return mountCanvasVisual(runtime, route, stage, 50, true, '简化观测模式');
+        stage.innerHTML = `<span class="fg-stage-label">OBSERVATION FIELD / 观测场</span>${ownerMarkup(route.course.course_key)}<span class="fg-stage-status" data-fg-stage-status>正在准备互动</span>`;
+        ensureOwner(config).then(() => {
+            if (runtime.abort.signal.aborted || activeRuntime !== runtime || !stage.isConnected) return;
+            global[config.init]();
+            applyOwnerPreset(route, stage);
+            runtime.visual = { dispose() { try { global[config.destroy](); } catch (error) {} } };
+            const status = $(stage, '[data-fg-stage-status]'); if (status) status.textContent = '互动已就绪';
+        }).catch(() => {
+            if (!runtime.abort.signal.aborted && activeRuntime === runtime) mountCanvasVisual(runtime, route, stage, 50, true, '简化观测模式');
+        });
+    }
+
+    function applyOwnerPreset(route, stage) {
+        const presets = {
+            'cosmos.day-season': { values: { '#cosmos-day': 172, '#cosmos-latitude': 39.9 } },
+            'cosmos.evidence-log': { values: { '#cosmos-day': 80, '#cosmos-latitude': 0 } },
+            'engineering.load-path': { values: { '#truss-load': 60 }, click: '[data-truss-joint="C"]' },
+            'engineering.member-choice': { values: { '#truss-load': 80 }, click: '[data-truss-joint="B"]' },
+            'engineering.safety-check': { values: { '#truss-load': 110 }, click: '[data-truss-joint="D"]' },
+            'datascience.model-fit': { values: { '#regression-slope': 6, '#regression-intercept': 38, '#regression-rate': .15 }, click: '[data-regression-dataset="study"]' },
+            'datascience.outlier-test': { values: { '#regression-slope': 4, '#regression-intercept': 42, '#regression-rate': .1 }, click: '[data-regression-dataset="outlier"]' },
+            'datascience.evidence-claim': { values: { '#regression-slope': 2, '#regression-intercept': 28, '#regression-rate': .25 }, click: '[data-regression-dataset="climate"]' },
+            'infotech.packet-route': { values: { '#network-payload': 1800, '#network-hops': 4 }, click: '[data-network-scenario="web"]' },
+            'infotech.layer-contract': { values: { '#network-payload': 4200, '#network-hops': 3 }, click: '[data-network-scenario="media"]' },
+            'infotech.fault-trace': { values: { '#network-payload': 900, '#network-hops': 7 }, click: '[data-network-scenario="sync"]' },
+            'materials.grain-boundary': { values: { '#materials-grain-size': 45 }, click: '[data-material-cell="fcc"]' },
+            'materials.defect-path': { values: { '#materials-grain-size': 20 }, click: '[data-material-cell="bcc"]' },
+            'materials.process-window': { values: { '#materials-grain-size': 92 }, click: '[data-material-preset="annealed"]' },
+            'humanities.context-map': { click: '[data-humanities-mode="network"]' },
+            'humanities.voice-shift': { click: '[data-humanities-sample="city"]' },
+            'humanities.claim-review': { click: '[data-humanities-sample="primary"]' }
+        };
+        const preset = presets[route.activity.activity_key];
+        if (!preset) return;
+        Object.entries(preset.values || {}).forEach(([selector, value]) => {
+            const input = $(stage, selector);
+            if (!input) return;
+            input.value = String(value);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        const button = preset.click && $(stage, preset.click);
+        if (button) button.click();
+    }
+
+    function renderCourse(runtime, route) {
+        const { course, activity } = route;
+        const answers = activityAnswers(activity);
+        const nav = course.activities.filter((item) => activityAccess(route.availability, item).state !== 'hidden').map((item) => {
+            const access = activityAccess(route.availability, item);
+            if (access.state === 'open') return `<a href="#${esc(course.page)}/${esc(item.route_slug)}" data-galaxy-key="${esc(course.galaxy_key)}" data-course-key="${esc(course.course_key)}" data-activity-key="${esc(item.activity_key)}"${item.activity_key === activity.activity_key ? ' aria-current="page"' : ''}>${esc(item.title)}</a>`;
+            return `<span aria-label="${esc(item.title)}暂不可用" data-activity-key="${esc(item.activity_key)}">${esc(item.title)}</span>`;
+        }).join('');
+        const modelControl = activity.kind === 'webgl'
+            ? `<section class="fg-control"><label for="fg-control-${runtime.id}">${esc(activity.input)}</label><output for="fg-control-${runtime.id}" data-fg-output>50</output><input id="fg-control-${runtime.id}" data-fg-control type="range" min="0" max="100" value="50" aria-label="${esc(activity.input)}"><label for="fg-view-${runtime.id}">观察方位</label><output for="fg-view-${runtime.id}" data-fg-view-output>35°</output><input id="fg-view-${runtime.id}" data-fg-view type="range" min="0" max="360" value="35" aria-label="观察方位"><label class="fg-check"><input data-fg-low-power type="checkbox"${isReducedMotion() ? ' checked' : ''}>简化观测模式</label></section>`
+            : `<section><h2>可操纵输入</h2><p>在观测场使用本课的控制器，改变${esc(activity.input)}后再比较证据。</p></section>`;
+        runtime.mount.innerHTML = `
+            <main class="fg-shell fg-course" data-galaxy-key="${esc(course.galaxy_key)}" data-course-key="${esc(course.course_key)}" data-activity-key="${esc(activity.activity_key)}" data-activity-kind="${esc(activity.kind)}">
+                <nav class="fg-breadcrumb" aria-label="课程路径"><a href="#frontier">未来星系</a><span>/</span><span>${esc(course.title)}</span><span>/</span><span>${esc(activity.title)}</span></nav>
+                <header class="fg-course-head">
+                    <div><div class="fg-eyebrow">${esc(course.eyebrow)}</div><h1>${esc(activity.title)}</h1><p>${esc(course.question)}</p></div>
+                    <ul class="fg-meta"><li><b>学习目标</b>${esc(course.objective)}</li><li><b>本次判断</b>${esc(activity.decision)}</li></ul>
+                </header>
+                <nav class="fg-activity-nav" aria-label="${esc(course.title)}子课程">${nav}</nav>
+                <section class="fg-lab" aria-label="${esc(activity.title)}互动实验">
+                    <div class="fg-stage" data-fg-stage>
+                        <span class="fg-stage-label">OBSERVATION FIELD / 观测场</span>
+                        <span class="fg-stage-status" data-fg-stage-status>准备观测</span>
+                    </div>
+                    <aside class="fg-panel">
+                        <section><h2>问题</h2><p>${esc(course.question)}</p></section>
+                        <section><h2>先预测</h2><p>${esc(activity.prompt)}</p></section>
+                        ${modelControl}
+                        <section><h2>观察</h2><p data-fg-observation>${esc(activity.observation)}</p></section>
+                        <section><h2>判断或解释</h2><p>${esc(activity.decision)}</p><div class="fg-answers">${answers.map((answer, index) => `<label class="fg-answer"><input type="radio" name="fg-answer-${runtime.id}" value="${index}" data-fg-correct="${answer.correct}">${esc(answer.text)}</label>`).join('')}</div><button class="fg-submit" type="button" data-fg-submit>提交判断</button><p class="fg-feedback" data-fg-feedback aria-live="polite"></p></section>
+                    </aside>
+                </section>
+                <footer class="fg-course-footer"><span>把这次观察写成能被下一次操纵检验的解释。</span><a href="#frontier">回到课程目录</a></footer>
+            </main>`;
+        wireCourse(runtime, route);
+    }
+
+    function renderUnavailableCourse(runtime, route) {
+        runtime.mount.innerHTML = `<main class="fg-shell fg-course" data-galaxy-key="future-galaxy"><nav class="fg-breadcrumb" aria-label="课程路径"><a href="#frontier">未来星系</a><span>/</span><span>课程状态</span></nav><header class="fg-course-head"><div><div class="fg-eyebrow">COURSE</div><h1>课程暂不可用</h1><p>课程暂不可用，请稍后重试。</p></div><ul class="fg-meta"><li><b>后续</b>可先回到课程目录继续探索。</li></ul></header><p class="fg-footer-note"><a href="#frontier">回到课程目录</a></p></main>`;
+    }
+
+    function setupCanvas(canvas, lowPower) {
+        const bounds = canvas.getBoundingClientRect();
+        const ratio = Math.min(global.devicePixelRatio || 1, lowPower ? 1 : 1.5);
+        const width = Math.max(1, Math.round(bounds.width * ratio));
+        const height = Math.max(1, Math.round(bounds.height * ratio));
+        if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+        const context = canvas.getContext('2d');
+        context.setTransform(ratio, 0, 0, ratio, 0, 0);
+        return { context, width: bounds.width, height: bounds.height };
+    }
+
+    function strokeLine(context, from, to, color, width) {
+        context.beginPath(); context.moveTo(from[0], from[1]); context.lineTo(to[0], to[1]); context.strokeStyle = color; context.lineWidth = width; context.stroke();
+    }
+
+    function drawCanvas(canvas, visual, value, lowPower) {
+        const { context, width, height } = setupCanvas(canvas, lowPower);
+        const t = value / 100;
+        context.clearRect(0, 0, width, height);
+        context.fillStyle = '#07142d'; context.fillRect(0, 0, width, height);
+        const kind = visual;
+        if (kind === 'orbit') {
+            const cx = width * .54; const cy = height * .53; const earthX = cx + Math.cos(t * Math.PI * 2) * width * .27; const earthY = cy + Math.sin(t * Math.PI * 2) * height * .12;
+            context.strokeStyle = 'rgba(140,231,255,.48)'; context.lineWidth = 1; context.beginPath(); context.ellipse(cx, cy, width * .27, height * .12, 0, 0, Math.PI * 2); context.stroke();
+            context.fillStyle = '#ffca75'; context.beginPath(); context.arc(cx, cy, 22, 0, Math.PI * 2); context.fill();
+            context.fillStyle = '#55b7ff'; context.beginPath(); context.arc(earthX, earthY, 28, 0, Math.PI * 2); context.fill();
+            context.fillStyle = 'rgba(4,12,28,.72)'; context.beginPath(); context.arc(earthX + 8, earthY, 26, -Math.PI / 2, Math.PI / 2); context.fill();
+            strokeLine(context, [cx, cy], [earthX, earthY], 'rgba(255,216,130,.42)', 1);
+        } else if (kind === 'bridge') {
+            const x0 = width * .13, x1 = width * .87, y = height * .68, top = height * .35, nodes = [[x0,y],[width*.31,y],[width*.5,y],[width*.69,y],[x1,y]];
+            nodes.forEach((node, index) => { if (index) strokeLine(context, nodes[index - 1], node, `hsl(${200 - Math.abs(index - 2 - t * 2) * 25} 90% 65%)`, 5); });
+            for (let index = 0; index < 4; index += 1) strokeLine(context, nodes[index], [nodes[index + 1][0], top + (index % 2) * 34], 'rgba(140,231,255,.72)', 3);
+            const loadX = x0 + (x1 - x0) * t; strokeLine(context, [loadX, height*.14], [loadX, y - 11], '#ffb86b', 3); context.fillStyle = '#ffb86b'; context.fillRect(loadX - 6, height*.14, 12, 12);
+        } else if (kind === 'data') {
+            const points = [[.14,.71],[.25,.61],[.34,.57],[.46,.48],[.55,.49],[.69,.31],[.8,.27]]; context.fillStyle = '#8ce7ff'; points.forEach(([x,y]) => { context.beginPath(); context.arc(width*x, height*y, 5, 0, Math.PI*2); context.fill(); });
+            const slope = .22 + t * .58; strokeLine(context, [width*.1,height*(.8-slope*.1)], [width*.9,height*(.8-slope*.8)], '#ffb86b', 3); context.strokeStyle='rgba(255,184,107,.28)'; context.setLineDash([4,5]); points.forEach(([x,y]) => strokeLine(context,[width*x,height*y],[width*x,height*(.8-slope*(x-.1))],'rgba(255,184,107,.28)',1)); context.setLineDash([]);
+        } else if (kind === 'network') {
+            const nodes = [[.15,.55],[.35,.3],[.35,.73],[.58,.5],[.82,.5]].map(([x,y]) => [width*x,height*y]); const active = Math.floor(t * 4);
+            nodes.slice(1).forEach((node, index) => strokeLine(context, nodes[index], node, index <= active ? '#8ce7ff' : 'rgba(140,231,255,.22)', index <= active ? 4 : 2));
+            nodes.forEach((node, index) => { context.fillStyle = index <= active + 1 ? '#ffb86b' : '#30608b'; context.beginPath(); context.arc(node[0],node[1],15,0,Math.PI*2); context.fill(); });
+        } else if (kind === 'materials') {
+            const grain = 20 + (1 - t) * 46; for (let y = grain; y < height; y += grain * 1.25) for (let x = grain; x < width; x += grain * 1.18) { context.beginPath(); context.arc(x + (y/grain%2)*8,y,grain*.55,0,Math.PI*2); context.fillStyle=`hsla(${190+(x+y)%60},70%,${30 + t*22}%,.82)`; context.fill(); context.strokeStyle='rgba(220,242,255,.36)'; context.stroke(); }
+            strokeLine(context,[width*.1,height*.18],[width*.9,height*.18],'#ffb86b',2); context.fillStyle='#ffb86b'; context.fillRect(width*.1,height*.15,width*.8*t,5);
+        } else {
+            const nodes = [[.22,.32],[.46,.21],[.73,.35],[.28,.68],[.58,.67],[.82,.73]].map(([x,y]) => [width*x,height*y]);
+            [[0,1],[1,2],[0,3],[1,4],[2,4],[3,4],[4,5]].forEach(([a,b], index) => strokeLine(context,nodes[a],nodes[b],index < 3 + Math.floor(t*4) ? 'rgba(140,231,255,.75)' : 'rgba(140,231,255,.16)',2));
+            nodes.forEach((node,index) => { context.fillStyle = index === Math.floor(t*5) ? '#ffb86b' : '#8ce7ff'; context.beginPath(); context.arc(node[0],node[1],13,0,Math.PI*2); context.fill(); });
+        }
+    }
+
+    function disposeThreeResources(renderer, scene, renderTargets, imageBitmaps, canvas) {
+        const textures = new Set();
+        const materials = new Set();
+        if (scene) scene.traverse((object) => {
+            if (object.geometry && typeof object.geometry.dispose === 'function') object.geometry.dispose();
+            if (object.material) (Array.isArray(object.material) ? object.material : [object.material]).forEach((material) => {
+                materials.add(material);
+                Object.values(material).forEach((value) => { if (value && value.isTexture) textures.add(value); });
+            });
+            if (object.userData && object.userData.imageBitmap && typeof object.userData.imageBitmap.close === 'function') imageBitmaps.add(object.userData.imageBitmap);
+        });
+        materials.forEach((material) => material.dispose && material.dispose());
+        textures.forEach((texture) => texture.dispose && texture.dispose());
+        renderTargets.forEach((target) => target.dispose && target.dispose());
+        imageBitmaps.forEach((bitmap) => bitmap.close && bitmap.close());
+        renderer.setAnimationLoop && renderer.setAnimationLoop(null);
+        renderer.renderLists && renderer.renderLists.dispose && renderer.renderLists.dispose();
+        renderer.dispose && renderer.dispose();
+        renderer.forceContextLoss && renderer.forceContextLoss();
+        if (canvas && canvas.isConnected) canvas.remove();
+    }
+
+    async function mountThreeOrbit(runtime, route, stage, value, lowPower, viewAzimuth = 35) {
+        if (lowPower || isReducedMotion()) return mountCanvasVisual(runtime, route, stage, value, true, '简化观测模式');
+        const canvas = document.createElement('canvas'); canvas.setAttribute('aria-label', '可观察地球日照与轨道位置的三维模型'); stage.prepend(canvas);
+        let renderer; let scene; let camera; let earth; let sun; let light; let frame = 0; let observer;
+        const targets = new Set(); const bitmaps = new Set();
+        try {
+            const THREE = await import('../../shared/vendor/three-r185/three.module.js');
+            if (runtime.abort.signal.aborted || activeRuntime !== runtime || !canvas.isConnected) {
+                if (canvas.isConnected) canvas.remove();
+                return;
+            }
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'low-power' });
+            renderer.setPixelRatio(Math.min(global.devicePixelRatio || 1, 1.5));
+            scene = new THREE.Scene(); scene.background = new THREE.Color(0x07142d);
+            camera = new THREE.PerspectiveCamera(38, 1, .1, 100);
+            const ambient = new THREE.AmbientLight(0x7eaaff, 1.45); scene.add(ambient);
+            sun = new THREE.Mesh(new THREE.SphereGeometry(.33, 24, 16), new THREE.MeshBasicMaterial({ color: 0xffc56b })); sun.position.set(0, 0, 0); scene.add(sun);
+            // A point light at the teaching sun makes the Earth day/night boundary visible.
+            // This is deliberately a non-real-scale learning model, not an orbital simulation.
+            light = new THREE.PointLight(0xffd381, 22, 0, 2); light.position.copy(sun.position); scene.add(light);
+            earth = new THREE.Mesh(new THREE.SphereGeometry(1.05, 36, 24), new THREE.MeshStandardMaterial({ color: 0x3098ef, roughness: .72, metalness: .04 })); earth.rotation.z = 23.44 * Math.PI / 180; scene.add(earth);
+            const orbit = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 65 }, (_, index) => { const angle = index / 64 * Math.PI * 2; return new THREE.Vector3(Math.cos(angle) * 2.5, 0, Math.sin(angle) * 1.2); })), new THREE.LineBasicMaterial({ color: 0x8ce7ff, transparent: true, opacity: .6 })); scene.add(orbit);
+            const setCamera = (azimuth) => { viewAzimuth = azimuth; const radians = viewAzimuth * Math.PI / 180; camera.position.set(Math.sin(radians) * 7.8, 4.4, Math.cos(radians) * 7.8); camera.lookAt(0, 0, 0); };
+            const resize = () => { const bounds = stage.getBoundingClientRect(); renderer.setSize(bounds.width, Math.max(350, bounds.height), false); camera.aspect = bounds.width / Math.max(350, bounds.height); camera.updateProjectionMatrix(); };
+            const render = (next) => { const angle = next / 100 * Math.PI * 2; earth.position.set(Math.cos(angle) * 2.5, 0, Math.sin(angle) * 1.2); earth.rotation.y = angle * 1.2; light.position.copy(sun.position); setCamera(viewAzimuth); renderer.render(scene, camera); };
+            resize(); render(value);
+            observer = new ResizeObserver(() => { global.cancelAnimationFrame(frame); frame = global.requestAnimationFrame(() => { resize(); render(value); }); }); observer.observe(stage);
+            runtime.visual = { update(next) { value = next; global.cancelAnimationFrame(frame); frame = global.requestAnimationFrame(() => render(value)); }, setView(next) { viewAzimuth = next; global.cancelAnimationFrame(frame); frame = global.requestAnimationFrame(() => render(value)); }, dispose() { global.cancelAnimationFrame(frame); observer.disconnect(); disposeThreeResources(renderer, scene, targets, bitmaps, canvas); } };
+            const status = $(stage, '[data-fg-stage-status]'); if (status) status.textContent = '互动已就绪；这是非真实比例的学习模型';
+        } catch (error) {
+            if (renderer) disposeThreeResources(renderer, scene, targets, bitmaps, canvas);
+            else if (canvas.isConnected) canvas.remove();
+            if (!runtime.abort.signal.aborted && activeRuntime === runtime) mountCanvasVisual(runtime, route, stage, value, true, '简化观测模式');
+        }
+    }
+
+    function mountCanvasVisual(runtime, route, stage, value, lowPower, message) {
+        if (runtime.visual && runtime.visual.dispose) runtime.visual.dispose();
+        stage.querySelectorAll('canvas').forEach((canvas) => canvas.remove());
+        const canvas = document.createElement('canvas'); canvas.setAttribute('aria-label', `${route.course.title} ${route.activity.title} 可操纵观察图`); stage.prepend(canvas);
+        let frame = 0;
+        const draw = () => drawCanvas(canvas, route.course.visual, value, lowPower);
+        const schedule = () => { global.cancelAnimationFrame(frame); frame = global.requestAnimationFrame(draw); };
+        const observer = new ResizeObserver(schedule); observer.observe(stage); schedule();
+        runtime.visual = { update(next) { value = next; schedule(); }, dispose() { global.cancelAnimationFrame(frame); observer.disconnect(); if (canvas.isConnected) canvas.remove(); } };
+        const status = $(stage, '[data-fg-stage-status]'); if (status) status.textContent = message || '互动已就绪';
+    }
+
+    function wireCourse(runtime, route) {
+        const control = $(runtime.mount, '[data-fg-control]'); const output = $(runtime.mount, '[data-fg-output]'); const lowPower = $(runtime.mount, '[data-fg-low-power]'); const stage = $(runtime.mount, '[data-fg-stage]');
+        const view = $(runtime.mount, '[data-fg-view]'); const viewOutput = $(runtime.mount, '[data-fg-view-output]');
+        let value = Number(control && control.value || 50);
+        const mountVisual = () => {
+            if (runtime.visual && runtime.visual.dispose) runtime.visual.dispose();
+            runtime.visual = null;
+            if (route.activity.kind === 'webgl') mountThreeOrbit(runtime, route, stage, value, !!(lowPower && lowPower.checked), Number(view && view.value || 35));
+            else mountOwnerVisual(runtime, route, stage);
+        };
+        if (route.activity.kind === 'webgl' && control) {
+            control.addEventListener('input', () => { value = Number(control.value); output.value = String(value); output.textContent = String(value); if (runtime.visual) runtime.visual.update(value); }, { signal: runtime.abort.signal });
+            lowPower.addEventListener('change', mountVisual, { signal: runtime.abort.signal });
+            view.addEventListener('input', () => { viewOutput.value = `${view.value}°`; viewOutput.textContent = `${view.value}°`; if (runtime.visual && runtime.visual.setView) runtime.visual.setView(Number(view.value)); }, { signal: runtime.abort.signal });
+        }
+        $(runtime.mount, '[data-fg-submit]').addEventListener('click', () => {
+            const selected = runtime.mount.querySelector('input[name="fg-answer-' + runtime.id + '"]:checked'); const feedback = $(runtime.mount, '[data-fg-feedback]');
+            if (!selected) {
+                feedback.textContent = `先完成「${route.activity.title}」的选择，再回看你操纵变量后的观察。`;
+            } else if (selected.dataset.fgCorrect === 'true') {
+                feedback.textContent = `这个解释可以由本课观察支持：${route.activity.decision}`;
+            } else {
+                feedback.textContent = `试着再观察一次：比较操纵前后的证据，再检查这个解释。`;
+            }
+        }, { signal: runtime.abort.signal });
+        mountVisual();
+    }
+
+    function render(requestedPage) {
+        const route = resolveRoute(requestedPage);
+        if (!route) return false;
+        const mount = document.getElementById(`page-${route.page}`);
+        if (!mount) return false;
+        clearActive();
+        const runtime = { id: ++generation, generation, page: route.page, mount, abort: new AbortController(), cleanups: [], visual: null, destroyed: false };
+        activeRuntime = runtime;
+        const manifest = getManifest();
+        if (route.page === 'frontier') renderCatalogue(runtime, manifest);
+        else if (route.access.state === 'open') renderCourse(runtime, route);
+        else renderUnavailableCourse(runtime, route);
+        if (global.lucide && typeof global.lucide.createIcons === 'function') global.lucide.createIcons();
+        return true;
+    }
+
+    function installHashListener() {
+        if (hashListenerInstalled) return;
+        hashListenerInstalled = true;
+        global.addEventListener('hashchange', () => {
+            const next = pageFromHash();
+            if (MANAGED_PAGES.has(next)) global.setTimeout(() => render(next), 0);
+        });
+    }
+
+    function refreshHttpCourseState() {
+        const manifest = getManifest();
+        if (!manifest || !manifest.hasHttpConfig || !manifest.hasHttpConfig()) return Promise.resolve(null);
+        return manifest.refresh().then(() => {
+            const next = pageFromHash();
+            if (MANAGED_PAGES.has(next)) render(next);
+        });
+    }
+
+    Object.assign(FrontierLearning, {
+        init(page) {
+            installHashListener();
+            const target = page || pageFromHash();
+            if (!MANAGED_PAGES.has(target)) return false;
+            if (getManifest()) {
+                ensureCourseStyle().then(() => { render(target); refreshHttpCourseState(); }).catch(() => { render(target); refreshHttpCourseState(); });
+                return true;
+            }
+            Promise.all([ensureManifest(), ensureCourseStyle()]).then(() => { render(target); refreshHttpCourseState(); }).catch(() => {});
+            return false;
+        },
+        destroy(page) { clearActive(page); },
+        renderRoute(page) { return render(page); },
+        lifecycleContract: Object.freeze({
+            abortController: true,
+            cleanupStack: true,
+            generationGuard: true,
+            disposes: Object.freeze(['controls', 'passes', 'geometry', 'material', 'texture', 'renderTarget', 'ImageBitmap', 'renderLists', 'renderer', 'animationLoop', 'canvas'])
+        })
+    });
+    global.initFrontierCourse = () => FrontierLearning.init(pageFromHash());
+    global.destroyFrontierCourse = () => FrontierLearning.destroy();
+    global.refreshFutureGalaxyCourses = () => refreshHttpCourseState();
+})(window);

@@ -1,0 +1,4 @@
+# Keep the audited npm payload normalized to its published LF bytes while
+# excluding upstream generated code from project whitespace and text diffs.
+*.js text eol=lf -diff
+LICENSE text eol=lf -diff
