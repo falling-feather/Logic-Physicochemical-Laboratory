@@ -1,0 +1,3 @@
+# Preserve the audited npm payload as LF bytes and suppress generated-code diffs.
+marked.min.js text eol=lf -diff
+LICENSE.md text eol=lf -diff

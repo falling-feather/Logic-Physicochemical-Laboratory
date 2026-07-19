@@ -5,7 +5,7 @@
 (() => {
     'use strict';
 
-    const MARKED_CDN = 'https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js';
+    const MARKED_ASSET = 'shared/vendor/marked-v12/marked.min.js?v=20260719re2OfflineP0';
     const cache = Object.create(null);
     let markedPromise = null;
 
@@ -45,13 +45,12 @@
         if (markedPromise) return markedPromise;
         markedPromise = new Promise((resolve, reject) => {
             const s = document.createElement('script');
-            s.src = MARKED_CDN;
-            s.crossOrigin = 'anonymous';
+            s.src = MARKED_ASSET;
             s.onload = () => {
                 if (window.marked) resolve(window.marked);
                 else reject(new Error('marked.js 已加载但全局变量缺失'));
             };
-            s.onerror = () => reject(new Error('marked.js 加载失败（请检查网络或 CDN 可达性）'));
+            s.onerror = () => reject(new Error('本地 Markdown 渲染组件加载失败'));
             document.head.appendChild(s);
         });
         return markedPromise;

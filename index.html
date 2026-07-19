@@ -10,21 +10,7 @@
     <link rel="icon" href="UI/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="apple-touch-icon" href="UI/apple-touch-icon.png">
 
-    <!-- External fonts load after app boot on deployed origins only; localhost must not wait on CDN. -->
-    <script>
-        (function () {
-            var isLocalhost = location.hostname === 'localhost' ||
-                location.hostname === '127.0.0.1' ||
-                location.hostname === '::1';
-            if (isLocalhost) return;
-            window.addEventListener('load', function () {
-                var link = document.createElement('link');
-                link.rel = 'stylesheet';
-                link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap';
-                document.head.appendChild(link);
-            }, { once: true });
-        })();
-    </script>
+    <!-- Typography is rendered from local system fonts; app boot never depends on a font CDN. -->
 
     <!-- CSS: Shared -->
     <link rel="stylesheet" href="shared/css/tokens.css?v=20260424ss">

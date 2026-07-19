@@ -21,7 +21,7 @@
 |----|------|------|
 | [GSAP 3.12.7](https://gsap.com/) | 页面转场动画引擎 | GreenSock 标准许可（非商业可用） |
 | [Lucide Icons 0.454](https://lucide.dev/) | 图标系统 | ISC |
-| [marked](https://marked.js.org/) | 当前页面 Markdown 渲染 | MIT |
+| [marked 12.0.0](https://marked.js.org/) | 当前页面 Markdown 渲染；以锁定版本同源提供 | MIT |
 | [cpp-httplib 0.18.3](https://github.com/yhirose/cpp-httplib) | C++ 静态文件服务器 | MIT |
 | [JS-Interpreter](https://github.com/NeilFraser/JS-Interpreter) | 代码空间 JS 沙箱 | Apache-2.0 |
 | [Skulpt](https://skulpt.org/) | 代码空间 Python 沙箱 | MIT |

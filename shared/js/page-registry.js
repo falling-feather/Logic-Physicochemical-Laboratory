@@ -9,6 +9,7 @@
     const FUTURE_RESOURCE_VERSION = '20260719v759A11yP0';
     const ADMIN_RESOURCE_VERSION = '20260718v7432UnifiedAtlasP0';
     const PLANETS_RESOURCE_VERSION = '20260719v7437AstraWorkspaceP0';
+    const ABOUT_RESOURCE_VERSION = '20260719re2OfflineP0';
 
     const definePage = (config) => Object.freeze({
         galaxy: config.galaxy || 'englab',
@@ -132,13 +133,13 @@
         }),
         license: definePage({
             galaxy: 'englab',
-            script: 'pages/about/about.js?v=20260630mainV64',
+            script: `pages/about/about.js?v=${ABOUT_RESOURCE_VERSION}`,
             ready: 'initLicense',
             enter: 'initLicense'
         }),
         changelog: definePage({
             galaxy: 'englab',
-            script: 'pages/about/about.js?v=20260630mainV64',
+            script: `pages/about/about.js?v=${ABOUT_RESOURCE_VERSION}`,
             ready: 'initChangelog',
             enter: 'initChangelog'
         })

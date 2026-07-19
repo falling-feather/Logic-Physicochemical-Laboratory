@@ -1,5 +1,5 @@
 /* ===== Design Tokens ===== */
-/* Fonts now loaded via <link> in HTML for faster initial render */
+/* Local system font stacks keep the one-click site independent from font CDNs. */
 
 :root {
     /* ── Surfaces (dark) ── */
@@ -53,10 +53,10 @@
     --noise-opacity: 0.035;
 
     /* ── Typography ── */
-    --font-display: 'Noto Sans SC', 'Inter', system-ui, -apple-system, sans-serif;
-    --font-sans: 'Inter', 'Noto Sans SC', system-ui, sans-serif;
-    --font-body: 'Inter', 'Noto Sans SC', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    --font-display: 'Noto Sans SC', 'Inter', system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+    --font-sans: 'Inter', 'Noto Sans SC', system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+    --font-body: 'Inter', 'Noto Sans SC', system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
 
     /* fluid type scale */
     --text-xs: clamp(0.7rem, 0.65rem + 0.25vw, 0.8rem);
