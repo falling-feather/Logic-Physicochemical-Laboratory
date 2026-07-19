@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    const TEACHER_ASSET_VERSION = '20260719v757TeacherCurriculumP0';
+    const TEACHER_ASSET_VERSION = '20260719v759A11yP0';
     const API_BASE_STORAGE_KEY = 'astra-teacher-api-base';
     const TEACHER_VIEWS = Object.freeze({
         overview: '教学总览',
@@ -210,16 +210,17 @@
                 <section class="teacher-scope-wrap" data-teacher-scope-panel></section>
                 <nav class="teacher-view-nav" role="tablist" aria-label="教师工作台分区">
                     ${Object.entries(TEACHER_VIEWS).map(([key, label]) => `
-                        <button type="button" role="tab" data-teacher-view="${key}" aria-selected="${state.activeView === key}" class="${state.activeView === key ? 'is-active' : ''}">${label}</button>
+                        <button type="button" id="teacher-tab-${key}" role="tab" data-teacher-view="${key}" aria-controls="teacher-workbench-panel" aria-selected="${state.activeView === key}" tabindex="${state.activeView === key ? '0' : '-1'}" class="${state.activeView === key ? 'is-active' : ''}">${label}</button>
                     `).join('')}
                 </nav>
-                <section class="teacher-panel-grid" data-teacher-panels role="tabpanel"></section>
+                <section id="teacher-workbench-panel" class="teacher-panel-grid" data-teacher-panels role="tabpanel" aria-labelledby="teacher-tab-${state.activeView}"></section>
             </div>
         `;
         refreshIcons();
     }
 
     function bindEvents() {
+        state.root.addEventListener('keydown', handleViewNavigationKeydown);
         state.root.addEventListener('click', (event) => {
             const target = event.target;
             if (!(target instanceof Element)) return;
@@ -675,6 +676,26 @@
         }
     }
 
+    function handleViewNavigationKeydown(event) {
+        const target = event.target;
+        if (!(target instanceof Element) || !target.matches('[data-teacher-view]')) return;
+        const tabs = Array.from(state.root.querySelectorAll('[data-teacher-view]'));
+        const currentIndex = tabs.indexOf(target);
+        if (currentIndex < 0 || !tabs.length) return;
+
+        let nextIndex = currentIndex;
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % tabs.length;
+        else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        else if (event.key === 'Home') nextIndex = 0;
+        else if (event.key === 'End') nextIndex = tabs.length - 1;
+        else return;
+
+        event.preventDefault();
+        const nextTab = tabs[nextIndex];
+        setActiveView(nextTab.dataset.teacherView);
+        nextTab.focus();
+    }
+
     function renderWorkspace() {
         renderFlash();
         renderWriteLock();
@@ -782,6 +803,7 @@
             structure: renderOrganizationPanel
         };
         container.dataset.activeView = state.activeView;
+        container.setAttribute('aria-labelledby', `teacher-tab-${state.activeView}`);
         container.innerHTML = (panels[state.activeView] || panels.overview)();
     }
 

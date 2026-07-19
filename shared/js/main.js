@@ -226,8 +226,9 @@ window.updateFooterVisibility = updateFooterVisibility;
 
 const ENGLAB_ASSET_VERSION = '20260716v7427RoleWorkflowGateP0';
 const ROLE_LANDING_ASSET_VERSION = '20260719v7437AstraWorkspaceP0';
-const SHELL_RUNTIME_ASSET_VERSION = '20260719v758ReleaseAuditP0';
-const PAGE_REGISTRY_ASSET_VERSION = '20260719v758ReleaseAuditP0';
+const SESSION_STYLE_ASSET_VERSION = '20260719v759A11yP0';
+const SHELL_RUNTIME_ASSET_VERSION = '20260719v759A11yP0';
+const PAGE_REGISTRY_ASSET_VERSION = '20260719v759A11yP0';
 const BASE_STYLE_ASSET_VERSION = '20260719v758ReleaseAuditP0';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
@@ -249,7 +250,7 @@ const CORE_HTTP_FALLBACK_ASSETS = [
     './shared/js/backend-content.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/css/backend-content.css?v=' + ENGLAB_ASSET_VERSION,
     './shared/css/auth-ui.css?v=' + ENGLAB_ASSET_VERSION,
-    './shared/css/app-session.css?v=' + ROLE_LANDING_ASSET_VERSION
+    './shared/css/app-session.css?v=' + SESSION_STYLE_ASSET_VERSION
 ];
 
 const GALAXY_HTTP_FALLBACK_ASSETS = {
@@ -285,10 +286,10 @@ const GALAXY_HTTP_FALLBACK_ASSETS = {
         './pages/home/home.js?v=20260704qianduanV70'
     ],
     frontier: [
-        './pages/frontier/frontier.css?v=20260719v755Game001',
+        './pages/frontier/frontier.css?v=20260719v759A11yP0',
         './pages/frontier/frontier-manifest.js?v=20260719v755Game001',
         './shared/js/frontier-publication-context.js?v=20260719v757FuturePublicationP0',
-        './shared/js/frontier-learning.js?v=20260719v758ReleaseAuditP0'
+        './shared/js/frontier-learning.js?v=20260719v759A11yP0'
     ]
 };
 

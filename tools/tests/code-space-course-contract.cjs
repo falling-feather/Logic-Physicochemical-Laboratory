@@ -13,12 +13,15 @@ const catalogSource = read('codevis/pages/course-catalog/course-catalog.js');
 const challengeSource = read('codevis/pages/course-challenge/course-challenge.js');
 const cppSource = read('codevis/shared/js/runtimes/runtime-cpp.js');
 const loaderSource = read('codevis/shared/js/runtime-loader.js');
+const navbarCss = read('codevis/shared/css/navbar.css');
 
 const versionedShellAssets = Array.from(indexSource.matchAll(/(?:href|src)="(?!\.\.\/shared\/js\/api-client\.js)([^"]+\?v=([^"]+))"/g));
 assert.ok(versionedShellAssets.length >= 18, 'code space must version every local course shell asset');
 versionedShellAssets.forEach((match) => {
-  assert.equal(match[2], '758r1', `${match[1]} must use the V7.5.8 cache generation`);
+  assert.equal(match[2], '759r1', `${match[1]} must use the V7.5.9 cache generation`);
 });
+assert.match(navbarCss, /\.cv-navbar__brand\s*\{[^}]*min-height:\s*44px;/, 'Code Space mobile brand needs a 44px touch target');
+assert.match(navbarCss, /\.cv-nav-item\s*\{[^}]*min-height:\s*44px;/, 'Code Space primary navigation needs 44px touch targets');
 
 for (const id of ['cv-page-catalog', 'cv-page-lesson', 'cv-page-challenge']) {
   assert.match(indexSource, new RegExp(`id=["']${id}["']`), `${id} must be a real route surface`);

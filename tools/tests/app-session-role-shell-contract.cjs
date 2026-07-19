@@ -41,7 +41,7 @@ assert.doesNotMatch(session, /localStorage|sessionStorage|Authorization\s*:|\.ac
 
 assert.match(main, /await window\.AstraApplicationSession\.bootstrap\(\);\s*initApp\(\)/);
 assert.match(main, /serviceWorker\.register\('\.\/sw\.js\?v=' \+ SHELL_RUNTIME_ASSET_VERSION\)/);
-assert.match(html, /page-registry\.js\?v=20260719v758ReleaseAuditP0[\s\S]*main\.js\?v=20260719v758ReleaseAuditP0/);
+assert.match(html, /page-registry\.js\?v=20260719v759A11yP0[\s\S]*main\.js\?v=20260719v759A11yP0/);
 assert.match(main, /page-registry\.js\?v=' \+ PAGE_REGISTRY_ASSET_VERSION/);
 assert.match(main, /main\.js\?v=' \+ SHELL_RUNTIME_ASSET_VERSION/);
 assert.doesNotMatch(main, /\ninitApp\(\);\s*$/);
@@ -66,5 +66,9 @@ assert.match(sessionCss, /@media \(max-width: 860px\)/);
 assert.match(sessionCss, /prefers-reduced-motion/);
 assert.match(sessionCss, /app-auth-locked/);
 assert.match(sessionCss, /\[data-app-roles\]\[hidden\][\s\S]*\.page\[hidden\][\s\S]*display:\s*none\s*!important/);
+assert.match(sessionCss, /\.app-session-control__trigger\s*\{[^}]*min-height:\s*44px;/, 'the mobile identity trigger needs a 44px touch target');
+assert.match(sessionCss, /\.app-session-control__menu button\s*\{[^}]*min-height:\s*44px;/, 'session menu actions need 44px touch targets');
+assert.match(sessionCss, /\.nav-logo\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/, 'the compact galaxy logo needs a 44px touch target');
+assert.match(sessionCss, /\.astra-workspace-mobile-header > div a\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/, 'the mobile Astra home link needs a 44px touch target');
 
 console.log('app-session-role-shell-contract: ok');

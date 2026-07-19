@@ -8,6 +8,13 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const teacher = read('pages/teacher/teacher.js');
 const teacherCss = read('pages/teacher/teacher.css');
 
+assert.ok(teacher.includes('id="teacher-tab-${key}"'), 'teacher tabs need stable ids');
+assert.ok(teacher.includes('aria-controls="teacher-workbench-panel"'), 'teacher tabs must own the shared panel');
+assert.ok(teacher.includes('tabindex="${state.activeView === key ? \'0\' : \'-1\'}"'), 'teacher tabs need roving tabindex');
+assert.ok(teacher.includes('aria-labelledby="teacher-tab-${state.activeView}"'), 'teacher panel must name its selected tab');
+assert.match(teacher, /function handleViewNavigationKeydown\(event\)[\s\S]*ArrowRight[\s\S]*ArrowLeft[\s\S]*Home[\s\S]*End[\s\S]*setActiveView\(nextTab\.dataset\.teacherView\);[\s\S]*nextTab\.focus\(\);/, 'teacher tabs must support keyboard roving selection');
+assert.match(teacherCss, /\.teacher-api-base input\s*\{[^}]*min-height:\s*44px;/, 'teacher API source input needs a 44px touch target');
+
 assert.match(teacher, /curriculum:\s*'课程节奏'/);
 assert.match(teacher, /curriculum:\s*renderCurriculumWorkspace/);
 assert.match(teacher, /data-teacher-scope="galaxyKey"/);

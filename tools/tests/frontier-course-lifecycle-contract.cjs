@@ -6,6 +6,7 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '..', '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const manifestSource = read('pages/frontier/frontier-manifest.js');
+const frontierCss = read('pages/frontier/frontier.css');
 
 function manifestFor(window) {
   const context = vm.createContext({ window, Object, Set, Error, Number });
@@ -99,6 +100,7 @@ assert.doesNotMatch(index, /<script src="shared\/js\/frontier-learning\.js/, 'Fu
 
 const main = read('shared/js/main.js');
 assert.ok(main.includes("'./pages/frontier/frontier-manifest.js?v=20260719v755Game001'"));
+assert.ok(main.includes("'./pages/frontier/frontier.css?v=20260719v759A11yP0'"));
 assert.ok(!main.includes("'./pages/cosmos/earth-sun.js?v=20260630mainV64'"), 'future galaxy must not warm every legacy activity');
 const registry = read('shared/js/page-registry.js');
 assert.ok(registry.includes("ready: 'initFrontierCourse'"));
@@ -108,6 +110,11 @@ assert.ok(registry.includes('FUTURE_RESOURCE_VERSION'), 'the route registry must
 const asset = path.join(root, 'UI', 'future-galaxy', 'orbit-observatory.webp');
 assert.ok(fs.existsSync(asset), 'observatory asset must ship locally');
 assert.ok(fs.statSync(asset).size < 550 * 1024, 'observatory asset must stay inside the image budget');
+assert.match(frontierCss, /\.fg-owner-controls input\[type="range"\]\s*\{[^}]*height:\s*44px;/, 'Future range inputs need a 44px touch target');
+assert.match(frontierCss, /\.fg-owner-controls button\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/, 'Future learning presets need 44px touch targets');
+assert.match(frontierCss, /\.fg-answer\s*\{[^}]*min-height:\s*44px;/, 'Future answer rows need 44px touch targets');
+assert.match(frontierCss, /\.fg-answer input\s*\{[^}]*position:\s*absolute;[^}]*inset:\s*0;[^}]*width:\s*100%;[^}]*height:\s*100%;/, 'the native answer control must own the complete answer hit area');
+assert.match(frontierCss, /\.fg-submit\s*\{[^}]*min-height:\s*44px;/, 'Future answer submission must remain touch accessible');
 const baseCss = read('shared/css/base.css');
 const serviceWorker = read('sw.js');
 ['future-galaxy-hero-sky.webp', 'future-galaxy-hero-nebula.webp'].forEach((name) => {

@@ -142,7 +142,7 @@
 
 .app-auth-tabs button {
     flex: 1;
-    min-height: 42px;
+    min-height: 44px;
     border: 0;
     border-radius: 9px;
     background: transparent;
@@ -263,7 +263,7 @@
     display: flex;
     align-items: center;
     gap: 9px;
-    min-height: 42px;
+    min-height: 44px;
     border: 1px solid rgba(146, 174, 214, 0.18);
     border-radius: 12px;
     padding: 5px 10px 5px 6px;
@@ -317,6 +317,7 @@
 
 .app-session-control__menu button {
     width: 100%;
+    min-height: 44px;
     border: 0;
     border-radius: 8px;
     padding: 10px;
@@ -333,6 +334,12 @@
 }
 
 @media (max-width: 860px) {
+    .nav-logo {
+        justify-content: center;
+        min-width: 44px;
+        min-height: 44px;
+    }
+
     .app-auth-overlay { padding: 14px; }
     .app-auth-portal { grid-template-columns: 1fr; min-height: auto; }
     .app-auth-context { gap: 30px; padding: 34px 26px; }
@@ -579,6 +586,10 @@
     }
 
     .astra-workspace-mobile-header > div a {
+        display: inline-flex;
+        align-items: center;
+        min-width: 44px;
+        min-height: 44px;
         color: #f5fbff;
         font-weight: 800;
         text-decoration: none;

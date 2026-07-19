@@ -20,6 +20,7 @@
 .cv-navbar__brand {
     display: inline-flex;
     align-items: center;
+    min-height: 44px;
     gap: 10px;
     font-family: var(--cv-font-mono);
     font-weight: 600;
@@ -82,6 +83,8 @@
 .cv-nav-item {
     display: inline-flex;
     align-items: center;
+    min-height: 44px;
+    box-sizing: border-box;
     gap: 6px;
     padding: 7px 14px;
     border-radius: var(--cv-radius-sm);
@@ -124,7 +127,7 @@
 @media (max-width: 768px) {
     .cv-navbar { height: 56px; padding: 0 16px; }
     .cv-navbar__brand { font-size: 0.85rem; }
-    .cv-nav-item { padding: 6px 10px; font-size: 0.78rem; }
+    .cv-nav-item { min-height: 44px; padding: 6px 10px; font-size: 0.78rem; }
     .cv-nav-external { display: none; }
     .cv-navbar__context label, .cv-navbar__context span { display: none; }
     .cv-navbar__context select { min-width: 126px; max-width: 150px; }
