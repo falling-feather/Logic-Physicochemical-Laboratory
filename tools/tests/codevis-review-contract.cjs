@@ -5,6 +5,16 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '../..');
 const challenge = fs.readFileSync(path.join(root, 'codevis/pages/course-challenge/course-challenge.js'), 'utf8');
 const submissionAdapter = fs.readFileSync(path.join(root, 'codevis/shared/js/submission-adapter.js'), 'utf8');
+const codevisRoot = path.join(root, 'codevis');
+const codevisIndex = fs.readFileSync(path.join(codevisRoot, 'index.html'), 'utf8');
+const codevisMain = fs.readFileSync(path.join(codevisRoot, 'shared/js/main.js'), 'utf8');
+
+function sourceFiles(directory) {
+    return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+        const entryPath = path.join(directory, entry.name);
+        return entry.isDirectory() ? sourceFiles(entryPath) : [entryPath];
+    });
+}
 
 assert.match(challenge, /function restoreResultFocus\(intent, generation\)/,
     'challenge results need an explicit, user-action-only focus restoration path');
@@ -34,5 +44,16 @@ assert.match(submissionAdapter, /active_version\.resource_policy\.wall_time_ms/,
     'polling must derive its bounded window from the formal problem resource policy');
 assert.match(submissionAdapter, /signal\r?\n\s*}\);/, 'poll requests must receive the same cancellation signal');
 assert.doesNotMatch(submissionAdapter, /setInterval\(/, 'polling must not leave periodic timers behind');
+assert.equal(fs.existsSync(path.join(codevisRoot, 'pages/home')), false,
+    'the retired Code Space home page directory must not remain as an orphaned production asset');
+assert.doesNotMatch(codevisIndex, /pages\/home|cv-page-home|data-page="home"|#home/,
+    'the Code Space shell must not load or expose a retired home page');
+assert.doesNotMatch(codevisMain, /register\('home'|CvHome/,
+    'the Code Space router must not retain a retired home route');
+for (const file of sourceFiles(codevisRoot)) {
+    const source = fs.readFileSync(file, 'utf8');
+    assert.doesNotMatch(source, /pages\/home|CvHome|cv-page-home/,
+        'no Code Space production source may reference retired home assets: ' + path.relative(root, file));
+}
 
-process.stdout.write('codevis-review-contract: re3 focus and re4 polling contracts ok\n');
+process.stdout.write('codevis-review-contract: re3 focus, re4 polling, re5 orphan-resource contracts ok\n');
