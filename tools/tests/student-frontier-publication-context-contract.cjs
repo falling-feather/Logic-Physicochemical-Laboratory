@@ -23,6 +23,8 @@ const configurations = [];
 const renders = [];
 let scenario = 'single';
 let activeConfig = null;
+let manifestAvailability = 'default-open';
+let pendingClassResponse = null;
 
 function response(payload, ok = true) {
   return { ok, json: async () => payload };
@@ -33,7 +35,7 @@ global.navigator = { onLine: true };
 global.location = { origin: 'https://astra.test', hash: '#cosmos/day-season' };
 global.addEventListener = (name, handler) => listeners.set(name, handler);
 global.removeEventListener = (name) => listeners.delete(name);
-global.FrontierLearning = { renderRoute: (page) => renders.push(page) };
+global.FrontierLearning = { renderRoute: (page) => renders.push({ page, availability: manifestAvailability }) };
 global.AstraApplicationSession = { getUser: () => null };
 global.FrontierCourseManifest = {
   galaxy_key: 'future-galaxy',
@@ -42,17 +44,20 @@ global.FrontierCourseManifest = {
     configurations.push(config);
     const valid = Boolean(config && config.course_ids && config.class_id !== undefined && typeof config.fetcher === 'function');
     activeConfig = valid ? config : null;
+    manifestAvailability = 'unavailable';
     return valid;
   },
   async refresh() {
     if (!activeConfig) return { availability: 'unavailable' };
     await activeConfig.fetcher(`/api/courses/${activeConfig.course_ids['earth-space']}/units?class_id=${activeConfig.class_id}`, { credentials: 'same-origin' });
+    manifestAvailability = 'available';
     return { availability: 'available', source: 'http-cache' };
   }
 };
 global.fetch = async (url, options = {}) => {
   fetchCalls.push({ url: String(url), options });
   if (String(url).startsWith('/api/classes')) {
+    if (scenario === 'classes-pending') return new Promise((resolve) => { pendingClassResponse = resolve; });
     if (scenario === 'multi') return response([{ id: 7 }, { id: 8 }]);
     if (scenario === 'classes-fail') return response({}, false);
     return response([{ id: 7 }]);
@@ -73,6 +78,16 @@ async function run() {
   assert.ok(listeners.has('astra:api-auth-required'), 'authority loss must close the future release snapshot');
   assert.ok(listeners.has('astra:session-signed-out'), 'sign-out must close the future release snapshot');
 
+  scenario = 'classes-pending';
+  const pendingBootstrap = publication.bootstrap({ id: 11, role: 'student' });
+  assert.equal(manifestAvailability, 'unavailable', 'student bootstrap must close legacy default-open before its first await');
+  assert.deepEqual(configurations.at(-1), {}, 'a pending class lookup must configure no authority course map');
+  assert.deepEqual(renders.at(-1), { page: 'cosmos', availability: 'unavailable' }, 'the active direct route must rerender closed before owners can mount');
+  pendingClassResponse(response([{ id: 7 }]));
+  const pendingResult = await pendingBootstrap;
+  assert.equal(pendingResult.availability, 'available', 'one resolved class may open only after its course map and unit refresh');
+
+  scenario = 'single';
   listeners.get('astra:session-ready')({ detail: { user: { id: 11, role: 'student' } } });
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
@@ -86,7 +101,7 @@ async function run() {
   const unitFetch = fetchCalls.find((call) => call.url.startsWith('/api/courses/101/units'));
   assert.ok(unitFetch, 'manifest refresh must use the configured course map');
   assert.equal(unitFetch.options.credentials, 'same-origin');
-  assert.ok(renders.includes('cosmos'), 'a completed authority refresh must rerender the active future route');
+  assert.ok(renders.some((entry) => entry.page === 'cosmos' && entry.availability === 'available'), 'a completed authority refresh must rerender the active future route');
 
   scenario = 'multi';
   fetchCalls.length = 0;

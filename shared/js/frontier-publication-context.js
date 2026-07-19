@@ -37,6 +37,14 @@
         abortController(state.controller);
         state.generation += 1;
         state.controller = new AbortController();
+        // A student context is not authoritative until its class and complete course map
+        // have both been verified. Close the legacy catalogue before the first await so a
+        // direct Future Galaxy route cannot mount an owner while /api/classes is pending.
+        const manifest = getManifest();
+        if (manifest) manifest.configureHttp({});
+        state.classId = '';
+        state.courseIds = null;
+        rerenderIfActive();
         return {
             generation: state.generation,
             controller: state.controller,
