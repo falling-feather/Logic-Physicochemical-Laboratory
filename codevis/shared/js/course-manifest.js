@@ -100,7 +100,7 @@
     }
 
     const activityKeyPattern = /^[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)*$/;
-    const httpState = { configured: false, phase: 'idle', courseIds: null, classId: null, fetcher: null, records: new Map() };
+    const httpState = { configured: false, phase: 'idle', courseIds: null, classId: null, fetcher: null, records: new Map(), generation: 0 };
 
     function unavailable(source) {
         return { status: 'unavailable', source, detail: '' };
@@ -128,6 +128,7 @@
             maps: { open: 'available', locked: 'locked', absent_from_authoritative_response: 'hidden', invalid_or_failed_adapter: 'unavailable' }
         },
         configureHttp({ course_ids, class_id, fetcher } = {}) {
+            httpState.generation++;
             httpState.configured = true;
             httpState.phase = 'unavailable';
             httpState.courseIds = course_ids && typeof course_ids === 'object' ? Object.assign({}, course_ids) : null;
@@ -140,17 +141,22 @@
                 httpState.phase = 'unavailable';
                 return false;
             }
+            const generation = httpState.generation;
+            const courseIds = Object.assign({}, httpState.courseIds);
+            const classId = httpState.classId;
+            const fetcher = httpState.fetcher;
             try {
                 const entries = await Promise.all(courses.map(async course => {
-                    const courseId = httpState.courseIds[course.course_key];
+                    const courseId = courseIds[course.course_key];
                     if (courseId == null) throw new Error('missing course id');
-                    const url = '/api/courses/' + encodeURIComponent(String(courseId)) + '/units?class_id=' + encodeURIComponent(httpState.classId);
-                    const response = await httpState.fetcher(url, { credentials: 'same-origin' });
+                    const url = '/api/courses/' + encodeURIComponent(String(courseId)) + '/units?class_id=' + encodeURIComponent(classId);
+                    const response = await fetcher(url, { credentials: 'same-origin' });
                     if (!response || !response.ok) throw new Error('request failed');
                     const units = await response.json();
                     if (!Array.isArray(units) || !units.every(validUnit)) throw new Error('invalid payload');
                     return [course.course_key, units];
                 }));
+                if (generation !== httpState.generation) return false;
                 httpState.records.clear();
                 entries.forEach(([courseKey, units]) => units.forEach(unit => {
                     const activity = byActivity.get(unit.activity_key);
@@ -159,6 +165,7 @@
                 httpState.phase = 'ready';
                 return true;
             } catch (_) {
+                if (generation !== httpState.generation) return false;
                 httpState.records.clear();
                 httpState.phase = 'unavailable';
                 return false;

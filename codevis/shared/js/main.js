@@ -1,11 +1,16 @@
 /* ============================================================
- * Codevis · 应用入口
+ * Codevis application entry.
  * ============================================================ */
 (function () {
     'use strict';
 
-    function bootstrap() {
-        // 注册页面
+    async function bootstrap() {
+        if (window.CvStudentContext && typeof window.CvStudentContext.start === 'function') {
+            await window.CvStudentContext.start();
+            const contextState = window.CvStudentContext.getState && window.CvStudentContext.getState();
+            if (contextState && contextState.phase === 'redirecting') return;
+        }
+
         if (window.CvRouter) {
             CvRouter.register('catalog', { onEnter: () => window.CvCourseCatalog && CvCourseCatalog.init() });
             CvRouter.register('lesson', { onEnter: () => window.CvCourseCatalog && CvCourseCatalog.renderLesson() });
@@ -20,23 +25,21 @@
                     window.CvRuntime && CvRuntime.cancel();
                 }
             });
-
             CvRouter.init();
         }
 
-        // 导航事件
         document.querySelectorAll('.cv-nav-item').forEach(el => {
-            el.addEventListener('click', (e) => {
+            el.addEventListener('click', (event) => {
                 const page = el.dataset.page;
                 if (!page) return;
-                e.preventDefault();
+                event.preventDefault();
                 CvRouter.navigateTo(page);
             });
         });
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', bootstrap);
+        document.addEventListener('DOMContentLoaded', () => { bootstrap(); });
     } else {
         bootstrap();
     }

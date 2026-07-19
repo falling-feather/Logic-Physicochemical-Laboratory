@@ -61,7 +61,8 @@ assert.equal(stateAdapter.contract.maps.invalid_or_failed_adapter, 'unavailable'
 assert.match(challengeSource, /预测[\s\S]*运行[\s\S]*追踪[\s\S]*修正/);
 assert.match(challengeSource, /仅用于学习反馈/);
 assert.match(challengeSource, /正式提交/);
-assert.match(challengeSource, /type=["']button["'] disabled/);
+assert.match(challengeSource, /const formalDisabled = !submitState\.available/);
+assert.match(challengeSource, /formalDisabled \? ['"] disabled aria-disabled=/);
 assert.doesNotMatch(challengeSource, /accepted\s*:\s*true|status\s*:\s*["']accepted["']/i);
 
 assert.match(cppSource, /new Worker\(WORKER_URL\)/, 'C and C++ must execute in a Worker');

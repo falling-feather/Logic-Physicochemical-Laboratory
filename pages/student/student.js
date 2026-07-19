@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    const STUDENT_ASSET_VERSION = '20260710v6653PermissionMatrixP1';
+    const STUDENT_ASSET_VERSION = '20260719v757StudentPublicationP0';
     const API_BASE_STORAGE_KEY = 'astra-student-api-base';
     const REQUEST_TIMEOUT_MS = 12000;
     const ASSIGNMENT_PAGE_LIMIT = 8;
@@ -263,6 +263,7 @@
         state.onOffline = () => {
             state.online = false;
             abortController(state.scopeController);
+            closeFutureGalaxyPublication();
             state.user = null;
             state.authorized = false;
             state.busy = false;
@@ -284,6 +285,7 @@
             state.scopeGeneration += 1;
             abortController(state.scopeController);
             abortController(state.lifecycleController);
+            closeFutureGalaxyPublication();
             state.scopeController = null;
             state.lifecycleController = new AbortController();
             state.user = null;
@@ -319,6 +321,38 @@
         state.onOffline = null;
         state.onAuthRequired = null;
         state.runtimeBound = false;
+    }
+
+    function futureGalaxyPublicationContext() {
+        return window.FutureGalaxyPublicationContext || null;
+    }
+
+    function closeFutureGalaxyPublication() {
+        const context = futureGalaxyPublicationContext();
+        return context && typeof context.close === 'function' ? context.close() : false;
+    }
+
+    function buildFutureCourseIdMap(payload, manifest) {
+        const context = futureGalaxyPublicationContext();
+        return context && typeof context.buildCourseIdMap === 'function'
+            ? context.buildCourseIdMap(payload, manifest)
+            : null;
+    }
+
+    async function configureFutureGalaxyPublication(classId, coursePayload) {
+        const context = futureGalaxyPublicationContext();
+        if (!context || typeof context.configure !== 'function') {
+            return { availability: 'unavailable', source: 'publication-context-unavailable' };
+        }
+        return context.configure(classId, coursePayload);
+    }
+
+    async function bootstrapFutureGalaxyPublication(user) {
+        const context = futureGalaxyPublicationContext();
+        if (!context || typeof context.bootstrap !== 'function') {
+            return { availability: 'unavailable', source: 'publication-context-unavailable' };
+        }
+        return context.bootstrap(user);
     }
 
     async function refreshAll() {
@@ -373,12 +407,13 @@
                 );
             }
             state.selected.classId = normalizeEntityId(state.selected.classId, state.data.classes);
-            if (!state.selected.classId && state.data.classes.length) {
+            if (!state.selected.classId && state.data.classes.length === 1) {
                 state.selected.classId = String(entityId(state.data.classes[0]));
             }
             showDashboard();
 
             if (!state.selected.classId) {
+                closeFutureGalaxyPublication();
                 state.busy = false;
                 renderWorkspace();
                 return;
@@ -386,6 +421,7 @@
             await loadClassScope(scope);
         } catch (error) {
             if (isCancelled(error)) return;
+            closeFutureGalaxyPublication();
             renderAuthError(error);
             hideDashboard();
         } finally {
@@ -399,6 +435,7 @@
 
     async function refreshClassScope() {
         if (!state.authorized || !state.selected.classId) {
+            if (state.authorized) closeFutureGalaxyPublication();
             renderWorkspace();
             return;
         }
@@ -442,6 +479,12 @@
         applySettledList(results[1], 'courses');
         applySettledValue(results[2], 'progress');
         applySettledList(results[3], 'points');
+
+        if (results[1].status === 'fulfilled') {
+            void configureFutureGalaxyPublication(classId, state.data.courses);
+        } else {
+            closeFutureGalaxyPublication();
+        }
 
         state.selected.courseId = normalizeEntityId(state.selected.courseId, state.data.courses);
         if (!state.selected.courseId && state.data.courses.length) {
@@ -825,10 +868,10 @@
 
         if (classSelect) {
             classSelect.innerHTML = state.data.classes.length
-                ? state.data.classes.map((item) => {
+                ? `${state.data.classes.length > 1 ? `<option value=""${state.selected.classId ? '' : ' selected'}>请选择班级</option>` : ''}${state.data.classes.map((item) => {
                     const label = [item.name || `班级 ${entityId(item)}`, item.grade, item.term].filter(Boolean).join(' · ');
                     return `<option value="${escapeAttr(entityId(item))}"${String(entityId(item)) === state.selected.classId ? ' selected' : ''}>${escapeHtml(label)}</option>`;
-                }).join('')
+                }).join('')}`
                 : '<option value="">尚未加入班级</option>';
             classSelect.disabled = locked || !state.data.classes.length;
         }
@@ -957,6 +1000,17 @@
     }
 
     function renderJoinState() {
+        if (state.data.classes.length > 1) {
+            return `
+                <div class="student-empty-hero">
+                    <span class="student-empty-hero__icon"><i data-lucide="users-round"></i></span>
+                    <div>
+                        <h2>请选择一个班级</h2>
+                        <p>你加入了多个班级。选择班级后，系统才会读取该班级的课程发布状态与学习内容。</p>
+                    </div>
+                </div>
+            `;
+        }
         return `
             <div class="student-empty-hero">
                 <span class="student-empty-hero__icon"><i data-lucide="users-round"></i></span>
@@ -1743,7 +1797,11 @@
             state,
             applyConfirmedSubmission,
             updateJoinReconciliationLock,
-            updateSubmissionReconciliationLock
+            updateSubmissionReconciliationLock,
+            buildFutureCourseIdMap,
+            bootstrapFutureGalaxyPublication,
+            configureFutureGalaxyPublication,
+            closeFutureGalaxyPublication
         };
     }
 })();

@@ -70,6 +70,7 @@ assert.ok(runtime.includes('data-fg-view') && runtime.includes('setView(next)') 
 assert.ok(runtime.includes('new THREE.PointLight') && runtime.includes('Earth day/night boundary visible'), 'orbit lighting must illuminate the Earth from the fixed teaching sun');
 assert.match(runtime, /runtime\.abort\.signal\.aborted \|\| activeRuntime !== runtime \|\| !canvas\.isConnected\) \{\s*if \(canvas\.isConnected\) canvas\.remove\(\);\s*return;/, 'a route left during dynamic Three import must remove its provisional canvas');
 assert.ok(runtime.includes('global.destroyFrontierCourse = () => FrontierLearning.destroy()'), 'leave cleanup must not infer a page from a changed hash');
+assert.ok(runtime.includes("route.access.state === 'locked'") && runtime.includes('教师正在按班级学习节奏开放课程'), 'locked child routes must explain the teacher-paced release state');
 ['earth-sun.js', 'bridge-truss.js', 'linear-regression.js', 'network-layers.js', 'materials-lab.js', 'text-lab.js'].forEach((owner) => assert.ok(runtime.includes(owner), `owner ${owner} must remain lazy-loadable`));
 assert.ok(runtime.length < 60000, 'the replaced long-page runtime must not remain in the future entry bundle');
 assert.ok(!runtime.includes('sectionPlans:'), 'legacy long-page section plans must be removed');
@@ -133,5 +134,33 @@ const threeSource = read('shared/vendor/three-r185/SOURCE.md');
   const failedManifest = manifestFor(failedWindow);
   assert.equal(failedManifest.configureHttp({ course_ids: courseIds, class_id: 'class-a', fetcher: async () => ({ ok: false, json: async () => [] }) }), true);
   assert.equal((await failedManifest.refresh()).availability, 'unavailable', 'one failed BE response closes the whole catalogue');
+
+  const raceWindow = {};
+  const raceManifest = manifestFor(raceWindow);
+  const staleResolvers = [];
+  assert.equal(raceManifest.configureHttp({
+    course_ids: courseIds,
+    class_id: 'class-old',
+    fetcher: (url) => new Promise((resolve) => staleResolvers.push(() => resolve({
+      ok: true,
+      json: async () => {
+        const course = raceManifest.courses.find((item) => url.includes(`course-${item.page}`));
+        return [{ id: `old-${course.page}`, activity_key: course.activities[0].activity_key, title: course.activities[0].title, position: 1, effective_release_state: 'open', lock_reasons: [] }];
+      }
+    })))
+  }), true);
+  const staleRefresh = raceManifest.refresh();
+  assert.equal(staleResolvers.length, 6, 'a refresh must capture each course request before a class switch');
+  assert.equal(raceManifest.configureHttp({
+    course_ids: courseIds,
+    class_id: 'class-new',
+    fetcher: async (url) => {
+      const course = raceManifest.courses.find((item) => url.includes(`course-${item.page}`));
+      return { ok: true, json: async () => [{ id: `new-${course.page}`, activity_key: course.activities[0].activity_key, title: course.activities[0].title, position: 1, effective_release_state: 'open', lock_reasons: [] }] };
+    }
+  }), true);
+  const freshSnapshot = await raceManifest.refresh();
+  staleResolvers.forEach((resolve) => resolve());
+  assert.equal(await staleRefresh, freshSnapshot, 'a superseded class refresh must not overwrite the latest availability snapshot');
   console.log('frontier-course-lifecycle-contract: ok');
 })().catch((error) => { process.nextTick(() => { throw error; }); });

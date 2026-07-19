@@ -130,6 +130,14 @@ input:focus-visible {
     padding: 84px 0 60px;   /* 顶部留出 navbar 空间 */
 }
 
+.course-context-gate {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 48px 24px;
+    border-top: 1px solid var(--cv-border-soft);
+    border-bottom: 1px solid var(--cv-border-soft);
+}
+
 .cv-container {
     max-width: 1280px;
     margin: 0 auto;
@@ -152,4 +160,9 @@ input:focus-visible {
 @media (max-width: 768px) {
     .cv-container { padding: 0 16px; }
     .cv-main { padding: 72px 0 40px; }
+}
+
+@media (max-width: 640px) {
+    .cv-has-class-selector .cv-main { padding-top: 132px; }
+    .course-context-gate { padding: 36px 16px; }
 }

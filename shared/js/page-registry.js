@@ -4,7 +4,8 @@
 
     if (global.AstraPageRegistry) return;
 
-    const ROLE_RESOURCE_VERSION = '20260719v7437AstraWorkspaceP0';
+    const ROLE_RESOURCE_VERSION = '20260719v757StudentPublicationP0';
+    const TEACHER_RESOURCE_VERSION = '20260719v757TeacherCurriculumP0';
     const ADMIN_RESOURCE_VERSION = '20260718v7432UnifiedAtlasP0';
     const PLANETS_RESOURCE_VERSION = '20260719v7437AstraWorkspaceP0';
 
@@ -50,8 +51,8 @@
         teacher: definePage({
             galaxy: 'astra',
             roles: ['teacher', 'admin'],
-            styles: [`pages/teacher/teacher.css?v=${ROLE_RESOURCE_VERSION}`],
-            script: `pages/teacher/teacher.js?v=${ROLE_RESOURCE_VERSION}`,
+            styles: [`pages/teacher/teacher.css?v=${TEACHER_RESOURCE_VERSION}`],
+            script: `pages/teacher/teacher.js?v=${TEACHER_RESOURCE_VERSION}`,
             ready: 'initTeacher',
             enter: 'initTeacher',
             leave: 'destroyTeacher'
@@ -69,7 +70,7 @@
             galaxy: 'frontier',
             tags: ['frontier'],
             styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
-            script: 'shared/js/frontier-learning.js?v=20260719v755Game001',
+            script: 'shared/js/frontier-learning.js?v=20260719v757FuturePublicationP0',
             ready: 'initFrontierCourse',
             enter: 'initFrontierCourse',
             leave: 'destroyFrontierCourse'
@@ -78,7 +79,7 @@
             galaxy: 'frontier',
             tags: ['frontier'],
             styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
-            script: 'shared/js/frontier-learning.js?v=20260719v755Game001',
+            script: 'shared/js/frontier-learning.js?v=20260719v757FuturePublicationP0',
             ready: 'initFrontierCourse',
             enter: 'initFrontierCourse',
             leave: 'destroyFrontierCourse'
@@ -87,7 +88,7 @@
             galaxy: 'frontier',
             tags: ['frontier'],
             styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
-            script: 'shared/js/frontier-learning.js?v=20260719v755Game001',
+            script: 'shared/js/frontier-learning.js?v=20260719v757FuturePublicationP0',
             ready: 'initFrontierCourse',
             enter: 'initFrontierCourse',
             leave: 'destroyFrontierCourse'
@@ -96,7 +97,7 @@
             galaxy: 'frontier',
             tags: ['frontier'],
             styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
-            script: 'shared/js/frontier-learning.js?v=20260719v755Game001',
+            script: 'shared/js/frontier-learning.js?v=20260719v757FuturePublicationP0',
             ready: 'initFrontierCourse',
             enter: 'initFrontierCourse',
             leave: 'destroyFrontierCourse'
@@ -105,7 +106,7 @@
             galaxy: 'frontier',
             tags: ['frontier'],
             styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
-            script: 'shared/js/frontier-learning.js?v=20260719v755Game001',
+            script: 'shared/js/frontier-learning.js?v=20260719v757FuturePublicationP0',
             ready: 'initFrontierCourse',
             enter: 'initFrontierCourse',
             leave: 'destroyFrontierCourse'
@@ -114,7 +115,7 @@
             galaxy: 'frontier',
             tags: ['frontier'],
             styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
-            script: 'shared/js/frontier-learning.js?v=20260719v755Game001',
+            script: 'shared/js/frontier-learning.js?v=20260719v757FuturePublicationP0',
             ready: 'initFrontierCourse',
             enter: 'initFrontierCourse',
             leave: 'destroyFrontierCourse'
@@ -123,7 +124,7 @@
             galaxy: 'frontier',
             tags: ['frontier'],
             styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
-            script: 'shared/js/frontier-learning.js?v=20260719v755Game001',
+            script: 'shared/js/frontier-learning.js?v=20260719v757FuturePublicationP0',
             ready: 'initFrontierCourse',
             enter: 'initFrontierCourse',
             leave: 'destroyFrontierCourse'

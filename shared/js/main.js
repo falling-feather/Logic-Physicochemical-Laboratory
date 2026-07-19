@@ -226,6 +226,8 @@ window.updateFooterVisibility = updateFooterVisibility;
 
 const ENGLAB_ASSET_VERSION = '20260716v7427RoleWorkflowGateP0';
 const ROLE_LANDING_ASSET_VERSION = '20260719v7437AstraWorkspaceP0';
+const SHELL_RUNTIME_ASSET_VERSION = '20260719v757TeacherCurriculumP0';
+const PAGE_REGISTRY_ASSET_VERSION = '20260719v757TeacherCurriculumP0';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',
@@ -240,9 +242,9 @@ const CORE_HTTP_FALLBACK_ASSETS = [
     './shared/js/api-client.js?v=' + ROLE_LANDING_ASSET_VERSION,
     './shared/js/app-session.js?v=' + ROLE_LANDING_ASSET_VERSION,
     './shared/js/experiment-registry.js?v=20260716v7427RoleWorkflowGateP0',
-    './shared/js/page-registry.js?v=' + ROLE_LANDING_ASSET_VERSION,
-    './shared/js/router.js?v=20260719v7437AstraWorkspaceP0',
-    './shared/js/main.js?v=' + ROLE_LANDING_ASSET_VERSION,
+    './shared/js/page-registry.js?v=' + PAGE_REGISTRY_ASSET_VERSION,
+    './shared/js/router.js?v=' + SHELL_RUNTIME_ASSET_VERSION,
+    './shared/js/main.js?v=' + SHELL_RUNTIME_ASSET_VERSION,
     './shared/js/backend-content.js?v=' + ENGLAB_ASSET_VERSION,
     './shared/css/backend-content.css?v=' + ENGLAB_ASSET_VERSION,
     './shared/css/auth-ui.css?v=' + ENGLAB_ASSET_VERSION,
@@ -284,7 +286,8 @@ const GALAXY_HTTP_FALLBACK_ASSETS = {
     frontier: [
         './pages/frontier/frontier.css?v=20260719v755Game001',
         './pages/frontier/frontier-manifest.js?v=20260719v755Game001',
-        './shared/js/frontier-learning.js?v=20260719v755Game001'
+        './shared/js/frontier-publication-context.js?v=20260719v757FuturePublicationP0',
+        './shared/js/frontier-learning.js?v=20260719v757FuturePublicationP0'
     ]
 };
 
@@ -427,7 +430,7 @@ function registerServiceWorker() {
     }
 
     const doRegister = function () {
-        navigator.serviceWorker.register('./sw.js?v=' + ROLE_LANDING_ASSET_VERSION)
+        navigator.serviceWorker.register('./sw.js?v=' + SHELL_RUNTIME_ASSET_VERSION)
             .then(function (registration) {
                 updateCacheDiagnostics({
                     cacheMode: 'service-worker',

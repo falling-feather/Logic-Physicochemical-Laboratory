@@ -8,6 +8,7 @@
     const CvRouter = {
         currentPage: 'catalog',
         currentParams: new URLSearchParams(),
+        initialized: false,
         pages: {},
 
         register(pageId, hooks) {
@@ -16,6 +17,8 @@
         },
 
         init() {
+            if (this.initialized) return;
+            this.initialized = true;
             window.addEventListener('hashchange', () => this._handle());
             this._handle(true);
         },

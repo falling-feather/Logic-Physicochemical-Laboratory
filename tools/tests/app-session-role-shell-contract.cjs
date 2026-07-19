@@ -40,10 +40,10 @@ assert.match(session, /HttpOnly Cookie/);
 assert.doesNotMatch(session, /localStorage|sessionStorage|Authorization\s*:|\.access_token/);
 
 assert.match(main, /await window\.AstraApplicationSession\.bootstrap\(\);\s*initApp\(\)/);
-assert.match(main, /serviceWorker\.register\('\.\/sw\.js\?v=' \+ ROLE_LANDING_ASSET_VERSION\)/);
-assert.match(html, /page-registry\.js\?v=20260719v7437AstraWorkspaceP0[\s\S]*main\.js\?v=20260719v7437AstraWorkspaceP0/);
-assert.match(main, /page-registry\.js\?v=' \+ ROLE_LANDING_ASSET_VERSION/);
-assert.match(main, /main\.js\?v=' \+ ROLE_LANDING_ASSET_VERSION/);
+assert.match(main, /serviceWorker\.register\('\.\/sw\.js\?v=' \+ SHELL_RUNTIME_ASSET_VERSION\)/);
+assert.match(html, /page-registry\.js\?v=20260719v757TeacherCurriculumP0[\s\S]*main\.js\?v=20260719v757TeacherCurriculumP0/);
+assert.match(main, /page-registry\.js\?v=' \+ PAGE_REGISTRY_ASSET_VERSION/);
+assert.match(main, /main\.js\?v=' \+ SHELL_RUNTIME_ASSET_VERSION/);
 assert.doesNotMatch(main, /\ninitApp\(\);\s*$/);
 assert.match(router, /_guardParsedRoute\(this\._parseHash\(\)\)/);
 assert.match(router, /AstraApplicationSession\.canAccessPage\(page\)/);

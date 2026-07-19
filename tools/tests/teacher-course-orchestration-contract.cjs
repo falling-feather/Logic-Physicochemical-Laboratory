@@ -1,0 +1,64 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const root = path.resolve(__dirname, '../..');
+const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+
+const teacher = read('pages/teacher/teacher.js');
+const teacherCss = read('pages/teacher/teacher.css');
+
+assert.match(teacher, /curriculum:\s*'课程节奏'/);
+assert.match(teacher, /curriculum:\s*renderCurriculumWorkspace/);
+assert.match(teacher, /data-teacher-scope="galaxyKey"/);
+assert.match(teacher, /const GALAXY_LABELS/);
+assert.match(teacher, /function filteredCourses\(\)/);
+assert.match(teacher, /async function loadCurriculumScope/);
+assert.match(teacher, /\/api\/courses\/\$\{courseId\}\/classes\/\$\{classId\}\/release-plan/);
+assert.match(teacher, /\/api\/progress\/courses\/\$\{courseId\}\/classes\/\$\{classId\}\/students/);
+assert.match(teacher, /fetchJson\('\/api\/code-submissions'/);
+assert.match(teacher, /params:\s*\{\s*class_id:\s*classId,\s*course_id:\s*courseId,\s*limit:\s*200/);
+
+assert.match(teacher, /data-teacher-form="release-plan"/);
+assert.match(teacher, /method:\s*'PATCH'[\s\S]*expected_version:\s*Number\(plan\.plan_version\)/);
+assert.match(teacher, /new Set\(positions\)\.size !== positions\.length/);
+assert.match(teacher, /prerequisite\.position >= item\.position/);
+assert.match(teacher, /Number\(error && error\.status\) !== 409/);
+assert.match(teacher, /await loadCurriculumScope\(\);[\s\S]*系统已回读最新权威版本，请确认后重新发布/);
+assert.match(teacher, /提交内容与权威版本 v\$\{updated\.plan_version\} 一致，无需重复写入/);
+
+for (const endpoint of [
+  '/api/code-submissions/${submissionId}/source',
+  '/api/code-submissions/${submissionId}/attempts'
+]) {
+  assert.ok(teacher.includes(endpoint), `teacher workbench must consume ${endpoint}`);
+}
+assert.match(teacher, /escapeHtml\(source\.source_code\)/);
+assert.match(teacher, /CODE_STATUS_LABELS/);
+const storageLines = Array.from(
+  teacher.matchAll(/(?:localStorage|sessionStorage)[^\n]*/g),
+  (match) => match[0]
+).join('\n');
+assert.doesNotMatch(storageLines, /source_code|codeSubmission|submissionSource/i);
+
+for (const stableField of ['name="galaxy_key"', 'name="course_key"', 'name="activity_key"']) {
+  assert.ok(teacher.includes(stableField), `teacher authoring must expose ${stableField}`);
+}
+assert.match(teacher, /galaxy_key:\s*optional\(data\.galaxy_key\)/);
+assert.match(teacher, /course_key:\s*optional\(data\.course_key\)/);
+assert.match(teacher, /activity_key:\s*optional\(data\.activity_key\)/);
+
+assert.match(teacherCss, /V7\.5\.7 · 三星系课程节奏与学情轨道/);
+for (const selector of [
+  '.teacher-orbit-context',
+  '.teacher-release-plan',
+  '.teacher-progress-matrix',
+  '.teacher-code-station',
+  '.teacher-source-code'
+]) {
+  assert.ok(teacherCss.includes(selector), `teacher curriculum styling must include ${selector}`);
+}
+assert.match(teacherCss, /@media \(max-width: 760px\)/);
+assert.match(teacherCss, /@media \(prefers-reduced-motion: reduce\)/);
+
+console.log('teacher-course-orchestration-contract: ok');

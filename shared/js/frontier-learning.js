@@ -302,7 +302,14 @@
     }
 
     function renderUnavailableCourse(runtime, route) {
-        runtime.mount.innerHTML = `<main class="fg-shell fg-course" data-galaxy-key="future-galaxy"><nav class="fg-breadcrumb" aria-label="课程路径"><a href="#frontier">未来星系</a><span>/</span><span>课程状态</span></nav><header class="fg-course-head"><div><div class="fg-eyebrow">COURSE</div><h1>课程暂不可用</h1><p>课程暂不可用，请稍后重试。</p></div><ul class="fg-meta"><li><b>后续</b>可先回到课程目录继续探索。</li></ul></header><p class="fg-footer-note"><a href="#frontier">回到课程目录</a></p></main>`;
+        const locked = route && route.access && route.access.state === 'locked';
+        const title = locked ? '本节尚未开放' : '课程暂不可用';
+        const description = locked
+            ? '教师正在按班级学习节奏开放课程，请先完成当前可学习的内容。'
+            : '课程状态暂时无法确认，请稍后重试。';
+        const metaLabel = locked ? '学习节奏' : '后续';
+        const metaText = locked ? '开放后可从课程目录进入。' : '可先回到课程目录继续探索。';
+        runtime.mount.innerHTML = `<main class="fg-shell fg-course" data-galaxy-key="future-galaxy"><nav class="fg-breadcrumb" aria-label="课程路径"><a href="#frontier">未来星系</a><span>/</span><span>课程状态</span></nav><header class="fg-course-head"><div><div class="fg-eyebrow">COURSE</div><h1>${title}</h1><p>${description}</p></div><ul class="fg-meta"><li><b>${metaLabel}</b>${metaText}</li></ul></header><p class="fg-footer-note"><a href="#frontier">回到课程目录</a></p></main>`;
     }
 
     function setupCanvas(canvas, lowPower) {

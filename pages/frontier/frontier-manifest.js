@@ -115,6 +115,7 @@
     let httpConfig = null;
     let httpSnapshot = null;
     let httpRefresh = null;
+    let httpGeneration = 0;
     const unavailableSnapshot = (source) => Object.freeze({
         galaxy_key: GALAXY_KEY,
         source,
@@ -132,6 +133,8 @@
     // resolveAvailability(). Consumers call refresh() during preload/refresh, then render
     // reads only the finished cached snapshot.
     const configureHttp = ({ course_ids, class_id, fetcher } = {}) => {
+        httpGeneration += 1;
+        httpRefresh = null;
         if (!isCourseIdMap(course_ids) || !(typeof class_id === 'string' || Number.isFinite(class_id))
             || (fetcher !== undefined && typeof fetcher !== 'function')
             || (fetcher === undefined && typeof global.fetch !== 'function')) {
@@ -149,18 +152,20 @@
     };
     const refresh = async () => {
         if (!httpConfig) return httpSnapshot || unavailableSnapshot('http-unconfigured');
-        if (httpRefresh) return httpRefresh;
-        httpRefresh = Promise.all(courses.map(async (item) => {
-            const courseId = encodeURIComponent(String(httpConfig.course_ids[item.course_key]));
-            const classId = encodeURIComponent(httpConfig.class_id);
-            const response = await httpConfig.fetcher(`/api/courses/${courseId}/units?class_id=${classId}`, { credentials: 'same-origin' });
+        const config = httpConfig;
+        const generation = httpGeneration;
+        if (httpRefresh && httpRefresh.generation === generation) return httpRefresh.promise;
+        const promise = Promise.all(courses.map(async (item) => {
+            const courseId = encodeURIComponent(String(config.course_ids[item.course_key]));
+            const classId = encodeURIComponent(config.class_id);
+            const response = await config.fetcher(`/api/courses/${courseId}/units?class_id=${classId}`, { credentials: 'same-origin' });
             if (!response || response.ok !== true || typeof response.json !== 'function') throw new Error('Invalid BE-004 units response');
             const access = adaptBe004Units(item.course_key, await response.json());
             if (!access) throw new Error('Invalid BE-004 unit fields');
             return access;
         })).then((perCourse) => {
             const activity_access = Object.freeze(Object.assign({}, ...perCourse));
-            httpSnapshot = Object.freeze({
+            const snapshot = Object.freeze({
                 galaxy_key: GALAXY_KEY,
                 source: 'http-cache',
                 availability: 'available',
@@ -168,12 +173,17 @@
                 course_access: deriveCourseAccess(activity_access),
                 activity_access
             });
-            return httpSnapshot;
+            if (generation === httpGeneration && config === httpConfig) httpSnapshot = snapshot;
+            return generation === httpGeneration && config === httpConfig ? snapshot : (httpSnapshot || snapshot);
         }).catch(() => {
-            httpSnapshot = unavailableSnapshot('http-unavailable');
-            return httpSnapshot;
-        }).finally(() => { httpRefresh = null; });
-        return httpRefresh;
+            const snapshot = unavailableSnapshot('http-unavailable');
+            if (generation === httpGeneration && config === httpConfig) httpSnapshot = snapshot;
+            return generation === httpGeneration && config === httpConfig ? snapshot : (httpSnapshot || snapshot);
+        }).finally(() => {
+            if (httpRefresh && httpRefresh.generation === generation) httpRefresh = null;
+        });
+        httpRefresh = Object.freeze({ generation, promise });
+        return promise;
     };
 
     // BE-004 can provide a state adapter later. Only a wholly absent adapter means the

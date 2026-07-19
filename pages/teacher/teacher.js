@@ -1,13 +1,37 @@
 (function () {
     'use strict';
 
-    const TEACHER_ASSET_VERSION = '20260710v6653PermissionMatrixP1';
+    const TEACHER_ASSET_VERSION = '20260719v757TeacherCurriculumP0';
     const API_BASE_STORAGE_KEY = 'astra-teacher-api-base';
     const TEACHER_VIEWS = Object.freeze({
         overview: '教学总览',
-        structure: '组织与课程',
+        curriculum: '课程节奏',
         assignments: '作业发布',
-        grading: '批改与学情'
+        grading: '批改与学情',
+        structure: '组织与课程'
+    });
+    const RELEASE_MODES = Object.freeze(['open', 'locked', 'hidden']);
+    const RELEASE_MODE_LABELS = Object.freeze({ open: '开放', locked: '锁定', hidden: '隐藏' });
+    const GALAXY_LABELS = Object.freeze({ englab: '工科试验室', 'code-space': '代码空间', 'future-galaxy': '未来星系' });
+    const RELEASE_REASON_LABELS = Object.freeze({
+        manual_locked: '教师锁定',
+        scheduled: '等待开放时间',
+        prerequisite_incomplete: '前置分块未完成'
+    });
+    const CODE_STATUS_LABELS = Object.freeze({
+        queued: '排队中',
+        runner_unavailable: '判题器未启用',
+        running: '判题中',
+        accepted: '通过',
+        wrong_answer: '答案不符',
+        partial: '部分通过',
+        compile_error: '编译错误',
+        runtime_error: '运行错误',
+        time_limit: '运行超时',
+        memory_limit: '内存超限',
+        output_limit: '输出超限',
+        internal_error: '判题异常',
+        cancelled: '已取消'
     });
 
     const state = {
@@ -32,12 +56,15 @@
             courseId: '',
             unitId: '',
             assignmentId: '',
-            studentId: ''
+            studentId: '',
+            codeSubmissionId: ''
         },
         filters: {
+            galaxyKey: '',
             memberRole: 'student',
             memberStatus: 'active',
-            submissionStatus: 'submitted'
+            submissionStatus: 'submitted',
+            codeStatus: ''
         },
         data: {
             schools: [],
@@ -55,7 +82,13 @@
             assignmentClassPolicy: null,
             knowledge: null,
             progress: null,
-            studentBatchImportResult: null
+            studentBatchImportResult: null,
+            curriculumAttached: false,
+            releasePlan: null,
+            courseProgress: null,
+            codeSubmissions: null,
+            codeSubmissionSource: null,
+            codeSubmissionAttempts: []
         },
         errors: {},
         flash: null
@@ -210,6 +243,23 @@
                 resetAssignmentClassPolicy();
                 return;
             }
+            const planPresetButton = target.closest('[data-teacher-plan-preset]');
+            if (planPresetButton) {
+                applyReleasePlanPreset(planPresetButton.dataset.teacherPlanPreset);
+                return;
+            }
+            const planResetButton = target.closest('[data-teacher-plan-reset]');
+            if (planResetButton) {
+                renderPanels();
+                applyWriteAvailability();
+                refreshIcons();
+                return;
+            }
+            const codeSubmissionButton = target.closest('[data-teacher-code-submission]');
+            if (codeSubmissionButton) {
+                selectCodeSubmission(codeSubmissionButton.dataset.teacherCodeSubmission);
+                return;
+            }
         });
 
         state.root.addEventListener('submit', (event) => {
@@ -228,6 +278,10 @@
             }
             if (target.matches('[data-teacher-filter]')) {
                 handleFilterChange(target);
+                return;
+            }
+            if (target.matches('[data-teacher-plan-field]')) {
+                markReleasePlanDraft(target);
                 return;
             }
             if (target.matches('[data-teacher-api-base]')) {
@@ -339,10 +393,13 @@
             state.errors.courses = coursesResult.reason;
         }
         state.selected.classId = normalizeSelectedId(state.selected.classId, state.data.classes);
-        state.selected.courseId = normalizeSelectedId(state.selected.courseId, state.data.courses);
+        const visibleCourses = filteredCourses();
+        state.selected.courseId = normalizeSelectedId(state.selected.courseId, visibleCourses);
         if (!state.selected.classId && state.data.classes.length) state.selected.classId = String(state.data.classes[0].id);
-        if (!state.selected.courseId && state.data.courses.length) state.selected.courseId = String(state.data.courses[0].id);
+        if (!state.selected.courseId && visibleCourses.length) state.selected.courseId = String(visibleCourses[0].id);
         await Promise.all([loadClassScope(generation), loadCourseScope(generation)]);
+        if (!isCurrentRequest(generation)) return;
+        await loadCurriculumScope(generation);
         if (!isCurrentRequest(generation)) return;
         renderWorkspace();
     }
@@ -515,6 +572,87 @@
         }
     }
 
+    async function loadCurriculumScope(generation = state.requestGeneration) {
+        if (!isCurrentRequest(generation)) return;
+        state.data.curriculumAttached = false;
+        state.data.releasePlan = null;
+        state.data.courseProgress = null;
+        state.data.codeSubmissions = null;
+        state.data.codeSubmissionSource = null;
+        state.data.codeSubmissionAttempts = [];
+        state.selected.codeSubmissionId = '';
+        state.errors.curriculumScope = null;
+        state.errors.releasePlan = null;
+        state.errors.courseProgress = null;
+        state.errors.codeSubmissions = null;
+        state.errors.codeSubmissionSource = null;
+        state.errors.codeSubmissionAttempts = null;
+        if (!state.selected.classId || !state.selected.courseId) return;
+
+        const classId = state.selected.classId;
+        const courseId = state.selected.courseId;
+        let attachedCourses = [];
+        try {
+            attachedCourses = await fetchJson('/api/courses', { params: { class_id: classId } });
+        } catch (error) {
+            if (!isCurrentRequest(generation)) return;
+            state.errors.curriculumScope = error;
+            return;
+        }
+        if (!isCurrentRequest(generation)) return;
+        state.data.curriculumAttached = attachedCourses.some((course) => String(course.id) === String(courseId));
+        if (!state.data.curriculumAttached) return;
+
+        const [planResult, progressResult, codeResult] = await Promise.allSettled([
+            fetchJson(`/api/courses/${courseId}/classes/${classId}/release-plan`),
+            fetchJson(`/api/progress/courses/${courseId}/classes/${classId}/students`, {
+                params: { limit: 200, offset: 0 }
+            }),
+            fetchJson('/api/code-submissions', {
+                params: { class_id: classId, course_id: courseId, limit: 200, offset: 0 }
+            })
+        ]);
+        if (!isCurrentRequest(generation)) return;
+        if (planResult.status === 'fulfilled') {
+            state.data.releasePlan = planResult.value;
+        } else {
+            state.errors.releasePlan = planResult.reason;
+        }
+        if (progressResult.status === 'fulfilled') {
+            state.data.courseProgress = progressResult.value;
+        } else {
+            state.errors.courseProgress = progressResult.reason;
+        }
+        if (codeResult.status === 'fulfilled') {
+            state.data.codeSubmissions = codeResult.value;
+        } else {
+            state.errors.codeSubmissions = codeResult.reason;
+        }
+    }
+
+    async function loadCodeSubmissionDetails(submissionId, generation = state.requestGeneration) {
+        if (!isCurrentRequest(generation) || !submissionId) return;
+        state.data.codeSubmissionSource = null;
+        state.data.codeSubmissionAttempts = [];
+        state.errors.codeSubmissionSource = null;
+        state.errors.codeSubmissionAttempts = null;
+        const [sourceResult, attemptsResult] = await Promise.allSettled([
+            fetchJson(`/api/code-submissions/${submissionId}/source`),
+            fetchJson(`/api/code-submissions/${submissionId}/attempts`)
+        ]);
+        if (!isCurrentRequest(generation) || String(state.selected.codeSubmissionId) !== String(submissionId)) return;
+        if (sourceResult.status === 'fulfilled') {
+            state.data.codeSubmissionSource = sourceResult.value;
+        } else {
+            state.errors.codeSubmissionSource = sourceResult.reason;
+        }
+        if (attemptsResult.status === 'fulfilled') {
+            state.data.codeSubmissionAttempts = attemptsResult.value;
+        } else {
+            state.errors.codeSubmissionAttempts = attemptsResult.reason;
+        }
+    }
+
     function renderWorkspace() {
         renderFlash();
         renderWriteLock();
@@ -555,7 +693,7 @@
     function applyWriteAvailability() {
         const blocked = Boolean(state.writeLock || !state.online || state.busy);
         state.root.querySelectorAll(
-            '[data-teacher-form] button[type="submit"], [data-teacher-member-status], [data-teacher-collaborator-status]'
+            '[data-teacher-form] button[type="submit"], [data-teacher-member-status], [data-teacher-collaborator-status], [data-teacher-plan-preset], [data-teacher-plan-reset]'
         ).forEach((control) => {
             if (blocked) control.disabled = true;
         });
@@ -583,7 +721,8 @@
         const container = state.root.querySelector('[data-teacher-scope-panel]');
         if (!container) return;
         const isCompact = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 760px)').matches;
-        const summary = [selectedSchool() && selectedSchool().name, selectedClass() && selectedClass().name, selectedCourse() && selectedCourse().title]
+        const course = selectedCourse();
+        const summary = [selectedSchool() && selectedSchool().name, selectedClass() && selectedClass().name, course && galaxyMeta(course).label, course && course.title]
             .filter(Boolean).join(' · ') || '尚未建立教学范围';
         container.innerHTML = `
             <details class="teacher-scope" ${isCompact ? '' : 'open'}>
@@ -591,7 +730,8 @@
                 <div class="teacher-scope__fields">
                     ${renderScopeSelect('schoolId', '学校', state.data.schools, state.selected.schoolId, (item) => `${item.name}${item.status !== 'active' ? ` · ${item.status}` : ''}`, state.errors.schools)}
                     ${renderScopeSelect('classId', '班级', state.data.classes, state.selected.classId, (item) => `${item.name}${item.status !== 'active' ? ` · ${item.status}` : ''}`, state.errors.classes)}
-                    ${renderScopeSelect('courseId', '课程', state.data.courses, state.selected.courseId, (item) => `${item.title}${item.status !== 'published' ? ` · ${item.status}` : ''}`, state.errors.courses)}
+                    ${renderGalaxyScopeSelect()}
+                    ${renderScopeSelect('courseId', '课程', filteredCourses(), state.selected.courseId, (item) => `${item.title}${item.status !== 'published' ? ` · ${item.status}` : ''}`, state.errors.courses)}
                 </div>
             </details>
         `;
@@ -614,9 +754,10 @@
         if (!container) return;
         const panels = {
             overview: renderOverviewPanel,
-            structure: renderOrganizationPanel,
+            curriculum: renderCurriculumWorkspace,
             assignments: renderAssignmentWorkspace,
-            grading: renderGradingWorkspace
+            grading: renderGradingWorkspace,
+            structure: renderOrganizationPanel
         };
         container.dataset.activeView = state.activeView;
         container.innerHTML = (panels[state.activeView] || panels.overview)();
@@ -671,11 +812,24 @@
                     <section class="teacher-quick-actions">
                         <header><span>NEXT STEP</span><h2>快速开始</h2></header>
                         ${renderQuickAction('assignments', 'clipboard-plus', '发布作业', '布置新作业给当前教学范围')}
+                        ${renderQuickAction('curriculum', 'milestone', '安排课程节奏', '分批开放分块并查看全班进度')}
                         ${renderQuickAction('structure', 'book-plus', '创建课程', '建立课程并挂接班级')}
                         ${renderQuickAction('grading', 'chart-no-axes-combined', '查看学情', '查看学生进度与作业反馈')}
                     </section>
                 </aside>
             </div>
+        `;
+    }
+
+    function renderGalaxyScopeSelect() {
+        return `
+            <label class="teacher-scope__field">
+                <span>星系</span>
+                <select data-teacher-scope="galaxyKey">
+                    <option value=""${state.filters.galaxyKey ? '' : ' selected'}>全部星系</option>
+                    ${Object.entries(GALAXY_LABELS).map(([value, label]) => `<option value="${value}"${state.filters.galaxyKey === value ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}
+                </select>
+            </label>
         `;
     }
 
@@ -692,6 +846,240 @@
 
     function renderQuickAction(view, icon, title, detail) {
         return `<button type="button" class="teacher-quick-action" data-teacher-view-target="${escapeAttr(view)}"><span><i data-lucide="${escapeAttr(icon)}"></i></span><div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(detail)}</small></div><i data-lucide="chevron-right"></i></button>`;
+    }
+
+    function renderCurriculumWorkspace() {
+        const course = selectedCourse();
+        const galaxy = galaxyMeta(course);
+        const classGroup = selectedClass();
+        const scopeError = state.errors.curriculumScope;
+        return `
+            <div class="teacher-view teacher-view--curriculum">
+                <header class="teacher-view__header teacher-curriculum-hero">
+                    <div>
+                        <span>COURSE ORCHESTRATION · ${escapeHtml(galaxy.code)}</span>
+                        <h2>课程节奏与学习轨道</h2>
+                        <p>同一处编排三个星系的开放顺序、班级进度与代码提交；学生端只呈现服务端确认可见的分块。</p>
+                    </div>
+                    <a class="teacher-galaxy-link teacher-galaxy-link--${escapeAttr(galaxy.tone)}" href="${escapeAttr(galaxy.href)}">
+                        <i data-lucide="${escapeAttr(galaxy.icon)}"></i>
+                        <span>${escapeHtml(galaxy.label)}</span>
+                        <i data-lucide="arrow-up-right"></i>
+                    </a>
+                </header>
+                <section class="teacher-orbit-context" aria-label="当前课程轨道">
+                    <div><span>班级轨道</span><strong>${escapeHtml(classGroup ? classGroup.name : '尚未选择班级')}</strong></div>
+                    <i data-lucide="chevron-right"></i>
+                    <div><span>星系</span><strong>${escapeHtml(galaxy.label)}</strong></div>
+                    <i data-lucide="chevron-right"></i>
+                    <div><span>课程</span><strong>${escapeHtml(course ? course.title : '尚未选择课程')}</strong></div>
+                    <div class="teacher-orbit-context__key"><code>${escapeHtml(course ? `${course.galaxy_key}/${course.course_key}` : '--')}</code></div>
+                </section>
+                ${!state.selected.classId || !state.selected.courseId
+                    ? renderCurriculumEmpty('先选择班级与课程', '顶部教学范围决定发布计划、进度矩阵和代码提交的授权范围。', 'scan-search')
+                    : scopeError
+                        ? renderError(scopeError, '课程挂班状态读取失败')
+                        : !state.data.curriculumAttached
+                            ? renderCurriculumEmpty('当前课程尚未挂接此班级', '完成课程挂班后，系统会建立默认开放计划并开始聚合学生进度。', 'link-2-off', 'structure', '前往组织与课程')
+                            : `
+                                <div class="teacher-curriculum-grid">
+                                    ${renderReleasePlanPanel()}
+                                    ${renderProgressMatrix()}
+                                </div>
+                                ${renderCodeSubmissionPanel()}
+                            `}
+            </div>
+        `;
+    }
+
+    function renderCurriculumEmpty(title, text, icon, view, action) {
+        return `
+            <div class="teacher-curriculum-empty">
+                <i data-lucide="${escapeAttr(icon)}"></i>
+                <div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></div>
+                ${view ? `<button type="button" data-teacher-view-target="${escapeAttr(view)}">${escapeHtml(action)} <i data-lucide="arrow-right"></i></button>` : ''}
+            </div>
+        `;
+    }
+
+    function renderReleasePlanPanel() {
+        if (state.errors.releasePlan) return `<article class="teacher-curriculum-panel">${renderError(state.errors.releasePlan, '发布计划读取失败')}</article>`;
+        const plan = state.data.releasePlan;
+        if (!plan || !Array.isArray(plan.items)) return `<article class="teacher-curriculum-panel">${renderEmpty('暂无发布计划')}</article>`;
+        const editable = canManageReleasePlan();
+        const openCount = plan.items.filter((item) => item.effective_release_state === 'open').length;
+        const lockedCount = plan.items.filter((item) => item.effective_release_state === 'locked').length;
+        const hiddenCount = plan.items.filter((item) => item.effective_release_state === 'hidden').length;
+        return `
+            <article class="teacher-curriculum-panel teacher-curriculum-panel--plan">
+                <header class="teacher-curriculum-panel__header">
+                    <div><span>RELEASE PLAN</span><h3>分块发布计划</h3></div>
+                    <div class="teacher-plan-version"><span>权威版本</span><strong>v${formatNumber(plan.plan_version)}</strong></div>
+                </header>
+                <div class="teacher-plan-summary" aria-label="发布状态摘要">
+                    <span data-state="open"><b>${formatNumber(openCount)}</b>开放</span>
+                    <span data-state="locked"><b>${formatNumber(lockedCount)}</b>锁定</span>
+                    <span data-state="hidden"><b>${formatNumber(hiddenCount)}</b>隐藏</span>
+                </div>
+                <form class="teacher-release-plan" data-teacher-form="release-plan" data-plan-version="${escapeAttr(plan.plan_version)}">
+                    <div class="teacher-plan-presets" aria-label="批量设置发布状态">
+                        <span>批量设置</span>
+                        ${RELEASE_MODES.map((mode) => `<button type="button" data-teacher-plan-preset="${mode}" ${editable ? '' : 'disabled'}>${escapeHtml(RELEASE_MODE_LABELS[mode])}</button>`).join('')}
+                        <button type="button" data-teacher-plan-reset ${editable ? '' : 'disabled'}>撤销草稿</button>
+                        <small data-teacher-plan-draft-status>尚未修改</small>
+                    </div>
+                    <div class="teacher-plan-list">
+                        ${plan.items.map((item, index) => renderReleasePlanRow(item, index, plan.items, editable)).join('')}
+                    </div>
+                    <footer class="teacher-plan-actions">
+                        <label><span>调整说明</span><input name="reason" maxlength="4000" placeholder="例如：第二周开放控制流程练习" ${editable ? '' : 'disabled'}></label>
+                        <button type="submit" ${editable && plan.items.length ? '' : 'disabled'}><i data-lucide="send"></i><span>发布到当前班级</span></button>
+                    </footer>
+                </form>
+            </article>
+        `;
+    }
+
+    function renderReleasePlanRow(item, index, allItems, editable) {
+        const unit = findById(state.data.units, item.course_unit_id);
+        const earlierItems = allItems.filter((candidate) => Number(candidate.position) < Number(item.position));
+        const reasons = Array.isArray(item.lock_reasons) ? item.lock_reasons : [];
+        return `
+            <div class="teacher-plan-row" data-teacher-plan-row data-unit-id="${escapeAttr(item.course_unit_id)}">
+                <div class="teacher-plan-row__index"><span>${String(index + 1).padStart(2, '0')}</span><i></i></div>
+                <div class="teacher-plan-row__identity">
+                    <strong>${escapeHtml(unit ? unit.title : item.activity_key)}</strong>
+                    <code>${escapeHtml(item.activity_key)}</code>
+                    <span class="teacher-release-state teacher-release-state--${escapeAttr(item.effective_release_state)}">${escapeHtml(RELEASE_MODE_LABELS[item.effective_release_state] || item.effective_release_state)}</span>
+                    ${reasons.length ? `<small>${reasons.map((reason) => escapeHtml(RELEASE_REASON_LABELS[reason] || reason)).join(' · ')}</small>` : ''}
+                </div>
+                <label><span>顺序</span><input type="number" min="1" max="100" value="${escapeAttr(item.position)}" data-teacher-plan-field="position" ${editable ? '' : 'disabled'}></label>
+                <label><span>呈现</span><select data-teacher-plan-field="release_mode" ${editable ? '' : 'disabled'}>${RELEASE_MODES.map((mode) => `<option value="${mode}"${mode === item.release_mode ? ' selected' : ''}>${escapeHtml(RELEASE_MODE_LABELS[mode])}</option>`).join('')}</select></label>
+                <label><span>开放时间</span><input type="datetime-local" value="${escapeAttr(datetimeLocalValue(item.open_at))}" data-teacher-plan-field="open_at" ${editable ? '' : 'disabled'}></label>
+                <label><span>前置分块</span><select data-teacher-plan-field="prerequisite_unit_id" ${editable ? '' : 'disabled'}><option value="">无</option>${earlierItems.map((candidate) => {
+                    const candidateUnit = findById(state.data.units, candidate.course_unit_id);
+                    return `<option value="${candidate.course_unit_id}"${Number(candidate.course_unit_id) === Number(item.prerequisite_unit_id) ? ' selected' : ''}>${escapeHtml(candidateUnit ? candidateUnit.title : candidate.activity_key)}</option>`;
+                }).join('')}</select></label>
+            </div>
+        `;
+    }
+
+    function renderProgressMatrix() {
+        if (state.errors.courseProgress) return `<article class="teacher-curriculum-panel">${renderError(state.errors.courseProgress, '课程进度矩阵读取失败')}</article>`;
+        const page = state.data.courseProgress;
+        const planItems = state.data.releasePlan && Array.isArray(state.data.releasePlan.items) ? state.data.releasePlan.items : [];
+        if (!page || !Array.isArray(page.items) || !page.items.length) {
+            return `<article class="teacher-curriculum-panel teacher-curriculum-panel--progress"><header class="teacher-curriculum-panel__header"><div><span>LEARNING ORBITS</span><h3>学生分块进度</h3></div></header>${renderEmpty('当前班级暂无可统计学生')}</article>`;
+        }
+        const blockTotal = planItems.length;
+        const completed = page.items.reduce((total, student) => total + student.blocks.filter((block) => block.completed).length, 0);
+        const possible = page.items.length * blockTotal;
+        return `
+            <article class="teacher-curriculum-panel teacher-curriculum-panel--progress">
+                <header class="teacher-curriculum-panel__header">
+                    <div><span>LEARNING ORBITS</span><h3>学生分块进度</h3></div>
+                    <div class="teacher-progress-total"><strong>${possible ? Math.round(completed / possible * 100) : 0}%</strong><span>全班完成度</span></div>
+                </header>
+                <div class="teacher-progress-legend"><span><i data-state="completed"></i>完成</span><span><i data-state="started"></i>进行中</span><span><i data-state="idle"></i>未开始</span><span><i data-state="hidden"></i>当前隐藏</span></div>
+                <div class="teacher-progress-matrix-wrap">
+                    <table class="teacher-progress-matrix">
+                        <thead><tr><th>学生</th>${planItems.map((item) => {
+                            const unit = findById(state.data.units, item.course_unit_id);
+                            return `<th><span>${escapeHtml(unit ? unit.title : item.activity_key)}</span><small>${escapeHtml(RELEASE_MODE_LABELS[item.effective_release_state] || item.effective_release_state)}</small></th>`;
+                        }).join('')}</tr></thead>
+                        <tbody>${page.items.map((student) => renderStudentProgressRow(student, planItems)).join('')}</tbody>
+                    </table>
+                </div>
+                <footer class="teacher-progress-foot"><span>显示 ${formatNumber(page.items.length)} / ${formatNumber(page.total)} 名学生</span><small>完成、提交与评分只统计当前权威可见范围。</small></footer>
+            </article>
+        `;
+    }
+
+    function renderStudentProgressRow(student, planItems) {
+        const completedCount = student.blocks.filter((block) => block.completed).length;
+        return `
+            <tr>
+                <th><strong>${escapeHtml(student.display_name)}</strong><span>#${formatNumber(student.student_id)}</span><small>${formatNumber(completedCount)} / ${formatNumber(planItems.length)} 完成</small></th>
+                ${planItems.map((planItem) => {
+                    const block = student.blocks.find((candidate) => Number(candidate.course_unit_id) === Number(planItem.course_unit_id));
+                    const stateName = !block || block.effective_release_state === 'hidden' ? 'hidden' : block.completed ? 'completed' : block.started ? 'started' : 'idle';
+                    const label = stateName === 'completed' ? '已完成' : stateName === 'started' ? '进行中' : stateName === 'hidden' ? '当前隐藏' : '未开始';
+                    return `<td data-progress-state="${stateName}"><i data-lucide="${stateName === 'completed' ? 'circle-check' : stateName === 'started' ? 'loader-circle' : stateName === 'hidden' ? 'eye-off' : 'circle-dashed'}"></i><strong>${label}</strong><span>${block ? `${formatNumber(block.submitted)} 提交 · ${formatNumber(block.graded)} 评分` : '--'}</span></td>`;
+                }).join('')}
+            </tr>
+        `;
+    }
+
+    function renderCodeSubmissionPanel() {
+        const course = selectedCourse();
+        const page = state.data.codeSubmissions || { items: [], total: 0 };
+        const allItems = Array.isArray(page.items) ? page.items : [];
+        const items = state.filters.codeStatus ? allItems.filter((item) => item.status === state.filters.codeStatus) : allItems;
+        const codeCourse = isCodeCourse(course) || allItems.length > 0;
+        return `
+            <article class="teacher-code-station${codeCourse ? '' : ' teacher-code-station--quiet'}">
+                <header class="teacher-code-station__header">
+                    <div><span>CODE REVIEW STATION</span><h3>代码提交与判题记录</h3><p>${codeCourse ? '按学生查看原始代码、语言和权威判题状态；公开样例运行不计入此处。' : '当前课程没有已识别的代码活动；建立代码题目后，提交会自动进入此处。'}</p></div>
+                    <div><strong>${formatNumber(page.total || allItems.length)}</strong><span>提交记录</span></div>
+                </header>
+                ${state.errors.codeSubmissions ? renderError(state.errors.codeSubmissions, '代码提交读取失败') : `
+                    <div class="teacher-code-station__toolbar">
+                        <label><span>判题状态</span><select data-teacher-filter="codeStatus"><option value="">全部状态</option>${Object.entries(CODE_STATUS_LABELS).map(([value, label]) => `<option value="${value}"${state.filters.codeStatus === value ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select></label>
+                        <span>当前筛选 ${formatNumber(items.length)} 条</span>
+                    </div>
+                    <div class="teacher-code-layout">
+                        <div class="teacher-code-list" role="list" aria-label="代码提交列表">
+                            ${items.length ? items.map((item) => renderCodeSubmissionItem(item)).join('') : renderEmpty(codeCourse ? '当前筛选下暂无代码提交' : '暂无代码提交')}
+                        </div>
+                        ${renderCodeSubmissionDetails(items)}
+                    </div>
+                `}
+            </article>
+        `;
+    }
+
+    function renderCodeSubmissionItem(item) {
+        const selected = String(item.id) === String(state.selected.codeSubmissionId);
+        return `
+            <button type="button" role="listitem" class="teacher-code-item${selected ? ' is-selected' : ''}" data-teacher-code-submission="${escapeAttr(item.id)}" aria-pressed="${selected}">
+                <span class="teacher-code-item__language">${escapeHtml(String(item.language || '').toUpperCase())}</span>
+                <span><strong>${escapeHtml(studentLabel(item.student_id))}</strong><small>${escapeHtml(item.activity_key)}</small></span>
+                ${renderCodeStatus(item.status)}
+                <time>${formatDate(item.created_at)}</time>
+            </button>
+        `;
+    }
+
+    function renderCodeSubmissionDetails(visibleItems) {
+        const selected = (visibleItems || []).find((item) => String(item.id) === String(state.selected.codeSubmissionId));
+        if (!selected) {
+            return `<div class="teacher-code-detail teacher-code-detail--empty"><i data-lucide="file-code-2"></i><strong>选择一条提交查看代码</strong><p>源代码只在教师授权范围内按需读取，不写入浏览器本地存储。</p></div>`;
+        }
+        const source = state.data.codeSubmissionSource;
+        const attempts = Array.isArray(state.data.codeSubmissionAttempts) ? state.data.codeSubmissionAttempts : [];
+        return `
+            <div class="teacher-code-detail">
+                <header><div><span>提交 #${formatNumber(selected.id)}</span><strong>${escapeHtml(studentLabel(selected.student_id))}</strong></div>${renderCodeStatus(selected.status)}</header>
+                ${state.errors.codeSubmissionSource ? renderError(state.errors.codeSubmissionSource, '源代码读取失败') : !source
+                    ? '<div class="teacher-code-loading"><i data-lucide="loader-circle"></i><span>正在读取授权源码</span></div>'
+                    : `
+                        <div class="teacher-code-meta"><span>${escapeHtml(String(source.language || selected.language).toUpperCase())}</span><code>${escapeHtml(selected.activity_key)}</code><span>${formatDate(selected.created_at)}</span></div>
+                        <pre class="teacher-source-code" tabindex="0" aria-label="学生源代码"><code>${escapeHtml(source.source_code)}</code></pre>
+                        ${source.stdin ? `<details class="teacher-code-input"><summary>查看标准输入</summary><pre>${escapeHtml(source.stdin)}</pre></details>` : ''}
+                    `}
+                <section class="teacher-attempts">
+                    <h4>判题轨迹</h4>
+                    ${state.errors.codeSubmissionAttempts ? renderError(state.errors.codeSubmissionAttempts, '判题轨迹读取失败') : attempts.length
+                        ? `<ol>${attempts.map((attempt) => `<li><i></i><div><strong>第 ${formatNumber(attempt.attempt_number)} 次 · ${escapeHtml(CODE_STATUS_LABELS[attempt.status] || attempt.status)}</strong><span>${escapeHtml(attempt.adapter_name || 'runner')} · ${formatDate(attempt.started_at || attempt.created_at)}</span>${attempt.error_code ? `<code>${escapeHtml(attempt.error_code)}</code>` : ''}</div></li>`).join('')}</ol>`
+                        : renderEmpty('暂无判题尝试')}
+                </section>
+            </div>
+        `;
+    }
+
+    function renderCodeStatus(value) {
+        const normalized = String(value || 'unknown').replace(/[^a-z0-9_-]/gi, '').toLowerCase();
+        return `<span class="teacher-code-status teacher-code-status--${escapeAttr(normalized)}">${escapeHtml(CODE_STATUS_LABELS[value] || value || '未知')}</span>`;
     }
 
     function renderOrganizationPanel() {
@@ -720,6 +1108,8 @@
                     ${renderOperation('course', 'book-plus', '创建课程', '在当前学校下建立课程内容', `
                         <form class="teacher-form" data-teacher-form="course">
                             <label><span>标题</span><input name="title" maxlength="180" required ${schoolDisabled ? 'disabled' : ''}></label>
+                            <label><span>所属星系</span><select name="galaxy_key" ${schoolDisabled ? 'disabled' : ''}>${optionSet([], 'englab', [['englab', '工科试验室'], ['code-space', '代码空间'], ['future-galaxy', '未来星系']])}</select></label>
+                            <label><span>课程稳定键</span><input name="course_key" maxlength="96" pattern="[a-zA-Z0-9][a-zA-Z0-9_-]*" placeholder="例如 control-flow" ${schoolDisabled ? 'disabled' : ''}></label>
                             <label><span>状态</span><select name="status" ${schoolDisabled ? 'disabled' : ''}>${optionSet(['draft', 'published', 'archived'], 'draft')}</select></label>
                             <label class="teacher-form__full"><span>摘要</span><textarea name="summary" maxlength="2000" rows="2" ${schoolDisabled ? 'disabled' : ''}></textarea></label>
                             <button type="submit" ${schoolDisabled ? 'disabled' : ''}><i data-lucide="book-plus"></i><span>创建课程</span></button>
@@ -778,6 +1168,7 @@
                         <label><span>标题</span><input name="title" maxlength="180" required ${unitDisabled ? 'disabled' : ''}></label>
                         <label><span>序号</span><input name="position" type="number" min="1" value="${state.data.units.length + 1}" required ${unitDisabled ? 'disabled' : ''}></label>
                         <label><span>状态</span><select name="status" ${unitDisabled ? 'disabled' : ''}>${optionSet(['draft', 'published', 'archived'], 'published')}</select></label>
+                        <label><span>活动稳定键</span><input name="activity_key" maxlength="120" pattern="[a-zA-Z0-9][a-zA-Z0-9_.-]*" placeholder="例如 cosmos.orbital-scale" ${unitDisabled ? 'disabled' : ''}></label>
                         <label><span>内容 slug</span><input name="content_slug" maxlength="180" ${unitDisabled ? 'disabled' : ''}></label>
                         <button type="submit" ${unitDisabled ? 'disabled' : ''}><i data-lucide="layers-3"></i><span>创建单元</span></button>
                     </form>
@@ -1080,6 +1471,7 @@
             if (formType === 'assignment-audience') await updateAssignmentAudience(form);
             if (formType === 'assignment-class-policy') await updateAssignmentClassPolicy(form);
             if (formType === 'point-rule') await updatePointRule(form);
+            if (formType === 'release-plan') await updateReleasePlan(form);
             if (formType === 'collaborator') await createCollaborator(form);
             if (formType === 'collaborator-batch') await batchUpdateCollaborators(form);
             if (formType === 'student-batch-import') await batchImportStudents(form);
@@ -1127,6 +1519,8 @@
             method: 'POST',
             body: {
                 school_id: Number(state.selected.schoolId),
+                galaxy_key: optional(data.galaxy_key),
+                course_key: optional(data.course_key),
                 title: data.title,
                 summary: optional(data.summary),
                 status: data.status || 'draft'
@@ -1143,7 +1537,10 @@
             body: { class_id: Number(state.selected.classId) }
         });
         setFlash('success', '课程已挂接班级');
-        await reconcileConfirmedWrite('挂接课程与班级', () => loadClassScope());
+        await reconcileConfirmedWrite('挂接课程与班级', async () => {
+            await loadClassScope();
+            await loadCurriculumScope();
+        });
     }
 
     async function createUnit(form) {
@@ -1151,6 +1548,7 @@
         const unit = await fetchJson(`/api/courses/${state.selected.courseId}/units`, {
             method: 'POST',
             body: {
+                activity_key: optional(data.activity_key),
                 title: data.title,
                 position: Number(data.position) || 1,
                 content_slug: optional(data.content_slug),
@@ -1159,7 +1557,10 @@
         });
         setFlash('success', '单元已创建');
         state.selected.unitId = String(unit.id);
-        await reconcileConfirmedWrite('创建单元', () => loadCourseScope());
+        await reconcileConfirmedWrite('创建单元', async () => {
+            await loadCourseScope();
+            await loadCurriculumScope();
+        });
     }
 
     async function createAssignment(form) {
@@ -1251,6 +1652,61 @@
         setFlash('success', '积分规则已保存');
         state.selected.assignmentId = String(assignmentId);
         await reconcileConfirmedWrite('保存积分规则', () => loadAssignmentScope());
+    }
+
+    async function updateReleasePlan(form) {
+        const plan = state.data.releasePlan;
+        if (!plan || !state.data.curriculumAttached) throw new Error('当前班级课程发布计划尚未就绪');
+        const rows = Array.from(form.querySelectorAll('[data-teacher-plan-row]'));
+        if (!rows.length) throw new Error('当前课程没有可编排分块');
+        const items = rows.map((row) => {
+            const position = Number(row.querySelector('[data-teacher-plan-field="position"]').value);
+            const releaseMode = row.querySelector('[data-teacher-plan-field="release_mode"]').value;
+            const openAtValue = row.querySelector('[data-teacher-plan-field="open_at"]').value;
+            const prerequisiteValue = row.querySelector('[data-teacher-plan-field="prerequisite_unit_id"]').value;
+            if (!Number.isInteger(position) || position < 1) throw new Error('课程分块顺序必须是正整数');
+            if (!RELEASE_MODES.includes(releaseMode)) throw new Error('课程分块呈现状态无效');
+            return {
+                course_unit_id: Number(row.dataset.unitId),
+                position,
+                release_mode: releaseMode,
+                open_at: openAtValue ? new Date(openAtValue).toISOString() : null,
+                prerequisite_unit_id: prerequisiteValue ? Number(prerequisiteValue) : null
+            };
+        });
+        const positions = items.map((item) => item.position);
+        if (new Set(positions).size !== positions.length) throw new Error('课程分块顺序不能重复');
+        const byUnitId = new Map(items.map((item) => [item.course_unit_id, item]));
+        items.forEach((item) => {
+            if (!item.prerequisite_unit_id) return;
+            const prerequisite = byUnitId.get(item.prerequisite_unit_id);
+            if (!prerequisite || prerequisite.position >= item.position) {
+                throw new Error('前置分块必须位于当前分块之前');
+            }
+        });
+        const reason = optional(new FormData(form).get('reason'));
+        try {
+            const updated = await fetchJson(
+                `/api/courses/${state.selected.courseId}/classes/${state.selected.classId}/release-plan`,
+                {
+                    method: 'PATCH',
+                    body: {
+                        expected_version: Number(plan.plan_version),
+                        items,
+                        reason
+                    }
+                }
+            );
+            state.data.releasePlan = updated;
+            setFlash(updated.changed ? 'success' : 'warning', updated.changed
+                ? `课程节奏已发布，权威版本更新为 v${updated.plan_version}`
+                : `提交内容与权威版本 v${updated.plan_version} 一致，无需重复写入`);
+            await reconcileConfirmedWrite('发布课程节奏', () => loadCurriculumScope());
+        } catch (error) {
+            if (Number(error && error.status) !== 409) throw error;
+            await loadCurriculumScope();
+            setFlash('warning', '另一位教师已更新课程节奏；系统已回读最新权威版本，请确认后重新发布');
+        }
     }
 
     async function createCollaborator(form) {
@@ -1447,12 +1903,65 @@
         );
     }
 
+    function applyReleasePlanPreset(mode) {
+        if (!RELEASE_MODES.includes(mode) || state.busy || !canManageReleasePlan()) return;
+        state.root.querySelectorAll('[data-teacher-plan-field="release_mode"]').forEach((select) => {
+            select.value = mode;
+            const row = select.closest('[data-teacher-plan-row]');
+            if (row) row.classList.add('is-dirty');
+        });
+        const status = state.root.querySelector('[data-teacher-plan-draft-status]');
+        if (status) status.textContent = `草稿：全部设为${RELEASE_MODE_LABELS[mode]}`;
+    }
+
+    function markReleasePlanDraft(control) {
+        const row = control.closest('[data-teacher-plan-row]');
+        if (row) row.classList.add('is-dirty');
+        const status = state.root.querySelector('[data-teacher-plan-draft-status]');
+        if (status) status.textContent = '存在尚未发布的调整';
+    }
+
+    async function selectCodeSubmission(submissionId) {
+        if (state.busy || !submissionId) return;
+        state.selected.codeSubmissionId = String(submissionId);
+        state.data.codeSubmissionSource = null;
+        state.data.codeSubmissionAttempts = [];
+        state.errors.codeSubmissionSource = null;
+        state.errors.codeSubmissionAttempts = null;
+        renderPanels();
+        applyWriteAvailability();
+        refreshIcons();
+        setBusy(true);
+        try {
+            await loadCodeSubmissionDetails(submissionId);
+        } finally {
+            setBusy(false);
+            renderWorkspace();
+        }
+    }
+
     async function handleScopeChange(target) {
         if (state.busy) {
             renderWorkspace();
             return;
         }
         const key = target.dataset.teacherScope;
+        if (key === 'galaxyKey') {
+            state.filters.galaxyKey = target.value;
+            const courses = filteredCourses();
+            state.selected.courseId = normalizeSelectedId(state.selected.courseId, courses);
+            if (!state.selected.courseId && courses.length) state.selected.courseId = String(courses[0].id);
+            setBusy(true);
+            try {
+                await loadCourseScope();
+                await loadClassScope();
+                await loadCurriculumScope();
+            } finally {
+                setBusy(false);
+                renderWorkspace();
+            }
+            return;
+        }
         state.selected[key] = target.value;
         if (key === 'schoolId' || key === 'classId') state.data.studentBatchImportResult = null;
         if (key === 'schoolId' || key === 'courseId') state.data.collaboratorBatchResult = null;
@@ -1462,10 +1971,12 @@
             if (key === 'classId') {
                 await loadClassScope();
                 await loadAssignmentScope();
+                await loadCurriculumScope();
             }
             if (key === 'courseId') {
                 await loadCourseScope();
                 await loadClassScope();
+                await loadCurriculumScope();
             }
             if (key === 'unitId') renderWorkspace();
             if (key === 'assignmentId') await loadAssignmentScope();
@@ -1485,6 +1996,11 @@
         if (key === 'memberRole') state.filters.memberRole = target.value;
         if (key === 'memberStatus') state.filters.memberStatus = target.value;
         if (key === 'submissionStatus') state.filters.submissionStatus = target.value;
+        if (key === 'codeStatus') {
+            state.filters.codeStatus = target.value;
+            renderWorkspace();
+            return;
+        }
         setBusy(true);
         try {
             await loadClassScope();
@@ -1722,6 +2238,11 @@
         return findById(state.data.courses, state.selected.courseId);
     }
 
+    function filteredCourses() {
+        if (!state.filters.galaxyKey) return state.data.courses;
+        return state.data.courses.filter((course) => String(course.galaxy_key || '') === state.filters.galaxyKey);
+    }
+
     function selectedCourseLabel() {
         const course = selectedCourse();
         return course ? `课程：${course.title}` : '课程：--';
@@ -1782,6 +2303,37 @@
 
     function canManageAssignmentClassPolicy() {
         return !isClassReadOnly() && hasCourseCapability(['editor', 'assessment_editor']);
+    }
+
+    function canManageReleasePlan() {
+        return Boolean(
+            state.data.curriculumAttached
+            && state.user
+            && ['teacher', 'admin'].includes(state.user.role)
+            && !isClassReadOnly()
+            && !isCourseReadOnly()
+        );
+    }
+
+    function galaxyMeta(course) {
+        const key = String(course && course.galaxy_key || '').toLowerCase();
+        if (key === 'code-space') return { code: 'CODE / 02', label: '代码空间', icon: 'code-2', tone: 'code', href: 'codevis/index.html#catalog' };
+        if (key === 'future-galaxy') return { code: 'FRONTIER / 03', label: '未来星系', icon: 'telescope', tone: 'future', href: '#frontier' };
+        if (key === 'englab') return { code: 'ENG / 01', label: '工科试验室', icon: 'flask-conical', tone: 'englab', href: '#home' };
+        return { code: 'ASTRA / COURSE', label: '星序课程', icon: 'orbit', tone: 'astra', href: '#planets' };
+    }
+
+    function isCodeCourse(course) {
+        if (!course) return false;
+        if (String(course.galaxy_key || '').toLowerCase() === 'code-space') return true;
+        if (/代码|编程|算法/i.test(String(course.title || ''))) return true;
+        return state.data.units.some((unit) => /^(program|control-flow|data-functions|algorithm|debugging|challenge)[.-]/.test(String(unit.activity_key || '')));
+    }
+
+    function studentLabel(studentId) {
+        const candidates = state.data.activeStudents.concat(state.data.members);
+        const member = candidates.find((item) => Number(item.user_id) === Number(studentId));
+        return member ? (member.display_name || member.username || `学生 #${studentId}`) : `学生 #${studentId}`;
     }
 
     function assignmentOptions() {
@@ -1847,6 +2399,13 @@
             state.data.knowledge = null;
             state.data.progress = null;
             state.data.studentBatchImportResult = null;
+            state.data.curriculumAttached = false;
+            state.data.releasePlan = null;
+            state.data.courseProgress = null;
+            state.data.codeSubmissions = null;
+            state.data.codeSubmissionSource = null;
+            state.data.codeSubmissionAttempts = [];
+            state.selected.codeSubmissionId = '';
         }
     }
 

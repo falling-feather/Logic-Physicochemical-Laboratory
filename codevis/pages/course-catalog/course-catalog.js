@@ -14,6 +14,15 @@
         return global.CvCourseStateAdapter.resolve(activity);
     }
 
+    function learningGate() {
+        const context = global.CvStudentContext;
+        return context && typeof context.gate === 'function' ? context.gate() : { blocked: false };
+    }
+
+    function renderGate(root, gate) {
+        root.innerHTML = '<div class="course-context-gate" role="status" aria-live="polite"><p class="course-eyebrow">代码空间</p><h1>' + escapeHtml(gate.title || '课程暂不可用') + '</h1><p class="course-lede">' + escapeHtml(gate.message || '请稍后重试。') + '</p></div>';
+    }
+
     function courseTitle(manifest, activity) {
         const course = manifest.courses.find(item => item.course_key === activity.course_key);
         return course ? course.title : '代码空间';
@@ -70,6 +79,11 @@
         const root = document.getElementById('course-catalog-root');
         const manifest = global.CvCourseManifest;
         if (!root || !manifest) return;
+        const gate = learningGate();
+        if (gate.blocked) {
+            renderGate(root, gate);
+            return;
+        }
         const visibleCourses = manifest.courses.filter(hasVisibleActivity);
         let course = manifest.courses.find(item => item.course_key === session.courseKey) || visibleCourses[0] || manifest.courses[0];
         if (!hasVisibleActivity(course) && visibleCourses.length) course = visibleCourses[0];
@@ -112,8 +126,13 @@
     function renderLesson() {
         const root = document.getElementById('course-lesson-root');
         const manifest = global.CvCourseManifest;
-        const activity = manifest && routeActivity(manifest);
         if (!root) return;
+        const gate = learningGate();
+        if (gate.blocked) {
+            renderGate(root, gate);
+            return;
+        }
+        const activity = manifest && routeActivity(manifest);
         if (!activity) {
             root.replaceChildren();
             global.CvRouter.navigateTo('catalog');

@@ -7,11 +7,11 @@
     <title>代码空间 · 星序 Astra</title>
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="shared/css/tokens.css?v=754r7" />
-    <link rel="stylesheet" href="shared/css/base.css?v=754r7" />
-    <link rel="stylesheet" href="shared/css/navbar.css?v=754r7" />
+    <link rel="stylesheet" href="shared/css/base.css?v=757r2" />
+    <link rel="stylesheet" href="shared/css/navbar.css?v=757r2" />
     <link rel="stylesheet" href="shared/css/layout.css?v=754r7" />
     <link rel="stylesheet" href="pages/code-trace/code-trace.css?v=754r7" />
-    <link rel="stylesheet" href="pages/course-catalog/course-space.css?v=754r7" />
+    <link rel="stylesheet" href="pages/course-catalog/course-space.css?v=757r2" />
 </head>
 <body>
     <div class="cv-app">
@@ -20,6 +20,11 @@
                 <span class="cv-navbar__brand-dot" aria-hidden="true"></span>
                 <span class="cv-navbar__brand-text">ASTRA <em>/</em> 代码空间</span>
             </a>
+            <div id="cv-class-context" class="cv-navbar__context" hidden>
+                <label for="cv-class-select">当前班级</label>
+                <select id="cv-class-select" aria-describedby="cv-class-status"></select>
+                <span id="cv-class-status" role="status" aria-live="polite"></span>
+            </div>
             <div class="cv-navbar__links">
                 <a href="#catalog" class="cv-nav-item" data-page="catalog">课程目录</a>
                 <a href="#trace" class="cv-nav-item" data-page="trace">执行追踪</a>
@@ -80,16 +85,19 @@
             </div>
         </footer>
     </div>
-    <script src="shared/js/router.js?v=754r7"></script>
-    <script src="shared/js/course-manifest.js?v=754r7"></script>
-    <script src="shared/js/runtime-loader.js?v=754r7"></script>
-    <script src="shared/js/runtime.js?v=754r7"></script>
-    <script src="shared/js/runtimes/runtime-js.js?v=754r7"></script>
-    <script src="shared/js/runtimes/runtime-py.js?v=754r7"></script>
-    <script src="shared/js/runtimes/runtime-cpp.js?v=754r7"></script>
-    <script src="pages/course-catalog/course-catalog.js?v=754r7"></script>
-    <script src="pages/course-challenge/course-challenge.js?v=754r7"></script>
-    <script src="pages/code-trace/code-trace.js?v=754r7"></script>
-    <script src="shared/js/main.js?v=754r7"></script>
+    <script src="../shared/js/api-client.js"></script>
+    <script src="shared/js/router.js?v=757r2"></script>
+    <script src="shared/js/course-manifest.js?v=757r2"></script>
+    <script src="shared/js/student-context.js?v=757r2"></script>
+    <script src="shared/js/submission-adapter.js?v=757r2"></script>
+    <script src="shared/js/runtime-loader.js?v=757r1"></script>
+    <script src="shared/js/runtime.js?v=757r1"></script>
+    <script src="shared/js/runtimes/runtime-js.js?v=757r1"></script>
+    <script src="shared/js/runtimes/runtime-py.js?v=757r1"></script>
+    <script src="shared/js/runtimes/runtime-cpp.js?v=757r1"></script>
+    <script src="pages/course-catalog/course-catalog.js?v=757r2"></script>
+    <script src="pages/course-challenge/course-challenge.js?v=757r2"></script>
+    <script src="pages/code-trace/code-trace.js?v=757r1"></script>
+    <script src="shared/js/main.js?v=757r2"></script>
 </body>
 </html>
