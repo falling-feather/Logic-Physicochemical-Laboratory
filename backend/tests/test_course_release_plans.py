@@ -1,15 +1,25 @@
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from threading import Barrier, Thread
 
 from alembic import command
 from alembic.config import Config
+from fastapi import HTTPException
+import pytest
 from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.schema import CreateTable
 
+from app.api.endpoints import code_judge, learning_events, submissions
 from app.core.config import get_settings
 from app.db.session import get_session_factory, make_engine, reset_database_state
-from app.models import CourseUnitClassPlan
+from app.models import (
+    ClassGroup,
+    Course,
+    CourseUnit,
+    CourseUnitClassPlan,
+)
+from app.services import course_release_plans
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -333,6 +343,258 @@ def test_student_unit_list_query_count_is_constant_per_block_count(client):
     assert response.status_code == 200
     assert len(response.json()) == 25
     assert len(statements) <= 20
+
+
+@pytest.mark.parametrize(
+    ("release_mode", "expected_status"),
+    [("hidden", 403), ("locked", 409)],
+)
+def test_student_write_access_rechecks_release_after_barrier(client, monkeypatch, release_mode, expected_status):
+    teacher = _login(client, f"release_barrier_teacher_{release_mode}", "teacher")
+    student = _login(client, f"release_barrier_student_{release_mode}", "student")
+    school_id = _school(client, teacher)
+    class_id = _class(client, teacher, school_id, f"Barrier {release_mode} Class")
+    course_id = _course(client, teacher, school_id)
+    _attach(client, teacher, course_id, class_id)
+    unit_id = _unit(client, teacher, course_id, 1)
+    assert client.post(f"/api/classes/{class_id}/join", headers=_auth(student), json={"role": "student"}).status_code == 201
+
+    barrier = Barrier(2, timeout=5)
+    original_lock = course_release_plans.lock_active_class_for_write
+
+    def pause_before_student_write_lock(db, locked_class_id):
+        barrier.wait()
+        barrier.wait()
+        return original_lock(db, locked_class_id)
+
+    monkeypatch.setattr(course_release_plans, "lock_active_class_for_write", pause_before_student_write_lock)
+    outcome: dict[str, int] = {}
+    session_factory = get_session_factory(get_settings().database_url)
+
+    def student_write() -> None:
+        with session_factory() as db:
+            course = db.get(Course, course_id)
+            class_group = db.get(ClassGroup, class_id)
+            unit = db.get(CourseUnit, unit_id)
+            student_user = db.scalar(text("SELECT id FROM users WHERE username = :username"), {"username": f"release_barrier_student_{release_mode}"})
+            assert course is not None and class_group is not None and unit is not None and student_user is not None
+            try:
+                course_release_plans.require_student_unit_open_for_write(
+                    db,
+                    course=course,
+                    class_group=class_group,
+                    unit=unit,
+                    student_id=int(student_user),
+                )
+            except HTTPException as exc:
+                outcome["status"] = exc.status_code
+                db.rollback()
+            else:
+                outcome["status"] = 201
+                db.rollback()
+
+    def teacher_release_change() -> None:
+        barrier.wait()
+        with session_factory() as db:
+            course_class = db.scalar(
+                text("SELECT id FROM course_classes WHERE course_id = :course_id AND class_id = :class_id"),
+                {"course_id": course_id, "class_id": class_id},
+            )
+            assert course_class is not None
+            db.execute(
+                text(
+                    "UPDATE course_unit_class_plans SET release_mode = :release_mode "
+                    "WHERE course_class_id = :course_class_id AND course_unit_id = :unit_id"
+                ),
+                {"release_mode": release_mode, "course_class_id": int(course_class), "unit_id": unit_id},
+            )
+            db.commit()
+        barrier.wait()
+
+    teacher_thread = Thread(target=teacher_release_change)
+    student_thread = Thread(target=student_write)
+    teacher_thread.start()
+    student_thread.start()
+    teacher_thread.join(timeout=10)
+    student_thread.join(timeout=10)
+    assert not teacher_thread.is_alive()
+    assert not student_thread.is_alive()
+    assert outcome == {"status": expected_status}
+
+
+def _post_student_write_after_release_barrier(
+    client,
+    monkeypatch,
+    *,
+    module,
+    teacher_headers,
+    course_id: int,
+    class_id: int,
+    unit_id: int,
+    student_headers,
+    write_url: str,
+    write_payload: dict,
+    release_mode: str,
+):
+    barrier = Barrier(2, timeout=5)
+    original_gate = module.require_student_unit_open_for_write
+
+    def pause_after_open_preflight(db, *, course, class_group, unit, student_id):
+        course_class = db.scalar(
+            text("SELECT id FROM course_classes WHERE course_id = :course_id AND class_id = :class_id"),
+            {"course_id": course.id, "class_id": class_group.id},
+        )
+        plan_mode = db.scalar(
+            text(
+                "SELECT release_mode FROM course_unit_class_plans "
+                "WHERE course_class_id = :course_class_id AND course_unit_id = :unit_id"
+            ),
+            {"course_class_id": int(course_class), "unit_id": unit.id},
+        )
+        assert plan_mode == "open"
+        barrier.wait()
+        barrier.wait()
+        return original_gate(
+            db,
+            course=course,
+            class_group=class_group,
+            unit=unit,
+            student_id=student_id,
+        )
+
+    monkeypatch.setattr(module, "require_student_unit_open_for_write", pause_after_open_preflight)
+    outcome: dict[str, object] = {}
+
+    def student_write() -> None:
+        try:
+            outcome["response"] = client.post(write_url, headers=student_headers, json=write_payload)
+        except BaseException as exc:  # pragma: no cover - asserted below
+            outcome["error"] = exc
+
+    worker = Thread(target=student_write)
+    worker.start()
+    barrier.wait()
+    release = client.patch(
+        f"/api/courses/{course_id}/classes/{class_id}/release-plan",
+        headers=teacher_headers,
+        json={
+            "expected_version": 1,
+            "items": [{"course_unit_id": unit_id, "release_mode": release_mode}],
+        },
+    )
+    assert release.status_code == 200, release.json()
+    barrier.wait()
+    worker.join(timeout=10)
+    assert not worker.is_alive()
+    assert "error" not in outcome
+    response = outcome.get("response")
+    assert response is not None
+    return response
+
+
+@pytest.mark.parametrize(("release_mode", "expected_status"), [("hidden", 403), ("locked", 409)])
+def test_learning_event_http_write_rechecks_release_after_barrier(client, monkeypatch, release_mode, expected_status):
+    teacher = _login(client, f"event_barrier_teacher_{release_mode}", "teacher")
+    student = _login(client, f"event_barrier_student_{release_mode}", "student")
+    school_id = _school(client, teacher)
+    class_id = _class(client, teacher, school_id, f"Event barrier {release_mode}")
+    course_id = _course(client, teacher, school_id)
+    _attach(client, teacher, course_id, class_id)
+    unit_id = _unit(client, teacher, course_id, 1)
+    assert client.post(f"/api/classes/{class_id}/join", headers=_auth(student), json={"role": "student"}).status_code == 201
+
+    response = _post_student_write_after_release_barrier(
+        client,
+        monkeypatch,
+        module=learning_events,
+        teacher_headers=_auth(teacher),
+        course_id=course_id,
+        class_id=class_id,
+        unit_id=unit_id,
+        student_headers=_auth(student),
+        write_url="/api/learning-events",
+        write_payload={"class_id": class_id, "unit_id": unit_id, "event_type": "start"},
+        release_mode=release_mode,
+    )
+    assert response.status_code == expected_status
+    with get_session_factory(get_settings().database_url)() as db:
+        assert db.scalar(text("SELECT COUNT(*) FROM learning_events WHERE class_id = :class_id AND unit_id = :unit_id"), {"class_id": class_id, "unit_id": unit_id}) == 0
+
+
+@pytest.mark.parametrize(("release_mode", "expected_status"), [("hidden", 403), ("locked", 409)])
+def test_assignment_submission_http_write_rechecks_release_after_barrier(client, monkeypatch, release_mode, expected_status):
+    teacher = _login(client, f"assignment_barrier_teacher_{release_mode}", "teacher")
+    student = _login(client, f"assignment_barrier_student_{release_mode}", "student")
+    school_id = _school(client, teacher)
+    class_id = _class(client, teacher, school_id, f"Assignment barrier {release_mode}")
+    course_id = _course(client, teacher, school_id)
+    _attach(client, teacher, course_id, class_id)
+    unit_id = _unit(client, teacher, course_id, 1)
+    assignment = client.post(
+        f"/api/courses/{course_id}/units/{unit_id}/assignments",
+        headers=_auth(teacher),
+        json={"title": "Barrier assignment"},
+    )
+    assert assignment.status_code == 201
+    assert client.post(f"/api/classes/{class_id}/join", headers=_auth(student), json={"role": "student"}).status_code == 201
+
+    response = _post_student_write_after_release_barrier(
+        client,
+        monkeypatch,
+        module=submissions,
+        teacher_headers=_auth(teacher),
+        course_id=course_id,
+        class_id=class_id,
+        unit_id=unit_id,
+        student_headers=_auth(student),
+        write_url=f"/api/assignments/{assignment.json()['id']}/submissions",
+        write_payload={"class_id": class_id, "content": {"answer": "must not persist"}},
+        release_mode=release_mode,
+    )
+    assert response.status_code == expected_status
+    with get_session_factory(get_settings().database_url)() as db:
+        assert db.scalar(text("SELECT COUNT(*) FROM submissions WHERE assignment_id = :assignment_id"), {"assignment_id": assignment.json()["id"]}) == 0
+
+
+@pytest.mark.parametrize(("release_mode", "expected_status"), [("hidden", 403), ("locked", 409)])
+def test_code_submission_http_write_rechecks_release_after_barrier(client, monkeypatch, release_mode, expected_status):
+    teacher = _login(client, f"code_barrier_teacher_{release_mode}", "teacher")
+    student = _login(client, f"code_barrier_student_{release_mode}", "student")
+    school_id = _school(client, teacher)
+    class_id = _class(client, teacher, school_id, f"Code barrier {release_mode}")
+    course_id = _course(client, teacher, school_id)
+    _attach(client, teacher, course_id, class_id)
+    unit_id = _unit(client, teacher, course_id, 1)
+    problem = client.post(
+        "/api/code-problems",
+        headers=_auth(teacher),
+        json={
+            "course_id": course_id,
+            "course_unit_id": unit_id,
+            "title": "Barrier code problem",
+            "statement_markdown": "Print one.",
+            "test_cases": [{"stdin": "", "expected_stdout": "1\n"}],
+        },
+    )
+    assert problem.status_code == 201, problem.json()
+    assert client.post(f"/api/classes/{class_id}/join", headers=_auth(student), json={"role": "student"}).status_code == 201
+
+    response = _post_student_write_after_release_barrier(
+        client,
+        monkeypatch,
+        module=code_judge,
+        teacher_headers=_auth(teacher),
+        course_id=course_id,
+        class_id=class_id,
+        unit_id=unit_id,
+        student_headers=_auth(student),
+        write_url=f"/api/code-problems/{problem.json()['id']}/submissions",
+        write_payload={"class_id": class_id, "language": "python", "source_code": "print(1)", "stdin": ""},
+        release_mode=release_mode,
+    )
+    assert response.status_code == expected_status
+    with get_session_factory(get_settings().database_url)() as db:
+        assert db.scalar(text("SELECT COUNT(*) FROM code_submissions WHERE problem_id = :problem_id"), {"problem_id": problem.json()["id"]}) == 0
 
 
 def test_0048_sqlite_roundtrip_backfills_id_keys_and_default_open_plans(tmp_path, monkeypatch):

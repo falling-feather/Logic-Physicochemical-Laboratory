@@ -60,6 +60,7 @@ from app.services.course_release_plans import (
     get_course_class_or_404,
     get_plan_for_unit,
     require_student_unit_open,
+    require_student_unit_open_for_write,
 )
 
 
@@ -275,7 +276,7 @@ def create_submission(
         raise HTTPException(status_code=422, detail="Class does not belong to assignment school")
     if not course_attached_to_class(db, course.id, class_group.id):
         raise HTTPException(status_code=403, detail="Course is not attached to this class")
-    require_student_unit_open(
+    class_group = require_student_unit_open_for_write(
         db,
         course=course,
         class_group=class_group,
@@ -287,8 +288,6 @@ def create_submission(
         raise HTTPException(status_code=403, detail="Assignment is not assigned to this class")
     if effective.status != "active":
         raise HTTPException(status_code=409, detail="Assignment is not active")
-    class_group = lock_active_class_for_write(db, class_group.id)
-
     existing = db.scalar(
         select(Submission).where(
             Submission.assignment_id == assignment.id,

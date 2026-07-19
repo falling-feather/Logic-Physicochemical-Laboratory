@@ -35,6 +35,7 @@ from app.services.course_release_plans import (
     get_course_class_or_404,
     get_plan_for_unit,
     require_student_unit_open,
+    require_student_unit_open_for_write,
 )
 
 
@@ -66,7 +67,7 @@ def create_learning_event(
         if not course_attached_to_class(db, course.id, class_group.id):
             raise HTTPException(status_code=403, detail="Course is not attached to this class")
     if unit is not None and current_user.role == "student" and class_group is not None:
-        require_student_unit_open(
+        class_group = require_student_unit_open_for_write(
             db,
             course=course,
             class_group=class_group,
@@ -80,7 +81,8 @@ def create_learning_event(
         if current_user.role == "student" and effective.status != "active":
             raise HTTPException(status_code=409, detail="Assignment is not active")
     if class_group is not None:
-        class_group = lock_active_class_for_write(db, class_group.id)
+        if not (unit is not None and current_user.role == "student"):
+            class_group = lock_active_class_for_write(db, class_group.id)
     else:
         lock_active_school_for_write(db, course.school_id)
 

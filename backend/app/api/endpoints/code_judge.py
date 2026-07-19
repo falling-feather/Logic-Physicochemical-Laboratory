@@ -48,7 +48,12 @@ from app.services.code_judge import (
     create_problem,
     create_problem_version,
 )
-from app.services.course_release_plans import effective_unit_access, get_course_class_or_404, get_plan_for_unit
+from app.services.course_release_plans import (
+    effective_unit_access,
+    get_course_class_or_404,
+    get_plan_for_unit,
+    require_student_unit_open_for_write,
+)
 from app.services.text import require_trimmed_text
 
 
@@ -249,11 +254,7 @@ def create_student_code_submission(
     problem = _problem_or_404(db, problem_id)
     if problem.status != "active":
         raise HTTPException(status_code=409, detail="Code problem is not active")
-    access = _student_problem_access(db, current_user, problem, payload.class_id)
-    if access.state == "hidden":
-        raise HTTPException(status_code=403, detail="Course unit is not visible in this class")
-    if access.state != "open":
-        raise HTTPException(status_code=409, detail="Course unit is locked in this class")
+    _require_student_problem_open_for_write(db, current_user, problem, payload.class_id)
     version = _active_version_or_409(db, problem.id)
     try:
         result = create_code_submission(
@@ -435,6 +436,27 @@ def _student_problem_access(db: Session, student: User, problem: CodeProblem, cl
         class_group=class_group,
         unit=unit,
         plan=plan,
+        student_id=student.id,
+    )
+
+
+def _require_student_problem_open_for_write(
+    db: Session,
+    student: User,
+    problem: CodeProblem,
+    class_id: int,
+) -> None:
+    course = require_course_visible(db, student, problem.course_id)
+    class_group = require_class_member(db, student, class_id)
+    if class_group.school_id != course.school_id or not course_attached_to_class(db, course.id, class_group.id):
+        raise HTTPException(status_code=403, detail="Course is not attached to this class")
+    unit = _course_unit_or_404(db, course, problem.course_unit_id)
+    require_student_unit_published(student, unit)
+    require_student_unit_open_for_write(
+        db,
+        course=course,
+        class_group=class_group,
+        unit=unit,
         student_id=student.id,
     )
 

@@ -23,6 +23,7 @@ from app.models import (
     User,
 )
 from app.models.base import utc_now
+from app.services.access_control import lock_active_class_for_write
 
 
 RELEASE_MODES = {"hidden", "locked", "open"}
@@ -205,6 +206,75 @@ def require_student_unit_open(
     if access.state != "open":
         raise HTTPException(status_code=409, detail="Course unit is locked in this class")
     return access
+
+
+def require_student_unit_open_for_write(
+    db: Session,
+    *,
+    course: Course,
+    class_group: ClassGroup,
+    unit: CourseUnit,
+    student_id: int,
+) -> ClassGroup:
+    """Lock the release scope and then make the authoritative write decision.
+
+    Release-plan PATCH takes locks in school -> class -> course-class order.
+    Student writes must take the same locks before evaluating release state, or
+    an access check made before a teacher hides/locks a unit can be persisted
+    after that teacher change commits.
+    """
+    locked_class = lock_active_class_for_write(db, class_group.id)
+    locked_course = db.scalar(
+        select(Course)
+        .where(Course.id == course.id)
+        .execution_options(populate_existing=True)
+    )
+    if locked_course is None:
+        raise HTTPException(status_code=404, detail="Course not found")
+    locked_unit = db.scalar(
+        select(CourseUnit)
+        .where(CourseUnit.id == unit.id, CourseUnit.course_id == locked_course.id)
+        .execution_options(populate_existing=True)
+    )
+    if locked_unit is None:
+        raise HTTPException(status_code=404, detail="Course unit not found")
+    course_class = db.scalar(
+        select(CourseClass)
+        .where(
+            CourseClass.course_id == locked_course.id,
+            CourseClass.class_id == locked_class.id,
+        )
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if course_class is None:
+        raise HTTPException(status_code=403, detail="Course is not attached to this class")
+    if course_class.status != "active":
+        raise HTTPException(status_code=409, detail="Course attachment is not active")
+    plan = db.scalar(
+        select(CourseUnitClassPlan)
+        .where(
+            CourseUnitClassPlan.course_class_id == course_class.id,
+            CourseUnitClassPlan.course_unit_id == locked_unit.id,
+        )
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if plan is None:
+        raise HTTPException(status_code=409, detail="Course release plan is inconsistent")
+    access = effective_unit_access(
+        db,
+        course=locked_course,
+        class_group=locked_class,
+        unit=locked_unit,
+        plan=plan,
+        student_id=student_id,
+    )
+    if access.state == "hidden":
+        raise HTTPException(status_code=403, detail="Course unit is not visible in this class")
+    if access.state != "open":
+        raise HTTPException(status_code=409, detail="Course unit is locked in this class")
+    return locked_class
 
 
 def school_is_active(db: Session, school_id: int) -> bool:

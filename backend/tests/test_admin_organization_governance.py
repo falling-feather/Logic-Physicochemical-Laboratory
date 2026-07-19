@@ -18,7 +18,7 @@ from app.api.endpoints import (
 from app.core.config import get_settings
 from app.db.session import get_session_factory
 from app.models import ClassMembership, SchoolMembership
-from app.services import class_join_requests
+from app.services import class_join_requests, course_release_plans
 from app.services.knowledge_snapshot_runs import rebuild_periodic_knowledge_snapshots
 
 
@@ -858,7 +858,7 @@ def test_admin_authority_changes_cannot_orphan_organization_responsibility(clien
         (assignment_policies.put_assignment_class_policy, ("lock_active_class_for_write",)),
         (assignment_policies.delete_assignment_class_policy, ("lock_active_class_for_write",)),
         (points.update_assignment_point_rule, ("lock_active_school_for_write",)),
-        (submissions.create_submission, ("lock_active_class_for_write",)),
+        (submissions.create_submission, ("require_student_unit_open_for_write",)),
         (submissions.grade_submission, ("lock_active_class_for_write",)),
         (
             learning_events.create_learning_event,
@@ -879,6 +879,11 @@ def test_scoped_domain_write_handlers_keep_active_organization_gate(handler, req
     source = getsource(handler)
     for required_token in required_tokens:
         assert required_token in source
+
+
+def test_student_release_write_gate_keeps_active_class_lock():
+    source = getsource(course_release_plans.require_student_unit_open_for_write)
+    assert "lock_active_class_for_write" in source
 
 
 @pytest.mark.parametrize(
