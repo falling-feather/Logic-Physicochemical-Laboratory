@@ -56,6 +56,7 @@ from app.services.points import (
     assignment_grade_point_total,
     points_for_assignment_score,
 )
+from app.services.pagination import list_legacy_scalars, paged_endpoint_url
 from app.services.course_release_plans import (
     effective_unit_access,
     get_course_class_or_404,
@@ -456,7 +457,16 @@ def list_assignment_submissions(
         class_id=class_id,
         current_user=current_user,
     )
-    return list(db.scalars(statement).all())
+    return list_legacy_scalars(
+        db,
+        statement,
+        paged_endpoint=paged_endpoint_url(
+            f"/api/assignments/{assignment_id}/submissions/page",
+            class_id=class_id,
+            limit=200,
+            offset=0,
+        ),
+    )
 
 
 @router.get("/assignments/{assignment_id}/submissions/page", response_model=AssignmentSubmissionPage)

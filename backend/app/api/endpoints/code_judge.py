@@ -55,6 +55,7 @@ from app.services.course_release_plans import (
     get_plan_for_unit,
     require_student_unit_open_for_write,
 )
+from app.services.pagination import list_legacy_scalars, paged_endpoint_url
 from app.services.text import require_trimmed_text
 
 
@@ -412,12 +413,16 @@ def list_code_judge_attempts(
 ) -> list[CodeJudgeAttemptRead]:
     submission = _submission_or_404(db, submission_id)
     _authorize_submission_read(db, current_user, submission, enforce_student_visibility=True)
-    attempts = list(
-        db.scalars(
-            select(CodeJudgeAttempt)
-            .where(CodeJudgeAttempt.submission_id == submission.id)
-            .order_by(CodeJudgeAttempt.attempt_number)
-        ).all()
+    attempts = list_legacy_scalars(
+        db,
+        select(CodeJudgeAttempt)
+        .where(CodeJudgeAttempt.submission_id == submission.id)
+        .order_by(CodeJudgeAttempt.attempt_number, CodeJudgeAttempt.id),
+        paged_endpoint=paged_endpoint_url(
+            f"/api/code-submissions/{submission_id}/attempts/page",
+            limit=200,
+            offset=0,
+        ),
     )
     return [CodeJudgeAttemptRead.model_validate(attempt) for attempt in attempts]
 

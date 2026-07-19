@@ -470,6 +470,20 @@ def test_learning_event_page_count_matches_student_release_visibility(client, re
     assert len(page.json()["items"]) == expected_total
     assert page.json()["next_offset"] is None
 
+    legacy_expected = 0 if release_change in {"missing_plan", "hidden"} else 1
+    compatibility_page = client.get(
+        "/api/learning-events/page?include_inactive_locked=true&limit=10&offset=0",
+        headers=_auth(student),
+    )
+    assert compatibility_page.status_code == 200
+    assert compatibility_page.json()["total"] == legacy_expected
+    assert len(compatibility_page.json()["items"]) == legacy_expected
+    assert compatibility_page.json()["next_offset"] is None
+
+    legacy = client.get("/api/learning-events", headers=_auth(student))
+    assert legacy.status_code == 200
+    assert len(legacy.json()) == legacy_expected
+
 
 @pytest.mark.parametrize(
     ("release_mode", "expected_status"),

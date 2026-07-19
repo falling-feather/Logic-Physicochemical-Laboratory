@@ -30,13 +30,8 @@ from app.services.access_control import (
     teacher_class_ids,
 )
 from app.services.assignment_policies import resolve_assignment_class_policy
-from app.services.course_release_plans import (
-    effective_unit_access,
-    get_course_class_or_404,
-    get_plan_for_unit,
-    require_student_unit_open,
-    require_student_unit_open_for_write,
-)
+from app.services.course_release_plans import require_student_unit_open_for_write
+from app.services.pagination import list_legacy_scalars, paged_endpoint_url
 
 
 router = APIRouter()
@@ -111,50 +106,32 @@ def list_learning_events(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[LearningEvent]:
-    statement = select(LearningEvent).order_by(LearningEvent.id)
-    if current_user.role == "admin":
-        if class_id is not None:
-            statement = statement.where(LearningEvent.class_id == class_id)
-        if user_id is not None:
-            statement = statement.where(LearningEvent.user_id == user_id)
-        return list(db.scalars(statement).all())
-
-    if current_user.role == "student":
-        if user_id is not None and user_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Students can only view their own learning events")
-        statement = statement.where(LearningEvent.user_id == current_user.id)
-        if class_id is not None:
-            require_class_member(db, current_user, class_id)
-            statement = statement.where(LearningEvent.class_id == class_id)
-        events = list(db.scalars(_apply_student_visible_event_filters(statement)).all())
-        return _filter_student_events_by_release_plan(db, current_user.id, events)
-
-    if class_id is not None:
-        class_group = get_class(db, class_id)
-        require_class_teacher_or_admin(
-            db,
-            current_user,
-            class_group,
-            detail="Learning events require class teacher scope",
-        )
-        statement = statement.where(LearningEvent.class_id == class_id)
-        if user_id is not None:
-            statement = statement.where(LearningEvent.user_id == user_id)
-        return list(db.scalars(statement).all())
-
-    class_ids = teacher_class_ids(db, current_user.id)
-    if not class_ids:
-        return []
-    statement = statement.where(LearningEvent.class_id.in_(class_ids))
-    if user_id is not None:
-        statement = statement.where(LearningEvent.user_id == user_id)
-    return list(db.scalars(statement).all())
+    statement = _learning_event_page_statement(
+        db,
+        current_user=current_user,
+        class_id=class_id,
+        user_id=user_id,
+        include_inactive_locked=current_user.role == "student",
+    )
+    return list_legacy_scalars(
+        db,
+        statement,
+        paged_endpoint=paged_endpoint_url(
+            "/api/learning-events/page",
+            class_id=class_id,
+            user_id=user_id,
+            include_inactive_locked="true" if current_user.role == "student" else None,
+            limit=200,
+            offset=0,
+        ),
+    )
 
 
 @router.get("/page", response_model=LearningEventPage)
 def list_learning_events_page(
     class_id: int | None = Query(default=None),
     user_id: int | None = Query(default=None),
+    include_inactive_locked: bool = Query(default=False),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
@@ -165,6 +142,7 @@ def list_learning_events_page(
         current_user=current_user,
         class_id=class_id,
         user_id=user_id,
+        include_inactive_locked=include_inactive_locked,
     )
     total = int(db.scalar(select(func.count()).select_from(statement.order_by(None).subquery())) or 0)
     items = list(db.scalars(statement.offset(offset).limit(limit)).all())
@@ -184,6 +162,7 @@ def _learning_event_page_statement(
     current_user: User,
     class_id: int | None,
     user_id: int | None,
+    include_inactive_locked: bool = False,
 ):
     statement = select(LearningEvent).order_by(LearningEvent.id)
     if current_user.role == "admin":
@@ -199,7 +178,10 @@ def _learning_event_page_statement(
         if class_id is not None:
             require_class_member(db, current_user, class_id)
             statement = statement.where(LearningEvent.class_id == class_id)
-        return _apply_student_database_release_filters(_apply_student_visible_event_filters(statement))
+        statement = _apply_student_visible_event_filters(statement)
+        if include_inactive_locked:
+            return _apply_student_legacy_release_filters(statement)
+        return _apply_student_database_release_filters(statement)
     if class_id is not None:
         class_group = get_class(db, class_id)
         require_class_teacher_or_admin(
@@ -329,88 +311,42 @@ def _apply_student_visible_event_filters(statement):
     )
 
 
-def _filter_student_events_by_release_plan(
-    db: Session,
-    student_id: int,
-    events: list[LearningEvent],
-) -> list[LearningEvent]:
-    scoped = [
-        event
-        for event in events
-        if event.unit_id is not None and event.course_id is not None and event.class_id is not None
-    ]
-    if not scoped:
-        return [event for event in events if event.unit_id is None]
-    course_ids = {event.course_id for event in scoped if event.course_id is not None}
-    class_ids = {event.class_id for event in scoped if event.class_id is not None}
-    unit_ids = {event.unit_id for event in scoped if event.unit_id is not None}
-    courses = {course.id: course for course in db.scalars(select(Course).where(Course.id.in_(course_ids))).all()}
-    units = {unit.id: unit for unit in db.scalars(select(CourseUnit).where(CourseUnit.id.in_(unit_ids))).all()}
-    classes = {
-        class_group.id: class_group
-        for class_group in db.scalars(select(ClassGroup).where(ClassGroup.id.in_(class_ids))).all()
-    }
-    schools = {
-        school.id: school
-        for school in db.scalars(select(School).where(School.id.in_({course.school_id for course in courses.values()}))).all()
-    }
-    course_classes = list(
-        db.scalars(
-            select(CourseClass).where(
-                CourseClass.course_id.in_(course_ids),
-                CourseClass.class_id.in_(class_ids),
-            )
-        ).all()
-    )
-    course_class_by_scope = {(row.course_id, row.class_id): row for row in course_classes}
-    plan_by_scope = {
-        (plan.course_class_id, plan.course_unit_id): plan
-        for plan in db.scalars(
-            select(CourseUnitClassPlan).where(
-                CourseUnitClassPlan.course_class_id.in_([row.id for row in course_classes]),
-                CourseUnitClassPlan.course_unit_id.in_(unit_ids),
-            )
-        ).all()
-    } if course_classes else {}
-    prerequisite_ids = {plan.prerequisite_unit_id for plan in plan_by_scope.values() if plan.prerequisite_unit_id is not None}
-    completed_by_scope: dict[tuple[int, int], set[int]] = {}
-    if prerequisite_ids:
-        complete_rows = db.execute(
-            select(LearningEvent.class_id, LearningEvent.course_id, LearningEvent.unit_id).where(
-                LearningEvent.user_id == student_id,
-                LearningEvent.class_id.in_(class_ids),
-                LearningEvent.course_id.in_(course_ids),
-                LearningEvent.unit_id.in_(prerequisite_ids),
-                LearningEvent.event_type == "complete",
-            )
-        ).all()
-        for class_id, course_id, unit_id in complete_rows:
-            completed_by_scope.setdefault((class_id, course_id), set()).add(unit_id)
+def _apply_student_legacy_release_filters(statement):
+    """Preserve the deprecated array endpoint's historical locked-record view.
 
-    visible: list[LearningEvent] = []
-    for event in events:
-        if event.unit_id is None:
-            visible.append(event)
-            continue
-        if event.course_id is None or event.class_id is None:
-            continue
-        course = courses.get(event.course_id)
-        unit = units.get(event.unit_id)
-        class_group = classes.get(event.class_id)
-        course_class = course_class_by_scope.get((event.course_id, event.class_id))
-        plan = plan_by_scope.get((course_class.id, event.unit_id)) if course_class is not None else None
-        if course is None or unit is None or class_group is None or plan is None:
-            continue
-        access = effective_unit_access(
-            db,
-            course=course,
-            class_group=class_group,
-            unit=unit,
-            plan=plan,
-            student_id=student_id,
-            completed_unit_ids=completed_by_scope.get((event.class_id, event.course_id), set()),
-            school_active=schools.get(course.school_id) is not None and schools[course.school_id].status == "active",
+    The legacy endpoint treated inactive schools, classes, and course-class
+    attachments as locked rather than hidden. Missing or explicitly hidden
+    release plans remained invisible. This SQL predicate retains that contract
+    without materializing the full result set in Python.
+    """
+    return (
+        statement.outerjoin(
+            ClassGroup,
+            ClassGroup.id == LearningEvent.class_id,
         )
-        if access.state != "hidden":
-            visible.append(event)
-    return visible
+        .outerjoin(
+            CourseClass,
+            and_(
+                CourseClass.course_id == LearningEvent.course_id,
+                CourseClass.class_id == LearningEvent.class_id,
+            ),
+        )
+        .outerjoin(
+            CourseUnitClassPlan,
+            and_(
+                CourseUnitClassPlan.course_class_id == CourseClass.id,
+                CourseUnitClassPlan.course_unit_id == LearningEvent.unit_id,
+            ),
+        )
+        .where(
+            or_(
+                LearningEvent.unit_id.is_(None),
+                and_(
+                    ClassGroup.id.is_not(None),
+                    CourseClass.id.is_not(None),
+                    CourseUnitClassPlan.id.is_not(None),
+                    CourseUnitClassPlan.release_mode != "hidden",
+                ),
+            )
+        )
+    )

@@ -48,6 +48,7 @@ from app.services.access_control import (
 )
 from app.services.security_control_locks import ADMIN_AUTHORITY_LOCK, acquire_security_control_lock
 from app.services.admin_common import lock_active_admin
+from app.services.pagination import list_legacy_rows, paged_endpoint_url
 from app.services.text import require_trimmed_text
 from app.services.users import normalize_username
 
@@ -762,7 +763,17 @@ def list_class_members(
         status_filter=status_filter,
         current_user=current_user,
     )
-    rows = db.execute(statement).all()
+    rows = list_legacy_rows(
+        db,
+        statement,
+        paged_endpoint=paged_endpoint_url(
+            f"/api/classes/{class_id}/members/page",
+            role=role,
+            status=status_filter,
+            limit=200,
+            offset=0,
+        ),
+    )
     return [_class_member_read(membership, user) for membership, user in rows]
 
 
