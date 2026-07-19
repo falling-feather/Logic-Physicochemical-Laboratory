@@ -24,6 +24,7 @@ from app.models.base import utc_now
 from app.schemas.course import (
     AssignmentRead,
     AssignmentReviewRead,
+    AssignmentSubmissionPage,
     CourseRead,
     CourseUnitRead,
     StudentAssignmentCenterItem,
@@ -442,13 +443,56 @@ def read_assignment_review(
     )
 
 
-@router.get("/assignments/{assignment_id}/submissions", response_model=list[SubmissionRead])
+@router.get("/assignments/{assignment_id}/submissions", response_model=list[SubmissionRead], deprecated=True)
 def list_assignment_submissions(
     assignment_id: int,
     class_id: int | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[Submission]:
+    statement = _assignment_submission_history_statement(
+        db,
+        assignment_id=assignment_id,
+        class_id=class_id,
+        current_user=current_user,
+    )
+    return list(db.scalars(statement).all())
+
+
+@router.get("/assignments/{assignment_id}/submissions/page", response_model=AssignmentSubmissionPage)
+def list_assignment_submissions_page(
+    assignment_id: int,
+    class_id: int | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AssignmentSubmissionPage:
+    statement = _assignment_submission_history_statement(
+        db,
+        assignment_id=assignment_id,
+        class_id=class_id,
+        current_user=current_user,
+    )
+    total = int(db.scalar(select(func.count()).select_from(statement.order_by(None).subquery())) or 0)
+    items = list(db.scalars(statement.offset(offset).limit(limit)).all())
+    next_offset = offset + len(items)
+    return AssignmentSubmissionPage(
+        items=[SubmissionRead.model_validate(item) for item in items],
+        total=total,
+        limit=limit,
+        offset=offset,
+        next_offset=next_offset if next_offset < total else None,
+    )
+
+
+def _assignment_submission_history_statement(
+    db: Session,
+    *,
+    assignment_id: int,
+    class_id: int | None,
+    current_user: User,
+):
     assignment, unit, course = _resolve_assignment(db, assignment_id)
     statement = select(Submission).where(Submission.assignment_id == assignment.id).order_by(Submission.id)
 
@@ -482,7 +526,7 @@ def list_assignment_submissions(
         if access.state == "hidden":
             raise HTTPException(status_code=403, detail="Course unit is not visible in this class")
         statement = statement.where(Submission.class_id == class_id)
-        return list(db.scalars(statement).all())
+        return statement
 
     require_school_role(db, current_user, course.school_id, {"admin", "teacher"})
     if class_id is not None:
@@ -501,9 +545,9 @@ def list_assignment_submissions(
     elif current_user.role != "admin":
         class_ids = teacher_class_ids(db, current_user.id)
         if not class_ids:
-            return []
+            return statement.where(Submission.id.is_(None))
         statement = statement.where(Submission.class_id.in_(class_ids))
-    return list(db.scalars(statement).all())
+    return statement
 
 
 @router.patch("/submissions/{submission_id}/grade", response_model=SubmissionRead)

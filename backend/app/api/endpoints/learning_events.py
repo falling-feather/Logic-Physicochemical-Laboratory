@@ -17,7 +17,7 @@ from app.models import (
     User,
 )
 from app.models.base import utc_now
-from app.schemas.course import LearningEventCreate, LearningEventRead
+from app.schemas.course import LearningEventCreate, LearningEventPage, LearningEventRead
 from app.services.access_control import (
     course_attached_to_class,
     get_class,
@@ -104,7 +104,7 @@ def create_learning_event(
     return event
 
 
-@router.get("", response_model=list[LearningEventRead])
+@router.get("", response_model=list[LearningEventRead], deprecated=True)
 def list_learning_events(
     class_id: int | None = Query(default=None),
     user_id: int | None = Query(default=None),
@@ -149,6 +149,116 @@ def list_learning_events(
     if user_id is not None:
         statement = statement.where(LearningEvent.user_id == user_id)
     return list(db.scalars(statement).all())
+
+
+@router.get("/page", response_model=LearningEventPage)
+def list_learning_events_page(
+    class_id: int | None = Query(default=None),
+    user_id: int | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> LearningEventPage:
+    statement = _learning_event_page_statement(
+        db,
+        current_user=current_user,
+        class_id=class_id,
+        user_id=user_id,
+    )
+    total = int(db.scalar(select(func.count()).select_from(statement.order_by(None).subquery())) or 0)
+    items = list(db.scalars(statement.offset(offset).limit(limit)).all())
+    next_offset = offset + len(items)
+    return LearningEventPage(
+        items=[LearningEventRead.model_validate(item) for item in items],
+        total=total,
+        limit=limit,
+        offset=offset,
+        next_offset=next_offset if next_offset < total else None,
+    )
+
+
+def _learning_event_page_statement(
+    db: Session,
+    *,
+    current_user: User,
+    class_id: int | None,
+    user_id: int | None,
+):
+    statement = select(LearningEvent).order_by(LearningEvent.id)
+    if current_user.role == "admin":
+        if class_id is not None:
+            statement = statement.where(LearningEvent.class_id == class_id)
+        if user_id is not None:
+            statement = statement.where(LearningEvent.user_id == user_id)
+        return statement
+    if current_user.role == "student":
+        if user_id is not None and user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Students can only view their own learning events")
+        statement = statement.where(LearningEvent.user_id == current_user.id)
+        if class_id is not None:
+            require_class_member(db, current_user, class_id)
+            statement = statement.where(LearningEvent.class_id == class_id)
+        return _apply_student_database_release_filters(_apply_student_visible_event_filters(statement))
+    if class_id is not None:
+        class_group = get_class(db, class_id)
+        require_class_teacher_or_admin(
+            db,
+            current_user,
+            class_group,
+            detail="Learning events require class teacher scope",
+        )
+        statement = statement.where(LearningEvent.class_id == class_id)
+        if user_id is not None:
+            statement = statement.where(LearningEvent.user_id == user_id)
+        return statement
+    class_ids = teacher_class_ids(db, current_user.id)
+    if not class_ids:
+        return statement.where(LearningEvent.id.is_(None))
+    statement = statement.where(LearningEvent.class_id.in_(class_ids))
+    if user_id is not None:
+        statement = statement.where(LearningEvent.user_id == user_id)
+    return statement
+
+
+def _apply_student_database_release_filters(statement):
+    return (
+        statement.outerjoin(
+            ClassGroup,
+            ClassGroup.id == LearningEvent.class_id,
+        )
+        .outerjoin(
+            School,
+            School.id == Course.school_id,
+        )
+        .outerjoin(
+            CourseClass,
+            and_(
+                CourseClass.course_id == LearningEvent.course_id,
+                CourseClass.class_id == LearningEvent.class_id,
+            ),
+        )
+        .outerjoin(
+            CourseUnitClassPlan,
+            and_(
+                CourseUnitClassPlan.course_class_id == CourseClass.id,
+                CourseUnitClassPlan.course_unit_id == LearningEvent.unit_id,
+            ),
+        )
+        .where(
+            or_(
+                LearningEvent.unit_id.is_(None),
+                and_(
+                    School.status == "active",
+                    ClassGroup.status == "active",
+                    CourseClass.id.is_not(None),
+                    CourseClass.status == "active",
+                    CourseUnitClassPlan.id.is_not(None),
+                    CourseUnitClassPlan.release_mode != "hidden",
+                ),
+            )
+        )
+    )
 
 
 def _resolve_learning_scope(

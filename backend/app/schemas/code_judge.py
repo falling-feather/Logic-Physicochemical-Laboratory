@@ -187,3 +187,11 @@ class CodeJudgeAttemptRead(BaseModel):
     created_at: datetime
     started_at: datetime | None = None
     finished_at: datetime | None = None
+
+
+class CodeJudgeAttemptPage(BaseModel):
+    items: list[CodeJudgeAttemptRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None

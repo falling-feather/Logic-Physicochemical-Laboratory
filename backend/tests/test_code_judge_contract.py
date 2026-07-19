@@ -184,6 +184,18 @@ def test_code_submission_access_idempotency_version_snapshot_and_release_gates(c
     attempts = client.get(f"/api/code-submissions/{submission['id']}/attempts", headers=_auth(student))
     assert attempts.status_code == 200
     assert attempts.json()[0]["status"] == "runner_unavailable"
+    attempts_page = client.get(
+        f"/api/code-submissions/{submission['id']}/attempts/page?limit=1&offset=0",
+        headers=_auth(student),
+    )
+    assert attempts_page.status_code == 200
+    assert attempts_page.json()["total"] == 1
+    assert attempts_page.json()["items"][0]["status"] == "runner_unavailable"
+    assert attempts_page.json()["next_offset"] is None
+    assert client.get(
+        f"/api/code-submissions/{submission['id']}/attempts/page",
+        headers=_auth(other_student),
+    ).status_code == 403
     teacher_page = client.get(f"/api/code-submissions?class_id={class_id}&course_id={course_id}", headers=_auth(teacher))
     assert teacher_page.status_code == 200
     assert teacher_page.json()["total"] == 1

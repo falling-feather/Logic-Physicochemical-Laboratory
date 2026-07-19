@@ -6,7 +6,7 @@ from alembic import command
 from alembic.config import Config
 from fastapi import HTTPException
 import pytest
-from sqlalchemy import create_engine, event, inspect, text
+from sqlalchemy import create_engine, event, inspect, select, text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.schema import CreateTable
 
@@ -16,8 +16,10 @@ from app.db.session import get_session_factory, make_engine, reset_database_stat
 from app.models import (
     ClassGroup,
     Course,
+    CourseClass,
     CourseUnit,
     CourseUnitClassPlan,
+    School,
 )
 from app.services import course_release_plans
 
@@ -175,6 +177,21 @@ def test_release_plan_effective_access_and_progress_contract(client):
     assert visible_events.json()
     assert {item["unit_id"] for item in visible_events.json()} == {unit_one_id}
     assert hidden_history_event.json()["id"] not in {item["id"] for item in visible_events.json()}
+    visible_event_page = client.get(
+        f"/api/learning-events/page?class_id={class_id}&limit=1&offset=0",
+        headers=_auth(student),
+    )
+    assert visible_event_page.status_code == 200
+    assert visible_event_page.json()["total"] == 2
+    assert [item["unit_id"] for item in visible_event_page.json()["items"]] == [unit_one_id]
+    assert visible_event_page.json()["next_offset"] == 1
+    teacher_event_page = client.get(
+        f"/api/learning-events/page?class_id={class_id}&limit=1&offset=0",
+        headers=_auth(teacher),
+    )
+    assert teacher_event_page.status_code == 200
+    assert teacher_event_page.json()["total"] == 4
+    assert teacher_event_page.json()["next_offset"] == 1
     progress = client.get(f"/api/progress/me?class_id={class_id}", headers=_auth(student))
     assert progress.status_code == 200
     assert progress.json()["learning_events"] == len(visible_events.json())
@@ -343,6 +360,115 @@ def test_student_unit_list_query_count_is_constant_per_block_count(client):
     assert response.status_code == 200
     assert len(response.json()) == 25
     assert len(statements) <= 20
+
+
+def test_learning_event_page_uses_limited_database_query(client):
+    teacher = _login(client, "release_event_page_teacher", "teacher")
+    student = _login(client, "release_event_page_student", "student")
+    school_id = _school(client, teacher)
+    class_id = _class(client, teacher, school_id, "Release Event Page Class")
+    course_id = _course(client, teacher, school_id)
+    _attach(client, teacher, course_id, class_id)
+    unit_id = _unit(client, teacher, course_id, 1)
+    assert client.post(f"/api/classes/{class_id}/join", headers=_auth(student), json={"role": "student"}).status_code == 201
+    for event_type in ("visit", "start", "complete"):
+        response = client.post(
+            "/api/learning-events",
+            headers=_auth(student),
+            json={"class_id": class_id, "unit_id": unit_id, "event_type": event_type},
+        )
+        assert response.status_code == 201
+
+    statements: list[str] = []
+    engine = make_engine(get_settings().database_url)
+
+    def capture_statement(_connection, _cursor, statement, _parameters, _context, _executemany):
+        if statement.lstrip().upper().startswith("SELECT"):
+            statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", capture_statement)
+    try:
+        page = client.get(
+            f"/api/learning-events/page?class_id={class_id}&limit=2&offset=0",
+            headers=_auth(student),
+        )
+    finally:
+        event.remove(engine, "before_cursor_execute", capture_statement)
+    assert page.status_code == 200
+    assert page.json()["total"] == 3
+    assert len(page.json()["items"]) == 2
+    assert page.json()["next_offset"] == 2
+    assert any("LIMIT" in statement.upper() for statement in statements)
+    assert len(statements) <= 8
+
+
+@pytest.mark.parametrize(
+    ("release_change", "expected_total"),
+    [
+        ("school_inactive", 0),
+        ("class_inactive", 0),
+        ("course_class_inactive", 0),
+        ("missing_plan", 0),
+        ("hidden", 0),
+        ("locked", 1),
+    ],
+)
+def test_learning_event_page_count_matches_student_release_visibility(client, release_change, expected_total):
+    teacher = _login(client, f"release_page_visibility_teacher_{release_change}", "teacher")
+    student = _login(client, f"release_page_visibility_student_{release_change}", "student")
+    school_id = _school(client, teacher)
+    class_id = _class(client, teacher, school_id, f"Release Page Visibility {release_change}")
+    course_id = _course(client, teacher, school_id)
+    _attach(client, teacher, course_id, class_id)
+    unit_id = _unit(client, teacher, course_id, 1)
+    assert client.post(f"/api/classes/{class_id}/join", headers=_auth(student), json={"role": "student"}).status_code == 201
+    created = client.post(
+        "/api/learning-events",
+        headers=_auth(student),
+        json={"class_id": class_id, "unit_id": unit_id, "event_type": "start"},
+    )
+    assert created.status_code == 201
+
+    if release_change in {"hidden", "locked"}:
+        changed = client.patch(
+            f"/api/courses/{course_id}/classes/{class_id}/release-plan",
+            headers=_auth(teacher),
+            json={"expected_version": 1, "items": [{"course_unit_id": unit_id, "release_mode": release_change}]},
+        )
+        assert changed.status_code == 200
+    else:
+        with get_session_factory(get_settings().database_url)() as db:
+            if release_change == "school_inactive":
+                school = db.get(School, school_id)
+                assert school is not None
+                school.status = "inactive"
+            elif release_change == "class_inactive":
+                class_group = db.get(ClassGroup, class_id)
+                assert class_group is not None
+                class_group.status = "inactive"
+            else:
+                course_class = db.scalar(
+                    select(CourseClass).where(CourseClass.course_id == course_id, CourseClass.class_id == class_id)
+                )
+                assert course_class is not None
+                if release_change == "course_class_inactive":
+                    course_class.status = "inactive"
+                else:
+                    plan = db.scalar(
+                        select(CourseUnitClassPlan).where(
+                            CourseUnitClassPlan.course_class_id == course_class.id,
+                            CourseUnitClassPlan.course_unit_id == unit_id,
+                        )
+                    )
+                    assert plan is not None
+                    db.delete(plan)
+            db.commit()
+
+    page = client.get("/api/learning-events/page?limit=10&offset=0", headers=_auth(student))
+    assert page.status_code == 200
+    assert page.json()["total"] == expected_total
+    assert len(page.json()["items"]) == expected_total
+    assert page.json()["next_offset"] is None
 
 
 @pytest.mark.parametrize(

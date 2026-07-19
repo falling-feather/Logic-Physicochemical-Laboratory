@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import get_current_user
@@ -14,6 +14,7 @@ from app.schemas.school import (
     ClassJoinRequestRead,
     ClassJoinRequestReview,
     ClassMemberRead,
+    ClassMemberPage,
     ClassMemberStatusUpdate,
     ClassStudentBatchImport,
     ClassStudentBatchImportRead,
@@ -746,7 +747,7 @@ def batch_import_class_students(
     )
 
 
-@router.get("/{class_id}/members", response_model=list[ClassMemberRead])
+@router.get("/{class_id}/members", response_model=list[ClassMemberRead], deprecated=True)
 def list_class_members(
     class_id: int,
     role: str | None = Query(default=None, max_length=32),
@@ -754,6 +755,55 @@ def list_class_members(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[ClassMemberRead]:
+    statement = _class_member_statement(
+        db,
+        class_id=class_id,
+        role=role,
+        status_filter=status_filter,
+        current_user=current_user,
+    )
+    rows = db.execute(statement).all()
+    return [_class_member_read(membership, user) for membership, user in rows]
+
+
+@router.get("/{class_id}/members/page", response_model=ClassMemberPage)
+def list_class_members_page(
+    class_id: int,
+    role: str | None = Query(default=None, max_length=32),
+    status_filter: str | None = Query(default="active", alias="status", max_length=32),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClassMemberPage:
+    statement = _class_member_statement(
+        db,
+        class_id=class_id,
+        role=role,
+        status_filter=status_filter,
+        current_user=current_user,
+    )
+    total = int(db.scalar(select(func.count()).select_from(statement.order_by(None).subquery())) or 0)
+    rows = db.execute(statement.offset(offset).limit(limit)).all()
+    items = [_class_member_read(membership, user) for membership, user in rows]
+    next_offset = offset + len(items)
+    return ClassMemberPage(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        next_offset=next_offset if next_offset < total else None,
+    )
+
+
+def _class_member_statement(
+    db: Session,
+    *,
+    class_id: int,
+    role: str | None,
+    status_filter: str | None,
+    current_user: User,
+):
     class_group = db.get(ClassGroup, class_id)
     if class_group is None:
         raise HTTPException(status_code=404, detail="Class not found")
@@ -778,8 +828,7 @@ def list_class_members(
             raise HTTPException(status_code=400, detail="Unsupported class member status")
         statement = statement.where(ClassMembership.status == membership_status)
 
-    rows = db.execute(statement).all()
-    return [_class_member_read(membership, user) for membership, user in rows]
+    return statement
 
 
 @router.patch("/{class_id}/members/batch-status", response_model=list[ClassMemberRead])

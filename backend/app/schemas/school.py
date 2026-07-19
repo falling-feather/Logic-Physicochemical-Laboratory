@@ -131,6 +131,14 @@ class ClassMemberRead(BaseModel):
     updated_at: datetime
 
 
+class ClassMemberPage(BaseModel):
+    items: list[ClassMemberRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
 class ClassTeacherTransferRead(BaseModel):
     source_membership: ClassMemberRead
     target_membership: ClassMemberRead

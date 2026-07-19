@@ -986,12 +986,27 @@ def test_same_assignment_can_be_submitted_once_per_class(client):
     assert first_history.status_code == 200
     assert [item["id"] for item in first_history.json()] == [first_submission.json()["id"]]
 
+    first_history_page = client.get(
+        f"/api/assignments/{assignment_id}/submissions/page?class_id={first_class_id}&limit=1&offset=0",
+        headers=_auth_header(student_token),
+    )
+    assert first_history_page.status_code == 200
+    assert first_history_page.json()["total"] == 1
+    assert [item["id"] for item in first_history_page.json()["items"]] == [first_submission.json()["id"]]
+    assert first_history_page.json()["next_offset"] is None
+
     second_history = client.get(
         f"/api/assignments/{assignment_id}/submissions?class_id={second_class_id}",
         headers=_auth_header(student_token),
     )
     assert second_history.status_code == 200
     assert [item["id"] for item in second_history.json()] == [second_submission.json()["id"]]
+
+    ambiguous_history_page = client.get(
+        f"/api/assignments/{assignment_id}/submissions/page",
+        headers=_auth_header(student_token),
+    )
+    assert ambiguous_history_page.status_code == 422
 
     first_review = client.get(
         f"/api/assignments/{assignment_id}/review?class_id={first_class_id}",

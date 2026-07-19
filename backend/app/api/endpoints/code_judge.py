@@ -18,6 +18,7 @@ from app.models import (
     User,
 )
 from app.schemas.code_judge import (
+    CodeJudgeAttemptPage,
     CodeJudgeAttemptRead,
     CodeProblemCreate,
     CodeProblemRead,
@@ -403,7 +404,7 @@ def read_code_submission_source(
     )
 
 
-@router.get("/code-submissions/{submission_id}/attempts", response_model=list[CodeJudgeAttemptRead])
+@router.get("/code-submissions/{submission_id}/attempts", response_model=list[CodeJudgeAttemptRead], deprecated=True)
 def list_code_judge_attempts(
     submission_id: int,
     current_user: User = Depends(get_current_user),
@@ -419,6 +420,33 @@ def list_code_judge_attempts(
         ).all()
     )
     return [CodeJudgeAttemptRead.model_validate(attempt) for attempt in attempts]
+
+
+@router.get("/code-submissions/{submission_id}/attempts/page", response_model=CodeJudgeAttemptPage)
+def list_code_judge_attempts_page(
+    submission_id: int,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CodeJudgeAttemptPage:
+    submission = _submission_or_404(db, submission_id)
+    _authorize_submission_read(db, current_user, submission, enforce_student_visibility=True)
+    statement = (
+        select(CodeJudgeAttempt)
+        .where(CodeJudgeAttempt.submission_id == submission.id)
+        .order_by(CodeJudgeAttempt.attempt_number, CodeJudgeAttempt.id)
+    )
+    total = int(db.scalar(select(func.count()).select_from(statement.order_by(None).subquery())) or 0)
+    attempts = list(db.scalars(statement.offset(offset).limit(limit)).all())
+    next_offset = offset + len(attempts)
+    return CodeJudgeAttemptPage(
+        items=[CodeJudgeAttemptRead.model_validate(attempt) for attempt in attempts],
+        total=total,
+        limit=limit,
+        offset=offset,
+        next_offset=next_offset if next_offset < total else None,
+    )
 
 
 def _student_problem_access(db: Session, student: User, problem: CodeProblem, class_id: int):

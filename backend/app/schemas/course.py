@@ -275,6 +275,14 @@ class LearningEventRead(BaseModel):
     occurred_at: datetime
 
 
+class LearningEventPage(BaseModel):
+    items: list[LearningEventRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
+
+
 class SubmissionCreate(BaseModel):
     class_id: int
     content: dict[str, Any] = Field(default_factory=dict)
@@ -294,6 +302,14 @@ class SubmissionRead(BaseModel):
     graded_by_user_id: int | None = None
     submitted_at: datetime
     graded_at: datetime | None = None
+
+
+class AssignmentSubmissionPage(BaseModel):
+    items: list[SubmissionRead]
+    total: int
+    limit: int
+    offset: int
+    next_offset: int | None = None
 
 
 class AssignmentReviewRead(BaseModel):

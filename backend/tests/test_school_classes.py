@@ -144,6 +144,14 @@ def test_teacher_creates_school_class_and_student_joins(client):
         "student01": "active",
         "teacher02": "active",
     }
+    member_page = client.get(
+        f"/api/classes/{class_id}/members/page?limit=1&offset=0",
+        headers=_auth_header(teacher_token),
+    )
+    assert member_page.status_code == 200
+    assert member_page.json()["total"] == 2
+    assert len(member_page.json()["items"]) == 1
+    assert member_page.json()["next_offset"] == 1
     teacher_membership_id = next(item["id"] for item in members_body if item["username"] == "teacher02")
 
     student_members = client.get(
@@ -160,6 +168,10 @@ def test_teacher_creates_school_class_and_student_joins(client):
     student_forbidden = client.get(f"/api/classes/{class_id}/members", headers=_auth_header(student_token))
     assert student_forbidden.status_code == 403
     assert student_forbidden.json()["detail"] == "Class members require class teacher scope"
+    assert client.get(
+        f"/api/classes/{class_id}/members/page",
+        headers=_auth_header(student_token),
+    ).status_code == 403
 
     outsider_forbidden = client.get(f"/api/classes/{class_id}/members", headers=_auth_header(outsider_teacher_token))
     assert outsider_forbidden.status_code == 403
