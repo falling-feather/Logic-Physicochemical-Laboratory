@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    const TEACHER_ASSET_VERSION = '20260719v759A11yP0';
+    const TEACHER_ASSET_VERSION = '20260719v75ReviewTeacherPagingP0';
     const API_BASE_STORAGE_KEY = 'astra-teacher-api-base';
     const TEACHER_VIEWS = Object.freeze({
         overview: '教学总览',
@@ -35,6 +35,10 @@
     });
     const COURSE_PROGRESS_PAGE_LIMIT = 50;
     const CODE_SUBMISSION_PAGE_LIMIT = 100;
+    const MEMBER_PAGE_LIMIT = 50;
+    const ACTIVE_STUDENT_PAGE_LIMIT = 50;
+    const ASSIGNMENT_SUBMISSION_PAGE_LIMIT = 50;
+    const CODE_ATTEMPT_PAGE_LIMIT = 20;
 
     const state = {
         root: null,
@@ -69,8 +73,12 @@
             codeStatus: ''
         },
         pagination: {
+            memberOffset: 0,
+            activeStudentOffset: 0,
+            assignmentSubmissionOffset: 0,
             courseProgressOffset: 0,
-            codeSubmissionsOffset: 0
+            codeSubmissionsOffset: 0,
+            codeAttemptOffset: 0
         },
         data: {
             schools: [],
@@ -79,9 +87,12 @@
             units: [],
             assignments: [],
             members: [],
+            membersPage: null,
             activeStudents: [],
+            activeStudentsPage: null,
             submissions: [],
             assignmentSubmissions: [],
+            assignmentSubmissionsPage: null,
             collaborators: [],
             collaboratorBatchResult: null,
             pointRule: null,
@@ -94,7 +105,8 @@
             courseProgress: null,
             codeSubmissions: null,
             codeSubmissionSource: null,
-            codeSubmissionAttempts: []
+            codeSubmissionAttempts: [],
+            codeSubmissionAttemptsPage: null
         },
         errors: {},
         flash: null
@@ -315,7 +327,7 @@
     async function refreshAll(options) {
         if (!state.root || !state.active) return;
         const request = options || {};
-        resetCurriculumPagination();
+        resetPagination();
         const generation = beginRequestGeneration();
         setBusy(true);
         state.user = null;
@@ -423,11 +435,14 @@
     async function loadClassScope(generation = state.requestGeneration) {
         if (!isCurrentRequest(generation)) return;
         state.data.members = [];
+        state.data.membersPage = null;
         state.data.activeStudents = [];
+        state.data.activeStudentsPage = null;
         state.data.submissions = [];
         state.data.knowledge = null;
         state.data.progress = null;
         state.errors.members = null;
+        state.errors.activeStudents = null;
         state.errors.submissions = null;
         state.errors.knowledge = null;
         state.errors.progress = null;
@@ -435,7 +450,9 @@
         const classId = state.selected.classId;
         const memberParams = {
             role: state.filters.memberRole || undefined,
-            status: state.filters.memberStatus || undefined
+            status: state.filters.memberStatus || undefined,
+            limit: MEMBER_PAGE_LIMIT,
+            offset: state.pagination.memberOffset
         };
         const submissionParams = {
             class_id: classId,
@@ -444,24 +461,38 @@
             offset: 0
         };
         const [membersResult, activeStudentsResult, submissionsResult, knowledgeResult] = await Promise.allSettled([
-            fetchJson(`/api/classes/${classId}/members`, { params: memberParams }),
-            fetchJson(`/api/classes/${classId}/members`, { params: { role: 'student', status: 'active' } }),
+            fetchJson(`/api/classes/${classId}/members/page`, { params: memberParams }),
+            fetchJson(`/api/classes/${classId}/members/page`, {
+                params: {
+                    role: 'student',
+                    status: 'active',
+                    limit: ACTIVE_STUDENT_PAGE_LIMIT,
+                    offset: state.pagination.activeStudentOffset
+                }
+            }),
             fetchJson('/api/admin/submissions/pending', { params: submissionParams }),
             fetchClassKnowledge(classId)
         ]);
         if (!isCurrentRequest(generation)) return;
         if (membersResult.status === 'fulfilled') {
-            state.data.members = membersResult.value;
-            state.selected.studentId = normalizeSelectedId(state.selected.studentId, state.data.members.filter((item) => item.role === 'student'));
-            if (!state.selected.studentId) {
-                const firstStudent = state.data.members.find((item) => item.role === 'student');
-                state.selected.studentId = firstStudent ? String(firstStudent.user_id) : '';
-            }
+            state.data.membersPage = membersResult.value;
+            state.data.members = Array.isArray(membersResult.value.items) ? membersResult.value.items : [];
+            state.pagination.memberOffset = Number(membersResult.value.offset) || 0;
         } else {
             state.errors.members = membersResult.reason;
         }
         if (activeStudentsResult.status === 'fulfilled') {
-            state.data.activeStudents = activeStudentsResult.value;
+            state.data.activeStudentsPage = activeStudentsResult.value;
+            state.data.activeStudents = Array.isArray(activeStudentsResult.value.items) ? activeStudentsResult.value.items : [];
+            state.pagination.activeStudentOffset = Number(activeStudentsResult.value.offset) || 0;
+            state.selected.studentId = normalizeSelectedUserId(state.selected.studentId, state.data.activeStudents);
+            if (!state.selected.studentId) {
+                const firstStudent = state.data.activeStudents[0];
+                state.selected.studentId = firstStudent ? String(firstStudent.user_id) : '';
+            }
+        } else {
+            state.errors.activeStudents = activeStudentsResult.reason;
+            state.selected.studentId = '';
         }
         if (submissionsResult.status === 'fulfilled') {
             state.data.submissions = Array.isArray(submissionsResult.value.items) ? submissionsResult.value.items : [];
@@ -513,6 +544,7 @@
         state.data.units = [];
         state.data.assignments = [];
         state.data.assignmentSubmissions = [];
+        state.data.assignmentSubmissionsPage = null;
         state.data.collaborators = [];
         state.data.pointRule = null;
         state.errors.units = null;
@@ -555,24 +587,31 @@
     async function loadAssignmentScope(generation = state.requestGeneration) {
         if (!isCurrentRequest(generation)) return;
         state.data.assignmentSubmissions = [];
+        state.data.assignmentSubmissionsPage = null;
         state.data.pointRule = null;
         state.data.assignmentClassPolicy = null;
         state.errors.assignmentSubmissions = null;
         state.errors.pointRule = null;
         state.errors.assignmentClassPolicy = null;
         if (!state.selected.assignmentId) return;
-        const params = state.selected.classId ? { class_id: state.selected.classId } : {};
+        const params = {
+            class_id: state.selected.classId || undefined,
+            limit: ASSIGNMENT_SUBMISSION_PAGE_LIMIT,
+            offset: state.pagination.assignmentSubmissionOffset
+        };
         const policyRequest = state.selected.classId
             ? fetchJson(`/api/assignments/${state.selected.assignmentId}/classes/${state.selected.classId}/policy`)
             : Promise.resolve(null);
         const [submissionsResult, ruleResult, policyResult] = await Promise.allSettled([
-            fetchJson(`/api/assignments/${state.selected.assignmentId}/submissions`, { params }),
+            fetchJson(`/api/assignments/${state.selected.assignmentId}/submissions/page`, { params }),
             fetchJson(`/api/points/assignments/${state.selected.assignmentId}/rule`),
             policyRequest
         ]);
         if (!isCurrentRequest(generation)) return;
         if (submissionsResult.status === 'fulfilled') {
-            state.data.assignmentSubmissions = submissionsResult.value;
+            state.data.assignmentSubmissionsPage = submissionsResult.value;
+            state.data.assignmentSubmissions = Array.isArray(submissionsResult.value.items) ? submissionsResult.value.items : [];
+            state.pagination.assignmentSubmissionOffset = Number(submissionsResult.value.offset) || 0;
         } else {
             state.errors.assignmentSubmissions = submissionsResult.reason;
         }
@@ -596,6 +635,8 @@
         state.data.codeSubmissions = null;
         state.data.codeSubmissionSource = null;
         state.data.codeSubmissionAttempts = [];
+        state.data.codeSubmissionAttemptsPage = null;
+        state.pagination.codeAttemptOffset = 0;
         state.selected.codeSubmissionId = '';
         state.errors.curriculumScope = null;
         state.errors.releasePlan = null;
@@ -657,11 +698,14 @@
         if (!isCurrentRequest(generation) || !submissionId) return;
         state.data.codeSubmissionSource = null;
         state.data.codeSubmissionAttempts = [];
+        state.data.codeSubmissionAttemptsPage = null;
         state.errors.codeSubmissionSource = null;
         state.errors.codeSubmissionAttempts = null;
         const [sourceResult, attemptsResult] = await Promise.allSettled([
             fetchJson(`/api/code-submissions/${submissionId}/source`),
-            fetchJson(`/api/code-submissions/${submissionId}/attempts`)
+            fetchJson(`/api/code-submissions/${submissionId}/attempts/page`, {
+                params: { limit: CODE_ATTEMPT_PAGE_LIMIT, offset: state.pagination.codeAttemptOffset }
+            })
         ]);
         if (!isCurrentRequest(generation) || String(state.selected.codeSubmissionId) !== String(submissionId)) return;
         if (sourceResult.status === 'fulfilled') {
@@ -670,7 +714,9 @@
             state.errors.codeSubmissionSource = sourceResult.reason;
         }
         if (attemptsResult.status === 'fulfilled') {
-            state.data.codeSubmissionAttempts = attemptsResult.value;
+            state.data.codeSubmissionAttemptsPage = attemptsResult.value;
+            state.data.codeSubmissionAttempts = Array.isArray(attemptsResult.value.items) ? attemptsResult.value.items : [];
+            state.pagination.codeAttemptOffset = Number(attemptsResult.value.offset) || 0;
         } else {
             state.errors.codeSubmissionAttempts = attemptsResult.reason;
         }
@@ -747,7 +793,7 @@
         if (!container) return;
         const activeClasses = state.data.classes.filter((item) => item.status === 'active').length;
         const visibleCourses = state.data.courses.filter((item) => item.status !== 'archived').length;
-        const activeStudents = state.data.members.filter((item) => item.role === 'student' && item.status === 'active').length;
+        const activeStudents = Math.max(0, Number(state.data.activeStudentsPage && state.data.activeStudentsPage.total) || 0);
         const pendingTotal = state.data.submissions.total || state.data.submissions.length || 0;
         const items = [
             ['班级', activeClasses, 'users'],
@@ -1127,6 +1173,13 @@
         }
         const source = state.data.codeSubmissionSource;
         const attempts = Array.isArray(state.data.codeSubmissionAttempts) ? state.data.codeSubmissionAttempts : [];
+        const attemptsPage = state.data.codeSubmissionAttemptsPage || {
+            items: attempts,
+            total: attempts.length,
+            limit: CODE_ATTEMPT_PAGE_LIMIT,
+            offset: state.pagination.codeAttemptOffset,
+            next_offset: null
+        };
         return `
             <div class="teacher-code-detail">
                 <header><div><span>提交 #${formatNumber(selected.id)}</span><strong>${escapeHtml(studentLabel(selected.student_id))}</strong></div>${renderCodeStatus(selected.status)}</header>
@@ -1142,6 +1195,7 @@
                     ${state.errors.codeSubmissionAttempts ? renderError(state.errors.codeSubmissionAttempts, '判题轨迹读取失败') : attempts.length
                         ? `<ol>${attempts.map((attempt) => `<li><i></i><div><strong>第 ${formatNumber(attempt.attempt_number)} 次 · ${escapeHtml(CODE_STATUS_LABELS[attempt.status] || attempt.status)}</strong><span>${escapeHtml(attempt.adapter_name || 'runner')} · ${formatDate(attempt.started_at || attempt.created_at)}</span>${attempt.error_code ? `<code>${escapeHtml(attempt.error_code)}</code>` : ''}</div></li>`).join('')}</ol>`
                         : renderEmpty('暂无判题尝试')}
+                    ${state.errors.codeSubmissionAttempts ? '' : `<footer class="teacher-list-pagination">${renderCurriculumPageControls(attemptsPage, 'code-attempts', '判题轨迹')}</footer>`}
                 </section>
             </div>
         `;
@@ -1362,6 +1416,13 @@
         const targetClassOptions = targetClasses.map((item) => (
             `<option value="${item.id}">${escapeHtml(item.name)}</option>`
         )).join('');
+        const activeStudentsPage = state.data.activeStudentsPage || {
+            items: state.data.activeStudents,
+            total: state.data.activeStudents.length,
+            limit: ACTIVE_STUDENT_PAGE_LIMIT,
+            offset: state.pagination.activeStudentOffset,
+            next_offset: null
+        };
         return `
             <article class="teacher-panel">
                 <header class="teacher-panel__header">
@@ -1376,12 +1437,15 @@
                     </form>
                     <form class="teacher-form teacher-form--member-operation" data-teacher-form="student-transfer">
                         <h3>同校转班</h3>
-                        <label><span>学生</span><select name="membership_id" required ${classDisabled || !activeStudentOptions ? 'disabled' : ''}>${activeStudentOptions || '<option value="">暂无在班学生</option>'}</select></label>
+                        <label><span>本页学生</span><select name="membership_id" required ${classDisabled || !activeStudentOptions ? 'disabled' : ''}>${activeStudentOptions || '<option value="">暂无在班学生</option>'}</select></label>
                         <label><span>目标班级</span><select name="target_class_id" required ${classDisabled || !targetClassOptions ? 'disabled' : ''}>${targetClassOptions || '<option value="">暂无可转班级</option>'}</select></label>
                         <label class="teacher-form__full"><span>备注（只记录是否填写，不写入敏感正文）</span><input name="note" maxlength="500" ${classDisabled ? 'disabled' : ''}></label>
                         <button type="submit" ${classDisabled || !activeStudentOptions || !targetClassOptions ? 'disabled' : ''}><i data-lucide="arrow-right-left"></i><span>确认转班</span></button>
                     </form>
                 </div>
+                ${state.errors.activeStudents
+                    ? renderError(state.errors.activeStudents, '转班学生候选读取失败')
+                    : `<footer class="teacher-list-pagination teacher-list-pagination--member-operations">${renderCurriculumPageControls(activeStudentsPage, 'active-students', '转班学生候选')}</footer>`}
                 ${renderStudentBatchImportResult()}
                 <div class="teacher-filter-row">
                     <label><span>角色</span><select data-teacher-filter="memberRole">${optionSet(['student', 'teacher'], state.filters.memberRole, [['', '全部']])}</select></label>
@@ -1395,8 +1459,14 @@
     function renderMembersTable() {
         if (state.errors.members) return renderError(state.errors.members, '成员读取失败');
         if (!state.selected.classId) return renderEmpty('请选择班级');
-        if (!state.data.members.length) return renderEmpty('暂无成员');
-        return `
+        const page = state.data.membersPage || {
+            items: state.data.members,
+            total: state.data.members.length,
+            limit: MEMBER_PAGE_LIMIT,
+            offset: state.pagination.memberOffset,
+            next_offset: null
+        };
+        const content = !state.data.members.length ? renderEmpty('当前页暂无成员') : `
             <div class="teacher-table-wrap">
                 <table class="teacher-table">
                     <thead><tr><th>用户</th><th>角色</th><th>状态</th><th>操作</th></tr></thead>
@@ -1418,6 +1488,10 @@
                     </tbody>
                 </table>
             </div>
+        `;
+        return `
+            ${content}
+            <footer class="teacher-list-pagination">${renderCurriculumPageControls(page, 'members', '班级成员')}</footer>
         `;
     }
 
@@ -1486,6 +1560,13 @@
             return `<option value="${submission.id}">${escapeHtml(label)}</option>`;
         }).join('');
         const disabled = !options || isClassReadOnly() || isSchoolReadOnly();
+        const page = state.data.assignmentSubmissionsPage || {
+            items: state.data.assignmentSubmissions,
+            total: state.data.assignmentSubmissions.length,
+            limit: ASSIGNMENT_SUBMISSION_PAGE_LIMIT,
+            offset: state.pagination.assignmentSubmissionOffset,
+            next_offset: null
+        };
         return `
             <form class="teacher-form teacher-form--grade" data-teacher-form="grade">
                 <h3>评分</h3>
@@ -1495,6 +1576,9 @@
                 <label class="teacher-form__full"><span>反馈</span><textarea name="feedback" maxlength="4000" rows="2" ${disabled ? 'disabled' : ''}></textarea></label>
                 <button type="submit" ${disabled ? 'disabled' : ''}><i data-lucide="check-check"></i><span>提交</span></button>
             </form>
+            ${state.errors.assignmentSubmissions
+                ? renderError(state.errors.assignmentSubmissions, '作业提交记录读取失败')
+                : `<footer class="teacher-list-pagination">${renderCurriculumPageControls(page, 'assignment-submissions', '作业提交记录')}</footer>`}
         `;
     }
 
@@ -1994,8 +2078,10 @@
     async function selectCodeSubmission(submissionId) {
         if (state.busy || !submissionId) return;
         state.selected.codeSubmissionId = String(submissionId);
+        state.pagination.codeAttemptOffset = 0;
         state.data.codeSubmissionSource = null;
         state.data.codeSubmissionAttempts = [];
+        state.data.codeSubmissionAttemptsPage = null;
         state.errors.codeSubmissionSource = null;
         state.errors.codeSubmissionAttempts = null;
         renderPanels();
@@ -2011,16 +2097,22 @@
     }
 
     async function changeCurriculumPage(kind, requestedOffset) {
-        if (state.busy || !state.selected.classId || !state.selected.courseId) return;
+        if (state.busy) return;
         const offset = Math.max(0, Math.floor(Number(requestedOffset) || 0));
-        const progressPage = kind === 'progress';
-        if (!progressPage && kind !== 'code') return;
-        const generation = beginRequestGeneration();
         const classId = state.selected.classId;
         const courseId = state.selected.courseId;
+        const assignmentId = state.selected.assignmentId;
+        const codeSubmissionId = state.selected.codeSubmissionId;
+        const supported = new Set(['progress', 'code', 'members', 'active-students', 'assignment-submissions', 'code-attempts']);
+        if (!supported.has(kind)) return;
+        if (['progress', 'code'].includes(kind) && (!classId || !courseId)) return;
+        if (['members', 'active-students'].includes(kind) && !classId) return;
+        if (kind === 'assignment-submissions' && !assignmentId) return;
+        if (kind === 'code-attempts' && !codeSubmissionId) return;
+        const generation = beginRequestGeneration();
         setBusy(true);
         try {
-            if (progressPage) {
+            if (kind === 'progress') {
                 state.errors.courseProgress = null;
                 const page = await fetchJson(`/api/progress/courses/${courseId}/classes/${classId}/students`, {
                     params: { limit: COURSE_PROGRESS_PAGE_LIMIT, offset }
@@ -2028,7 +2120,7 @@
                 if (!isCurrentRequest(generation)) return;
                 state.data.courseProgress = page;
                 state.pagination.courseProgressOffset = Number(page.offset) || 0;
-            } else {
+            } else if (kind === 'code') {
                 state.errors.codeSubmissions = null;
                 const page = await fetchJson('/api/code-submissions', {
                     params: { class_id: classId, course_id: courseId, limit: CODE_SUBMISSION_PAGE_LIMIT, offset }
@@ -2039,11 +2131,67 @@
                 state.selected.codeSubmissionId = '';
                 state.data.codeSubmissionSource = null;
                 state.data.codeSubmissionAttempts = [];
+                state.data.codeSubmissionAttemptsPage = null;
+                state.pagination.codeAttemptOffset = 0;
+            } else if (kind === 'members') {
+                state.errors.members = null;
+                const page = await fetchJson(`/api/classes/${classId}/members/page`, {
+                    params: {
+                        role: state.filters.memberRole || undefined,
+                        status: state.filters.memberStatus || undefined,
+                        limit: MEMBER_PAGE_LIMIT,
+                        offset
+                    }
+                });
+                if (!isCurrentRequest(generation)) return;
+                state.data.membersPage = page;
+                state.data.members = Array.isArray(page.items) ? page.items : [];
+                state.pagination.memberOffset = Number(page.offset) || 0;
+            } else if (kind === 'active-students') {
+                state.errors.activeStudents = null;
+                const page = await fetchJson(`/api/classes/${classId}/members/page`, {
+                    params: { role: 'student', status: 'active', limit: ACTIVE_STUDENT_PAGE_LIMIT, offset }
+                });
+                if (!isCurrentRequest(generation)) return;
+                state.data.activeStudentsPage = page;
+                state.data.activeStudents = Array.isArray(page.items) ? page.items : [];
+                state.pagination.activeStudentOffset = Number(page.offset) || 0;
+                state.selected.studentId = state.data.activeStudents[0] ? String(state.data.activeStudents[0].user_id) : '';
+                await loadStudentProgress(generation);
+            } else if (kind === 'assignment-submissions') {
+                state.errors.assignmentSubmissions = null;
+                const page = await fetchJson(`/api/assignments/${assignmentId}/submissions/page`, {
+                    params: {
+                        class_id: classId || undefined,
+                        limit: ASSIGNMENT_SUBMISSION_PAGE_LIMIT,
+                        offset
+                    }
+                });
+                if (!isCurrentRequest(generation)) return;
+                state.data.assignmentSubmissionsPage = page;
+                state.data.assignmentSubmissions = Array.isArray(page.items) ? page.items : [];
+                state.pagination.assignmentSubmissionOffset = Number(page.offset) || 0;
+            } else if (kind === 'code-attempts') {
+                state.errors.codeSubmissionAttempts = null;
+                const page = await fetchJson(`/api/code-submissions/${codeSubmissionId}/attempts/page`, {
+                    params: { limit: CODE_ATTEMPT_PAGE_LIMIT, offset }
+                });
+                if (!isCurrentRequest(generation) || String(state.selected.codeSubmissionId) !== String(codeSubmissionId)) return;
+                state.data.codeSubmissionAttemptsPage = page;
+                state.data.codeSubmissionAttempts = Array.isArray(page.items) ? page.items : [];
+                state.pagination.codeAttemptOffset = Number(page.offset) || 0;
             }
         } catch (error) {
             if (!isCurrentRequest(generation)) return;
-            if (progressPage) state.errors.courseProgress = error;
-            else state.errors.codeSubmissions = error;
+            const errorKey = {
+                progress: 'courseProgress',
+                code: 'codeSubmissions',
+                members: 'members',
+                'active-students': 'activeStudents',
+                'assignment-submissions': 'assignmentSubmissions',
+                'code-attempts': 'codeSubmissionAttempts'
+            }[kind];
+            if (errorKey) state.errors[errorKey] = error;
         } finally {
             if (isCurrentRequest(generation)) {
                 setBusy(false);
@@ -2060,7 +2208,7 @@
         const key = target.dataset.teacherScope;
         if (key === 'galaxyKey') {
             state.filters.galaxyKey = target.value;
-            resetCurriculumPagination();
+            resetPagination();
             const courses = filteredCourses();
             state.selected.courseId = normalizeSelectedId(state.selected.courseId, courses);
             if (!state.selected.courseId && courses.length) state.selected.courseId = String(courses[0].id);
@@ -2076,7 +2224,8 @@
             return;
         }
         state.selected[key] = target.value;
-        if (key === 'schoolId' || key === 'classId' || key === 'courseId') resetCurriculumPagination();
+        if (key === 'schoolId' || key === 'classId' || key === 'courseId') resetPagination();
+        if (key === 'assignmentId') state.pagination.assignmentSubmissionOffset = 0;
         if (key === 'schoolId' || key === 'classId') state.data.studentBatchImportResult = null;
         if (key === 'schoolId' || key === 'courseId') state.data.collaboratorBatchResult = null;
         setBusy(true);
@@ -2107,8 +2256,14 @@
             return;
         }
         const key = target.dataset.teacherFilter;
-        if (key === 'memberRole') state.filters.memberRole = target.value;
-        if (key === 'memberStatus') state.filters.memberStatus = target.value;
+        if (key === 'memberRole') {
+            state.filters.memberRole = target.value;
+            state.pagination.memberOffset = 0;
+        }
+        if (key === 'memberStatus') {
+            state.filters.memberStatus = target.value;
+            state.pagination.memberOffset = 0;
+        }
         if (key === 'submissionStatus') state.filters.submissionStatus = target.value;
         if (key === 'codeStatus') {
             state.filters.codeStatus = target.value;
@@ -2457,8 +2612,7 @@
     }
 
     function studentOptions() {
-        const students = state.data.members.filter((item) => item.role === 'student');
-        return students.map((member) => (
+        return state.data.activeStudents.map((member) => (
             `<option value="${member.user_id}"${String(member.user_id) === state.selected.studentId ? ' selected' : ''}>${escapeHtml(member.display_name || member.username)}</option>`
         )).join('') || '<option value="">--</option>';
     }
@@ -2496,17 +2650,25 @@
         return items.some((item) => String(item.id) === String(value)) ? String(value) : '';
     }
 
+    function normalizeSelectedUserId(value, members) {
+        if (!value) return '';
+        return members.some((item) => String(item.user_id) === String(value)) ? String(value) : '';
+    }
+
     function resetBelow(level) {
         if (level === 'school') {
-            resetCurriculumPagination();
+            resetPagination();
             state.data.classes = [];
             state.data.courses = [];
             state.data.units = [];
             state.data.assignments = [];
             state.data.members = [];
+            state.data.membersPage = null;
             state.data.activeStudents = [];
+            state.data.activeStudentsPage = null;
             state.data.submissions = [];
             state.data.assignmentSubmissions = [];
+            state.data.assignmentSubmissionsPage = null;
             state.data.collaborators = [];
             state.data.collaboratorBatchResult = null;
             state.data.pointRule = null;
@@ -2520,6 +2682,7 @@
             state.data.codeSubmissions = null;
             state.data.codeSubmissionSource = null;
             state.data.codeSubmissionAttempts = [];
+            state.data.codeSubmissionAttemptsPage = null;
             state.selected.codeSubmissionId = '';
         }
     }
@@ -2527,16 +2690,20 @@
     function clearWorkspace() {
         state.user = null;
         state.errors = {};
-        resetCurriculumPagination();
+        resetPagination();
         Object.keys(state.data).forEach((key) => {
             state.data[key] = Array.isArray(state.data[key]) ? [] : null;
         });
         hideDashboard();
     }
 
-    function resetCurriculumPagination() {
+    function resetPagination() {
+        state.pagination.memberOffset = 0;
+        state.pagination.activeStudentOffset = 0;
+        state.pagination.assignmentSubmissionOffset = 0;
         state.pagination.courseProgressOffset = 0;
         state.pagination.codeSubmissionsOffset = 0;
+        state.pagination.codeAttemptOffset = 0;
     }
 
     function showDashboard() {

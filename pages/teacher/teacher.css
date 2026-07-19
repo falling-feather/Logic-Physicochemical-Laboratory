@@ -2461,6 +2461,19 @@
     height: 14px;
 }
 
+.teacher-list-pagination {
+    display: flex;
+    justify-content: flex-end;
+    min-height: 54px;
+    padding: 9px 0 0;
+}
+
+.teacher-list-pagination--member-operations {
+    margin: -8px 0 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(139, 180, 224, 0.12);
+}
+
 .teacher-code-station {
     margin-top: 36px;
     padding-top: 2px;
@@ -2957,7 +2970,8 @@
     }
 
     .teacher-page-nav,
-    .teacher-code-pagination {
+    .teacher-code-pagination,
+    .teacher-list-pagination {
         width: 100%;
     }
 

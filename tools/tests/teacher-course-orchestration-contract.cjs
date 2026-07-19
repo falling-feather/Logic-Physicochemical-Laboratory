@@ -41,7 +41,7 @@ assert.match(teacher, /提交内容与权威版本 v\$\{updated\.plan_version\} 
 
 for (const endpoint of [
   '/api/code-submissions/${submissionId}/source',
-  '/api/code-submissions/${submissionId}/attempts'
+  '/api/code-submissions/${submissionId}/attempts/page'
 ]) {
   assert.ok(teacher.includes(endpoint), `teacher workbench must consume ${endpoint}`);
 }

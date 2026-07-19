@@ -18,7 +18,7 @@ vm.runInNewContext(registrySource, context, { filename: 'shared/js/page-registry
 const registry = context.window.AstraPageRegistry;
 const normalize = (items) => Array.from(items);
 const studentVersion = '20260719v757StudentPublicationP0';
-const teacherVersion = '20260719v759A11yP0';
+const teacherVersion = '20260719v75ReviewTeacherPagingP0';
 const adminVersion = '20260718v7432UnifiedAtlasP0';
 const student = [
     `pages/student/student.css?v=${studentVersion}`,
