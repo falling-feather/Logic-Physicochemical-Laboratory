@@ -99,6 +99,7 @@ class CodeJudgeAttempt(TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("submission_id", "attempt_number", name="uq_code_judge_attempts_submission_number"),
         Index("ix_code_judge_attempts_claim", "status", "available_at", "id"),
+        Index("ix_code_judge_attempts_expired_claim", "status", "claim_expires_at", "id"),
         CheckConstraint("attempt_number > 0", name="ck_code_judge_attempts_number_positive"),
         CheckConstraint(f"status IN ({_CODE_JUDGE_STATES})", name="ck_code_judge_attempts_status"),
     )

@@ -1,19 +1,22 @@
 from __future__ import annotations
 
 import os
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 import pytest
-from sqlalchemy import create_engine, event, inspect, select, text
+from sqlalchemy import create_engine, event, func, inspect, select, text
 from sqlalchemy.dialects import mysql
-from sqlalchemy.schema import CreateTable
+from sqlalchemy.schema import CreateIndex, CreateTable
 
 from app.core.config import get_settings
 from app.db.session import get_session_factory, make_engine, reset_database_state
 from app.models import CodeJudgeAttempt, CodeProblem, CodeProblemVersion, CodeSubmission, Course, User
 from app.services.code_judge import (
+    EXPIRED_CLAIM_RECOVERY_BATCH_SIZE,
     TERMINAL_STATUSES,
     CodeRunnerAdapter,
     DisabledCodeRunnerAdapter,
@@ -24,6 +27,7 @@ from app.services.code_judge import (
     record_judge_result,
     retry_submission_if_runner_available,
 )
+from app.services import code_judge as code_judge_service
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -330,6 +334,105 @@ def test_judge_claim_is_atomic_and_api_has_no_code_execution_path(client):
     assert not any(token in service_source or token in api_source for token in forbidden)
 
 
+def test_expired_judge_claim_recovery_is_bounded_stable_and_converges(client, monkeypatch):
+    teacher = _login(client, "code_recovery_teacher", "teacher")
+    student = _login(client, "code_recovery_student", "student")
+    school_id = _school(client, teacher)
+    class_id = _class(client, teacher, school_id, "Recovery Class")
+    course_id = _course(client, teacher, school_id)
+    _attach(client, teacher, course_id, class_id)
+    unit_id = _unit(client, teacher, course_id)
+    assert client.post(f"/api/classes/{class_id}/join", headers=_auth(student), json={"role": "student"}).status_code == 201
+    problem_response = client.post("/api/code-problems", headers=_auth(teacher), json=_problem_payload(course_id, unit_id))
+    assert problem_response.status_code == 201
+
+    now = datetime.now(UTC)
+    adapter = _AvailableAdapter()
+    monkeypatch.setattr(code_judge_service, "EXPIRED_CLAIM_RECOVERY_BATCH_SIZE", 2)
+    with get_session_factory(get_settings().database_url)() as db:
+        problem = db.get(CodeProblem, problem_response.json()["id"])
+        student_user = db.scalar(select(User).where(User.username == "code_recovery_student"))
+        teacher_user = db.scalar(select(User).where(User.username == "code_recovery_teacher"))
+        assert problem is not None and student_user is not None and teacher_user is not None
+        versions = [db.get(CodeProblemVersion, problem_response.json()["active_version"]["id"])]
+        assert versions[0] is not None
+        for number in range(2, 6):
+            versions.append(
+                create_problem_version(
+                    db,
+                    problem=problem,
+                    statement_markdown=f"Recovery version {number}.",
+                    test_cases=[{"stdin": "", "expected_stdout": "", "weight": 1}],
+                    language_allowlist=["python"],
+                    resource_policy={
+                        "cpu_time_ms": 500,
+                        "wall_time_ms": 1000,
+                        "memory_kb": 65536,
+                        "output_max_bytes": 4096,
+                        "process_limit": 1,
+                        "network_enabled": False,
+                        "filesystem_mode": "none",
+                    },
+                    source_max_bytes=128,
+                    input_max_bytes=16,
+                    output_max_bytes=4096,
+                    created_by_user_id=teacher_user.id,
+                )
+            )
+        for index, version in enumerate(versions):
+            assert version is not None
+            created = create_code_submission(
+                db,
+                problem=problem,
+                version=version,
+                student_id=student_user.id,
+                class_id=class_id,
+                language="python",
+                source_code=f"print({index})",
+                stdin="",
+                adapter=adapter,
+            )
+            created.submission.status = "running"
+            attempt = db.scalar(select(CodeJudgeAttempt).where(CodeJudgeAttempt.submission_id == created.submission.id))
+            assert attempt is not None
+            attempt.status = "running"
+            attempt.claim_owner = "expired-worker"
+            attempt.claim_token = f"expired-{index}"
+            attempt.claim_expires_at = now - timedelta(minutes=5 - index)
+        db.commit()
+
+        first = code_judge_service._requeue_expired_claims(db, now)
+        db.flush()
+        first_recovered = list(
+            db.scalars(
+                select(CodeJudgeAttempt)
+                .where(CodeJudgeAttempt.status == "queued")
+                .order_by(CodeJudgeAttempt.available_at, CodeJudgeAttempt.id)
+            ).all()
+        )
+        assert first == 2
+        assert [attempt.claim_expires_at for attempt in first_recovered] == [None, None]
+        assert len(first_recovered) == 2
+        assert db.scalar(
+            select(func.count()).select_from(CodeJudgeAttempt).where(CodeJudgeAttempt.status == "running")
+        ) == 3
+        db.commit()
+
+        second = code_judge_service._requeue_expired_claims(db, now)
+        db.commit()
+        third = code_judge_service._requeue_expired_claims(db, now)
+        db.commit()
+        assert (second, third) == (2, 1)
+        assert db.scalar(
+            select(func.count()).select_from(CodeJudgeAttempt).where(CodeJudgeAttempt.status == "running")
+        ) == 0
+        assert db.scalar(
+            select(func.count()).select_from(CodeJudgeAttempt).where(CodeJudgeAttempt.status == "queued")
+        ) == 5
+
+    assert EXPIRED_CLAIM_RECOVERY_BATCH_SIZE == 100
+
+
 def test_code_submission_list_is_database_paginated(client):
     teacher = _login(client, "code_page_teacher", "teacher")
     student = _login(client, "code_page_student", "student")
@@ -383,7 +486,7 @@ def test_code_submission_list_is_database_paginated(client):
     assert len(statements) <= 8
 
 
-def test_0049_sqlite_roundtrip_and_mysql_schema_compile(tmp_path, monkeypatch):
+def test_0050_sqlite_roundtrip_reupgrade_and_mysql_schema_compile(tmp_path, monkeypatch):
     database_path = tmp_path / "code-judge-roundtrip.db"
     database_url = f"sqlite+pysqlite:///{database_path.as_posix()}"
     backend_root = Path(__file__).resolve().parents[1]
@@ -395,9 +498,25 @@ def test_0049_sqlite_roundtrip_and_mysql_schema_compile(tmp_path, monkeypatch):
     try:
         command.upgrade(config, "20260716_0047")
         command.upgrade(config, "20260719_0049")
+        assert "ix_code_judge_attempts_expired_claim" not in {
+            index["name"] for index in inspect(create_engine(database_url)).get_indexes("code_judge_attempts")
+        }
+        command.upgrade(config, "20260719_0050")
         engine = create_engine(database_url)
         names = set(inspect(engine).get_table_names())
         assert {"code_problems", "code_problem_versions", "code_submissions", "code_judge_attempts"} <= names
+        assert "ix_code_judge_attempts_expired_claim" in {
+            index["name"] for index in inspect(engine).get_indexes("code_judge_attempts")
+        }
+        assert ScriptDirectory.from_config(config).get_heads() == ["20260719_0050"]
+        command.downgrade(config, "20260719_0049")
+        assert "ix_code_judge_attempts_expired_claim" not in {
+            index["name"] for index in inspect(engine).get_indexes("code_judge_attempts")
+        }
+        command.upgrade(config, "20260719_0050")
+        assert "ix_code_judge_attempts_expired_claim" in {
+            index["name"] for index in inspect(engine).get_indexes("code_judge_attempts")
+        }
         command.downgrade(config, "20260716_0047")
         names = set(inspect(engine).get_table_names())
         assert not {"code_problems", "code_problem_versions", "code_submissions", "code_judge_attempts"} & names
@@ -410,10 +529,14 @@ def test_0049_sqlite_roundtrip_and_mysql_schema_compile(tmp_path, monkeypatch):
         assert "code_" in ddl
         assert "status IN" in ddl
         assert "VARCHAR" in ddl
+    recovery_index = next(
+        index for index in CodeJudgeAttempt.__table__.indexes if index.name == "ix_code_judge_attempts_expired_claim"
+    )
+    assert "claim_expires_at" in str(CreateIndex(recovery_index).compile(dialect=mysql.dialect()))
 
 
 @pytest.mark.mysql_release_evidence
-def test_0049_mysql_schema_when_explicit_release_drill_is_configured():
+def test_0050_mysql_schema_when_explicit_release_drill_is_configured():
     database_url = os.environ.get("ASTRA_TEST_MYSQL_URL", "").strip()
     expected_database = os.environ.get("ASTRA_TEST_MYSQL_DATABASE", "").strip()
     if not database_url or not expected_database:
@@ -426,5 +549,8 @@ def test_0049_mysql_schema_when_explicit_release_drill_is_configured():
         assert {"code_problems", "code_problem_versions", "code_submissions", "code_judge_attempts"} <= tables
         submission_columns = {column["name"] for column in inspect(engine).get_columns("code_submissions")}
         assert {"problem_snapshot_json", "resource_policy_snapshot_json", "source_code", "status"} <= submission_columns
+        assert "ix_code_judge_attempts_expired_claim" in {
+            index["name"] for index in inspect(engine).get_indexes("code_judge_attempts")
+        }
     finally:
         engine.dispose()

@@ -39,6 +39,7 @@ TERMINAL_STATUSES = {
     "cancelled",
 }
 ALL_STATUSES = {QUEUED, RUNNER_UNAVAILABLE, RUNNING, *TERMINAL_STATUSES}
+EXPIRED_CLAIM_RECOVERY_BATCH_SIZE = 100
 
 
 @dataclass(frozen=True)
@@ -498,28 +499,49 @@ def _assert_idempotent_match(
         raise ValueError("idempotency_conflict")
 
 
-def _requeue_expired_claims(db: Session, now_value: datetime) -> None:
+def _requeue_expired_claims(db: Session, now_value: datetime) -> int:
+    """Return a bounded, deterministic batch of expired claims to the queue."""
     expired = list(
-        db.scalars(
-            select(CodeJudgeAttempt).where(
+        db.execute(
+            select(CodeJudgeAttempt.id, CodeJudgeAttempt.submission_id)
+            .where(
                 CodeJudgeAttempt.status == RUNNING,
                 CodeJudgeAttempt.claim_expires_at.is_not(None),
                 CodeJudgeAttempt.claim_expires_at <= now_value,
             )
+            .order_by(CodeJudgeAttempt.claim_expires_at, CodeJudgeAttempt.id)
+            .limit(EXPIRED_CLAIM_RECOVERY_BATCH_SIZE)
         ).all()
     )
-    for attempt in expired:
-        attempt.status = QUEUED
-        attempt.claim_owner = None
-        attempt.claim_token = None
-        attempt.claim_expires_at = None
-        attempt.error_code = "claim_expired"
-        attempt.available_at = now_value
-        db.execute(
-            update(CodeSubmission)
-            .where(CodeSubmission.id == attempt.submission_id, CodeSubmission.status == RUNNING)
-            .values(status=QUEUED)
+    if not expired:
+        return 0
+    attempt_ids = [int(row.id) for row in expired]
+    submission_ids = [int(row.submission_id) for row in expired]
+    recovered = db.execute(
+        update(CodeJudgeAttempt)
+        .where(
+            CodeJudgeAttempt.id.in_(attempt_ids),
+            CodeJudgeAttempt.status == RUNNING,
+            CodeJudgeAttempt.claim_expires_at.is_not(None),
+            CodeJudgeAttempt.claim_expires_at <= now_value,
         )
+        .values(
+            status=QUEUED,
+            claim_owner=None,
+            claim_token=None,
+            claim_expires_at=None,
+            error_code="claim_expired",
+            available_at=now_value,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    db.execute(
+        update(CodeSubmission)
+        .where(CodeSubmission.id.in_(submission_ids), CodeSubmission.status == RUNNING)
+        .values(status=QUEUED)
+        .execution_options(synchronize_session=False)
+    )
+    return int(recovered.rowcount or 0)
 
 
 def _sha256_text(value: str) -> str:
