@@ -11,13 +11,16 @@
         dayValue: null,
         latInput: null,
         latValue: null,
+        hourInput: null,
+        hourValue: null,
         latButtons: [],
         infoRoot: null,
         dpr: 1,
         rafId: 0,
         state: {
             day: 172,
-            latitude: 39.9
+            latitude: 39.9,
+            hour: 12
         },
 
         init() {
@@ -30,6 +33,8 @@
             this.dayValue = document.getElementById('cosmos-day-value');
             this.latInput = document.getElementById('cosmos-latitude');
             this.latValue = document.getElementById('cosmos-latitude-value');
+            this.hourInput = document.getElementById('cosmos-hour');
+            this.hourValue = document.getElementById('cosmos-hour-value');
             this.latButtons = Array.from(document.querySelectorAll('[data-cosmos-lat]'));
             this.infoRoot = document.getElementById('cosmos-info');
 
@@ -45,6 +50,14 @@
                 this.latInput.dataset.bound = 'true';
                 this.latInput.addEventListener('input', () => {
                     this.state.latitude = Number(this.latInput.value) || 0;
+                    this.render();
+                });
+            }
+
+            if (this.hourInput && !this.hourInput.dataset.bound) {
+                this.hourInput.dataset.bound = 'true';
+                this.hourInput.addEventListener('input', () => {
+                    this.state.hour = Number(this.hourInput.value) || 12;
                     this.render();
                 });
             }
@@ -71,8 +84,10 @@
         render() {
             if (this.dayInput) this.dayInput.value = String(this.state.day);
             if (this.latInput) this.latInput.value = String(this.state.latitude);
+            if (this.hourInput) this.hourInput.value = String(this.state.hour);
             if (this.dayValue) this.dayValue.textContent = this._formatDate(this.state.day);
             if (this.latValue) this.latValue.textContent = this._formatLatitude(this.state.latitude);
+            if (this.hourValue) this.hourValue.textContent = this._formatClock(this.state.hour);
             this.latButtons.forEach(button => {
                 const active = Math.abs(Number(button.dataset.cosmosLat) - this.state.latitude) < 0.2;
                 button.classList.toggle('is-active', active);
@@ -100,6 +115,12 @@
             else if (cosH <= -1) dayLength = 24;
             else dayLength = (2 * Math.acos(cosH) / (15 * DEG));
             const noonEnergy = Math.max(0, Math.sin(noonAltitude * DEG));
+            const hourAngle = (this.state.hour - 12) * 15 * DEG;
+            const currentAltitude = Math.asin(
+                Math.sin(phi) * Math.sin(delta)
+                + Math.cos(phi) * Math.cos(delta) * Math.cos(hourAngle)
+            ) / DEG;
+            const shadowRatio = currentAltitude <= 0.5 ? null : 1 / Math.tan(currentAltitude * DEG);
             return {
                 day,
                 lat,
@@ -107,6 +128,9 @@
                 noonAltitude,
                 dayLength,
                 noonEnergy,
+                hour: this.state.hour,
+                currentAltitude,
+                shadowRatio,
                 season: this._seasonLabel(lat, declination)
             };
         },
@@ -137,6 +161,7 @@
         _updateInfo(data) {
             if (!this.infoRoot) return;
             const daylight = this._formatHours(data.dayLength);
+            const shadow = data.shadowRatio === null ? '太阳在地平线下或接近地平线' : `${data.shadowRatio.toFixed(2)} 倍物高`;
             this.infoRoot.innerHTML = `
                 <div class="cosmos-panel">
                     <span class="cosmos-panel__label">太阳赤纬</span>
@@ -152,6 +177,11 @@
                     <span class="cosmos-panel__label">理论昼长</span>
                     <strong>${daylight}</strong>
                     <p>由纬度和太阳赤纬估算；实测日出日落还会受大气折射、地形和天气影响。</p>
+                </div>
+                <div class="cosmos-panel">
+                    <span class="cosmos-panel__label">${this._formatClock(data.hour)} 太阳高度</span>
+                    <strong>${data.currentAltitude.toFixed(1)}°</strong>
+                    <p>同一地点把观察时刻从上午移到下午，太阳高度和影长会改变；当前估计影长为 ${shadow}。</p>
                 </div>
                 <div class="cosmos-panel">
                     <span class="cosmos-panel__label">季节判断</span>
@@ -294,6 +324,13 @@
             const daylightRatio = data.dayLength / 24;
             ctx.fillStyle = 'rgba(116,185,255,0.2)';
             ctx.fillRect(chart.x, chart.y + chart.h - 12, chart.w * daylightRatio, 7);
+            const hourX = chart.x + (data.hour / 24) * chart.w;
+            const altitudeRatio = Math.max(0, Math.sin(Math.max(0, data.currentAltitude) * DEG));
+            const hourY = baseY - altitudeRatio * chart.h * 0.62;
+            ctx.beginPath();
+            ctx.arc(hourX, hourY, 4.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#8dd7ff';
+            ctx.fill();
             ctx.fillStyle = 'rgba(216,220,230,0.78)';
             ctx.font = `12px ${this._fontMono()}`;
             ctx.fillText('日出', chart.x, chart.y + chart.h + 18);
@@ -340,6 +377,13 @@
             const h = Math.floor(hours);
             const m = Math.round((hours - h) * 60);
             return `${h}小时${String(m).padStart(2, '0')}分`;
+        },
+
+        _formatClock(hour) {
+            const normalized = Math.max(0, Math.min(24, Number(hour) || 0));
+            const whole = Math.floor(normalized);
+            const minutes = Math.round((normalized - whole) * 60);
+            return `${String(whole).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
         },
 
         _seasonLabel(lat, declination) {

@@ -74,9 +74,12 @@
         focusRoot: null,
         sampleButtons: [],
         modeButtons: [],
+        thresholdInput: null,
+        thresholdValue: null,
         sampleId: 'primary',
         mode: 'terms',
         focusTerm: '',
+        connectionThreshold: 1,
         dpr: 1,
         _boundResize: null,
 
@@ -90,6 +93,8 @@
             this.focusRoot = document.getElementById('humanities-focus-list');
             this.sampleButtons = Array.from(document.querySelectorAll('[data-humanities-sample]'));
             this.modeButtons = Array.from(document.querySelectorAll('[data-humanities-mode]'));
+            this.thresholdInput = document.getElementById('humanities-threshold');
+            this.thresholdValue = document.getElementById('humanities-threshold-value');
             this._bindControls();
             if (!this._boundResize) this._boundResize = () => this.render();
             window.addEventListener('resize', this._boundResize);
@@ -132,6 +137,14 @@
                     this.render();
                 });
             });
+
+            if (this.thresholdInput && !this.thresholdInput.dataset.bound) {
+                this.thresholdInput.dataset.bound = 'true';
+                this.thresholdInput.addEventListener('input', () => {
+                    this.connectionThreshold = Math.max(1, Math.min(3, Number(this.thresholdInput.value) || 1));
+                    this.render();
+                });
+            }
         },
 
         _bindFocusButtons() {
@@ -157,6 +170,8 @@
                 button.classList.toggle('is-active', active);
                 button.setAttribute('aria-pressed', String(active));
             });
+            if (this.thresholdInput) this.thresholdInput.value = String(this.connectionThreshold);
+            if (this.thresholdValue) this.thresholdValue.textContent = `${this.connectionThreshold} 次`;
 
             if (this.focusRoot) {
                 this.focusRoot.innerHTML = model.topTerms.slice(0, 6).map(item => {
@@ -202,6 +217,7 @@
             });
             const coTerms = Array.from(coMap.entries())
                 .map(([term, count]) => ({ term, count }))
+                .filter((item) => item.count >= this.connectionThreshold)
                 .sort((a, b) => b.count - a.count || a.term.localeCompare(b.term, 'zh-Hans-CN'))
                 .slice(0, 8);
 
@@ -215,7 +231,8 @@
                 focusTerm: allFocus,
                 contextSentences,
                 coTerms,
-                mode: this.mode
+                mode: this.mode,
+                connectionThreshold: this.connectionThreshold
             };
         },
 
@@ -416,7 +433,11 @@
             const cx = box.x + box.w * 0.5;
             const cy = box.y + box.h * 0.54;
             const radius = Math.min(box.w, box.h) * 0.28;
-            const terms = model.coTerms.length ? model.coTerms : model.topTerms.filter(item => item.term !== model.focusTerm).slice(0, 6);
+            const terms = model.coTerms.length
+                ? model.coTerms
+                : model.connectionThreshold > 1
+                    ? []
+                    : model.topTerms.filter(item => item.term !== model.focusTerm).slice(0, 6);
 
             ctx.save();
             ctx.fillStyle = 'rgba(126,215,193,0.14)';
@@ -498,6 +519,11 @@
             const method = this._methodHint(model);
 
             this.infoRoot.innerHTML = `
+                <div class="humanities-panel">
+                    <span class="humanities-panel__label">证据阈值</span>
+                    <strong>至少 ${model.connectionThreshold} 次共现</strong>
+                    <p>提高阈值会移除较弱连接；它检验证据强度，不会把留下的连接变成因果关系。</p>
+                </div>
                 <div class="humanities-panel">
                     <span class="humanities-panel__label">词项分布</span>
                     <strong>${this._escapeHtml(topList || '暂无词项')}</strong>

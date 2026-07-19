@@ -46,11 +46,13 @@
         hopsValue: null,
         infoRoot: null,
         presetButtons: [],
+        faultButtons: [],
         dpr: 1,
         scenarioId: 'web',
         state: {
             payload: 1800,
-            hops: 4
+            hops: 4,
+            faultNode: 'none'
         },
         tick: 0,
         rafId: 0,
@@ -70,6 +72,7 @@
             this.hopsValue = document.getElementById('network-hops-value');
             this.infoRoot = document.getElementById('network-info');
             this.presetButtons = Array.from(document.querySelectorAll('[data-network-scenario]'));
+            this.faultButtons = Array.from(document.querySelectorAll('[data-network-fault]'));
             this.motionQuery = typeof window.matchMedia === 'function'
                 ? window.matchMedia('(prefers-reduced-motion: reduce)')
                 : null;
@@ -132,6 +135,14 @@
                     this.render();
                 });
             });
+            this.faultButtons.forEach(button => {
+                if (button.dataset.bound) return;
+                button.dataset.bound = 'true';
+                button.addEventListener('click', () => {
+                    this.state.faultNode = button.dataset.networkFault || 'none';
+                    this.render();
+                });
+            });
         },
 
         _calculate() {
@@ -143,6 +154,13 @@
             const internetBytes = segments * IPV6_HEADER_BYTES;
             const transmittedPerPath = payload + transportBytes + internetBytes;
             const ipv6TcpPayloadBudget = IPV6_MIN_LINK_MTU - IPV6_HEADER_BYTES - TCP_HEADER_BYTES;
+            const faultIndexByNode = {
+                none: -1,
+                access: 1,
+                transit: Math.max(1, Math.floor(hops / 2)),
+                edge: Math.max(1, hops - 1)
+            };
+            const faultIndex = Math.min(hops - 1, faultIndexByNode[this.state.faultNode] ?? -1);
             return {
                 scenario,
                 payload,
@@ -152,7 +170,12 @@
                 internetBytes,
                 transmittedPerPath,
                 ipv6TcpPayloadBudget,
-                pathBytes: transmittedPerPath * hops
+                pathBytes: transmittedPerPath * hops,
+                fault: {
+                    node: this.state.faultNode,
+                    index: faultIndex,
+                    active: faultIndex >= 1
+                }
             };
         },
 
@@ -168,6 +191,11 @@
             if (this.hopsValue) this.hopsValue.textContent = `${Math.round(this.state.hops)} 跳`;
             this.presetButtons.forEach(button => {
                 const active = button.dataset.networkScenario === this.scenarioId;
+                button.classList.toggle('is-active', active);
+                button.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
+            this.faultButtons.forEach(button => {
+                const active = button.dataset.networkFault === this.state.faultNode;
                 button.classList.toggle('is-active', active);
                 button.setAttribute('aria-pressed', active ? 'true' : 'false');
             });
@@ -279,8 +307,11 @@
             ctx.stroke();
 
             const progress = (this.tick % 1);
-            const packetIndex = Math.min(points.length - 2, Math.floor(progress * (points.length - 1)));
-            const local = progress * (points.length - 1) - packetIndex;
+            const limit = model.fault.active ? Math.min(points.length - 2, model.fault.index) : points.length - 2;
+            const packetIndex = model.fault.active
+                ? Math.max(0, limit - 1)
+                : Math.min(limit, Math.floor(progress * (points.length - 1)));
+            const local = model.fault.active ? 1 : progress * (points.length - 1) - packetIndex;
             const a = points[packetIndex];
             const b = points[packetIndex + 1];
             const px = a.x + (b.x - a.x) * local;
@@ -296,7 +327,9 @@
                 ctx.fill();
                 ctx.beginPath();
                 ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
-                ctx.fillStyle = index === 0 || index === points.length - 1
+                ctx.fillStyle = index === model.fault.index
+                    ? 'rgba(225,106,92,0.92)'
+                    : index === 0 || index === points.length - 1
                     ? 'rgba(94,224,216,0.82)'
                     : 'rgba(242,200,107,0.72)';
                 ctx.fill();
@@ -305,6 +338,18 @@
                 ctx.textAlign = 'center';
                 ctx.fillText(point.label, point.x, point.y + radius + 18);
             });
+
+            if (model.fault.active) {
+                const failed = points[model.fault.index];
+                ctx.strokeStyle = 'rgba(225,106,92,0.95)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(failed.x - 12, failed.y - 12);
+                ctx.lineTo(failed.x + 12, failed.y + 12);
+                ctx.moveTo(failed.x + 12, failed.y - 12);
+                ctx.lineTo(failed.x - 12, failed.y + 12);
+                ctx.stroke();
+            }
 
             this._roundRect(ctx, px - 20, py - 12, 40, 24, 7);
             ctx.fillStyle = 'rgba(94,224,216,0.88)';
@@ -330,7 +375,15 @@
 
         _updateInfo(model) {
             if (!this.infoRoot) return;
+            const faultLabel = model.fault.active
+                ? `${this._routeLabels(model.hops)[model.fault.index]} 节点使数据包停止`
+                : '未设置路径故障';
             this.infoRoot.innerHTML = `
+                <div class="network-panel">
+                    <span class="network-panel__label">故障追踪</span>
+                    <strong>${this._escapeHtml(faultLabel)}</strong>
+                    <p>红色叉号节点与停下的数据包用于观察路径中断，不代表真实网络诊断结论。</p>
+                </div>
                 <div class="network-panel">
                     <span class="network-panel__label">DNS</span>
                     <strong>${this._escapeHtml(model.scenario.domain)} → ${this._escapeHtml(model.scenario.ip)}</strong>

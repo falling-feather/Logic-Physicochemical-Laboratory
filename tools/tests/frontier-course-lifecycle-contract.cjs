@@ -14,6 +14,13 @@ function manifestFor(window) {
   return window.FrontierCourseManifest;
 }
 
+function ownerFor(file, name) {
+  const window = {};
+  const context = vm.createContext({ window, Array, Date, Map, Math, Number, Object, RegExp, Set, String, console });
+  vm.runInContext(read(file), context, { filename: file });
+  return window[name];
+}
+
 const localWindow = {};
 const localManifest = manifestFor(localWindow);
 assert.equal(localManifest.galaxy_key, 'future-galaxy');
@@ -56,6 +63,91 @@ assert.equal(validState.activity_access['infotech.packet-route'].state, 'unavail
 
 const runtime = read('shared/js/frontier-learning.js');
 const index = read('index.html');
+const ownerEvidence = {
+  'cosmos.day-season': ['pages/cosmos/earth-sun.js', 'cosmos-day', 'declination'],
+  'cosmos.orbital-scale': ['shared/js/frontier-learning.js', 'fg-orbit-position', 'earth.position.set'],
+  'cosmos.evidence-log': ['pages/cosmos/earth-sun.js', 'cosmos-hour', 'shadowRatio'],
+  'engineering.load-path': ['pages/engineering/bridge-truss.js', 'truss-joint', 'memberForces'],
+  'engineering.member-choice': ['pages/engineering/bridge-truss.js', 'truss-member', 'structuralStatus'],
+  'engineering.safety-check': ['pages/engineering/bridge-truss.js', 'truss-safety', 'utilization'],
+  'datascience.model-fit': ['pages/datascience/linear-regression.js', 'regression-slope', 'state.slope'],
+  'datascience.outlier-test': ['pages/datascience/linear-regression.js', 'regression-dataset', 'datasetId'],
+  'datascience.evidence-claim': ['pages/datascience/linear-regression.js', 'regression-dataset', 'datasetId'],
+  'infotech.packet-route': ['pages/infotech/network-layers.js', 'network-hops', 'pathBytes'],
+  'infotech.layer-contract': ['pages/infotech/network-layers.js', 'network-payload', 'segments'],
+  'infotech.fault-trace': ['pages/infotech/network-layers.js', 'network-fault', 'fault.active'],
+  'materials.grain-boundary': ['pages/materials/materials-lab.js', 'materials-grain-size', 'boundaryIndex'],
+  'materials.defect-path': ['pages/materials/materials-lab.js', 'materials-defect', 'defectDensity'],
+  'materials.process-window': ['pages/materials/materials-lab.js', 'materials-cooling', 'observedGrainSize'],
+  'humanities.context-map': ['pages/humanities/text-lab.js', 'humanities-threshold', 'connectionThreshold'],
+  'humanities.voice-shift': ['pages/humanities/text-lab.js', 'humanities-sample', 'sampleId'],
+  'humanities.claim-review': ['pages/humanities/text-lab.js', 'humanities-threshold', 'connectionThreshold']
+};
+localManifest.courses.forEach((course) => course.activities.forEach((activity) => {
+  const expected = ownerEvidence[activity.activity_key];
+  assert.ok(expected, `${activity.activity_key} needs an explicit owner evidence contract`);
+  const [ownerPath, control, observable] = expected;
+  assert.equal(activity.input_control, control, `${activity.activity_key} must declare its real learning input`);
+  assert.ok(runtime.includes(control), `${activity.activity_key} control must be rendered by the route runtime`);
+  assert.ok(read(ownerPath).includes(observable), `${activity.activity_key} control must change an owner observation or reading`);
+  assert.ok(runtime.includes(`'${activity.activity_key}'`), `${activity.activity_key} needs its own route preset and answer feedback`);
+}));
+
+const seasons = ownerFor('pages/cosmos/earth-sun.js', 'CosmosSeasons');
+const noonObservation = seasons._calculate();
+seasons.state.hour = 9;
+const morningObservation = seasons._calculate();
+assert.notEqual(morningObservation.currentAltitude, noonObservation.currentAltitude, 'evidence-log time input must change the solar observation');
+assert.notEqual(morningObservation.shadowRatio, noonObservation.shadowRatio, 'evidence-log time input must change the shadow reading');
+
+const truss = ownerFor('pages/engineering/bridge-truss.js', 'BridgeTruss');
+const completeTruss = truss.solve();
+truss.state.memberMode = 'remove-fb';
+const reducedTruss = truss.solve();
+assert.equal(reducedTruss.memberForces.find((member) => member.name === 'FB').disabled, true, 'member-choice must visibly remove the selected diagonal');
+assert.equal(reducedTruss.structuralStatus.stable, false, 'member-choice must expose the interrupted structural path instead of inventing a rebalanced truss');
+assert.equal(reducedTruss.safety.available, false, 'an interrupted truss must not report a safety pass or utilisation');
+assert.ok(reducedTruss.memberForces.every((member) => member.disabled || member.unavailable), 'an interrupted truss must not output fabricated member-force readings');
+assert.doesNotMatch(read('pages/engineering/bridge-truss.js'), /transferred\s*\/\s*2/, 'member removal must not hard-code a half-force transfer');
+truss.state.memberMode = 'full';
+truss.state.safetyFactor = 3;
+const strictSafety = truss.solve().safety;
+truss.state.safetyFactor = 1.1;
+const relaxedSafety = truss.solve().safety;
+assert.ok(strictSafety.utilization > relaxedSafety.utilization, 'safety-check input must change utilization evidence');
+
+const regression = ownerFor('pages/datascience/linear-regression.js', 'LinearRegressionLab');
+const baselineRegression = regression._calculate();
+regression.state.slope += 5;
+assert.notEqual(regression._calculate().current.mse, baselineRegression.current.mse, 'model-fit slope must change residual evidence');
+regression.datasetId = 'outlier';
+assert.notEqual(regression._calculate().dataset.label, baselineRegression.dataset.label, 'outlier-test must switch to the actual outlier dataset');
+regression.datasetId = 'climate';
+assert.notEqual(regression._calculate().dataset.label, baselineRegression.dataset.label, 'evidence-claim must switch to its evidence dataset');
+
+const network = ownerFor('pages/infotech/network-layers.js', 'NetworkLayersLab');
+const baselineNetwork = network._calculate();
+network.state.hops = 7;
+assert.notEqual(network._calculate().pathBytes, baselineNetwork.pathBytes, 'packet-route hops must change path-byte evidence');
+network.state.payload = 5400;
+assert.ok(network._calculate().segments > baselineNetwork.segments, 'layer-contract payload must change segmentation evidence');
+network.state.faultNode = 'transit';
+assert.equal(network._calculate().fault.active, true, 'fault-trace must create a visible fault state');
+
+const materials = ownerFor('pages/materials/materials-lab.js', 'MaterialsLab');
+const baselineMaterial = materials._calculate({});
+materials.defectDensity = 8;
+assert.ok(materials._calculate({}).defectCount > baselineMaterial.defectCount, 'defect-path density must change the visible defect count');
+materials.coolingRate = 100;
+assert.ok(materials._calculate({}).observedGrainSize < baselineMaterial.observedGrainSize, 'process-window cooling rate must refine the observed grain size');
+
+const humanities = ownerFor('pages/humanities/text-lab.js', 'HumanitiesLab');
+const baselineHumanities = humanities._buildModel();
+humanities.sampleId = 'city';
+humanities.focusTerm = '';
+assert.notEqual(humanities._buildModel().sample.label, baselineHumanities.sample.label, 'voice-shift must change the inspected material');
+humanities.connectionThreshold = 3;
+assert.ok(humanities._buildModel().coTerms.length <= baselineHumanities.coTerms.length, 'claim-review threshold must filter relationship evidence');
 [
   'AbortController', 'ResizeObserver', 'runtime.abort.signal.aborted', 'cancelAnimationFrame',
   'geometry.dispose', 'material.dispose', 'texture.dispose', 'target.dispose', 'bitmap.close',

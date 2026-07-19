@@ -6,13 +6,18 @@
         ctx: null,
         loadInput: null,
         loadValue: null,
+        safetyInput: null,
+        safetyValue: null,
         positionButtons: [],
+        memberButtons: [],
         infoRoot: null,
         rafId: 0,
         dpr: 1,
         state: {
             load: 60,
-            loadJoint: 'C'
+            loadJoint: 'C',
+            memberMode: 'full',
+            safetyFactor: 1.8
         },
         joints: [
             { id: 'A', x: 0, y: 0 },
@@ -40,7 +45,10 @@
                 : null;
             this.loadInput = document.getElementById('truss-load');
             this.loadValue = document.getElementById('truss-load-value');
+            this.safetyInput = document.getElementById('truss-safety');
+            this.safetyValue = document.getElementById('truss-safety-value');
             this.positionButtons = Array.from(document.querySelectorAll('[data-truss-joint]'));
+            this.memberButtons = Array.from(document.querySelectorAll('[data-truss-member]'));
             this.infoRoot = document.getElementById('truss-info');
 
             if (this.loadInput && !this.loadInput.dataset.bound) {
@@ -51,11 +59,28 @@
                 });
             }
 
+            if (this.safetyInput && !this.safetyInput.dataset.bound) {
+                this.safetyInput.dataset.bound = 'true';
+                this.safetyInput.addEventListener('input', () => {
+                    this.state.safetyFactor = Math.max(1.1, Number(this.safetyInput.value) || 1.8);
+                    this.render();
+                });
+            }
+
             this.positionButtons.forEach(button => {
                 if (button.dataset.bound) return;
                 button.dataset.bound = 'true';
                 button.addEventListener('click', () => {
                     this.state.loadJoint = button.dataset.trussJoint || 'C';
+                    this.render();
+                });
+            });
+
+            this.memberButtons.forEach(button => {
+                if (button.dataset.bound) return;
+                button.dataset.bound = 'true';
+                button.addEventListener('click', () => {
+                    this.state.memberMode = button.dataset.trussMember || 'full';
                     this.render();
                 });
             });
@@ -73,8 +98,15 @@
         render() {
             if (this.loadInput) this.loadInput.value = String(this.state.load);
             if (this.loadValue) this.loadValue.textContent = `${this.state.load} kN`;
+            if (this.safetyInput) this.safetyInput.value = String(this.state.safetyFactor);
+            if (this.safetyValue) this.safetyValue.textContent = this.state.safetyFactor.toFixed(1);
             this.positionButtons.forEach(button => {
                 const active = button.dataset.trussJoint === this.state.loadJoint;
+                button.classList.toggle('is-active', active);
+                button.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
+            this.memberButtons.forEach(button => {
+                const active = button.dataset.trussMember === this.state.memberMode;
                 button.classList.toggle('is-active', active);
                 button.setAttribute('aria-pressed', active ? 'true' : 'false');
             });
@@ -88,6 +120,10 @@
         },
 
         solve() {
+            if (this.state.memberMode === 'remove-fb') {
+                return this._unavailableMemberResult('FB');
+            }
+
             const jointIndex = new Map(this.joints.map((joint, index) => [joint.id, index]));
             const unknowns = this.members.map(pair => pair.join(''));
             unknowns.push('Ax', 'Ay', 'Ey');
@@ -150,6 +186,8 @@
             const critical = memberForces.reduce((best, item) => (
                 Math.abs(item.force) > Math.abs(best.force) ? item : best
             ), memberForces[0]);
+            const allowableForce = 130 / this.state.safetyFactor;
+            const utilization = Math.abs(critical.force) / allowableForce;
 
             return {
                 memberForces,
@@ -159,7 +197,51 @@
                     Ey: byName.Ey || 0
                 },
                 maxForce,
-                critical
+                critical,
+                removedMember: '',
+                structuralStatus: {
+                    stable: true,
+                    message: ''
+                },
+                safety: {
+                    available: true,
+                    factor: this.state.safetyFactor,
+                    allowableForce,
+                    utilization,
+                    passes: utilization <= 1
+                }
+            };
+        },
+
+        _unavailableMemberResult(removedMember) {
+            return {
+                memberForces: this.members.map((pair) => {
+                    const name = pair.join('');
+                    return {
+                        name,
+                        from: pair[0],
+                        to: pair[1],
+                        force: 0,
+                        type: name === removedMember ? 'removed' : 'unavailable',
+                        disabled: name === removedMember,
+                        unavailable: true
+                    };
+                }),
+                reactions: { Ax: 0, Ay: 0, Ey: 0 },
+                maxForce: 1,
+                critical: { name: removedMember, force: 0, type: 'unavailable' },
+                removedMember,
+                structuralStatus: {
+                    stable: false,
+                    message: 'FB 斜杆缺失后，受力路径中断；本静定桁架模型无法继续校核。'
+                },
+                safety: {
+                    available: false,
+                    factor: this.state.safetyFactor,
+                    allowableForce: null,
+                    utilization: null,
+                    passes: false
+                }
             };
         },
 
@@ -183,24 +265,28 @@
             this._drawGrid(ctx, w, h, deckY, padX, span);
             this._drawSupports(ctx, joints);
             this._drawLoad(ctx, joints.get(this.state.loadJoint), this.state.load);
-            this._drawReactions(ctx, joints, result.reactions);
+            if (result.structuralStatus.stable) this._drawReactions(ctx, joints, result.reactions);
 
             result.memberForces.forEach(member => {
                 const a = joints.get(member.from);
                 const b = joints.get(member.to);
                 const ratio = Math.abs(member.force) / result.maxForce;
-                const width = 2 + ratio * 7;
+                const width = member.disabled ? 1.4 : 2 + ratio * 7;
                 ctx.beginPath();
                 ctx.moveTo(a.x, a.y);
                 ctx.lineTo(b.x, b.y);
                 ctx.lineWidth = width;
                 ctx.lineCap = 'round';
-                ctx.strokeStyle = member.type === 'tension'
+                ctx.setLineDash(member.disabled ? [7, 6] : []);
+                ctx.strokeStyle = member.disabled
+                    ? 'rgba(184,84,80,0.92)'
+                    : member.type === 'tension'
                     ? `rgba(79,168,163,${0.46 + ratio * 0.5})`
                     : member.type === 'compression'
                     ? `rgba(216,163,72,${0.46 + ratio * 0.5})`
                     : 'rgba(138,144,160,0.38)';
                 ctx.stroke();
+                ctx.setLineDash([]);
             });
 
             result.memberForces.forEach(member => {
@@ -227,10 +313,29 @@
             });
 
             this._drawLegend(ctx, w, top);
+            ctx.save();
+            ctx.fillStyle = result.safety.available && result.safety.passes ? 'rgba(126,215,193,0.92)' : 'rgba(225,106,92,0.95)';
+            ctx.font = `600 12px ${this._fontMono()}`;
+            ctx.textAlign = 'left';
+            const safetyText = result.safety.available
+                ? `安全校核：利用率 ${(result.safety.utilization * 100).toFixed(0)}% / 系数 ${result.safety.factor.toFixed(1)}`
+                : '构件路径中断：本模型不可校核';
+            ctx.fillText(safetyText, padX, top);
+            ctx.restore();
         },
 
         updateInfo(result) {
             if (!this.infoRoot) return;
+            if (!result.structuralStatus.stable) {
+                this.infoRoot.innerHTML = `
+                    <div class="truss-panel">
+                        <span class="truss-panel__label">构件路径中断</span>
+                        <strong>FB 斜杆已移除</strong>
+                        <p>该 15 杆、3 支反力的静定桁架失去一根构件后，不能用原静力模型重新求得平衡。画布因此只标示失效位置，不输出伪造内力、反力或安全通过率。</p>
+                    </div>
+                `;
+                return;
+            }
             const critical = result.critical || { name: '-', force: 0, type: 'zero' };
             const typeLabel = critical.type === 'tension' ? '受拉' : critical.type === 'compression' ? '受压' : '近似零力';
             const left = result.reactions.Ay.toFixed(1);

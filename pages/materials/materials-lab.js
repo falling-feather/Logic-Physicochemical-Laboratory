@@ -59,12 +59,18 @@
         ctx: null,
         grainInput: null,
         grainValue: null,
+        defectInput: null,
+        defectValue: null,
+        coolingInput: null,
+        coolingValue: null,
         infoRoot: null,
         cellButtons: [],
         presetButtons: [],
         dpr: 1,
         cellId: 'fcc',
         grainSize: 45,
+        defectDensity: 2,
+        coolingRate: 50,
         _boundResize: null,
 
         init() {
@@ -75,6 +81,10 @@
                 : null;
             this.grainInput = document.getElementById('materials-grain-size');
             this.grainValue = document.getElementById('materials-grain-size-value');
+            this.defectInput = document.getElementById('materials-defect');
+            this.defectValue = document.getElementById('materials-defect-value');
+            this.coolingInput = document.getElementById('materials-cooling');
+            this.coolingValue = document.getElementById('materials-cooling-value');
             this.infoRoot = document.getElementById('materials-info');
             this.cellButtons = Array.from(document.querySelectorAll('[data-material-cell]'));
             this.presetButtons = Array.from(document.querySelectorAll('[data-material-preset]'));
@@ -110,6 +120,22 @@
                 });
             }
 
+            if (this.defectInput && !this.defectInput.dataset.bound) {
+                this.defectInput.dataset.bound = 'true';
+                this.defectInput.addEventListener('input', () => {
+                    this.defectDensity = Math.max(0, Math.min(10, Number(this.defectInput.value) || 0));
+                    this.render();
+                });
+            }
+
+            if (this.coolingInput && !this.coolingInput.dataset.bound) {
+                this.coolingInput.dataset.bound = 'true';
+                this.coolingInput.addEventListener('input', () => {
+                    this.coolingRate = Math.max(10, Math.min(100, Number(this.coolingInput.value) || 50));
+                    this.render();
+                });
+            }
+
             this.cellButtons.forEach(button => {
                 if (button.dataset.bound) return;
                 button.dataset.bound = 'true';
@@ -134,6 +160,10 @@
         _syncControls() {
             if (this.grainInput) this.grainInput.value = String(this.grainSize);
             if (this.grainValue) this.grainValue.textContent = `${Math.round(this.grainSize)} μm`;
+            if (this.defectInput) this.defectInput.value = String(this.defectDensity);
+            if (this.defectValue) this.defectValue.textContent = `${Math.round(this.defectDensity)} / 10`;
+            if (this.coolingInput) this.coolingInput.value = String(this.coolingRate);
+            if (this.coolingValue) this.coolingValue.textContent = String(Math.round(this.coolingRate));
             this.cellButtons.forEach(button => {
                 const active = button.dataset.materialCell === this.cellId;
                 button.classList.toggle('is-active', active);
@@ -155,13 +185,19 @@
         },
 
         _calculate(cell) {
-            const boundaryIndex = Math.sqrt(45 / this.grainSize);
-            const hallPetchTerm = 1 / Math.sqrt(this.grainSize);
-            const strengthIndex = 0.72 + 1.55 * hallPetchTerm;
-            const grainCount = Math.round(this._map(this.grainSize, 5, 120, 70, 12));
+            const coolingFraction = (this.coolingRate - 10) / 90;
+            const observedGrainSize = Math.max(5, this.grainSize * (1 - coolingFraction * 0.55));
+            const boundaryIndex = Math.sqrt(45 / observedGrainSize);
+            const hallPetchTerm = 1 / Math.sqrt(observedGrainSize);
+            const strengthIndex = 0.72 + 1.55 * hallPetchTerm - this.defectDensity * 0.025;
+            const grainCount = Math.round(this._map(observedGrainSize, 5, 120, 70, 12));
             return {
                 cell,
                 grainSize: this.grainSize,
+                observedGrainSize,
+                defectDensity: this.defectDensity,
+                defectCount: Math.round(this.defectDensity * 1.8),
+                coolingRate: this.coolingRate,
                 boundaryIndex,
                 hallPetchTerm,
                 strengthIndex,
@@ -191,7 +227,7 @@
             this._drawCell(ctx, cellBox, model.cell);
             this._drawPackingBar(ctx, cellBox, model.cell);
 
-            this._drawPanel(ctx, grainBox, '多晶显微结构', `${Math.round(model.grainSize)} μm`);
+            this._drawPanel(ctx, grainBox, '多晶显微结构', `${Math.round(model.observedGrainSize)} μm`);
             this._drawGrains(ctx, grainBox, model);
 
             this._drawPanel(ctx, curveBox, '晶粒尺寸趋势', 'relative');
@@ -353,13 +389,31 @@
 
             ctx.strokeStyle = 'rgba(224,181,106,0.62)';
             ctx.lineWidth = 1.4;
-            const lines = Math.min(8, Math.max(3, Math.round(110 / model.grainSize)));
+            const lines = Math.min(8, Math.max(3, Math.round(110 / model.observedGrainSize)));
             for (let i = 0; i < lines; i += 1) {
                 const sx = area.x + (i + 0.8) * (area.w / (lines + 1));
                 const sy = area.y + area.h * (0.24 + (i % 3) * 0.16);
                 ctx.beginPath();
                 ctx.moveTo(sx, sy);
                 ctx.quadraticCurveTo(sx + 24, sy + 16, sx + 52, sy + 5);
+                ctx.stroke();
+            }
+            for (let i = 0; i < model.defectCount; i += 1) {
+                const x = area.x + ((Math.sin(i * 12.7 + model.defectDensity) + 1) / 2) * area.w;
+                const y = area.y + ((Math.cos(i * 8.3 + model.defectDensity) + 1) / 2) * area.h;
+                ctx.beginPath();
+                ctx.arc(x, y, 2.4 + model.defectDensity * 0.12, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(225,106,92,0.9)';
+                ctx.fill();
+            }
+            if (model.defectDensity > 0) {
+                const pathY = area.y + area.h * 0.62;
+                ctx.strokeStyle = `rgba(225,106,92,${0.25 + model.defectDensity * 0.05})`;
+                ctx.lineWidth = 1.2 + model.defectDensity * 0.16;
+                ctx.beginPath();
+                ctx.moveTo(area.x + 8, pathY);
+                ctx.lineTo(area.x + area.w * 0.42, pathY - model.defectDensity * 2);
+                ctx.lineTo(area.x + area.w * 0.72, pathY + model.defectDensity * 1.5);
                 ctx.stroke();
             }
             ctx.restore();
@@ -409,7 +463,7 @@
             }
             ctx.stroke();
 
-            const markerX = sx(model.grainSize);
+            const markerX = sx(model.observedGrainSize);
             const markerY = sy(model.strengthIndex);
             ctx.strokeStyle = 'rgba(224,181,106,0.42)';
             ctx.beginPath();
@@ -441,6 +495,11 @@
             const boundary = this._boundaryHint(model);
             this.infoRoot.innerHTML = `
                 <div class="materials-panel">
+                    <span class="materials-panel__label">缺陷与工艺读数</span>
+                    <strong>缺陷 ${model.defectDensity.toFixed(0)} / 10 · 冷却 ${model.coolingRate.toFixed(0)}</strong>
+                    <p>红色缺陷点与传播线随缺陷密度增加；本教学模型把冷却速率映射为当前可见组织尺度 ${model.observedGrainSize.toFixed(1)} μm。</p>
+                </div>
+                <div class="materials-panel">
                     <span class="materials-panel__label">晶体结构</span>
                     <strong>${cell.label}</strong>
                     <p>${cell.summary}</p>
@@ -452,7 +511,7 @@
                 </div>
                 <div class="materials-panel">
                     <span class="materials-panel__label">晶粒尺度</span>
-                    <strong>${Math.round(model.grainSize)} μm</strong>
+                    <strong>${Math.round(model.observedGrainSize)} μm</strong>
                     <p>相对晶界密度约 ${model.boundaryIndex.toFixed(2)}；在微米级多晶金属入门模型中，晶粒越细，单位体积内晶界通常越多。</p>
                 </div>
                 <div class="materials-panel">
@@ -468,13 +527,13 @@
         },
 
         _boundaryHint(model) {
-            if (model.grainSize <= 12) {
+            if (model.observedGrainSize <= 12) {
                 return {
                     title: '接近超细晶讨论边缘',
                     copy: '晶粒继续变小时，晶界扩散、晶界滑移和材料成分会更明显，Hall-Petch 型直线趋势不能简单外推。'
                 };
             }
-            if (model.grainSize >= 85) {
+            if (model.observedGrainSize >= 85) {
                 return {
                     title: '粗晶粒更依赖其他缺陷',
                     copy: '晶界密度降低后，强度还会受到位错密度、相组成、孔隙和热处理历史影响，不能只看平均晶粒尺寸。'
