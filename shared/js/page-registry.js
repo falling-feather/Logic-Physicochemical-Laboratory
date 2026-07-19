@@ -5,7 +5,8 @@
     if (global.AstraPageRegistry) return;
 
     const ROLE_RESOURCE_VERSION = '20260719v757StudentPublicationP0';
-    const TEACHER_RESOURCE_VERSION = '20260719v757TeacherCurriculumP0';
+    const TEACHER_RESOURCE_VERSION = '20260719v758TeacherPaginationP0';
+    const FUTURE_RESOURCE_VERSION = '20260719v758ReleaseAuditP0';
     const ADMIN_RESOURCE_VERSION = '20260718v7432UnifiedAtlasP0';
     const PLANETS_RESOURCE_VERSION = '20260719v7437AstraWorkspaceP0';
 
@@ -70,7 +71,7 @@
             galaxy: 'frontier',
             tags: ['frontier'],
             styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
-            script: 'shared/js/frontier-learning.js?v=20260719v757FuturePublicationP0',
+            script: `shared/js/frontier-learning.js?v=${FUTURE_RESOURCE_VERSION}`,
             ready: 'initFrontierCourse',
             enter: 'initFrontierCourse',
             leave: 'destroyFrontierCourse'
@@ -79,7 +80,7 @@
             galaxy: 'frontier',
             tags: ['frontier'],
             styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
-            script: 'shared/js/frontier-learning.js?v=20260719v757FuturePublicationP0',
+            script: `shared/js/frontier-learning.js?v=${FUTURE_RESOURCE_VERSION}`,
             ready: 'initFrontierCourse',
             enter: 'initFrontierCourse',
             leave: 'destroyFrontierCourse'
@@ -88,7 +89,7 @@
             galaxy: 'frontier',
             tags: ['frontier'],
             styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
-            script: 'shared/js/frontier-learning.js?v=20260719v757FuturePublicationP0',
+            script: `shared/js/frontier-learning.js?v=${FUTURE_RESOURCE_VERSION}`,
             ready: 'initFrontierCourse',
             enter: 'initFrontierCourse',
             leave: 'destroyFrontierCourse'
@@ -97,7 +98,7 @@
             galaxy: 'frontier',
             tags: ['frontier'],
             styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
-            script: 'shared/js/frontier-learning.js?v=20260719v757FuturePublicationP0',
+            script: `shared/js/frontier-learning.js?v=${FUTURE_RESOURCE_VERSION}`,
             ready: 'initFrontierCourse',
             enter: 'initFrontierCourse',
             leave: 'destroyFrontierCourse'
@@ -106,7 +107,7 @@
             galaxy: 'frontier',
             tags: ['frontier'],
             styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
-            script: 'shared/js/frontier-learning.js?v=20260719v757FuturePublicationP0',
+            script: `shared/js/frontier-learning.js?v=${FUTURE_RESOURCE_VERSION}`,
             ready: 'initFrontierCourse',
             enter: 'initFrontierCourse',
             leave: 'destroyFrontierCourse'
@@ -115,7 +116,7 @@
             galaxy: 'frontier',
             tags: ['frontier'],
             styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
-            script: 'shared/js/frontier-learning.js?v=20260719v757FuturePublicationP0',
+            script: `shared/js/frontier-learning.js?v=${FUTURE_RESOURCE_VERSION}`,
             ready: 'initFrontierCourse',
             enter: 'initFrontierCourse',
             leave: 'destroyFrontierCourse'
@@ -124,7 +125,7 @@
             galaxy: 'frontier',
             tags: ['frontier'],
             styles: ['pages/frontier/frontier.css?v=20260719v755Game001'],
-            script: 'shared/js/frontier-learning.js?v=20260719v757FuturePublicationP0',
+            script: `shared/js/frontier-learning.js?v=${FUTURE_RESOURCE_VERSION}`,
             ready: 'initFrontierCourse',
             enter: 'initFrontierCourse',
             leave: 'destroyFrontierCourse'

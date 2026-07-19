@@ -68,6 +68,9 @@ assert.ok(!runtime.includes('href="#${esc(course.page)}/${esc(item.activity_key)
 assert.ok(runtime.includes('mountOwnerVisual'), 'Canvas owners must be the normal non-WebGL path');
 assert.ok(runtime.includes('data-fg-view') && runtime.includes('setView(next)') && runtime.includes('viewAzimuth'), 'orbit view input must drive the camera');
 assert.ok(runtime.includes('new THREE.PointLight') && runtime.includes('Earth day/night boundary visible'), 'orbit lighting must illuminate the Earth from the fixed teaching sun');
+assert.match(runtime, /orbitFocusX\s*=\s*-Math\.sqrt\(orbitMajorRadius \*\* 2 - orbitMinorRadius \*\* 2\)/, 'the Three teaching sun must occupy an ellipse focus');
+assert.match(runtime, /sun\.position\.set\(orbitFocusX, 0, 0\)/, 'the Three light source must follow the focal teaching sun');
+assert.match(runtime, /focusX\s*=\s*cx - Math\.sqrt/, 'the Canvas fallback must preserve the same focal model');
 assert.match(runtime, /runtime\.abort\.signal\.aborted \|\| activeRuntime !== runtime \|\| !canvas\.isConnected\) \{\s*if \(canvas\.isConnected\) canvas\.remove\(\);\s*return;/, 'a route left during dynamic Three import must remove its provisional canvas');
 assert.ok(runtime.includes('global.destroyFrontierCourse = () => FrontierLearning.destroy()'), 'leave cleanup must not infer a page from a changed hash');
 assert.ok(runtime.includes("route.access.state === 'locked'") && runtime.includes('教师正在按班级学习节奏开放课程'), 'locked child routes must explain the teacher-paced release state');
@@ -92,6 +95,7 @@ assert.match(index, /href="#frontier" data-page="frontier"/, 'the resource index
 assert.equal((index.match(/class="frontier-footer__container"/g) || []).length, 1, 'the future footer must have one real layout container');
 assert.equal((index.match(/class="frontier-footer__bottom"/g) || []).length, 1, 'the future footer must retain the shared copyright row');
 ['返回星序', '开源协议', '更新日志'].forEach((label) => assert.ok(index.includes(label), `future footer must preserve the valid ${label} entry`));
+assert.doesNotMatch(index, /<script src="shared\/js\/frontier-learning\.js/, 'Future runtime must be loaded by the route registry, not parsed for every role');
 
 const main = read('shared/js/main.js');
 assert.ok(main.includes("'./pages/frontier/frontier-manifest.js?v=20260719v755Game001'"));
@@ -99,10 +103,26 @@ assert.ok(!main.includes("'./pages/cosmos/earth-sun.js?v=20260630mainV64'"), 'fu
 const registry = read('shared/js/page-registry.js');
 assert.ok(registry.includes("ready: 'initFrontierCourse'"));
 assert.ok(registry.includes("leave: 'destroyFrontierCourse'"));
+assert.ok(registry.includes('FUTURE_RESOURCE_VERSION'), 'the route registry must own the Future runtime cache generation');
 
 const asset = path.join(root, 'UI', 'future-galaxy', 'orbit-observatory.webp');
 assert.ok(fs.existsSync(asset), 'observatory asset must ship locally');
 assert.ok(fs.statSync(asset).size < 550 * 1024, 'observatory asset must stay inside the image budget');
+const baseCss = read('shared/css/base.css');
+const serviceWorker = read('sw.js');
+['future-galaxy-hero-sky.webp', 'future-galaxy-hero-nebula.webp'].forEach((name) => {
+  const optimized = path.join(root, 'UI', 'future-galaxy', name);
+  assert.ok(fs.existsSync(optimized), `${name} must ship in a browser-efficient format`);
+  assert.ok(fs.statSync(optimized).size < 180 * 1024, `${name} must remain inside the background image budget`);
+  assert.ok(baseCss.includes(name), `${name} must be the active base background`);
+});
+assert.doesNotMatch(baseCss, /future-galaxy-hero-(?:sky|nebula)\.png/);
+assert.doesNotMatch(serviceWorker, /future-galaxy-hero-(?:sky|nebula)\.(?:png|webp)/, 'future-only backgrounds must not inflate the global app shell');
+assert.match(baseCss, /\.frontier-overview-page\.active\s*\{[\s\S]*?height:\s*auto;[\s\S]*?max-height:\s*none;[\s\S]*?overflow:\s*hidden;/, 'the catalogue must grow below one viewport while clipping decorative overflow');
+const networkRuntime = read('pages/infotech/network-layers.js');
+assert.match(networkRuntime, /matchMedia\('\(prefers-reduced-motion: reduce\)'\)/);
+assert.match(networkRuntime, /Math\.min\(window\.devicePixelRatio \|\| 1, this\.reducedMotion \? 1 : 1\.5\)/, 'Canvas DPR must be bounded');
+assert.match(networkRuntime, /if \(!this\.ctx \|\| this\.reducedMotion\) return;/, 'reduced-motion must disable the continuous RAF loop');
 assert.match(read('shared/vendor/three-r185/LICENSE'), /MIT License/);
 assert.ok(fs.statSync(path.join(root, 'shared/vendor/three-r185/three.module.js')).size > 600000, 'auditable local Three ESM is required');
 assert.match(read('shared/vendor/three-r185/three.module.js'), /from '.\/three\.core\.js'/, 'r185 module dependency must remain explicit');

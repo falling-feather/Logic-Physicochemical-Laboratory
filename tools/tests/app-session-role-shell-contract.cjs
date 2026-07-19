@@ -41,7 +41,7 @@ assert.doesNotMatch(session, /localStorage|sessionStorage|Authorization\s*:|\.ac
 
 assert.match(main, /await window\.AstraApplicationSession\.bootstrap\(\);\s*initApp\(\)/);
 assert.match(main, /serviceWorker\.register\('\.\/sw\.js\?v=' \+ SHELL_RUNTIME_ASSET_VERSION\)/);
-assert.match(html, /page-registry\.js\?v=20260719v757TeacherCurriculumP0[\s\S]*main\.js\?v=20260719v757TeacherCurriculumP0/);
+assert.match(html, /page-registry\.js\?v=20260719v758ReleaseAuditP0[\s\S]*main\.js\?v=20260719v758ReleaseAuditP0/);
 assert.match(main, /page-registry\.js\?v=' \+ PAGE_REGISTRY_ASSET_VERSION/);
 assert.match(main, /main\.js\?v=' \+ SHELL_RUNTIME_ASSET_VERSION/);
 assert.doesNotMatch(main, /\ninitApp\(\);\s*$/);

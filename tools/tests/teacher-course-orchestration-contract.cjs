@@ -17,7 +17,12 @@ assert.match(teacher, /async function loadCurriculumScope/);
 assert.match(teacher, /\/api\/courses\/\$\{courseId\}\/classes\/\$\{classId\}\/release-plan/);
 assert.match(teacher, /\/api\/progress\/courses\/\$\{courseId\}\/classes\/\$\{classId\}\/students/);
 assert.match(teacher, /fetchJson\('\/api\/code-submissions'/);
-assert.match(teacher, /params:\s*\{\s*class_id:\s*classId,\s*course_id:\s*courseId,\s*limit:\s*200/);
+assert.match(teacher, /limit:\s*COURSE_PROGRESS_PAGE_LIMIT,\s*offset:\s*state\.pagination\.courseProgressOffset/);
+assert.match(teacher, /limit:\s*CODE_SUBMISSION_PAGE_LIMIT,\s*offset:\s*state\.pagination\.codeSubmissionsOffset/);
+assert.match(teacher, /data-teacher-curriculum-page=/);
+assert.match(teacher, /page\.next_offset/);
+assert.match(teacher, /本页完成度/);
+assert.doesNotMatch(teacher, /全班完成度/);
 
 assert.match(teacher, /data-teacher-form="release-plan"/);
 assert.match(teacher, /method:\s*'PATCH'[\s\S]*expected_version:\s*Number\(plan\.plan_version\)/);

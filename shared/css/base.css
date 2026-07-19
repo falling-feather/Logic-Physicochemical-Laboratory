@@ -656,8 +656,8 @@ a:focus:not(:focus-visible) {
 .frontier-overview-page {
     --frontier-accent: #f2c86b;
     --frontier-accent-rgb: 242, 200, 107;
-    --frontier-hero-sky: url("../../UI/future-galaxy/future-galaxy-hero-sky.png");
-    --frontier-hero-nebula: url("../../UI/future-galaxy/future-galaxy-hero-nebula.png");
+    --frontier-hero-sky: url("../../UI/future-galaxy/future-galaxy-hero-sky.webp");
+    --frontier-hero-nebula: url("../../UI/future-galaxy/future-galaxy-hero-nebula.webp");
     --frontier-bg-shift-x: 0px;
     --frontier-bg-shift-y: 0px;
     --frontier-orbit-shift-x: 0px;
@@ -667,9 +667,9 @@ a:focus:not(:focus-visible) {
     position: relative;
     isolation: isolate;
     width: 100%;
-    height: 100vh;
+    height: auto;
     min-height: 100vh;
-    max-height: 100vh;
+    max-height: none;
     overflow: hidden;
     background:
         radial-gradient(ellipse 72% 58% at 78% 44%, rgba(101, 228, 240, 0.10), transparent 68%),
@@ -678,8 +678,9 @@ a:focus:not(:focus-visible) {
 }
 
 .frontier-overview-page.active {
-    height: 100vh;
+    height: auto;
     min-height: 100vh;
+    max-height: none;
     overflow: hidden;
 }
 

@@ -2410,6 +2410,57 @@
     font-size: 0.65rem;
 }
 
+.teacher-progress-foot > div:first-child {
+    display: grid;
+    gap: 4px;
+}
+
+.teacher-page-nav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #8095aa;
+    font-size: 0.65rem;
+    white-space: nowrap;
+}
+
+.teacher-page-nav > div {
+    display: flex;
+    gap: 6px;
+}
+
+.teacher-page-nav button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 44px;
+    padding: 0 11px;
+    border: 1px solid rgba(139, 180, 224, 0.22);
+    border-radius: 4px;
+    color: #b7c8d9;
+    background: rgba(9, 19, 34, 0.74);
+    font: inherit;
+    cursor: pointer;
+}
+
+.teacher-page-nav button:hover:not(:disabled),
+.teacher-page-nav button:focus-visible {
+    border-color: rgba(115, 233, 191, 0.52);
+    color: #e4fff6;
+    outline: none;
+}
+
+.teacher-page-nav button:disabled {
+    opacity: 0.38;
+    cursor: not-allowed;
+}
+
+.teacher-page-nav svg {
+    width: 14px;
+    height: 14px;
+}
+
 .teacher-code-station {
     margin-top: 36px;
     padding-top: 2px;
@@ -2418,6 +2469,14 @@
     background:
         radial-gradient(circle at 92% 8%, rgba(126, 108, 255, 0.1), transparent 24%),
         linear-gradient(180deg, rgba(9, 18, 34, 0.5), rgba(5, 11, 20, 0.12));
+}
+
+.teacher-code-pagination {
+    display: flex;
+    justify-content: flex-end;
+    min-height: 54px;
+    padding: 9px 0;
+    border-top: 1px solid rgba(139, 180, 224, 0.12);
 }
 
 .teacher-code-station--quiet {
@@ -2895,6 +2954,16 @@
     .teacher-code-station__toolbar {
         align-items: flex-start;
         flex-direction: column;
+    }
+
+    .teacher-page-nav,
+    .teacher-code-pagination {
+        width: 100%;
+    }
+
+    .teacher-page-nav {
+        justify-content: space-between;
+        white-space: normal;
     }
 
     .teacher-code-layout {

@@ -118,8 +118,10 @@ async function run() {
   const manifestIndex = indexSource.indexOf('pages/frontier/frontier-manifest.js');
   const contextIndex = indexSource.indexOf('shared/js/frontier-publication-context.js');
   const runtimeIndex = indexSource.indexOf('shared/js/frontier-learning.js');
-  assert.ok(manifestIndex >= 0 && manifestIndex < contextIndex && contextIndex < runtimeIndex,
-    'the direct-entry controller must load after the manifest and before the Future runtime');
+  const registryIndex = indexSource.indexOf('shared/js/page-registry.js');
+  assert.ok(manifestIndex >= 0 && manifestIndex < contextIndex && contextIndex < registryIndex,
+    'the direct-entry controller must load after the manifest and before route startup');
+  assert.equal(runtimeIndex, -1, 'the Future runtime must remain route-lazy on direct and non-Future entries');
 
   console.log('student-frontier-publication-context-contract: ok');
 }

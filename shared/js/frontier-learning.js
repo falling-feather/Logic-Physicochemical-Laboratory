@@ -180,7 +180,7 @@
         'earth-space': { script: 'pages/cosmos/earth-sun.js?v=20260719v755Game001', init: 'initCosmosSeasons', destroy: 'destroyCosmosSeasons' },
         'engineering-systems': { script: 'pages/engineering/bridge-truss.js?v=20260719v755Game001', init: 'initBridgeTruss', destroy: 'destroyBridgeTruss' },
         'data-ai': { script: 'pages/datascience/linear-regression.js?v=20260719v755Game001', init: 'initLinearRegressionLab', destroy: 'destroyLinearRegressionLab' },
-        'information-technology': { script: 'pages/infotech/network-layers.js?v=20260719v755Game001', init: 'initNetworkLayersLab', destroy: 'destroyNetworkLayersLab' },
+        'information-technology': { script: 'pages/infotech/network-layers.js?v=20260719v758ReleaseAuditP0', init: 'initNetworkLayersLab', destroy: 'destroyNetworkLayersLab' },
         'materials-science': { script: 'pages/materials/materials-lab.js?v=20260719v755Game001', init: 'initMaterialsLab', destroy: 'destroyMaterialsLab' },
         'humanities-futures': { script: 'pages/humanities/text-lab.js?v=20260719v755Game001', init: 'initHumanitiesLab', destroy: 'destroyHumanitiesLab' }
     });
@@ -334,12 +334,12 @@
         context.fillStyle = '#07142d'; context.fillRect(0, 0, width, height);
         const kind = visual;
         if (kind === 'orbit') {
-            const cx = width * .54; const cy = height * .53; const earthX = cx + Math.cos(t * Math.PI * 2) * width * .27; const earthY = cy + Math.sin(t * Math.PI * 2) * height * .12;
+            const cx = width * .54; const cy = height * .53; const orbitRadiusX = width * .27; const orbitRadiusY = height * .12; const focusX = cx - Math.sqrt(Math.max(0, orbitRadiusX ** 2 - orbitRadiusY ** 2)); const earthX = cx + Math.cos(t * Math.PI * 2) * orbitRadiusX; const earthY = cy + Math.sin(t * Math.PI * 2) * orbitRadiusY;
             context.strokeStyle = 'rgba(140,231,255,.48)'; context.lineWidth = 1; context.beginPath(); context.ellipse(cx, cy, width * .27, height * .12, 0, 0, Math.PI * 2); context.stroke();
-            context.fillStyle = '#ffca75'; context.beginPath(); context.arc(cx, cy, 22, 0, Math.PI * 2); context.fill();
+            context.fillStyle = '#ffca75'; context.beginPath(); context.arc(focusX, cy, 22, 0, Math.PI * 2); context.fill();
             context.fillStyle = '#55b7ff'; context.beginPath(); context.arc(earthX, earthY, 28, 0, Math.PI * 2); context.fill();
             context.fillStyle = 'rgba(4,12,28,.72)'; context.beginPath(); context.arc(earthX + 8, earthY, 26, -Math.PI / 2, Math.PI / 2); context.fill();
-            strokeLine(context, [cx, cy], [earthX, earthY], 'rgba(255,216,130,.42)', 1);
+            strokeLine(context, [focusX, cy], [earthX, earthY], 'rgba(255,216,130,.42)', 1);
         } else if (kind === 'bridge') {
             const x0 = width * .13, x1 = width * .87, y = height * .68, top = height * .35, nodes = [[x0,y],[width*.31,y],[width*.5,y],[width*.69,y],[x1,y]];
             nodes.forEach((node, index) => { if (index) strokeLine(context, nodes[index - 1], node, `hsl(${200 - Math.abs(index - 2 - t * 2) * 25} 90% 65%)`, 5); });
@@ -400,15 +400,18 @@
             scene = new THREE.Scene(); scene.background = new THREE.Color(0x07142d);
             camera = new THREE.PerspectiveCamera(38, 1, .1, 100);
             const ambient = new THREE.AmbientLight(0x7eaaff, 1.45); scene.add(ambient);
-            sun = new THREE.Mesh(new THREE.SphereGeometry(.33, 24, 16), new THREE.MeshBasicMaterial({ color: 0xffc56b })); sun.position.set(0, 0, 0); scene.add(sun);
+            const orbitMajorRadius = 2.5;
+            const orbitMinorRadius = 1.2;
+            const orbitFocusX = -Math.sqrt(orbitMajorRadius ** 2 - orbitMinorRadius ** 2);
+            sun = new THREE.Mesh(new THREE.SphereGeometry(.33, 24, 16), new THREE.MeshBasicMaterial({ color: 0xffc56b })); sun.position.set(orbitFocusX, 0, 0); scene.add(sun);
             // A point light at the teaching sun makes the Earth day/night boundary visible.
             // This is deliberately a non-real-scale learning model, not an orbital simulation.
             light = new THREE.PointLight(0xffd381, 22, 0, 2); light.position.copy(sun.position); scene.add(light);
             earth = new THREE.Mesh(new THREE.SphereGeometry(1.05, 36, 24), new THREE.MeshStandardMaterial({ color: 0x3098ef, roughness: .72, metalness: .04 })); earth.rotation.z = 23.44 * Math.PI / 180; scene.add(earth);
-            const orbit = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 65 }, (_, index) => { const angle = index / 64 * Math.PI * 2; return new THREE.Vector3(Math.cos(angle) * 2.5, 0, Math.sin(angle) * 1.2); })), new THREE.LineBasicMaterial({ color: 0x8ce7ff, transparent: true, opacity: .6 })); scene.add(orbit);
+            const orbit = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 65 }, (_, index) => { const angle = index / 64 * Math.PI * 2; return new THREE.Vector3(Math.cos(angle) * orbitMajorRadius, 0, Math.sin(angle) * orbitMinorRadius); })), new THREE.LineBasicMaterial({ color: 0x8ce7ff, transparent: true, opacity: .6 })); scene.add(orbit);
             const setCamera = (azimuth) => { viewAzimuth = azimuth; const radians = viewAzimuth * Math.PI / 180; camera.position.set(Math.sin(radians) * 7.8, 4.4, Math.cos(radians) * 7.8); camera.lookAt(0, 0, 0); };
             const resize = () => { const bounds = stage.getBoundingClientRect(); renderer.setSize(bounds.width, Math.max(350, bounds.height), false); camera.aspect = bounds.width / Math.max(350, bounds.height); camera.updateProjectionMatrix(); };
-            const render = (next) => { const angle = next / 100 * Math.PI * 2; earth.position.set(Math.cos(angle) * 2.5, 0, Math.sin(angle) * 1.2); earth.rotation.y = angle * 1.2; light.position.copy(sun.position); setCamera(viewAzimuth); renderer.render(scene, camera); };
+            const render = (next) => { const angle = next / 100 * Math.PI * 2; earth.position.set(Math.cos(angle) * orbitMajorRadius, 0, Math.sin(angle) * orbitMinorRadius); earth.rotation.y = angle * 1.2; light.position.copy(sun.position); setCamera(viewAzimuth); renderer.render(scene, camera); };
             resize(); render(value);
             observer = new ResizeObserver(() => { global.cancelAnimationFrame(frame); frame = global.requestAnimationFrame(() => { resize(); render(value); }); }); observer.observe(stage);
             runtime.visual = { update(next) { value = next; global.cancelAnimationFrame(frame); frame = global.requestAnimationFrame(() => render(value)); }, setView(next) { viewAzimuth = next; global.cancelAnimationFrame(frame); frame = global.requestAnimationFrame(() => render(value)); }, dispose() { global.cancelAnimationFrame(frame); observer.disconnect(); disposeThreeResources(renderer, scene, targets, bitmaps, canvas); } };

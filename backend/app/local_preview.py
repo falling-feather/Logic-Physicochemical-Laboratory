@@ -5,6 +5,7 @@ development/acceptance entrypoint, not the staging or production service
 bundle defined by ``deploy.ps1``.
 """
 
+import mimetypes
 import os
 import re
 from pathlib import Path
@@ -15,6 +16,12 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 
 from app.main import create_app
+
+
+# Windows does not consistently register WebP in the system MIME database.
+# Register the reviewed browser asset type before Starlette builds a response;
+# otherwise the one-click preview emits application/octet-stream.
+mimetypes.add_type("image/webp", ".webp", strict=True)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]

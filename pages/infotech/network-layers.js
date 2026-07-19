@@ -54,6 +54,9 @@
         },
         tick: 0,
         rafId: 0,
+        reducedMotion: false,
+        motionQuery: null,
+        onMotionChange: null,
 
         init() {
             this.canvas = document.getElementById('network-layers-canvas');
@@ -67,17 +70,32 @@
             this.hopsValue = document.getElementById('network-hops-value');
             this.infoRoot = document.getElementById('network-info');
             this.presetButtons = Array.from(document.querySelectorAll('[data-network-scenario]'));
+            this.motionQuery = typeof window.matchMedia === 'function'
+                ? window.matchMedia('(prefers-reduced-motion: reduce)')
+                : null;
+            this.reducedMotion = Boolean(this.motionQuery && this.motionQuery.matches);
+            this.onMotionChange = (event) => {
+                this.reducedMotion = Boolean(event.matches);
+                if (this.reducedMotion && this.rafId) cancelAnimationFrame(this.rafId);
+                this.rafId = 0;
+                this.render();
+                if (!this.reducedMotion) this._startLoop();
+            };
+            if (this.motionQuery) this.motionQuery.addEventListener('change', this.onMotionChange);
 
             this._bindInputs();
             window.addEventListener('resize', this._boundResize || (this._boundResize = () => this.render()));
             this.render();
-            this._startLoop();
+            if (!this.reducedMotion) this._startLoop();
         },
 
         destroy() {
             if (this.rafId) cancelAnimationFrame(this.rafId);
             this.rafId = 0;
             if (this._boundResize) window.removeEventListener('resize', this._boundResize);
+            if (this.motionQuery && this.onMotionChange) this.motionQuery.removeEventListener('change', this.onMotionChange);
+            this.motionQuery = null;
+            this.onMotionChange = null;
         },
 
         render() {
@@ -159,7 +177,7 @@
             const rect = this.canvas.getBoundingClientRect();
             const width = Math.max(320, Math.floor(rect.width || this.canvas.parentElement.offsetWidth || 760));
             const height = Math.max(360, Math.floor(rect.height || this.canvas.parentElement.offsetHeight || 540));
-            const dpr = window.devicePixelRatio || 1;
+            const dpr = Math.min(window.devicePixelRatio || 1, this.reducedMotion ? 1 : 1.5);
             if (this.canvas.width !== Math.floor(width * dpr) || this.canvas.height !== Math.floor(height * dpr)) {
                 this.canvas.width = Math.floor(width * dpr);
                 this.canvas.height = Math.floor(height * dpr);
@@ -171,7 +189,7 @@
         },
 
         _startLoop() {
-            if (!this.ctx) return;
+            if (!this.ctx || this.reducedMotion) return;
             if (this.rafId) cancelAnimationFrame(this.rafId);
             const loop = () => {
                 this.tick += 0.018;

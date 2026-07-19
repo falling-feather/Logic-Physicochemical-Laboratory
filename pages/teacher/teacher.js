@@ -33,6 +33,8 @@
         internal_error: '判题异常',
         cancelled: '已取消'
     });
+    const COURSE_PROGRESS_PAGE_LIMIT = 50;
+    const CODE_SUBMISSION_PAGE_LIMIT = 100;
 
     const state = {
         root: null,
@@ -65,6 +67,10 @@
             memberStatus: 'active',
             submissionStatus: 'submitted',
             codeStatus: ''
+        },
+        pagination: {
+            courseProgressOffset: 0,
+            codeSubmissionsOffset: 0
         },
         data: {
             schools: [],
@@ -260,6 +266,14 @@
                 selectCodeSubmission(codeSubmissionButton.dataset.teacherCodeSubmission);
                 return;
             }
+            const curriculumPageButton = target.closest('[data-teacher-curriculum-page]');
+            if (curriculumPageButton) {
+                changeCurriculumPage(
+                    curriculumPageButton.dataset.teacherCurriculumPage,
+                    curriculumPageButton.dataset.offset
+                );
+                return;
+            }
         });
 
         state.root.addEventListener('submit', (event) => {
@@ -300,6 +314,7 @@
     async function refreshAll(options) {
         if (!state.root || !state.active) return;
         const request = options || {};
+        resetCurriculumPagination();
         const generation = beginRequestGeneration();
         setBusy(true);
         state.user = null;
@@ -606,10 +621,15 @@
         const [planResult, progressResult, codeResult] = await Promise.allSettled([
             fetchJson(`/api/courses/${courseId}/classes/${classId}/release-plan`),
             fetchJson(`/api/progress/courses/${courseId}/classes/${classId}/students`, {
-                params: { limit: 200, offset: 0 }
+                params: { limit: COURSE_PROGRESS_PAGE_LIMIT, offset: state.pagination.courseProgressOffset }
             }),
             fetchJson('/api/code-submissions', {
-                params: { class_id: classId, course_id: courseId, limit: 200, offset: 0 }
+                params: {
+                    class_id: classId,
+                    course_id: courseId,
+                    limit: CODE_SUBMISSION_PAGE_LIMIT,
+                    offset: state.pagination.codeSubmissionsOffset
+                }
             })
         ]);
         if (!isCurrentRequest(generation)) return;
@@ -620,11 +640,13 @@
         }
         if (progressResult.status === 'fulfilled') {
             state.data.courseProgress = progressResult.value;
+            state.pagination.courseProgressOffset = Number(progressResult.value.offset) || 0;
         } else {
             state.errors.courseProgress = progressResult.reason;
         }
         if (codeResult.status === 'fulfilled') {
             state.data.codeSubmissions = codeResult.value;
+            state.pagination.codeSubmissionsOffset = Number(codeResult.value.offset) || 0;
         } else {
             state.errors.codeSubmissions = codeResult.reason;
         }
@@ -978,7 +1000,7 @@
             <article class="teacher-curriculum-panel teacher-curriculum-panel--progress">
                 <header class="teacher-curriculum-panel__header">
                     <div><span>LEARNING ORBITS</span><h3>学生分块进度</h3></div>
-                    <div class="teacher-progress-total"><strong>${possible ? Math.round(completed / possible * 100) : 0}%</strong><span>全班完成度</span></div>
+                    <div class="teacher-progress-total"><strong>${possible ? Math.round(completed / possible * 100) : 0}%</strong><span>本页完成度</span></div>
                 </header>
                 <div class="teacher-progress-legend"><span><i data-state="completed"></i>完成</span><span><i data-state="started"></i>进行中</span><span><i data-state="idle"></i>未开始</span><span><i data-state="hidden"></i>当前隐藏</span></div>
                 <div class="teacher-progress-matrix-wrap">
@@ -990,7 +1012,10 @@
                         <tbody>${page.items.map((student) => renderStudentProgressRow(student, planItems)).join('')}</tbody>
                     </table>
                 </div>
-                <footer class="teacher-progress-foot"><span>显示 ${formatNumber(page.items.length)} / ${formatNumber(page.total)} 名学生</span><small>完成、提交与评分只统计当前权威可见范围。</small></footer>
+                <footer class="teacher-progress-foot">
+                    <div><span>本页显示 ${formatNumber(page.items.length)} / 全班 ${formatNumber(page.total)} 名学生</span><small>完成度仅基于本页；完成、提交与评分只统计当前权威可见范围。</small></div>
+                    ${renderCurriculumPageControls(page, 'progress', '学生')}
+                </footer>
             </article>
         `;
     }
@@ -1010,6 +1035,28 @@
         `;
     }
 
+    function renderCurriculumPageControls(page, kind, itemLabel) {
+        const items = page && Array.isArray(page.items) ? page.items : [];
+        const total = Math.max(0, Number(page && page.total) || 0);
+        const offset = Math.max(0, Number(page && page.offset) || 0);
+        const limit = Math.max(1, Number(page && page.limit) || 1);
+        const start = items.length ? offset + 1 : 0;
+        const end = items.length ? Math.min(total, offset + items.length) : 0;
+        const previousOffset = Math.max(0, offset - limit);
+        const nextOffset = page && page.next_offset !== null && page.next_offset !== undefined
+            ? Math.max(0, Number(page.next_offset) || 0)
+            : null;
+        return `
+            <nav class="teacher-page-nav" aria-label="${escapeAttr(itemLabel)}分页">
+                <span>${formatNumber(start)}–${formatNumber(end)} / ${formatNumber(total)}</span>
+                <div>
+                    <button type="button" data-teacher-curriculum-page="${escapeAttr(kind)}" data-offset="${previousOffset}" ${offset > 0 ? '' : 'disabled'}><i data-lucide="chevron-left"></i><span>上一页</span></button>
+                    <button type="button" data-teacher-curriculum-page="${escapeAttr(kind)}" data-offset="${nextOffset === null ? offset : nextOffset}" ${nextOffset === null ? 'disabled' : ''}><span>下一页</span><i data-lucide="chevron-right"></i></button>
+                </div>
+            </nav>
+        `;
+    }
+
     function renderCodeSubmissionPanel() {
         const course = selectedCourse();
         const page = state.data.codeSubmissions || { items: [], total: 0 };
@@ -1025,7 +1072,7 @@
                 ${state.errors.codeSubmissions ? renderError(state.errors.codeSubmissions, '代码提交读取失败') : `
                     <div class="teacher-code-station__toolbar">
                         <label><span>判题状态</span><select data-teacher-filter="codeStatus"><option value="">全部状态</option>${Object.entries(CODE_STATUS_LABELS).map(([value, label]) => `<option value="${value}"${state.filters.codeStatus === value ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select></label>
-                        <span>当前筛选 ${formatNumber(items.length)} 条</span>
+                        <span>本页筛选 ${formatNumber(items.length)} 条</span>
                     </div>
                     <div class="teacher-code-layout">
                         <div class="teacher-code-list" role="list" aria-label="代码提交列表">
@@ -1033,6 +1080,7 @@
                         </div>
                         ${renderCodeSubmissionDetails(items)}
                     </div>
+                    <footer class="teacher-code-pagination">${renderCurriculumPageControls(page, 'code', '代码提交')}</footer>
                 `}
             </article>
         `;
@@ -1940,6 +1988,48 @@
         }
     }
 
+    async function changeCurriculumPage(kind, requestedOffset) {
+        if (state.busy || !state.selected.classId || !state.selected.courseId) return;
+        const offset = Math.max(0, Math.floor(Number(requestedOffset) || 0));
+        const progressPage = kind === 'progress';
+        if (!progressPage && kind !== 'code') return;
+        const generation = beginRequestGeneration();
+        const classId = state.selected.classId;
+        const courseId = state.selected.courseId;
+        setBusy(true);
+        try {
+            if (progressPage) {
+                state.errors.courseProgress = null;
+                const page = await fetchJson(`/api/progress/courses/${courseId}/classes/${classId}/students`, {
+                    params: { limit: COURSE_PROGRESS_PAGE_LIMIT, offset }
+                });
+                if (!isCurrentRequest(generation)) return;
+                state.data.courseProgress = page;
+                state.pagination.courseProgressOffset = Number(page.offset) || 0;
+            } else {
+                state.errors.codeSubmissions = null;
+                const page = await fetchJson('/api/code-submissions', {
+                    params: { class_id: classId, course_id: courseId, limit: CODE_SUBMISSION_PAGE_LIMIT, offset }
+                });
+                if (!isCurrentRequest(generation)) return;
+                state.data.codeSubmissions = page;
+                state.pagination.codeSubmissionsOffset = Number(page.offset) || 0;
+                state.selected.codeSubmissionId = '';
+                state.data.codeSubmissionSource = null;
+                state.data.codeSubmissionAttempts = [];
+            }
+        } catch (error) {
+            if (!isCurrentRequest(generation)) return;
+            if (progressPage) state.errors.courseProgress = error;
+            else state.errors.codeSubmissions = error;
+        } finally {
+            if (isCurrentRequest(generation)) {
+                setBusy(false);
+                renderWorkspace();
+            }
+        }
+    }
+
     async function handleScopeChange(target) {
         if (state.busy) {
             renderWorkspace();
@@ -1948,6 +2038,7 @@
         const key = target.dataset.teacherScope;
         if (key === 'galaxyKey') {
             state.filters.galaxyKey = target.value;
+            resetCurriculumPagination();
             const courses = filteredCourses();
             state.selected.courseId = normalizeSelectedId(state.selected.courseId, courses);
             if (!state.selected.courseId && courses.length) state.selected.courseId = String(courses[0].id);
@@ -1963,6 +2054,7 @@
             return;
         }
         state.selected[key] = target.value;
+        if (key === 'schoolId' || key === 'classId' || key === 'courseId') resetCurriculumPagination();
         if (key === 'schoolId' || key === 'classId') state.data.studentBatchImportResult = null;
         if (key === 'schoolId' || key === 'courseId') state.data.collaboratorBatchResult = null;
         setBusy(true);
@@ -2384,6 +2476,7 @@
 
     function resetBelow(level) {
         if (level === 'school') {
+            resetCurriculumPagination();
             state.data.classes = [];
             state.data.courses = [];
             state.data.units = [];
@@ -2412,10 +2505,16 @@
     function clearWorkspace() {
         state.user = null;
         state.errors = {};
+        resetCurriculumPagination();
         Object.keys(state.data).forEach((key) => {
             state.data[key] = Array.isArray(state.data[key]) ? [] : null;
         });
         hideDashboard();
+    }
+
+    function resetCurriculumPagination() {
+        state.pagination.courseProgressOffset = 0;
+        state.pagination.codeSubmissionsOffset = 0;
     }
 
     function showDashboard() {

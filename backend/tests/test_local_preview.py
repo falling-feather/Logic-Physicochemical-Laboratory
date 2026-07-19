@@ -29,6 +29,9 @@ def test_local_preview_serves_same_origin_api_and_public_site(client):
         assert preview.get("/pages/planets/planets.css").status_code == 200
         assert preview.get("/shared/js/app-session.js").status_code == 200
         assert preview.get("/UI/favicon-32.png").status_code == 200
+        optimized_background = preview.get("/UI/future-galaxy/future-galaxy-hero-sky.webp")
+        assert optimized_background.status_code == 200
+        assert optimized_background.headers["content-type"] == "image/webp"
         assert preview.get("/codevis/index.html").status_code == 200
 
         cross_port = preview.get(

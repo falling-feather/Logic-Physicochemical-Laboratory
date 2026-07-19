@@ -31,11 +31,12 @@ codevis/
 - **V7.5.4（已完成）**：6 个课程群、18 个稳定活动、独立子课与四步互动挑战；浏览器公开样例预检不等同于权威判题。
 - **V7.5.6（后端已完成）**：0049 已提供稳定 activity 题目发现、不可变题目版本、学生源码提交、判题状态和教师分页查看。
 - **V7.5.7（前端已完成）**：`student-context.js` 从 same-origin Cookie Session 与本人课程建立内存态班级/课程映射，`submission-adapter.js` 按稳定活动解析题目并提交源码；多班级歧义、认证丢失和接口异常失败关闭，runner 未启用时显示真实 `runner_unavailable`。
+- **V7.5.8（综合收束已完成）**：入口 HTML 的 19 个本地 CSS/JS 查询代际统一为 `758r1`，防止旧样式与新逻辑混合缓存；课程内容、四语言运行时、正式提交、统一页脚和 390×844 布局已进入全量前端门禁。
 - **浏览器学习运行时（已完成）**：固定版本、本地同源、按需加载；来源、许可证和哈希见 `vendor/manifest.json` 与 `THIRD_PARTY_NOTICES.md`。
   - JavaScript：[JS-Interpreter](https://github.com/NeilFraser/JS-Interpreter)（acorn + interpreter）
   - Python：[Skulpt](https://skulpt.org/)（纯 JS Python 3 子集）
   - C / C++：[JSCPP](https://github.com/felixhao28/JSCPP) v2.0.9（纯 JS C++ 子集，不支持 namespace/class）
-- **待验收**：V7.5.8 综合收束与 QA-010 独立终验；状态只在 `doc/02-项目规划.md` 维护。
+- **待验收**：QA-010/V7.5.9 独立终验；状态只在 `doc/02-项目规划.md` 维护。
 
 ## 沙箱 API 速查
 所有后端共享相同的"标记函数"协议，由 runtime 拦截后驱动可视化：
@@ -68,6 +69,10 @@ powershell -ExecutionPolicy Bypass -File .\astra-local.ps1
 ## 📝 更新日志（子站视角）
 
 > 仅记录与代码空间子站直接相关的变更；平台级更新见 [主站 README](../README.md#-更新日志)。
+
+### V7.5.8 — 2026-07-19
+- 统一入口 CSS/JS 静态代际为 `758r1`，新增合同阻止资源查询版本漂移；全量前端门禁为 193 个受跟踪 JavaScript 与 31/31 合同。
+- 教师端代码提交列表改为真实服务端分页并清除跨页陈旧源码详情；本版不改变浏览器预检非权威、默认 runner 不可用和正式提交服务端授权边界。
 
 ### V7.5.7 — 2026-07-19
 - 接入 Cookie-only 学生上下文、权威发布计划和正式代码提交；公开预检继续只作学习反馈，不写入 accepted。

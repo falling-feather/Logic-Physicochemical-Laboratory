@@ -226,13 +226,14 @@ window.updateFooterVisibility = updateFooterVisibility;
 
 const ENGLAB_ASSET_VERSION = '20260716v7427RoleWorkflowGateP0';
 const ROLE_LANDING_ASSET_VERSION = '20260719v7437AstraWorkspaceP0';
-const SHELL_RUNTIME_ASSET_VERSION = '20260719v757TeacherCurriculumP0';
-const PAGE_REGISTRY_ASSET_VERSION = '20260719v757TeacherCurriculumP0';
+const SHELL_RUNTIME_ASSET_VERSION = '20260719v758ReleaseAuditP0';
+const PAGE_REGISTRY_ASSET_VERSION = '20260719v758ReleaseAuditP0';
+const BASE_STYLE_ASSET_VERSION = '20260719v758ReleaseAuditP0';
 const CORE_HTTP_FALLBACK_ASSETS = [
     './',
     './index.html',
     './shared/css/tokens.css?v=20260424ss',
-    './shared/css/base.css?v=20260630mainV64',
+    './shared/css/base.css?v=' + BASE_STYLE_ASSET_VERSION,
     './shared/css/typography.css?v=20260526v61c',
     './shared/css/navbar.css?v=' + ENGLAB_ASSET_VERSION,
     './shared/css/page-layout.css?v=20260606v62e',
@@ -287,7 +288,7 @@ const GALAXY_HTTP_FALLBACK_ASSETS = {
         './pages/frontier/frontier.css?v=20260719v755Game001',
         './pages/frontier/frontier-manifest.js?v=20260719v755Game001',
         './shared/js/frontier-publication-context.js?v=20260719v757FuturePublicationP0',
-        './shared/js/frontier-learning.js?v=20260719v757FuturePublicationP0'
+        './shared/js/frontier-learning.js?v=20260719v758ReleaseAuditP0'
     ]
 };
 
