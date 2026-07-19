@@ -5,7 +5,7 @@
     if (global.AstraPageRegistry) return;
 
     const ROLE_RESOURCE_VERSION = '20260719v757StudentPublicationP0';
-    const TEACHER_RESOURCE_VERSION = '20260719v75ReviewTeacherPagingP0';
+    const TEACHER_RESOURCE_VERSION = '20260719v75ReviewTeacherLayersP0';
     const FUTURE_RESOURCE_VERSION = '20260719v759A11yP0';
     const ADMIN_RESOURCE_VERSION = '20260718v7432UnifiedAtlasP0';
     const PLANETS_RESOURCE_VERSION = '20260719v7437AstraWorkspaceP0';
@@ -53,7 +53,11 @@
         teacher: definePage({
             galaxy: 'astra',
             roles: ['teacher', 'admin'],
-            styles: [`pages/teacher/teacher.css?v=${TEACHER_RESOURCE_VERSION}`],
+            styles: [
+                `pages/teacher/teacher-foundation.css?v=${TEACHER_RESOURCE_VERSION}`,
+                `pages/teacher/teacher-workbench.css?v=${TEACHER_RESOURCE_VERSION}`,
+                `pages/teacher/teacher-curriculum.css?v=${TEACHER_RESOURCE_VERSION}`
+            ],
             script: `pages/teacher/teacher.js?v=${TEACHER_RESOURCE_VERSION}`,
             ready: 'initTeacher',
             enter: 'initTeacher',

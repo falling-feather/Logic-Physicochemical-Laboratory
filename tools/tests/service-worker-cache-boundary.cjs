@@ -59,7 +59,7 @@ async function main() {
 
     let roleResourcePromise = null;
     handlers.fetch({
-        request: { method: 'GET', mode: 'cors', url: 'https://astra.test/pages/admin/admin.js?v=current' },
+        request: { method: 'GET', mode: 'cors', url: 'https://astra.test/pages/teacher/teacher-foundation.css?v=current' },
         respondWith(value) { roleResourcePromise = value; }
     });
     assert.ok(roleResourcePromise, 'role resources must use an explicit network-only response');

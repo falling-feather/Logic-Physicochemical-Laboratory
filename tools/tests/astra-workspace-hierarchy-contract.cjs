@@ -13,7 +13,11 @@ const main = read('shared/js/main.js');
 const serviceWorker = read('sw.js');
 const sessionCss = read('shared/css/app-session.css');
 const teacher = read('pages/teacher/teacher.js');
-const teacherCss = read('pages/teacher/teacher.css');
+const teacherCss = [
+  'pages/teacher/teacher-foundation.css',
+  'pages/teacher/teacher-workbench.css',
+  'pages/teacher/teacher-curriculum.css',
+].map(read).join('');
 const browserProof = read('tools/browser/role-workflows-proof.cjs');
 const context = { window: {} };
 
@@ -45,10 +49,10 @@ assert.match(html, /data-astra-workspace="student"[\s\S]*星序[\s\S]*我的学�
 assert.match(router, /navbar--hidden', this\._galaxyForPage\(initialPage\) === 'astra'/);
 assert.match(router, /navbar--hidden', this\._galaxyForPage\(page\) === 'astra'/);
 assert.match(router, /return this\._galaxyForPage\(page\) === 'englab' && page !== 'home'/);
-assert.match(html, /shared\/js\/router\.js\?v=20260719v759A11yP0/);
+assert.match(html, /shared\/js\/router\.js\?v=20260719v75ReviewTeacherLayersP0/);
 assert.match(main, /const galaxy = window\.AstraPageRegistry[\s\S]*const showEnglab = galaxy === 'englab' && page !== 'home'/);
 assert.match(main, /shared\/js\/router\.js\?v=' \+ SHELL_RUNTIME_ASSET_VERSION/);
-assert.match(serviceWorker, /shared\/js\/router\.js\?v=20260719v759A11yP0/);
+assert.match(serviceWorker, /shared\/js\/router\.js\?v=20260719v75ReviewTeacherLayersP0/);
 
 assert.match(sessionCss, /\.astra-workspace-shell\s*\{[\s\S]*grid-template-columns:\s*232px minmax\(0, 1fr\)/);
 assert.match(sessionCss, /\.astra-workspace-rail/);

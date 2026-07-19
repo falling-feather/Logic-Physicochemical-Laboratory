@@ -18,14 +18,16 @@ vm.runInNewContext(registrySource, context, { filename: 'shared/js/page-registry
 const registry = context.window.AstraPageRegistry;
 const normalize = (items) => Array.from(items);
 const studentVersion = '20260719v757StudentPublicationP0';
-const teacherVersion = '20260719v75ReviewTeacherPagingP0';
+const teacherVersion = '20260719v75ReviewTeacherLayersP0';
 const adminVersion = '20260718v7432UnifiedAtlasP0';
 const student = [
     `pages/student/student.css?v=${studentVersion}`,
     `pages/student/student.js?v=${studentVersion}`
 ];
 const teacher = [
-    `pages/teacher/teacher.css?v=${teacherVersion}`,
+    `pages/teacher/teacher-foundation.css?v=${teacherVersion}`,
+    `pages/teacher/teacher-workbench.css?v=${teacherVersion}`,
+    `pages/teacher/teacher-curriculum.css?v=${teacherVersion}`,
     `pages/teacher/teacher.js?v=${teacherVersion}`
 ];
 const admin = [
@@ -40,15 +42,15 @@ assert.deepEqual(normalize(registry.resourcesForRole('admin')), admin);
 assert.deepEqual(normalize(registry.resourcesForRole('anonymous')), []);
 assert.deepEqual(normalize(registry.stylesForRole('student')), student.slice(0, 1));
 assert.deepEqual(normalize(registry.rolesFor('teacher')), ['teacher', 'admin']);
-assert.equal(new Set(normalize(registry.allRoleResources())).size, 6);
+assert.equal(new Set(normalize(registry.allRoleResources())).size, 8);
 
-const roleAssetPattern = /pages\/(?:student|teacher|admin)\/(?:student|teacher|admin)\.(?:css|js)/;
+const roleAssetPattern = /pages\/(?:student|teacher|admin)\/[^?'"\s]+\.(?:css|js)/;
 assert.doesNotMatch(html, /<link[^>]+href="pages\/(?:student|teacher|admin)\//);
 
 const appShell = serviceWorker.match(/const APP_SHELL = \[([\s\S]*?)\n\];/);
 assert.ok(appShell, 'service-worker APP_SHELL must remain inspectable');
 assert.doesNotMatch(appShell[1], roleAssetPattern, 'APP_SHELL must not pre-cache any role resource');
-assert.match(serviceWorker, /astra-static-v20260719v759A11yP0/);
+assert.match(serviceWorker, /astra-static-v20260719v75ReviewTeacherLayersP0/);
 
 const coreFallback = main.match(/const CORE_HTTP_FALLBACK_ASSETS = \[([\s\S]*?)\n\];/);
 const galaxyFallback = main.match(/const GALAXY_HTTP_FALLBACK_ASSETS = \{([\s\S]*?)\n\};/);

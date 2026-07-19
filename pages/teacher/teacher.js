@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    const TEACHER_ASSET_VERSION = '20260719v75ReviewTeacherPagingP0';
+    const TEACHER_ASSET_VERSION = '20260719v75ReviewTeacherLayersP0';
     const API_BASE_STORAGE_KEY = 'astra-teacher-api-base';
     const TEACHER_VIEWS = Object.freeze({
         overview: '教学总览',

@@ -6,7 +6,11 @@ const root = path.resolve(__dirname, '../..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 const teacher = read('pages/teacher/teacher.js');
-const teacherCss = read('pages/teacher/teacher.css');
+const teacherCss = [
+  'pages/teacher/teacher-foundation.css',
+  'pages/teacher/teacher-workbench.css',
+  'pages/teacher/teacher-curriculum.css',
+].map(read).join('');
 
 assert.ok(teacher.includes('id="teacher-tab-${key}"'), 'teacher tabs need stable ids');
 assert.ok(teacher.includes('aria-controls="teacher-workbench-panel"'), 'teacher tabs must own the shared panel');

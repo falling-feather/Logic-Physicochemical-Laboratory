@@ -19,7 +19,9 @@ const EXAMPLE_DOMAIN_ROOTS = Object.freeze(['example.com', 'example.net', 'examp
 const ROLE_RESOURCE_PATHS = Object.freeze([
   '/pages/student/student.css',
   '/pages/student/student.js',
-  '/pages/teacher/teacher.css',
+  '/pages/teacher/teacher-foundation.css',
+  '/pages/teacher/teacher-workbench.css',
+  '/pages/teacher/teacher-curriculum.css',
   '/pages/teacher/teacher.js',
   '/pages/admin/admin.css',
   '/pages/admin/admin.js',
@@ -30,11 +32,20 @@ const ROLE_RESOURCE_EXPECTATIONS = Object.freeze({
     scripts: Object.freeze(['/pages/student/student.js']),
   }),
   teacher: Object.freeze({
-    styles: Object.freeze(['/pages/teacher/teacher.css']),
+    styles: Object.freeze([
+      '/pages/teacher/teacher-foundation.css',
+      '/pages/teacher/teacher-workbench.css',
+      '/pages/teacher/teacher-curriculum.css',
+    ]),
     scripts: Object.freeze(['/pages/teacher/teacher.js']),
   }),
   admin: Object.freeze({
-    styles: Object.freeze(['/pages/admin/admin.css', '/pages/teacher/teacher.css']),
+    styles: Object.freeze([
+      '/pages/teacher/teacher-foundation.css',
+      '/pages/teacher/teacher-workbench.css',
+      '/pages/teacher/teacher-curriculum.css',
+      '/pages/admin/admin.css',
+    ]),
     scripts: Object.freeze(['/pages/admin/admin.js']),
   }),
 });
@@ -208,6 +219,9 @@ async function criticalArtifactHashes() {
     'shared/js/page-registry.js',
     'shared/js/router.js',
     'pages/student/student.js',
+    'pages/teacher/teacher-foundation.css',
+    'pages/teacher/teacher-workbench.css',
+    'pages/teacher/teacher-curriculum.css',
     'pages/teacher/teacher.js',
     'pages/admin/admin.js',
     'sw.js',
@@ -225,6 +239,15 @@ function assertSamePaths(actual, expected, label) {
   assert(
     JSON.stringify(actualPaths) === JSON.stringify(expectedPaths),
     `${label}: expected ${JSON.stringify(expectedPaths)}, got ${JSON.stringify(actualPaths)}`
+  );
+}
+
+function assertOrderedPaths(actual, expected, label) {
+  const actualPaths = Array.from(actual || []);
+  const expectedPaths = Array.from(expected || []);
+  assert(
+    JSON.stringify(actualPaths) === JSON.stringify(expectedPaths),
+    `${label}: expected ordered ${JSON.stringify(expectedPaths)}, got ${JSON.stringify(actualPaths)}`
   );
 }
 
@@ -598,7 +621,7 @@ async function serviceWorkerRoleEvidence(page, role, options = {}) {
   );
   assert(browserEvidence.apiEntries.length === 0, `${role} CacheStorage must not contain API entries`);
   assert(browserEvidence.roleEntries.length === 0, `${role} CacheStorage must not contain role resources`);
-  assertSamePaths(browserEvidence.loadedStyles, expectation.styles, `${role} loaded role styles`);
+  assertOrderedPaths(browserEvidence.loadedStyles, expectation.styles, `${role} loaded role styles`);
   assertSamePaths(browserEvidence.loadedScripts, expectedScripts, `${role} loaded role scripts`);
   assertSamePaths(responsePaths, expectedResources, `${role} role resource responses`);
   assert(responsePaths.length === expectedResources.length, `${role} role resources must load exactly once`);

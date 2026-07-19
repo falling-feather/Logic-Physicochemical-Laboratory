@@ -1,4 +1,4 @@
-const CACHE_NAME = 'astra-static-v20260719v759A11yP0';
+const CACHE_NAME = 'astra-static-v20260719v75ReviewTeacherLayersP0';
 const APP_SHELL = [
   './',
   './index.html',
@@ -8,9 +8,9 @@ const APP_SHELL = [
   './shared/js/auth-ui.js?v=20260716v7427RoleWorkflowGateP0',
   './shared/js/app-session.js?v=20260719v7437AstraWorkspaceP0',
   './shared/js/experiment-registry.js?v=20260716v7427RoleWorkflowGateP0',
-  './shared/js/page-registry.js?v=20260719v759A11yP0',
-  './shared/js/router.js?v=20260719v759A11yP0',
-  './shared/js/main.js?v=20260719v759A11yP0',
+  './shared/js/page-registry.js?v=20260719v75ReviewTeacherLayersP0',
+  './shared/js/router.js?v=20260719v75ReviewTeacherLayersP0',
+  './shared/js/main.js?v=20260719v75ReviewTeacherLayersP0',
   './shared/js/backend-content.js?v=20260716v7427RoleWorkflowGateP0',
   './shared/css/tokens.css?v=20260424ss',
   './shared/css/base.css?v=20260719v758ReleaseAuditP0',
@@ -58,7 +58,7 @@ self.addEventListener('fetch', (event) => {
 
   // Role workspaces are selected only after the server session is known. Keep these
   // assets out of the shared runtime cache so logout/role changes cannot race cache.put.
-  const isRoleResource = /^\/pages\/(?:student\/student|teacher\/teacher|admin\/admin)\.(?:js|css)$/.test(url.pathname);
+  const isRoleResource = /^\/pages\/(?:student|teacher|admin)\/[^/]+\.(?:js|css)$/.test(url.pathname);
   if (isRoleResource) {
     event.respondWith(fetch(request, { cache: 'no-store' }));
     return;
