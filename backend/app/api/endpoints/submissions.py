@@ -455,47 +455,33 @@ def list_assignment_submissions(
     if current_user.role == "student":
         require_course_visible(db, current_user, course.id)
         require_student_unit_published(current_user, unit)
+        if class_id is None:
+            eligible_class_ids = _active_user_course_class_ids(db, current_user.id, course.id)
+            if len(eligible_class_ids) != 1:
+                raise HTTPException(
+                    status_code=422,
+                    detail="class_id is required for student assignment submission history scope",
+                )
+            class_id = eligible_class_ids[0]
         statement = statement.where(Submission.student_id == current_user.id)
-        if class_id is not None:
-            _require_active_user_class(db, current_user.id, class_id)
-            if not course_attached_to_class(db, course.id, class_id):
-                raise HTTPException(status_code=403, detail="Course is not attached to this class")
-            if not resolve_assignment_class_policy(db, assignment, class_id).assigned:
-                raise HTTPException(status_code=403, detail="Assignment is not assigned to this class")
-            course_class = get_course_class_or_404(db, course.id, class_id)
-            plan = get_plan_for_unit(db, course_class, unit.id)
-            access = effective_unit_access(
-                db,
-                course=course,
-                class_group=get_class(db, class_id),
-                unit=unit,
-                plan=plan,
-                student_id=current_user.id,
-            )
-            if access.state == "hidden":
-                raise HTTPException(status_code=403, detail="Course unit is not visible in this class")
-            statement = statement.where(Submission.class_id == class_id)
-        else:
-            eligible_class_ids = [
-                eligible_class_id
-                for eligible_class_id in _active_user_course_class_ids(db, current_user.id, course.id)
-                if resolve_assignment_class_policy(db, assignment, eligible_class_id).assigned
-            ]
-            eligible_class_ids = [
-                eligible_class_id
-                for eligible_class_id in eligible_class_ids
-                if effective_unit_access(
-                    db,
-                    course=course,
-                    class_group=get_class(db, eligible_class_id),
-                    unit=unit,
-                    plan=get_plan_for_unit(db, get_course_class_or_404(db, course.id, eligible_class_id), unit.id),
-                    student_id=current_user.id,
-                ).state != "hidden"
-            ]
-            if not eligible_class_ids:
-                return []
-            statement = statement.where(Submission.class_id.in_(eligible_class_ids))
+        _require_active_user_class(db, current_user.id, class_id)
+        if not course_attached_to_class(db, course.id, class_id):
+            raise HTTPException(status_code=403, detail="Course is not attached to this class")
+        if not resolve_assignment_class_policy(db, assignment, class_id).assigned:
+            raise HTTPException(status_code=403, detail="Assignment is not assigned to this class")
+        course_class = get_course_class_or_404(db, course.id, class_id)
+        plan = get_plan_for_unit(db, course_class, unit.id)
+        access = effective_unit_access(
+            db,
+            course=course,
+            class_group=get_class(db, class_id),
+            unit=unit,
+            plan=plan,
+            student_id=current_user.id,
+        )
+        if access.state == "hidden":
+            raise HTTPException(status_code=403, detail="Course unit is not visible in this class")
+        statement = statement.where(Submission.class_id == class_id)
         return list(db.scalars(statement).all())
 
     require_school_role(db, current_user, course.school_id, {"admin", "teacher"})

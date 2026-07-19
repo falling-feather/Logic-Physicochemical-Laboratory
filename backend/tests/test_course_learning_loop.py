@@ -972,6 +972,27 @@ def test_same_assignment_can_be_submitted_once_per_class(client):
     )
     assert duplicate_first_class.status_code == 409
 
+    ambiguous_history = client.get(
+        f"/api/assignments/{assignment_id}/submissions",
+        headers=_auth_header(student_token),
+    )
+    assert ambiguous_history.status_code == 422
+    assert ambiguous_history.json()["detail"] == "class_id is required for student assignment submission history scope"
+
+    first_history = client.get(
+        f"/api/assignments/{assignment_id}/submissions?class_id={first_class_id}",
+        headers=_auth_header(student_token),
+    )
+    assert first_history.status_code == 200
+    assert [item["id"] for item in first_history.json()] == [first_submission.json()["id"]]
+
+    second_history = client.get(
+        f"/api/assignments/{assignment_id}/submissions?class_id={second_class_id}",
+        headers=_auth_header(student_token),
+    )
+    assert second_history.status_code == 200
+    assert [item["id"] for item in second_history.json()] == [second_submission.json()["id"]]
+
     first_review = client.get(
         f"/api/assignments/{assignment_id}/review?class_id={first_class_id}",
         headers=_auth_header(student_token),
