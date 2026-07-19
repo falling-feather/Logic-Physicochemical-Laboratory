@@ -61,6 +61,7 @@
 
     function formalButtonCopy(record, state) {
         if (record && record.pending) return '正在提交…';
+        if (record && record.can_retry) return '再次查询正式结果';
         return state.available ? '正式提交代码' : '暂不能正式提交';
     }
 
@@ -141,6 +142,7 @@
             const sourceCode = code.value;
             challenge.drafts[activity.activity_key] = sourceCode;
             challenge.predictions[activity.activity_key] = predictionInput.value;
+            const previous = challenge.submissions[activity.activity_key] || null;
             if (challenge.submissionAbort) challenge.submissionAbort.abort();
             const controller = new AbortController();
             challenge.submissionAbort = controller;
@@ -149,7 +151,9 @@
             render();
             let response;
             try {
-                response = await adapter.submit(activity, sourceCode, { signal: controller.signal });
+                response = previous && previous.can_retry && typeof adapter.refresh === 'function'
+                    ? await adapter.refresh(activity, previous, { signal: controller.signal })
+                    : await adapter.submit(activity, sourceCode, { signal: controller.signal });
             } catch (_) {
                 response = { ok: false, reason: '提交结果尚未确认，未显示为成功。请刷新后核对。', code: 'submission_unconfirmed' };
             }

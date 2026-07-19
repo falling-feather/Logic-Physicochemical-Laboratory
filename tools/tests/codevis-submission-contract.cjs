@@ -19,6 +19,8 @@ function createHarness() {
     const context = {
         console,
         AbortController,
+        setTimeout,
+        clearTimeout,
         window: null,
         CvCourseStateAdapter: { resolve: () => ({ status: 'available' }) },
         AstraCodeSpaceStudentContext: {
@@ -58,6 +60,22 @@ function createHarness() {
     return { context, calls, adapter: context.CvSubmissionAdapter };
 }
 
+function submission(status, id = 48) {
+    return {
+        id, problem_id: 23, course_id: 19, class_id: 7, activity_key: activity.activity_key,
+        language: 'javascript', status, result_summary: {}, idempotent_replay: false
+    };
+}
+
+function openProblem(resourcePolicy) {
+    return {
+        id: 23, course_id: 19, activity_key: activity.activity_key,
+        effective_release_state: 'open', active_version: {
+            id: 31, language_allowlist: ['javascript'], resource_policy: resourcePolicy
+        }
+    };
+}
+
 async function main() {
     const source = fs.readFileSync(adapterPath, 'utf8');
     const challengeSource = fs.readFileSync(challengePath, 'utf8');
@@ -65,6 +83,12 @@ async function main() {
     assert.match(source, /AstraCodeSpaceStudentContext\.resolve/, 'host student scope must be explicit and injectable');
     assert.match(source, /\/api\/code-problems\/by-activity/, 'formal submission must discover problems by stable activity key');
     assert.match(source, /\/api\/code-problems\/['"] \+ encodeURIComponent/, 'submission URL must use the authoritative problem id');
+    assert.match(source, /\/api\/code-submissions\//, 'queued and running submissions must have an authoritative status endpoint');
+    assert.match(source, /while \(pendingStatuses\.has\(current\.status\) && attempts < plan\.maxAttempts && Date\.now\(\) < deadline\)/,
+        'submission polling must be bounded and only continue for queued or running states');
+    assert.match(source, /active_version\.resource_policy\.wall_time_ms/,
+        'polling time budget must safely derive from the authoritative resource policy');
+    assert.doesNotMatch(source, /setInterval\(/, 'submission polling must not leak setInterval timers');
     assert.match(source, /dispatchAuthRequired: false/, 'Code Space must not recreate the app-shell authentication flow');
     assert.match(challengeSource, /id="challenge-submit"/, 'challenge UI must expose a real formal submission control');
     assert.match(challengeSource, /state\.available\).*正式提交服务已连接/, 'available service must not be described as unavailable');
@@ -79,6 +103,8 @@ async function main() {
         status: 'runner_unavailable',
         reason: '权威状态：判题器暂不可用，尚未判定通过。',
         submission_id: 47,
+        problem_id: 23,
+        can_retry: false,
         idempotent_replay: false
     });
     assert.equal(calls.length, 2);
@@ -116,6 +142,64 @@ async function main() {
     assert.equal(accepted.status, 'accepted');
     assert.equal(accepted.reason, '权威状态：通过。');
     assert.equal(accepted.idempotent_replay, true);
+
+    const polled = createHarness();
+    const pollCalls = [];
+    let pollStep = 0;
+    polled.context.setTimeout = callback => { callback(); return 1; };
+    polled.context.AstraApiClient.request = async (url, options) => {
+        pollCalls.push({ url, options });
+        if (url === '/api/code-problems/by-activity') {
+            return openProblem({ wall_time_ms: 30000 });
+        }
+        if (url === '/api/code-problems/23/submissions') return submission('queued');
+        assert.equal(url, '/api/code-submissions/48');
+        pollStep++;
+        return submission(pollStep === 1 ? 'running' : 'accepted');
+    };
+    const polledResult = await polled.adapter.submit(activity, 'print(3)');
+    assert.equal(polledResult.status, 'accepted', 'queued → running → accepted must resolve from authoritative GET results');
+    assert.deepEqual(pollCalls.map(call => call.url), [
+        '/api/code-problems/by-activity', '/api/code-problems/23/submissions',
+        '/api/code-submissions/48', '/api/code-submissions/48'
+    ]);
+
+    const failedPoll = createHarness();
+    failedPoll.context.setTimeout = callback => { callback(); return 1; };
+    failedPoll.context.AstraApiClient.request = async (url) => {
+        if (url === '/api/code-problems/by-activity') {
+            return openProblem({ wall_time_ms: 30000 });
+        }
+        return url === '/api/code-problems/23/submissions' ? submission('queued') : submission('compile_error');
+    };
+    const failedResult = await failedPoll.adapter.submit(activity, 'print(4)');
+    assert.equal(failedResult.status, 'compile_error', 'authoritative failure statuses must be terminal');
+
+    const pollingNetwork = createHarness();
+    pollingNetwork.context.setTimeout = callback => { callback(); return 1; };
+    pollingNetwork.context.AstraApiClient.request = async (url) => {
+        if (url === '/api/code-problems/by-activity') {
+            return openProblem({ wall_time_ms: 30000 });
+        }
+        if (url === '/api/code-problems/23/submissions') return submission('queued');
+        throw { code: 'network' };
+    };
+    const pollingNetworkResult = await pollingNetwork.adapter.submit(activity, 'print(5)');
+    assert.equal(pollingNetworkResult.ok, false);
+    assert.equal(pollingNetworkResult.code, 'network', 'polling network errors must fail closed');
+
+    const cancelledPoll = createHarness();
+    cancelledPoll.context.AstraApiClient.request = async (url) => {
+        if (url === '/api/code-problems/by-activity') {
+            return openProblem({ wall_time_ms: 30000 });
+        }
+        return submission('queued');
+    };
+    const cancellation = new AbortController();
+    cancellation.abort();
+    const cancelledResult = await cancelledPoll.adapter.submit(activity, 'print(6)', { signal: cancellation.signal });
+    assert.equal(cancelledResult.ok, false);
+    assert.equal(cancelledResult.code, 'cancelled', 'aborted polling must not report a formal result');
 
     const unavailable = createHarness();
     delete unavailable.context.AstraCodeSpaceStudentContext;
@@ -182,6 +266,57 @@ async function main() {
     assert.equal(adapter.resultMessage('queued'), '权威状态：已进入判题队列。');
     assert.equal(adapter.resultMessage('accepted'), '权威状态：通过。');
     assert.equal(adapter.resultMessage('compile_error'), '权威状态：编译未通过。');
+    const pendingWindow = createHarness();
+    let minimumWindowPolls = 0;
+    pendingWindow.context.setTimeout = callback => { callback(); return 1; };
+    pendingWindow.context.AstraApiClient.request = async (url) => {
+        if (url === '/api/code-problems/by-activity') return openProblem({ wall_time_ms: 1 });
+        if (url === '/api/code-problems/23/submissions') return submission('queued');
+        minimumWindowPolls++;
+        return submission('queued');
+    };
+    const pendingResult = await pendingWindow.adapter.submit(activity, 'print(7)');
+    assert.equal(minimumWindowPolls, 5, 'small policies must retain the five-second minimum polling window');
+    assert.equal(pendingResult.status, 'queued');
+    assert.equal(pendingResult.can_retry, true, 'a budget-exhausted pending result must remain retryable, not be presented as terminal');
+    assert.match(pendingResult.reason, /再次查询最新权威状态/, 'the pending result must explain how to query again');
+
+    const maximumWindow = createHarness();
+    let maximumWindowPolls = 0;
+    maximumWindow.context.setTimeout = callback => { callback(); return 1; };
+    maximumWindow.context.AstraApiClient.request = async (url) => {
+        if (url === '/api/code-problems/by-activity') return openProblem({ wall_time_ms: 30000 });
+        if (url === '/api/code-problems/23/submissions') return submission('queued');
+        maximumWindowPolls++;
+        return maximumWindowPolls === 33 ? submission('accepted') : submission('running');
+    };
+    const maximumWindowResult = await maximumWindow.adapter.submit(activity, 'print(8)');
+    assert.equal(maximumWindowPolls, 33, '30-second policy must include a queue allowance before the bounded deadline');
+    assert.equal(maximumWindowResult.status, 'accepted');
+
+    const invalidPolicy = createHarness();
+    let invalidPolicyPolls = 0;
+    invalidPolicy.context.setTimeout = callback => { callback(); return 1; };
+    invalidPolicy.context.AstraApiClient.request = async (url) => {
+        if (url === '/api/code-problems/by-activity') return openProblem({ wall_time_ms: '30000' });
+        if (url === '/api/code-problems/23/submissions') return submission('queued');
+        invalidPolicyPolls++;
+        return submission('queued');
+    };
+    const invalidPolicyResult = await invalidPolicy.adapter.submit(activity, 'print(9)');
+    assert.equal(invalidPolicyPolls, 5, 'malformed policy values must fall back to the bounded minimum');
+    assert.equal(invalidPolicyResult.can_retry, true);
+
+    const refresh = createHarness();
+    refresh.context.setTimeout = callback => { callback(); return 1; };
+    refresh.context.AstraApiClient.request = async (url) => {
+        assert.equal(url, '/api/code-submissions/48');
+        return submission('accepted');
+    };
+    const refreshed = await refresh.adapter.refresh(activity, { submission_id: 48, problem_id: 23 }, {});
+    assert.equal(refreshed.status, 'accepted', 'budget-exhausted results must support a direct authoritative re-query');
+
+    assert.equal(adapter.contract.poll, 'GET /api/code-submissions/{id} while queued or running; 5–35 second bounded window with 1 second cadence');
 
     process.stdout.write('codevis-submission-contract: ok\n');
 }

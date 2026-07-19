@@ -85,7 +85,20 @@ async function main() {
     assert.match(source, /AstraCodeSpaceStudentContext = Object\.freeze/, 'Code Space must own the formal submission context adapter');
     assert.match(index, /id="cv-class-select"/, 'multi-class selection must be present in the Code Space navbar');
     assert.ok(mainSource.indexOf('await window.CvStudentContext.start()') < mainSource.indexOf('CvRouter.init()'), 'first route rendering must wait for context bootstrap');
-    assert.match(challengeSource, /try \{\s*response = await adapter\.submit[\s\S]*?\} catch/, 'unexpected formal-submit errors must resolve pending UI state');
+    const formalSubmitStart = challengeSource.indexOf('const formalSubmit = async () => {');
+    const formalSubmitEnd = challengeSource.indexOf("root.querySelector('#challenge-run')", formalSubmitStart);
+    assert.ok(formalSubmitStart >= 0 && formalSubmitEnd > formalSubmitStart, 'challenge must keep a bounded formal-submit handler');
+    const formalSubmitSource = challengeSource.slice(formalSubmitStart, formalSubmitEnd);
+    const tryStart = formalSubmitSource.indexOf('try {');
+    const catchStart = formalSubmitSource.indexOf('} catch (_)', tryStart);
+    assert.ok(tryStart >= 0 && catchStart > tryStart, 'formal submission must contain one recoverable request branch');
+    const requestBranch = formalSubmitSource.slice(tryStart, catchStart);
+    assert.match(requestBranch, /adapter\.refresh\(activity, previous/, 'retryable pending submissions must refresh inside the recoverable branch');
+    assert.match(requestBranch, /adapter\.submit\(activity, sourceCode/, 'new formal submissions must submit inside the recoverable branch');
+    const catchBranch = formalSubmitSource.slice(catchStart, formalSubmitSource.indexOf('if (generation !== challenge.submissionGeneration)', catchStart));
+    assert.match(catchBranch, /response = \{ ok: false/, 'unexpected refresh or submit errors must produce an unconfirmed result');
+    assert.match(formalSubmitSource, /challenge\.submissions\[activity\.activity_key\] = response;\s*render\(\);/,
+        'every recovered formal-submit result must replace pending UI state and re-render');
 
     const single = createHarness(standardRoutes([{ id: 7, name: '一班' }]));
     assert.equal(await single.context.CvStudentContext.start(), true);

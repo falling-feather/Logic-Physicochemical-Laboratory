@@ -23,6 +23,12 @@
     ]);
     const enterableCourseStates = new Set(['available', 'completed']);
     const languagePattern = /^(javascript|python|c|cpp)$/;
+    const pendingStatuses = new Set(['queued', 'running']);
+    const submissionPollMinWindowMs = 5000;
+    const submissionPollMaxWindowMs = 35000;
+    const submissionPollQueueAllowanceMs = 3000;
+    const submissionPollIntervalMs = 1000;
+    const submissionPollMaxAttempts = 36;
 
     function unavailable(reason, code) {
         return { available: false, reason, code: code || 'unavailable' };
@@ -150,6 +156,91 @@
         return unavailable('无法连接判题服务，未提交成功。', 'network');
     }
 
+    function submissionResult(submission, canRetry) {
+        return {
+            ok: true,
+            status: submission.status,
+            reason: resultMessage(submission.status) + (canRetry ? ' 本页查询窗口已结束；你可以再次查询最新权威状态。' : ''),
+            submission_id: submission.id,
+            problem_id: submission.problem_id,
+            can_retry: canRetry === true,
+            idempotent_replay: submission.idempotent_replay === true
+        };
+    }
+
+    function pollPlan(problem) {
+        const rawWallTimeMs = problem && problem.active_version && problem.active_version.resource_policy &&
+            problem.active_version.resource_policy.wall_time_ms;
+        const wallTimeMs = Number.isSafeInteger(rawWallTimeMs) && rawWallTimeMs > 0 ? rawWallTimeMs : 0;
+        const requestedWindowMs = wallTimeMs ? wallTimeMs + submissionPollQueueAllowanceMs : submissionPollMinWindowMs;
+        const windowMs = Math.max(submissionPollMinWindowMs, Math.min(submissionPollMaxWindowMs, requestedWindowMs));
+        return {
+            windowMs,
+            maxAttempts: Math.min(submissionPollMaxAttempts, Math.max(1, Math.ceil(windowMs / submissionPollIntervalMs)))
+        };
+    }
+
+    function waitForPoll(signal, delayMs) {
+        if (signal && signal.aborted) return Promise.reject({ code: 'cancelled' });
+        return new Promise((resolve, reject) => {
+            let timer = null;
+            const onAbort = () => {
+                if (timer !== null) global.clearTimeout(timer);
+                if (signal) signal.removeEventListener('abort', onAbort);
+                reject({ code: 'cancelled' });
+            };
+            timer = global.setTimeout(() => {
+                if (signal) signal.removeEventListener('abort', onAbort);
+                resolve();
+            }, delayMs);
+            if (signal) signal.addEventListener('abort', onAbort, { once: true });
+        });
+    }
+
+    async function pollSubmission(api, submission, problem, context, activity, signal) {
+        let current = submission;
+        let attempts = 0;
+        const plan = pollPlan(problem);
+        const deadline = Date.now() + plan.windowMs;
+        while (pendingStatuses.has(current.status) && attempts < plan.maxAttempts && Date.now() < deadline) {
+            attempts++;
+            await waitForPoll(signal, Math.min(submissionPollIntervalMs, Math.max(1, deadline - Date.now())));
+            const refreshed = await api.request('/api/code-submissions/' + encodeURIComponent(String(current.id)), {
+                method: 'GET',
+                dispatchAuthRequired: false,
+                signal
+            });
+            if (!validSubmission(refreshed, problem, context, activity)) {
+                return { ok: false, ...unavailable('提交结果无法确认，未显示为成功。', 'submission_invalid') };
+            }
+            current = refreshed;
+        }
+        return submissionResult(current, pendingStatuses.has(current.status));
+    }
+
+    async function refresh(activity, record, options) {
+        const ready = availability(activity);
+        if (!ready.available) return { ok: false, ...ready };
+        if (!record || !positiveInteger(record.submission_id) || !positiveInteger(record.problem_id)) {
+            return { ok: false, ...unavailable('提交结果无法确认，未显示为成功。', 'submission_invalid') };
+        }
+        const api = global.AstraApiClient;
+        const problem = { id: record.problem_id };
+        try {
+            const submission = await api.request('/api/code-submissions/' + encodeURIComponent(String(record.submission_id)), {
+                method: 'GET',
+                dispatchAuthRequired: false,
+                signal: options && options.signal
+            });
+            if (!validSubmission(submission, problem, ready.context, activity)) {
+                return { ok: false, ...unavailable('提交结果无法确认，未显示为成功。', 'submission_invalid') };
+            }
+            return await pollSubmission(api, submission, problem, ready.context, activity, options && options.signal);
+        } catch (error) {
+            return { ok: false, ...requestFailure(error) };
+        }
+    }
+
     async function submit(activity, sourceCode, options) {
         const ready = availability(activity);
         if (!ready.available) return { ok: false, ...ready };
@@ -185,13 +276,7 @@
             if (!validSubmission(submission, problem, ready.context, activity)) {
                 return { ok: false, ...unavailable('提交结果无法确认，未显示为成功。', 'submission_invalid') };
             }
-            return {
-                ok: true,
-                status: submission.status,
-                reason: resultMessage(submission.status),
-                submission_id: submission.id,
-                idempotent_replay: submission.idempotent_replay === true
-            };
+            return await pollSubmission(api, submission, problem, ready.context, activity, options && options.signal);
         } catch (error) {
             return { ok: false, ...requestFailure(error) };
         }
@@ -203,10 +288,12 @@
             context_result: '{ authenticated: true, role: "student", class_id: positive integer, course_id: positive integer }',
             discovery: 'GET /api/code-problems/by-activity?course_id={course_id}&activity_key={activity_key}&class_id={class_id}',
             submit: 'POST /api/code-problems/{id}/submissions',
+            poll: 'GET /api/code-submissions/{id} while queued or running; 5–35 second bounded window with 1 second cadence',
             statuses: Array.from(submissionStatuses)
         }),
         availability,
         submit,
+        refresh,
         resultMessage
     });
 })(window);
