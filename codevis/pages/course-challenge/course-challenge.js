@@ -64,6 +64,17 @@
         return state.available ? '正式提交代码' : '暂不能正式提交';
     }
 
+    function restoreResultFocus(intent, generation) {
+        if (intent === 'run' && generation !== challenge.runGeneration) return;
+        if (intent === 'submit' && generation !== challenge.submissionGeneration) return;
+        const root = document.getElementById('course-challenge-root');
+        if (!root) return;
+        const target = intent === 'run'
+            ? root.querySelector('#challenge-repair')
+            : root.querySelector('#challenge-submit:not([disabled])') || root.querySelector('#challenge-submission-status');
+        if (target && typeof target.focus === 'function') target.focus();
+    }
+
     function render() {
         const root = document.getElementById('course-challenge-root');
         const manifest = global.CvCourseManifest;
@@ -105,7 +116,7 @@
             '<div class="challenge-layout"><section class="challenge-editor"><label for="challenge-prediction">你的预测</label><input id="challenge-prediction" maxlength="180" value="' + esc(prediction) + '" placeholder="先写下你的判断，不会作为正式记录保存。" /><label for="challenge-code">可编辑代码</label><textarea id="challenge-code" spellcheck="false" aria-label="可编辑代码">' + esc(draft) + '</textarea><p class="challenge-public">' + esc(template.public_check) + '</p><p class="challenge-repair-hint">修正线索：' + esc(template.repair_hint) + '</p><button class="cv-btn cv-btn--primary" type="button" id="challenge-run">运行并追踪</button></section>' +
             '<section class="challenge-trace" aria-live="polite"><div class="challenge-panel-title">运行 / 追踪</div>' + traceView(result) + '<button class="cv-btn" type="button" id="challenge-repair">修改后再次运行</button></section></div>' +
             observation +
-            '<section class="challenge-checks"><div><p>浏览器预检</p><strong class="' + (result ? (precheck ? 'is-pass' : 'is-warn') : '') + '">' + (result ? (precheck ? '样例通过 · 仅用于学习反馈，不是正式判题' : '样例尚未通过 · 仅用于学习反馈，不是正式判题') : '请先运行公开样例 · 仅用于学习反馈，不是正式判题') + '</strong></div><div><p>正式提交</p><strong id="challenge-submission-status" class="' + formalStatusClass(submission) + '" aria-live="polite">' + esc(formalStatusCopy(submission, submitState)) + '</strong><button class="cv-btn" type="button" id="challenge-submit"' + (formalDisabled ? ' disabled aria-disabled="true"' : '') + '>' + formalButtonCopy(submission, submitState) + '</button></div></section>' +
+            '<section class="challenge-checks"><div><p>浏览器预检</p><strong class="' + (result ? (precheck ? 'is-pass' : 'is-warn') : '') + '">' + (result ? (precheck ? '样例通过 · 仅用于学习反馈，不是正式判题' : '样例尚未通过 · 仅用于学习反馈，不是正式判题') : '请先运行公开样例 · 仅用于学习反馈，不是正式判题') + '</strong></div><div><p>正式提交</p><strong id="challenge-submission-status" class="' + formalStatusClass(submission) + '" aria-live="polite" tabindex="-1">' + esc(formalStatusCopy(submission, submitState)) + '</strong><button class="cv-btn" type="button" id="challenge-submit"' + (formalDisabled ? ' disabled aria-disabled="true"' : '') + '>' + formalButtonCopy(submission, submitState) + '</button></div></section>' +
             '</div>';
 
         const code = root.querySelector('#challenge-code');
@@ -122,6 +133,7 @@
             challenge.result = { activity_key: activity.activity_key, value };
             challenge.repairingKey = null;
             render();
+            restoreResultFocus('run', runGeneration);
         };
         const formalSubmit = async () => {
             const adapter = global.CvSubmissionAdapter;
@@ -145,6 +157,7 @@
             challenge.submissionAbort = null;
             challenge.submissions[activity.activity_key] = response;
             render();
+            restoreResultFocus('submit', generation);
         };
         root.querySelector('#challenge-run').addEventListener('click', run);
         const submitButton = root.querySelector('#challenge-submit');
