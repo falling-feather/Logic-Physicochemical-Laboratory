@@ -37,6 +37,16 @@
             prohibitedClaims: ['已掌握课程', '浏览即完成']
         }),
         define({
+            key: 'last-learning-position',
+            label: '账号级上次学习位置',
+            roles: ['student', 'teacher', 'admin'],
+            status: 'planned',
+            route: null,
+            evidenceSource: 'BE-006 账号级续学投影尚未交付',
+            allowedClaim: '当前仅为规划能力，不提供继续上次学习入口',
+            prohibitedClaims: ['继续上次学习', '已支持跨设备续学', '本地访问记录即权威位置']
+        }),
+        define({
             key: 'course-release-plan',
             label: '班级课程发布节奏',
             roles: ['student', 'teacher', 'admin'],

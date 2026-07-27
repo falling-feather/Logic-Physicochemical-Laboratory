@@ -27,11 +27,26 @@ function walk(directory, predicate = () => true) {
 
 function normalizedModelImportBlocks(source) {
   const blocks = [];
-  for (const match of source.matchAll(/from\s+app\.models\s+import\s*\(([\s\S]*?)\)/g)) {
+  for (const match of source.matchAll(/from\s+app\.models(?:\.[A-Za-z_][A-Za-z0-9_]*)*\s+import\s*\(([\s\S]*?)\)/g)) {
     blocks.push(match[0].replace(/\s+/g, ' ').trim());
   }
-  for (const match of source.matchAll(/^from\s+app\.models\s+import\s+([^\r\n]+)/gm)) {
+  for (const match of source.matchAll(/from\s+\.{2,}models(?:\.[A-Za-z_][A-Za-z0-9_]*)*\s+import\s*\(([\s\S]*?)\)/g)) {
+    blocks.push(match[0].replace(/\s+/g, ' ').trim());
+  }
+  for (const match of source.matchAll(/^from\s+app\.models(?:\.[A-Za-z_][A-Za-z0-9_]*)*\s+import\s+([^\r\n]+)/gm)) {
     if (!match[0].includes('(')) blocks.push(match[0].replace(/\s+/g, ' ').trim());
+  }
+  for (const match of source.matchAll(/^from\s+\.{2,}models(?:\.[A-Za-z_][A-Za-z0-9_]*)*\s+import\s+([^\r\n]+)/gm)) {
+    if (!match[0].includes('(')) blocks.push(match[0].replace(/\s+/g, ' ').trim());
+  }
+  for (const match of source.matchAll(/^import\s+app\.models(?:\.[A-Za-z_][A-Za-z0-9_]*)*(?:\s+as\s+[A-Za-z_][A-Za-z0-9_]*)?[^\r\n]*$/gm)) {
+    blocks.push(match[0].replace(/\s+/g, ' ').trim());
+  }
+  for (const match of source.matchAll(/^from\s+app\s+import\s+([^\r\n]*\bmodels\b[^\r\n]*)$/gm)) {
+    blocks.push(match[0].replace(/\s+/g, ' ').trim());
+  }
+  for (const match of source.matchAll(/^from\s+\.{2,}\s+import\s+([^\r\n]*\bmodels\b[^\r\n]*)$/gm)) {
+    blocks.push(match[0].replace(/\s+/g, ' ').trim());
   }
   return blocks;
 }
@@ -48,19 +63,26 @@ function endpointModelImportIsAllowed(relativePath, source) {
 }
 
 function forbiddenBackendImports(relativePath, source) {
-  const forbiddenImport = relativePath.startsWith('backend/app/api/endpoints/')
-    ? /^(?:from|import)\s+app\.api\.endpoints(?:\.|\s|$)/
+  const forbiddenImports = relativePath.startsWith('backend/app/api/endpoints/')
+    ? [
+      /^(?:from|import)\s+app\.api\.endpoints(?:\.|\s|$)/,
+      /^from\s+\.(?:\s+import|[A-Za-z_][A-Za-z0-9_.]*\s+import)/,
+    ]
     : relativePath.startsWith('backend/app/models/')
       || relativePath.startsWith('backend/app/schemas/')
       || relativePath.startsWith('backend/app/services/')
-      ? /^(?:from|import)\s+app\.api(?:\.|\s|$)/
+      ? [
+        /^(?:from|import)\s+app\.api(?:\.|\s|$)/,
+        /^from\s+\.{2,}api(?:\.|\s|$)/,
+        /^from\s+\.{2,}\s+import\s+[^\r\n]*\bapi\b/,
+      ]
       : null;
-  if (!forbiddenImport) return [];
+  if (!forbiddenImports) return [];
   return source
     .replace(/\r\n?/g, '\n')
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => forbiddenImport.test(line));
+    .filter((line) => forbiddenImports.some((pattern) => pattern.test(line)));
 }
 
 function backendImportsAreAllowed(relativePath, source) {
@@ -79,8 +101,11 @@ function ownedGlobalDefinitions(relativePath, source) {
   const definitions = [];
   for (const [symbol, owner] of Object.entries(manifest.frontend_single_owner_globals)) {
     const assignmentPatterns = [
-      new RegExp(`(?:global|window)\\.${symbol}\\s*=`),
-      new RegExp(`Object\\.defineProperty\\((?:global|window),\\s*['"]${symbol}['"]`),
+      new RegExp(`(?:globalThis|global|window)(?:\\.${symbol}|\\[['"]${symbol}['"]\\])\\s*(?:=|\\|\\|=|&&=|\\?\\?=)`),
+      new RegExp(`Object\\.defineProperty\\((?:globalThis|global|window),\\s*['"]${symbol}['"]`),
+      new RegExp(`Object\\.defineProperties\\((?:globalThis|global|window),\\s*\\{[\\s\\S]{0,1000}?\\b${symbol}\\s*:`),
+      new RegExp(`Object\\.assign\\((?:globalThis|global|window),\\s*\\{[\\s\\S]{0,1000}?(?:\\b${symbol}\\b\\s*(?::|[,}])|['"]${symbol}['"]\\s*:)`),
+      new RegExp(`Reflect\\.(?:set|defineProperty)\\((?:globalThis|global|window),\\s*['"]${symbol}['"]`),
     ];
     if (assignmentPatterns.some((pattern) => pattern.test(source))) {
       definitions.push({ symbol, owner, valid: relativePath === owner });
@@ -133,7 +158,7 @@ for (const file of walk(path.join(root, 'backend/app/models'), (candidate) => ca
   const source = fs.readFileSync(file, 'utf8');
   assert.doesNotMatch(
     source,
-    /^(?:from|import)\s+app\.(?:api|schemas|services)(?:\.|\s|$)/m,
+    /^(?:(?:from|import)\s+app\.(?:api|schemas|services)(?:\.|\s|$)|from\s+\.\.(?:api|schemas|services)(?:\.|\s|$)|from\s+\.\.\s+import\s+[^\r\n]*\b(?:api|schemas|services)\b)/m,
     `${normalizePath(file)} must remain a persistence-layer module`,
   );
 }
@@ -141,7 +166,7 @@ for (const file of walk(path.join(root, 'backend/app/schemas'), (candidate) => c
   const source = fs.readFileSync(file, 'utf8');
   assert.doesNotMatch(
     source,
-    /^(?:from|import)\s+app\.(?:api|models|services)(?:\.|\s|$)/m,
+    /^(?:(?:from|import)\s+app\.(?:api|models|services)(?:\.|\s|$)|from\s+\.\.(?:api|models|services)(?:\.|\s|$)|from\s+\.\.\s+import\s+[^\r\n]*\b(?:api|models|services)\b)/m,
     `${normalizePath(file)} must remain a transport DTO module`,
   );
 }
@@ -149,7 +174,8 @@ for (const file of walk(path.join(root, 'backend/app/schemas'), (candidate) => c
 const frontendRoots = ['shared', 'pages', 'codevis']
   .map((directory) => path.join(root, directory))
   .filter((directory) => fs.existsSync(directory));
-const frontendFiles = frontendRoots.flatMap((directory) => walk(directory, (file) => file.endsWith('.js')));
+const isFrontendScript = (file) => /\.(?:[cm]?js)$/i.test(file);
+const frontendFiles = frontendRoots.flatMap((directory) => walk(directory, isFrontendScript));
 for (const file of frontendFiles) {
   const relativePath = normalizePath(file);
   const source = fs.readFileSync(file, 'utf8');
@@ -209,11 +235,18 @@ assert.ok(Object.isFrozen(capabilities));
 assert.deepEqual(Array.from(capabilities.statuses), ['available', 'partial', 'planned', 'unavailable']);
 const records = Array.from(capabilities.all());
 assert.equal(new Set(records.map((record) => record.key)).size, records.length, 'capability keys must be unique');
+assert.deepEqual(
+  Object.fromEntries(records.map((record) => [record.key, record.status])),
+  manifest.product_capability_statuses,
+  'the capability registry must exactly implement the frozen PM-009 key/status ledger',
+);
 assert.equal(capabilities.get('formal-oj').status, 'unavailable');
 assert.equal(capabilities.get('authoritative-learning-evidence').status, 'partial');
 assert.equal(capabilities.get('browser-precheck').status, 'available');
+assert.equal(capabilities.get('last-learning-position').status, 'planned');
 assert.equal(capabilities.canPresentAsPrimary('browser-precheck'), true);
 assert.equal(capabilities.canPresentAsPrimary('formal-oj'), false);
+assert.equal(capabilities.canPresentAsPrimary('last-learning-position'), false);
 for (const record of records) {
   assert.ok(Object.isFrozen(record), `${record.key} must be immutable`);
   assert.ok(capabilities.statuses.includes(record.status), `${record.key} has an invalid status`);
@@ -233,12 +266,36 @@ assert.equal(
   'a new endpoint -> ORM dependency must be rejected',
 );
 assert.equal(
+  endpointModelImportIsAllowed(
+    'backend/app/api/endpoints/architecture_negative_fixture.py',
+    'from app.models.learning_evidence import LearningEvidence\n',
+  ),
+  false,
+  'a new endpoint -> ORM submodule dependency must be rejected',
+);
+assert.equal(
+  endpointModelImportIsAllowed(
+    'backend/app/api/endpoints/architecture_negative_fixture.py',
+    'from ...models.learning_evidence import LearningEvidence\n',
+  ),
+  false,
+  'a new endpoint -> ORM relative submodule dependency must be rejected',
+);
+assert.equal(
   backendImportsAreAllowed(
     'backend/app/services/architecture_negative_fixture.py',
     'from app.api.endpoints import learning_evidence\n',
   ),
   false,
   'a service -> HTTP adapter dependency must be rejected',
+);
+assert.equal(
+  backendImportsAreAllowed(
+    'backend/app/services/architecture_negative_fixture.py',
+    'from ..api.endpoints import learning_evidence\n',
+  ),
+  false,
+  'a relative service -> HTTP adapter dependency must be rejected',
 );
 assert.equal(
   backendImportsAreAllowed(
@@ -249,6 +306,14 @@ assert.equal(
   'an endpoint -> peer endpoint dependency must be rejected',
 );
 assert.equal(
+  backendImportsAreAllowed(
+    'backend/app/api/endpoints/architecture_negative_fixture.py',
+    'from .progress import read_progress\n',
+  ),
+  false,
+  'a relative endpoint -> peer endpoint dependency must be rejected',
+);
+assert.equal(
   learningEvidenceApiIsAllowed(
     'pages/planets/architecture-negative-fixture.js',
     "fetch('/api/learning-evidence')",
@@ -256,10 +321,18 @@ assert.equal(
   false,
   'a page-owned learning-evidence request must be rejected',
 );
+assert.equal(
+  learningEvidenceApiIsAllowed(
+    'pages/planets/architecture-negative-fixture.mjs',
+    "fetch('/api/learning-evidence')",
+  ),
+  false,
+  'an ES module page-owned learning-evidence request must be rejected',
+);
 assert.deepEqual(
   ownedGlobalDefinitions(
     'pages/planets/architecture-negative-fixture.js',
-    'window.AstraLearningEvidenceClient = {};',
+    'globalThis.AstraLearningEvidenceClient = {};',
   ),
   [{
     symbol: 'AstraLearningEvidenceClient',
@@ -268,6 +341,20 @@ assert.deepEqual(
   }],
   'a duplicate global state-machine owner must be detectable',
 );
+assert.deepEqual(
+  ownedGlobalDefinitions(
+    'pages/planets/architecture-negative-fixture.mjs',
+    "Object.assign(globalThis, { AstraLearningEvidenceClient: {} });",
+  ),
+  [{
+    symbol: 'AstraLearningEvidenceClient',
+    owner: 'shared/js/learning-evidence-client.js',
+    valid: false,
+  }],
+  'an indirect duplicate global state-machine owner must be detectable',
+);
+assert.equal(isFrontendScript('pages/planets/architecture-negative-fixture.mjs'), true);
+assert.equal(isFrontendScript('pages/planets/architecture-negative-fixture.cjs'), true);
 assert.deepEqual(
   resourceVersionDeclarations(
     'pages/planets/architecture-negative-fixture.js',
