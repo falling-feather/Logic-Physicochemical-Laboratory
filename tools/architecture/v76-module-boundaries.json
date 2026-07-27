@@ -1,0 +1,100 @@
+{
+  "schema_version": "astra-architecture-boundaries-v1",
+  "baseline_revision": "beaa36b911671f580d03a9c01a6f72a44a0e3444",
+  "legacy_line_ceilings": {
+    "index.html": 3758,
+    "shared/js/main.js": 489,
+    "shared/js/router.js": 1116,
+    "pages/student/student.js": 1807,
+    "pages/teacher/teacher.js": 2883,
+    "pages/admin/admin.js": 2485,
+    "backend/app/main.py": 151,
+    "backend/app/models/course.py": 305,
+    "backend/app/schemas/course.py": 438,
+    "backend/app/api/endpoints/learning_events.py": 352,
+    "backend/app/api/endpoints/progress.py": 306,
+    "backend/app/api/endpoints/knowledge.py": 1575,
+    "backend/app/api/endpoints/courses.py": 1212,
+    "backend/app/services/course_release_plans.py": 542
+  },
+  "legacy_endpoint_model_import_hashes": {
+    "backend/app/api/endpoints/admin_alerts.py": "cdf5a90e777d0798f7c53f4cb7c5062dd313c29eadc0348c125c1ad73e3532e3",
+    "backend/app/api/endpoints/admin_audit.py": "ef30560d07dbc9252f58e0d5b618923530fb5a6061d148116369210b4ee05010",
+    "backend/app/api/endpoints/admin_background_tasks.py": "f5ef0bbe8553f33ed8ac82cd1436d2a42aaffcd64ea84d618e7c65bedd882179",
+    "backend/app/api/endpoints/admin_content.py": "c5a83ec0dcda7b6f46ab6e1bd3183d5af336aea4782aca986a9cf6edcaa60a4d",
+    "backend/app/api/endpoints/admin_governance.py": "3ab91a4d3b037664135c0cef18c0402afa7db469ed9af075110f3c0649b06566",
+    "backend/app/api/endpoints/admin_organizations.py": "bf7986bfad5b8fb40b9c2f547296ffdc35f3b78ead883167c18c5e57cf13240a",
+    "backend/app/api/endpoints/admin_overview.py": "2fb0e414749b2bbc9b565cca8cdb03ca49fd4bd7b9050b041a9e0522633b0ea4",
+    "backend/app/api/endpoints/admin_presenters.py": "7010bbd043ea830ac8d41171c226cd41c75800b5890274746c5a8a6ec7e2c7e9",
+    "backend/app/api/endpoints/admin_snapshot_tasks.py": "e4f61df14e91c2d1a31fcc4e354cb17c40b9722b75b9dd47fb10d226f7fd6be1",
+    "backend/app/api/endpoints/admin_users.py": "3d8c346470fbf239739242cc769ef5c733f3322163bbdc0919af1a9ea40e54fa",
+    "backend/app/api/endpoints/assignment_policies.py": "5e5affb3eb6162adbac51a59eab617badcbffdfd5758bef19b50bf114b314a08",
+    "backend/app/api/endpoints/auth.py": "fb8143b256fc3c51f74733a3135b17a7fd0499106b16d6b345a53989b72ebb22",
+    "backend/app/api/endpoints/classes.py": "2649af0616a737f20c2bcb172044424cb6cc7e0a26f950096b0e51a7e93a2064",
+    "backend/app/api/endpoints/code_judge.py": "019ff22f5f1bac16b0a4cfa9ddfcc23412a451eb504e0ace5dd8000dba79aaac",
+    "backend/app/api/endpoints/content.py": "6424ae84a9042b61b9a3662ffb2dcef1053656c5ad7c4ddee44c02da052c9c57",
+    "backend/app/api/endpoints/courses.py": "b53aa23309cdf4b05f99e6f1af12a6e2d2448d30c4acb805359a6964b146895d",
+    "backend/app/api/endpoints/knowledge.py": "1e2fe785feaea833b93f7d3c396b0d9ed2b4cc2d63a673892062edf800eedfe3",
+    "backend/app/api/endpoints/learning_events.py": "21eaeef559c6246d1f3af4d6c2a20fa6f4bea1d588015f94db857e9cc1d95cbf",
+    "backend/app/api/endpoints/points.py": "d5fe80444bf7bc6f10cca54ba59bff1bffe5a2c47e1e61d4023be4a752490b5a",
+    "backend/app/api/endpoints/progress.py": "73102e15e6c15fde8200fb803297fdaf36e6a7cc0a4455306c7bc9d15ea1fb6d",
+    "backend/app/api/endpoints/render.py": "f42b886ad89364bea1561cc0b8b0cc65c82cf1449738081bc85b2ab9593ee2d3",
+    "backend/app/api/endpoints/schools.py": "1614a7c92c050b8a392f7a010a61e38552f44cbf259465adb0476ee1e32a0037",
+    "backend/app/api/endpoints/submissions.py": "45b541e5617e7f8d07fbc78eb3048318aad55fcd54396c7a59b35f00417dfa2b",
+    "backend/app/api/endpoints/users.py": "f2c53c158557f437b852c6ff82264db56f31e0aa4d41ff323ce45c8d2e8788e6"
+  },
+  "legacy_backend_upward_imports": {
+    "backend/app/services/knowledge_snapshot_runs.py": [
+      "from app.api.endpoints import knowledge as knowledge_endpoint"
+    ],
+    "backend/app/api/endpoints/admin.py": [
+      "from app.api.endpoints import ("
+    ],
+    "backend/app/api/endpoints/admin_alerts.py": [
+      "from app.api.endpoints.admin_presenters import admin_alert_outbox_entry_read"
+    ],
+    "backend/app/api/endpoints/admin_content.py": [
+      "from app.api.endpoints.admin_presenters import admin_alert_outbox_write_response"
+    ],
+    "backend/app/api/endpoints/admin_snapshot_tasks.py": [
+      "from app.api.endpoints.admin_presenters import admin_alert_outbox_write_response"
+    ]
+  },
+  "legacy_resource_version_declarations": [
+    "pages/admin/admin.js:ADMIN_ASSET_VERSION",
+    "pages/planets/planets.js:PLANETS_ASSET_VERSION",
+    "pages/student/student.js:STUDENT_ASSET_VERSION",
+    "pages/teacher/teacher.js:TEACHER_ASSET_VERSION",
+    "shared/js/main.js:BASE_STYLE_ASSET_VERSION",
+    "shared/js/main.js:ENGLAB_ASSET_VERSION",
+    "shared/js/main.js:PAGE_REGISTRY_ASSET_VERSION",
+    "shared/js/main.js:ROLE_LANDING_ASSET_VERSION",
+    "shared/js/main.js:SESSION_STYLE_ASSET_VERSION",
+    "shared/js/main.js:SHELL_RUNTIME_ASSET_VERSION",
+    "shared/js/page-registry.js:ABOUT_RESOURCE_VERSION",
+    "shared/js/page-registry.js:ADMIN_RESOURCE_VERSION",
+    "shared/js/page-registry.js:FUTURE_RESOURCE_VERSION",
+    "shared/js/page-registry.js:PLANETS_RESOURCE_VERSION",
+    "shared/js/page-registry.js:ROLE_RESOURCE_VERSION",
+    "shared/js/page-registry.js:TEACHER_RESOURCE_VERSION",
+    "shared/js/router.js:_galaxyCacheVersion",
+    "sw.js:CACHE_NAME"
+  ],
+  "frontend_single_owner_globals": {
+    "AstraRoleHomeClient": "shared/js/role-home-client.js",
+    "AstraLearningEvidenceClient": "shared/js/learning-evidence-client.js",
+    "AstraLearningEvidenceQueue": "shared/js/learning-evidence-queue.js",
+    "AstraProductCapabilities": "shared/js/product-capabilities.js"
+  },
+  "learning_evidence_api_owners": [
+    "shared/js/learning-evidence-client.js"
+  ],
+  "learning_evidence_api_fragments": [
+    "/api/learning-events",
+    "/api/learning-evidence",
+    "/api/activity-evidence"
+  ],
+  "legacy_learning_progress_call_owners": [
+    "shared/js/module-selector.js"
+  ]
+}
