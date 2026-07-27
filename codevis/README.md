@@ -82,7 +82,7 @@ powershell -ExecutionPolicy Bypass -File .\astra-local.ps1
 - 课程目录、独立子课和可执行挑战取代旧首页作为默认路径，首批 6 组/18 活动覆盖 JavaScript、Python、C、C++。
 - 新增 BE-004 发布状态 adapter、统一课程页脚、本地审计运行时清单和 C/C++ Worker 4.2 秒硬终止；移除学生页面的实现说明。
 
-### v6.1.0-alpha（迭代中 · `feature/v6.1`）
+### v6.1.0-alpha（历史阶段；实现已进入现行主线）
 - **alpha2** — 2026-05-26 — 优化代码空间子站交互与更新规划口径
 - **alpha1** — 2026-05-26 — 修复 CodeSpace 跳转与文档口径偏差（主站 → 子站入口校准）
 
